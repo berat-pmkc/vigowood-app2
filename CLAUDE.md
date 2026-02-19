@@ -238,10 +238,10 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] BOM'daki ASM referansları (DAG)
 - [x] İlişki testleri
 
-### KATMAN 5: DB Migration — İşlem Tabloları
-- [ ] cut_batches, cut_lines, clean, pack_events
-- [ ] stock_movements, yari_mamul_stok (234K satır)
-- [ ] hazir_eleman_akis, iade_giris, attendance, notifications
+### KATMAN 5: DB Migration — İşlem Tabloları ✅
+- [x] cut_batches, cut_lines, clean, pack_events
+- [x] stock_movements, yari_mamul_stok (234K satır)
+- [x] hazir_eleman_akis, iade_giris, attendance, notifications
 
 ### KATMAN 6: Admin — Ürün Yönetimi
 - [ ] Ürün listesi, arama, filtre

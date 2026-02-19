@@ -1,6 +1,6 @@
 // Will be auto-generated after all migrations with:
 // npx supabase gen types typescript --project-id <id> > src/lib/supabase/types.ts
-// Manual types for Katman 1-4
+// Manual types for Katman 1-5
 
 export type UserRole =
   | "Yönetici"
@@ -283,6 +283,249 @@ export type Database = {
           kodu?: string | null;
           kritik_stok_products?: number;
         };
+        Relationships: [];
+      };
+      cut_batches: {
+        Row: {
+          cut_id: string;
+          tarih: string;
+          sku: string | null;
+          plaka_id: string | null;
+          makine_id: string | null;
+          adet: number;
+          operator_id: string | null;
+          plk_notu: string | null;
+          email: string | null;
+          created_at: string;
+        };
+        Insert: {
+          cut_id: string;
+          tarih: string;
+          sku?: string | null;
+          plaka_id?: string | null;
+          makine_id?: string | null;
+          adet?: number;
+          operator_id?: string | null;
+          plk_notu?: string | null;
+          email?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["cut_batches"]["Insert"]>;
+        Relationships: [];
+      };
+      cut_lines: {
+        Row: {
+          cut_line_id: string;
+          cut_id: string;
+          tarih: string;
+          part_id: string | null;
+          adet: number;
+          not_text: string | null;
+          renk: string | null;
+          email: string | null;
+          created_at: string;
+        };
+        Insert: {
+          cut_line_id: string;
+          cut_id: string;
+          tarih: string;
+          part_id?: string | null;
+          adet?: number;
+          not_text?: string | null;
+          renk?: string | null;
+          email?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["cut_lines"]["Insert"]>;
+        Relationships: [];
+      };
+      clean: {
+        Row: {
+          cutline_id: string;
+          clean_batch_id: string;
+          start_time: string | null;
+          end_time: string | null;
+          status: string;
+          not_text: string | null;
+          email: string | null;
+          created_at: string;
+        };
+        Insert: {
+          cutline_id: string;
+          clean_batch_id: string;
+          start_time?: string | null;
+          end_time?: string | null;
+          status?: string;
+          not_text?: string | null;
+          email?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["clean"]["Insert"]>;
+        Relationships: [];
+      };
+      pack_events: {
+        Row: {
+          session_id: string;
+          email: string | null;
+          tarih: string | null;
+          sku: string | null;
+          personel: string | null;
+          start_time: string | null;
+          end_time: string | null;
+          qty: number;
+          not_text: string | null;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          session_id: string;
+          email?: string | null;
+          tarih?: string | null;
+          sku?: string | null;
+          personel?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          qty?: number;
+          not_text?: string | null;
+          status?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["pack_events"]["Insert"]>;
+        Relationships: [];
+      };
+      hazir_eleman_akis: {
+        Row: {
+          hakis_id: string;
+          tarih: string;
+          part_id: string | null;
+          qty: number;
+          operator: string | null;
+          created_at: string;
+        };
+        Insert: {
+          hakis_id: string;
+          tarih: string;
+          part_id?: string | null;
+          qty?: number;
+          operator?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["hazir_eleman_akis"]["Insert"]>;
+        Relationships: [];
+      };
+      iade_giris: {
+        Row: {
+          iade_id: string;
+          tarih: string | null;
+          sku: string | null;
+          qty: number;
+          durum: string | null;
+          created_at: string;
+        };
+        Insert: {
+          iade_id: string;
+          tarih?: string | null;
+          sku?: string | null;
+          qty?: number;
+          durum?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["iade_giris"]["Insert"]>;
+        Relationships: [];
+      };
+      attendance: {
+        Row: {
+          att_id: string;
+          tarih: string;
+          employee: string;
+          department: string | null;
+          start_time: string | null;
+          end_time: string | null;
+          not_text: string | null;
+          created_at: string;
+        };
+        Insert: {
+          att_id: string;
+          tarih: string;
+          employee: string;
+          department?: string | null;
+          start_time?: string | null;
+          end_time?: string | null;
+          not_text?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["attendance"]["Insert"]>;
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          notif_id: string;
+          title: string;
+          message: string | null;
+          target_user: string | null;
+          status: string;
+          created_by: string | null;
+          attachments: string | null;
+          created_at: string;
+        };
+        Insert: {
+          notif_id: string;
+          title: string;
+          message?: string | null;
+          target_user?: string | null;
+          status?: string;
+          created_by?: string | null;
+          attachments?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
+        Relationships: [];
+      };
+      stock_movements: {
+        Row: {
+          id: string;
+          mov_id: string | null;
+          tarih: string | null;
+          sku: string | null;
+          qty: number;
+          source: string | null;
+          source_row_id: string | null;
+          batch_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          mov_id?: string | null;
+          tarih?: string | null;
+          sku?: string | null;
+          qty?: number;
+          source?: string | null;
+          source_row_id?: string | null;
+          batch_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["stock_movements"]["Insert"]>;
+        Relationships: [];
+      };
+      yari_mamul_stok: {
+        Row: {
+          yms_id: string;
+          tarih: string | null;
+          part_id: string | null;
+          part_adi: string | null;
+          sku: string | null;
+          qty: number;
+          direction: string | null;
+          source: string | null;
+          source_id: string | null;
+          operator: string | null;
+          created_at: string;
+        };
+        Insert: {
+          yms_id: string;
+          tarih?: string | null;
+          part_id?: string | null;
+          part_adi?: string | null;
+          sku?: string | null;
+          qty?: number;
+          direction?: string | null;
+          source?: string | null;
+          source_id?: string | null;
+          operator?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["yari_mamul_stok"]["Insert"]>;
         Relationships: [];
       };
     };

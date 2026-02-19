@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 5: DB Migration — İşlem Tabloları** — Sırada
+**Katman 6: Admin — Ürün Yönetimi** — Sırada
 
 ---
 
@@ -80,16 +80,16 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 | plaka_parts | 392/406 | ✅ (14 atlandı — part_id Excel'de yok) |
 | assembly_steps | 522/523 | ✅ (1 duplicate) |
 | step_bom | 1651 | ✅ (427 DAG ref) |
-| cut_batches | 760 | ⏳ |
-| cut_lines | 1631 | ⏳ |
-| clean | 1589 | ⏳ |
-| pack_events | 717 | ⏳ |
-| stock_movements | 20752 | ⏳ |
-| yari_mamul_stok | 234141 | ⏳ |
-| hazir_eleman_akis | 106 | ⏳ |
-| iade_giris | 128 | ⏳ |
-| attendance | 2399 | ⏳ |
-| notifications | 2 | ⏳ |
+| cut_batches | 748 | ✅ |
+| cut_lines | 1575 | ✅ |
+| clean | 1515/1538 | ✅ (23 FK mismatch atlandı) |
+| pack_events | 712 | ✅ |
+| stock_movements | 20752 | ✅ (UUID PK, mixed date format) |
+| yari_mamul_stok | 234141 | ✅ (2 format: A normal, B shifted cols) |
+| hazir_eleman_akis | 105 | ✅ |
+| iade_giris | 128 | ✅ |
+| attendance | 1891 | ✅ |
+| notifications | 2 | ✅ |
 
 ---
 
@@ -144,6 +144,26 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 - AllParts decimal fix: hazir_eleman_aktif_stok ve yari_mamul_stok INTEGER→NUMERIC (004_fix_allparts_decimal.sql)
 - Products'ta negatif stok_aktif değerleri var (normal, iade/satış farkı)
 - PlakaParts 9 part_id Excel'de AllParts'ta yok: LS051-P12, LS051-P07, LS051-P10, MKOS-P01, LS011-P03, MKOS-P02-M, KOSC-P02, KOSM-P02, KOSA-P02
+- StockMovements mixed date format: M.D.YYYY (236 row) + D.M.YYYY (11357 row), smart detection ile çözüldü
+- YarıMamulStok 2 format: A (185207 normal DD/MM), B (48934 shifted cols, JS Date string)
+- YarıMamulStok MM/DD/YYYY (US format), DD/MM değil — smart detection eklendi
+- Clean 23 CutlineID cut_lines'ta yok — FK validated, atlandı
+- HazırElemanAkıs kolon adı: HAkısID (Turkish ı), HAkisID değil
+- CutBatches MakineID: BUYUK→BÜYÜK, KUCUK→KÜÇÜK mapping gerekli
+
+---
+
+### Katman 5 ✅ (2026-02-20)
+- Migration: 005_transaction_tables.sql — 10 tablo
+- Seed: seed-transaction-tables.ts (8 Excel) + seed-large-csv.ts (2 CSV)
+- CutBatches→CutLines→Clean FK zinciri (CASCADE)
+- Clean PK: cutline_id (1:1 with cut_lines), clean_batch_id ayrı kolon
+- stock_movements: UUID surrogate PK (MovID'de 2 duplicate var)
+- yari_mamul_stok: 234K satır, 2 format handling (Format A/B auto-detect)
+- StockMovements tarih: M.D.YYYY ve D.M.YYYY karışık — smart detection
+- PackEvents.Personel: virgülle ayrık VW### — TEXT olarak saklanıyor (ileride normalize)
+- Notifications.TargetUser: aynı pattern, TEXT
+- Attendance.Employee: isim bazlı, VW### değil — user mapping ileride yapılacak
 
 ---
 
