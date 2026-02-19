@@ -228,10 +228,10 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Rol bazlı menü filtreleme
 - [x] Responsive test
 
-### KATMAN 3: DB Migration — Temel Tablolar
-- [ ] products, users, kesim_makinesi, all_parts
-- [ ] Veri aktarımı (Excel/CSV → Supabase)
-- [ ] RLS policy'leri + database types
+### KATMAN 3: DB Migration — Temel Tablolar ✅
+- [x] products, users, kesim_makinesi, all_parts
+- [x] Veri aktarımı (Excel/CSV → Supabase)
+- [x] RLS policy'leri + database types
 
 ### KATMAN 4: DB Migration — İlişkili Tablolar
 - [ ] plakalar, plaka_parts, assembly_steps, step_bom

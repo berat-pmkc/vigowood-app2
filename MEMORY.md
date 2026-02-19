@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 3: DB Migration — Temel Tablolar** — Sırada
+**Katman 4: DB Migration — İlişkili Tablolar** — Sırada
 
 ---
 
@@ -117,12 +117,22 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 - Rol bazlı menü filtreleme: getFilteredNavGroups(role)
 - navigation.ts: Tüm menü yapısı ve roller merkezi config'de
 
+### Katman 3 ✅ (2026-02-20)
+- Migration: products (101 SKU, 10 kategori), all_parts (379, 4 tip), kesim_makinesi (3)
+- Seed script: Excel → Supabase (upsert, batch 100, duplicate dedup)
+- AllParts'ta 10 duplicate row var (5 PartID), seed'de first-occurrence alınır
+- Products'ta İlkSatısTarihi Excel serial date formatında — ISO'ya çevrilir
+- RLS: Authenticated read, Yönetici full CRUD
+- product_category ve part_type enum'ları eklendi
+- Geçici analiz dosyaları temizlendi (read-users.js vb.)
+
 ---
 
 ## BUGLAR VE ÇÖZÜMLER
 
-(Bulunan buglar ve çözümleri buraya yazılır)
+- AllParts duplicate PartID'ler: LS051-P09, LS051-P11, MKOS-P02, LS011-P04, LS051-P08 — seed'de ilk kayıt alınır
+- Products'ta negatif stok_aktif değerleri var (normal, iade/satış farkı)
 
 ---
 
-*Son güncelleme: 2026-02-18*
+*Son güncelleme: 2026-02-20*
