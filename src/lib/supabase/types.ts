@@ -1,6 +1,6 @@
 // Will be auto-generated after all migrations with:
 // npx supabase gen types typescript --project-id <id> > src/lib/supabase/types.ts
-// Manual types for Katman 1-3
+// Manual types for Katman 1-4
 
 export type UserRole =
   | "Yönetici"
@@ -170,6 +170,118 @@ export type Database = {
           makine_id?: string;
           tipi?: string;
           aciklama?: string | null;
+        };
+        Relationships: [];
+      };
+      plakalar: {
+        Row: {
+          plakalar_id: string;
+          plaka_id: string;
+          plaka_adi: string;
+          sku: string | null;
+          tipi: string | null;
+          renk: string | null;
+          makine_id: string;
+          std_kesim_suresi_dk: number | null;
+          created_at: string;
+        };
+        Insert: {
+          plakalar_id: string;
+          plaka_id: string;
+          plaka_adi: string;
+          sku?: string | null;
+          tipi?: string | null;
+          renk?: string | null;
+          makine_id: string;
+          std_kesim_suresi_dk?: number | null;
+        };
+        Update: {
+          plakalar_id?: string;
+          plaka_id?: string;
+          plaka_adi?: string;
+          sku?: string | null;
+          tipi?: string | null;
+          renk?: string | null;
+          makine_id?: string;
+          std_kesim_suresi_dk?: number | null;
+        };
+        Relationships: [];
+      };
+      plaka_parts: {
+        Row: {
+          ppart_id: string;
+          plaka_id: string;
+          part_id: string;
+          default_qty: number | null;
+          sku: string | null;
+          created_at: string;
+        };
+        Insert: {
+          ppart_id: string;
+          plaka_id: string;
+          part_id: string;
+          default_qty?: number | null;
+          sku?: string | null;
+        };
+        Update: {
+          ppart_id?: string;
+          plaka_id?: string;
+          part_id?: string;
+          default_qty?: number | null;
+          sku?: string | null;
+        };
+        Relationships: [];
+      };
+      assembly_steps: {
+        Row: {
+          step_id: string;
+          sku: string | null;
+          step_name: string | null;
+          seq_no: number | null;
+          is_final_step: boolean;
+          created_at: string;
+        };
+        Insert: {
+          step_id: string;
+          sku?: string | null;
+          step_name?: string | null;
+          seq_no?: number | null;
+          is_final_step?: boolean;
+        };
+        Update: {
+          step_id?: string;
+          sku?: string | null;
+          step_name?: string | null;
+          seq_no?: number | null;
+          is_final_step?: boolean;
+        };
+        Relationships: [];
+      };
+      step_bom: {
+        Row: {
+          step_bom_id: string;
+          step_id: string;
+          part_id: string;
+          qty_per: number;
+          kodu: string | null;
+          kritik_stok_products: number;
+          created_at: string;
+        };
+        Insert: {
+          step_bom_id: string;
+          step_id: string;
+          part_id: string;
+          qty_per?: number;
+          kodu?: string | null;
+          kritik_stok_products?: number;
+        };
+        Update: {
+          step_bom_id?: string;
+          step_id?: string;
+          part_id?: string;
+          qty_per?: number;
+          kodu?: string | null;
+          kritik_stok_products?: number;
         };
         Relationships: [];
       };

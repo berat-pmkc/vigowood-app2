@@ -233,10 +233,10 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Veri aktarımı (Excel/CSV → Supabase)
 - [x] RLS policy'leri + database types
 
-### KATMAN 4: DB Migration — İlişkili Tablolar
-- [ ] plakalar, plaka_parts, assembly_steps, step_bom
-- [ ] BOM'daki ASM referansları (DAG)
-- [ ] İlişki testleri
+### KATMAN 4: DB Migration — İlişkili Tablolar ✅
+- [x] plakalar, plaka_parts, assembly_steps, step_bom
+- [x] BOM'daki ASM referansları (DAG)
+- [x] İlişki testleri
 
 ### KATMAN 5: DB Migration — İşlem Tabloları
 - [ ] cut_batches, cut_lines, clean, pack_events

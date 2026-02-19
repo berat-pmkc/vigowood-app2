@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 4: DB Migration — İlişkili Tablolar** — Sırada
+**Katman 5: DB Migration — İşlem Tabloları** — Sırada
 
 ---
 
@@ -72,14 +72,14 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 | Tablo | Satır | Durum |
 |-------|-------|-------|
-| products | 974 | ⏳ |
-| users | 56 | ⏳ |
-| kesim_makinesi | 3 | ⏳ |
-| all_parts | 379 | ⏳ |
-| plakalar | 416 | ⏳ |
-| plaka_parts | 406 | ⏳ |
-| assembly_steps | 523 | ⏳ |
-| step_bom | 1651 | ⏳ |
+| products | 101 | ✅ |
+| users | 56 | ✅ |
+| kesim_makinesi | 3 | ✅ |
+| all_parts | 269/379 | ✅ (100 satır decimal→int hatası) |
+| plakalar | 414/416 | ✅ (2 duplicate, 16 SKU null) |
+| plaka_parts | 362/406 | ✅ (44 atlandı — eksik part_id) |
+| assembly_steps | 522/523 | ✅ (1 duplicate) |
+| step_bom | 1651 | ✅ (427 DAG ref) |
 | cut_batches | 760 | ⏳ |
 | cut_lines | 1631 | ⏳ |
 | clean | 1589 | ⏳ |
@@ -126,12 +126,24 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 - product_category ve part_type enum'ları eklendi
 - Geçici analiz dosyaları temizlendi (read-users.js vb.)
 
+### Katman 4 ✅ (2026-02-20)
+- Migration: plakalar (414), plaka_parts (362), assembly_steps (522), step_bom (1651)
+- step_bom.part_id FK yok — DAG yapısı (all_parts VEYA assembly_steps referansı)
+- 427 satırda ASM-XXXX referansı (önceki adım çıktısı = sonraki adım girdisi)
+- Plakalar 2 duplicate PlakalarID, AssemblySteps 1 duplicate StepID — seed'de dedup
+- PlakaParts'ta 44 satır atlandı (part_id all_parts'ta yok — AllParts batch hatası kaynaklı)
+- Plakalar'da 16 SKU null yapıldı (products tablosunda yok — pasif ürünler)
+- Seed script Supabase'den mevcut referansları çekip doğruluyor (robust FK handling)
+- Excel kolon adları: StepBOMID (not StepBomID), KODU (not Kodu) — case-sensitive dikkat
+
 ---
 
 ## BUGLAR VE ÇÖZÜMLER
 
 - AllParts duplicate PartID'ler: LS051-P09, LS051-P11, MKOS-P02, LS011-P04, LS051-P08 — seed'de ilk kayıt alınır
+- AllParts batch 0-100: hazir_eleman_aktif_stok integer field'a "-816.35" decimal geldi — 100 satır kaybı
 - Products'ta negatif stok_aktif değerleri var (normal, iade/satış farkı)
+- PlakaParts 9 part_id Excel'de AllParts'ta yok: LS051-P12, LS051-P07, LS051-P10, MKOS-P01, LS011-P03, MKOS-P02-M, KOSC-P02, KOSM-P02, KOSA-P02
 
 ---
 
