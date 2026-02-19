@@ -1,0 +1,126 @@
+import {
+  LayoutDashboard,
+  Scissors,
+  SprayCan,
+  Wrench,
+  Package,
+  Box,
+  Warehouse,
+  Layers,
+  Component,
+  RotateCcw,
+  ShoppingCart,
+  Truck,
+  BarChart3,
+  Users,
+  Settings,
+  Bell,
+  type LucideIcon,
+} from "lucide-react";
+import type { UserRole } from "@/lib/constants";
+
+export type NavItem = {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  roles: UserRole[] | "all";
+  badge?: string;
+};
+
+export type NavGroup = {
+  label: string;
+  items: NavItem[];
+};
+
+/** All roles that can see management/office sections */
+const MANAGEMENT_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "E-Ticaret Müdürü",
+  "Dış Ticaret Müdürü",
+  "Muhasebe",
+  "Pazaryeri Sorumlusu",
+  "Mimar",
+  "Sevkiyat Sorumlusu",
+];
+
+const ALL_INTERNAL: UserRole[] = [...MANAGEMENT_ROLES, "Hat"];
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Ana Sayfa",
+    items: [
+      {
+        title: "Dashboard",
+        href: "/",
+        icon: LayoutDashboard,
+        roles: "all",
+      },
+    ],
+  },
+  {
+    label: "Üretim",
+    items: [
+      { title: "Kesim", href: "/uretim/kesim", icon: Scissors, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Temizlik", href: "/uretim/temizlik", icon: SprayCan, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Montaj", href: "/uretim/montaj", icon: Wrench, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Paketleme", href: "/uretim/paketleme", icon: Package, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Kutu-Koli", href: "/uretim/kutu", icon: Box, roles: [...ALL_INTERNAL, "Üretim"] },
+    ],
+  },
+  {
+    label: "Stok",
+    items: [
+      { title: "Mamül Stok", href: "/stok/mamul", icon: Warehouse, roles: ALL_INTERNAL },
+      { title: "Yarı Mamül", href: "/stok/yari-mamul", icon: Layers, roles: ALL_INTERNAL },
+      { title: "Hazır Eleman", href: "/stok/hazir-eleman", icon: Component, roles: ALL_INTERNAL },
+      { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: ALL_INTERNAL },
+    ],
+  },
+  {
+    label: "Satış",
+    items: [
+      { title: "Satışlar", href: "/satis", icon: ShoppingCart, roles: MANAGEMENT_ROLES },
+    ],
+  },
+  {
+    label: "Sevkiyat",
+    items: [
+      {
+        title: "Sevkiyat",
+        href: "/sevkiyat",
+        icon: Truck,
+        roles: ["Yönetici", "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"],
+      },
+    ],
+  },
+  {
+    label: "Analiz",
+    items: [
+      { title: "Raporlar", href: "/analiz", icon: BarChart3, roles: MANAGEMENT_ROLES },
+    ],
+  },
+  {
+    label: "Personel",
+    items: [
+      { title: "Yoklama", href: "/personel", icon: Users, roles: ["Yönetici", "Endüstri Mühendisi", "Hat"] },
+    ],
+  },
+  {
+    label: "Yönetim",
+    items: [
+      { title: "Admin", href: "/admin", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
+      { title: "Bildirimler", href: "/bildirimler", icon: Bell, roles: "all" },
+    ],
+  },
+];
+
+/** Filter nav groups by user role — returns only groups that have visible items */
+export function getFilteredNavGroups(role: UserRole): NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => item.roles === "all" || item.roles.includes(role)
+    ),
+  })).filter((group) => group.items.length > 0);
+}

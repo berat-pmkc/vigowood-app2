@@ -222,11 +222,11 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Shared hesap desteği (kesim@, paketleme@ vs.)
 - [x] Rol bazlı yönlendirme + Logout
 
-### KATMAN 2: Ana Layout ve Navigasyon
-- [ ] Sidebar (web), Bottom nav (mobil), Hamburger menü
-- [ ] Üst navbar (bildirim, profil)
-- [ ] Rol bazlı menü filtreleme
-- [ ] Responsive test
+### KATMAN 2: Ana Layout ve Navigasyon ✅
+- [x] Sidebar (web), Bottom nav (mobil), Hamburger menü
+- [x] Üst navbar (bildirim, profil)
+- [x] Rol bazlı menü filtreleme
+- [x] Responsive test
 
 ### KATMAN 3: DB Migration — Temel Tablolar
 - [ ] products, users, kesim_makinesi, all_parts

@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 1: Auth Sistemi** — Sırada
+**Katman 3: DB Migration — Temel Tablolar** — Sırada
 
 ---
 
@@ -100,6 +100,22 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 - Tailwind v4 geldi, shadcn/ui v4 uyumlu çalışıyor
 - Bash shell'de echo/pwd gibi basit komutlar bazen exit code 1 veriyor (Windows Git Bash sorunu), node -e ile workaround yapıldı
 - Renk paleti hex olarak CSS variables'a yazıldı (oklch yerine), Tailwind @theme ile custom renk token'ları eklendi
+
+### Katman 1 ✅ (2026-02-20)
+- Login sayfası (email/password, Zod validation, VigoWood tema)
+- Operatör seçim ekranı (station hesapları)
+- Auth middleware (login redirect, station operator redirect)
+- Users tablosu migration (56 kullanıcı, 10 rol, RLS)
+- Seed script (18 email kullanıcı Supabase Auth kaydı)
+- server-only auth helpers, DB types
+
+### Katman 2 ✅ (2026-02-20)
+- shadcn/ui Sidebar: collapsible="icon", dark wood tema
+- SidebarProvider + SidebarInset wrapper pattern
+- TopNavbar: SidebarTrigger, bildirim ikonu, kullanıcı adı/rol
+- MobileBottomNav: max 5 item, < md breakpoint
+- Rol bazlı menü filtreleme: getFilteredNavGroups(role)
+- navigation.ts: Tüm menü yapısı ve roller merkezi config'de
 
 ---
 
