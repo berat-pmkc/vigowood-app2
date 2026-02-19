@@ -75,9 +75,9 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 | products | 101 | ✅ |
 | users | 56 | ✅ |
 | kesim_makinesi | 3 | ✅ |
-| all_parts | 269/379 | ✅ (100 satır decimal→int hatası) |
+| all_parts | 369/379 | ✅ (10 duplicate, decimal fix yapıldı) |
 | plakalar | 414/416 | ✅ (2 duplicate, 16 SKU null) |
-| plaka_parts | 362/406 | ✅ (44 atlandı — eksik part_id) |
+| plaka_parts | 392/406 | ✅ (14 atlandı — part_id Excel'de yok) |
 | assembly_steps | 522/523 | ✅ (1 duplicate) |
 | step_bom | 1651 | ✅ (427 DAG ref) |
 | cut_batches | 760 | ⏳ |
@@ -141,7 +141,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 ## BUGLAR VE ÇÖZÜMLER
 
 - AllParts duplicate PartID'ler: LS051-P09, LS051-P11, MKOS-P02, LS011-P04, LS051-P08 — seed'de ilk kayıt alınır
-- AllParts batch 0-100: hazir_eleman_aktif_stok integer field'a "-816.35" decimal geldi — 100 satır kaybı
+- AllParts decimal fix: hazir_eleman_aktif_stok ve yari_mamul_stok INTEGER→NUMERIC (004_fix_allparts_decimal.sql)
 - Products'ta negatif stok_aktif değerleri var (normal, iade/satış farkı)
 - PlakaParts 9 part_id Excel'de AllParts'ta yok: LS051-P12, LS051-P07, LS051-P10, MKOS-P01, LS011-P03, MKOS-P02-M, KOSC-P02, KOSM-P02, KOSA-P02
 
