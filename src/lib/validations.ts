@@ -1,3 +1,14 @@
-// Zod validation schemas will be added here as forms are built
-// Placeholder for Katman 0
-export {};
+import { z } from "zod";
+
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "E-posta adresi gereklidir")
+    .email("Geçerli bir e-posta adresi giriniz"),
+  password: z
+    .string()
+    .min(1, "Şifre gereklidir")
+    .min(6, "Şifre en az 6 karakter olmalıdır"),
+});
+
+export type LoginFormData = z.infer<typeof loginSchema>;

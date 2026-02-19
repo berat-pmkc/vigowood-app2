@@ -45,6 +45,9 @@ next-env.d.ts
 # data files (Excel/CSV source data)
 /data/
 
+# supabase CLI temp files
+supabase/.temp/
+
 # IDE
 .idea/
 .vscode/

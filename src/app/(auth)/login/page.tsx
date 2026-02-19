@@ -1,8 +1,138 @@
-// Login page — Katman 1'de implement edilecek
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { loginSchema, type LoginFormData } from "@/lib/validations";
+import { APP_NAME, isStationEmail } from "@/lib/constants";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { LogIn, Loader2 } from "lucide-react";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: "",
+    password: "",
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof LoginFormData, string>>>({});
+  const [serverError, setServerError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErrors({});
+    setServerError("");
+
+    // Validate
+    const result = loginSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: typeof errors = {};
+      result.error.issues.forEach((issue) => {
+        const field = issue.path[0] as keyof LoginFormData;
+        fieldErrors[field] = issue.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setLoading(true);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    });
+
+    if (error) {
+      setServerError("E-posta veya şifre hatalı");
+      setLoading(false);
+      return;
+    }
+
+    // Station accounts → operator selection
+    if (isStationEmail(formData.email)) {
+      router.push("/select-operator");
+    } else {
+      router.push("/");
+    }
+
+    router.refresh();
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-muted-foreground">Giriş sayfası — Katman 1</p>
+    <div className="flex min-h-screen items-center justify-center bg-vw-light p-4">
+      <Card className="w-full max-w-md border-vw-side/30">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-xl bg-vw-dark">
+            <span className="text-2xl font-bold text-vw-light">VW</span>
+          </div>
+          <CardTitle className="text-xl text-vw-dark">{APP_NAME}</CardTitle>
+          <CardDescription>Devam etmek için giriş yapın</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">E-posta</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="ornek@vigowood.com"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, email: e.target.value }))
+                }
+                autoComplete="email"
+                disabled={loading}
+              />
+              {errors.email && (
+                <p className="text-sm text-vw-error">{errors.email}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Şifre</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Şifrenizi giriniz"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, password: e.target.value }))
+                }
+                autoComplete="current-password"
+                disabled={loading}
+              />
+              {errors.password && (
+                <p className="text-sm text-vw-error">{errors.password}</p>
+              )}
+            </div>
+
+            {serverError && (
+              <div className="rounded-md bg-vw-error/10 px-3 py-2 text-sm text-vw-error">
+                {serverError}
+              </div>
+            )}
+
+            <Button type="submit" disabled={loading} className="mt-2">
+              {loading ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <LogIn className="size-4" />
+              )}
+              {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

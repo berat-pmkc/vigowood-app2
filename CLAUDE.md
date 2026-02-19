@@ -206,20 +206,21 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 
 ## GELİŞTİRME KATMANLARI
 
-### KATMAN 0: Proje İskeleti
-- [ ] Next.js 14 + Tailwind + shadcn/ui kurulumu
-- [ ] Supabase bağlantısı (client + server)
-- [ ] Dosya/klasör yapısı
-- [ ] .env.example → .env.local kopyala, key'leri gir
-- [ ] .gitignore'da .env.local olduğundan emin ol
-- [ ] Git init, ilk commit, Vercel deploy
+### KATMAN 0: Proje İskeleti ✅
+- [x] Next.js 16 + Tailwind v4 + shadcn/ui kurulumu
+- [x] Supabase bağlantısı (client + server + admin + middleware)
+- [x] Dosya/klasör yapısı
+- [x] .env.example → .env.local kopyala, key'leri gir
+- [x] .gitignore'da .env.local olduğundan emin ol
+- [x] Git init, ilk commit
+- [ ] Vercel deploy
 
-### KATMAN 1: Auth Sistemi
-- [ ] Supabase Auth + Login sayfası
-- [ ] Auth middleware (korumalı route'lar)
-- [ ] users tablosu + 56 kullanıcı migration
-- [ ] Shared hesap desteği (kesim@, paketleme@ vs.)
-- [ ] Rol bazlı yönlendirme + Logout
+### KATMAN 1: Auth Sistemi ✅
+- [x] Supabase Auth + Login sayfası
+- [x] Auth middleware (korumalı route'lar)
+- [x] users tablosu + 56 kullanıcı migration
+- [x] Shared hesap desteği (kesim@, paketleme@ vs.)
+- [x] Rol bazlı yönlendirme + Logout
 
 ### KATMAN 2: Ana Layout ve Navigasyon
 - [ ] Sidebar (web), Bottom nav (mobil), Hamburger menü

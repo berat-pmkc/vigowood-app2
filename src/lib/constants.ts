@@ -64,6 +64,13 @@ export const STATION_EMAILS = [
   "temizlik@vigowood.com",
   "montaj@vigowood.com",
   "montaj2@vigowood.com",
+  "montaj3@vigowood.com",
   "paketleme@vigowood.com",
   "kutu@vigowood.com",
 ] as const;
+
+/** Check if an email belongs to a shared station account */
+export function isStationEmail(email: string | undefined): boolean {
+  if (!email) return false;
+  return STATION_EMAILS.includes(email as (typeof STATION_EMAILS)[number]);
+}

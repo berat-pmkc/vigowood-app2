@@ -6,13 +6,23 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 0: Proje İskeleti** — Henüz başlanmadı
+**Katman 1: Auth Sistemi** — Sırada
 
 ---
 
 ## TAMAMLANAN KATMANLAR
 
-(henüz yok)
+### Katman 0: Proje İskeleti ✅ (2026-02-18)
+- Next.js 16.1.6 (App Router) + TypeScript strict + Tailwind CSS v4
+- shadcn/ui (new-york, lucide icons) — Button, Card, Badge kuruldu
+- Supabase SSR bağlantısı: client.ts, server.ts, admin.ts, middleware.ts
+- VigoWood renk paleti globals.css'e entegre (Natural, Functional, Recycle, Ekstra)
+- Tailwind custom renkler: `bg-vw-primary`, `bg-vw-success` vb. kullanılabilir
+- CLAUDE.md yapısına uygun klasör iskeleti (11 route, layout grupları)
+- Ana sayfa: Logo + Hoş geldiniz + Renk paleti kartları + Komponent testi
+- .env.local Supabase key'leri hazır, .gitignore'da korunuyor
+- Build başarılı, tüm sayfalar statik generate edildi
+- Not: Next.js 16'da "middleware" → "proxy" deprecation uyarısı var (çalışıyor)
 
 ---
 
@@ -85,7 +95,11 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## KATMAN NOTLARI
 
-(Her katman tamamlandığında buraya detay eklenir)
+### Katman 0
+- create-next-app@latest Next.js 16 kurdu (CLAUDE.md'de 14 yazıyor ama 16 en güncel, App Router aynı)
+- Tailwind v4 geldi, shadcn/ui v4 uyumlu çalışıyor
+- Bash shell'de echo/pwd gibi basit komutlar bazen exit code 1 veriyor (Windows Git Bash sorunu), node -e ile workaround yapıldı
+- Renk paleti hex olarak CSS variables'a yazıldı (oklch yerine), Tailwind @theme ile custom renk token'ları eklendi
 
 ---
 
@@ -95,4 +109,4 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ---
 
-*Son güncelleme: 2026-02-19*
+*Son güncelleme: 2026-02-18*
