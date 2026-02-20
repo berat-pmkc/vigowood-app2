@@ -173,6 +173,34 @@ DeepNavy:    #0c1c2d    HotWalnuts:  #6f4c37    IceBlue:  #adb5be    Black: #000
 - Server-side pagination büyük tablolarda
 - Zod ile form validation
 
+### RLS Policy Kuralları — KRİTİK
+RLS policy yazarken **asla** aynı tabloyu veya users tablosunu doğrudan sorgulamayın. PostgreSQL infinite recursion hatası verir.
+
+**YANLIŞ — YAPMA:**
+```sql
+CREATE POLICY "admin manage" ON public.users
+  USING (EXISTS (SELECT 1 FROM public.users WHERE auth_id = auth.uid() AND role = 'Yönetici'));
+```
+
+**DOĞRU — HER ZAMAN BU PATTERNİ KULLAN:**
+```sql
+-- SECURITY DEFINER fonksiyon kullan (RLS bypass eder)
+CREATE POLICY "admin manage" ON public.users
+  USING (is_admin());
+```
+
+Mevcut SECURITY DEFINER fonksiyonlar (`009_fix_rls_recursion.sql`):
+- `is_admin()` → Yönetici rolü kontrolü
+- `is_admin_or_engineer()` → Yönetici veya Endüstri Mühendisi
+- `has_production_access()` → Yönetici, Endüstri Mühendisi, Üretim, Hat
+
+Yeni tablo eklerken RLS policy'de **mutlaka bu fonksiyonları kullan**, inline subquery YAZMA.
+
+### Supabase SSR Middleware Kuralları — KRİTİK
+Next.js 16 + Supabase SSR'da `setAll` callback'i her istekte cookie set eder. Next.js 16 cookie değişikliğini algılayıp re-render tetikler → sonsuz döngü.
+
+**Çözüm**: `middleware.ts`'de cookie karşılaştırma mevcut (`existingCookies` Map). Bu kodu değiştirme/kaldırma.
+
 ---
 
 ## ARAÇLAR
