@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_sevkiyat_fiyatlar_sku ON public.sevkiyat_fiyatlar
 CREATE OR REPLACE TRIGGER set_sevkiyat_fiyatlar_updated_at
   BEFORE UPDATE ON public.sevkiyat_fiyatlar
   FOR EACH ROW
-  EXECUTE FUNCTION public.set_updated_at();
+  EXECUTE FUNCTION public.handle_updated_at();
 
 -- 4. RLS: sevkiyat_fiyatlar
 ALTER TABLE public.sevkiyat_fiyatlar ENABLE ROW LEVEL SECURITY;

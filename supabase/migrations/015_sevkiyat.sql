@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_sevkiyat_created_at ON public.sevkiyat(created_at
 CREATE OR REPLACE TRIGGER set_sevkiyat_updated_at
   BEFORE UPDATE ON public.sevkiyat
   FOR EACH ROW
-  EXECUTE FUNCTION public.set_updated_at();
+  EXECUTE FUNCTION public.handle_updated_at();
 
 -- 3. sevkiyat_items tablosu
 CREATE TABLE IF NOT EXISTS public.sevkiyat_items (
