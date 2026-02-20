@@ -22,3 +22,34 @@ export function formatNumber(n: number | null | undefined): string {
   if (n == null) return "—";
   return n.toLocaleString("tr-TR");
 }
+
+/** Format ISO timestamp to HH:MM */
+export function formatTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Format duration between two ISO timestamps → "Xsa Ydk" */
+export function formatDuration(start: string | null, end: string | null): string {
+  if (!start || !end) return "—";
+  const s = new Date(start);
+  const e = new Date(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return "—";
+  const diffMs = e.getTime() - s.getTime();
+  if (diffMs < 0) return "—";
+  const totalMin = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours > 0) return `${hours}sa ${mins}dk`;
+  return `${mins}dk`;
+}
+
+/** Calculate elapsed time from start to now → "Xsa Ydk" */
+export function formatElapsed(start: string | null): string {
+  if (!start) return "—";
+  const s = new Date(start);
+  if (isNaN(s.getTime())) return "—";
+  return formatDuration(start, new Date().toISOString());
+}

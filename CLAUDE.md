@@ -35,7 +35,7 @@ Veritabanı yapısını, kolon isimlerini, ilişkileri ve veri tiplerini bu dosy
 
 | Teknoloji | Görev |
 |-----------|-------|
-| Next.js 14 (App Router) | Frontend |
+| Next.js 16 (App Router) | Frontend |
 | Supabase Pro ($25/ay) | PostgreSQL, Auth, Realtime, RLS, Storage |
 | Vercel Pro ($20/ay) | Hosting, CDN |
 | Tailwind CSS + shadcn/ui | Styling + UI |
@@ -257,15 +257,15 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] PlakaParts yönetimi
 - [x] Makine bazlı kesim süresi
 
-### KATMAN 9: Admin — BOM ve Montaj
-- [ ] Montaj adımları (sıralama, drag-drop)
-- [ ] StepBOM + ASM referans desteği
-- [ ] Reçete ağaç görünümü
+### KATMAN 9: Admin — BOM ve Montaj ✅
+- [x] Montaj adımları (sıralama, drag-drop)
+- [x] StepBOM + ASM referans desteği
+- [x] Reçete ağaç görünümü
 
-### KATMAN 10: Üretim — Kesim
-- [ ] Kesim listesi + yeni kesim formu
-- [ ] CutLines otomatik oluşturma
-- [ ] YarıMamulStok'a otomatik IN
+### KATMAN 10: Üretim — Kesim ✅
+- [x] Kesim listesi + yeni kesim formu
+- [x] CutLines otomatik oluşturma
+- [x] YarıMamulStok'a otomatik IN
 
 ### KATMAN 11: Üretim — Temizlik
 - [ ] Bekleyen işler listesi

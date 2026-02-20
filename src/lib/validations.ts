@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -72,3 +72,43 @@ export const plakaPartSchema = z.object({
 });
 
 export type PlakaPartData = z.infer<typeof plakaPartSchema>;
+
+// Assembly Step
+export const assemblyStepSchema = z.object({
+  step_name: z
+    .string()
+    .min(1, "Adım adı gereklidir")
+    .max(200, "Adım adı en fazla 200 karakter"),
+  seq_no: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "Sıra numarası 1 veya üzeri olmalıdır"),
+  is_final_step: z.boolean(),
+});
+
+export type AssemblyStepFormData = z.infer<typeof assemblyStepSchema>;
+
+// StepBOM Item
+export const stepBomItemSchema = z.object({
+  part_id: z.string().min(1, "Parça/adım ID gereklidir"),
+  qty_per: z.number().min(0.01, "Miktar 0'dan büyük olmalıdır"),
+});
+
+export type StepBomItemFormData = z.infer<typeof stepBomItemSchema>;
+
+// Kesim Batch oluşturma
+export const cutBatchCreateSchema = z.object({
+  makine_id: z.enum(MAKINE_IDS, {
+    error: "Geçerli bir makine seçiniz",
+  }),
+  sku: z.string().min(1, "Ürün seçimi gereklidir"),
+  plaka_id: z.string().min(1, "Plaka seçimi gereklidir"),
+  adet: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(100, "En fazla 100 adet olabilir"),
+  plk_notu: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
+});
+
+export type CutBatchCreateData = z.infer<typeof cutBatchCreateSchema>;

@@ -296,6 +296,9 @@ export type Database = {
           operator_id: string | null;
           plk_notu: string | null;
           email: string | null;
+          durum: string;
+          baslama_zamani: string | null;
+          bitis_zamani: string | null;
           created_at: string;
         };
         Insert: {
@@ -308,6 +311,9 @@ export type Database = {
           operator_id?: string | null;
           plk_notu?: string | null;
           email?: string | null;
+          durum?: string;
+          baslama_zamani?: string | null;
+          bitis_zamani?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["cut_batches"]["Insert"]>;
         Relationships: [];

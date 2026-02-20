@@ -111,6 +111,37 @@ export const MAKINE_LABELS: Record<MakineId, string> = {
   KUTU: "Kutu (BALA)",
 };
 
+// Kesim durum sabitleri
+export const CUT_STATUS = ["bekliyor", "kesiliyor", "tamamlandi"] as const;
+export type CutStatus = (typeof CUT_STATUS)[number];
+
+export const CUT_STATUS_LABELS: Record<CutStatus, string> = {
+  bekliyor: "Bekliyor",
+  kesiliyor: "Kesiliyor",
+  tamamlandi: "Tamamlandı",
+};
+
+export const CUT_STATUS_COLORS: Record<CutStatus, { bg: string; text: string; border: string }> = {
+  bekliyor: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  kesiliyor: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  tamamlandi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+// Kesim kartı sol kenar renkleri
+export const CUT_STATUS_BORDER_COLORS: Record<CutStatus, string> = {
+  bekliyor: "border-l-amber-400",
+  kesiliyor: "border-l-blue-500",
+  tamamlandi: "border-l-emerald-500",
+};
+
+// Üretim erişim rolleri
+export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "Hat",
+  "Üretim",
+];
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;
