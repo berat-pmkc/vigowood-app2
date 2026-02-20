@@ -178,6 +178,28 @@ export const MONTAJ_STATUS_BORDER_COLORS: Record<MontajStatus, string> = {
   tamamlandi: "border-l-emerald-500",
 };
 
+// Paketleme durum sabitleri
+export const PACK_STATUS = ["bekliyor", "paketlemede", "tamamlandi"] as const;
+export type PackStatus = (typeof PACK_STATUS)[number];
+
+export const PACK_STATUS_LABELS: Record<PackStatus, string> = {
+  bekliyor: "Bekliyor",
+  paketlemede: "Paketlemede",
+  tamamlandi: "Tamamlandı",
+};
+
+export const PACK_STATUS_COLORS: Record<PackStatus, { bg: string; text: string; border: string }> = {
+  bekliyor: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  paketlemede: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  tamamlandi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+export const PACK_STATUS_BORDER_COLORS: Record<PackStatus, string> = {
+  bekliyor: "border-l-amber-400",
+  paketlemede: "border-l-blue-500",
+  tamamlandi: "border-l-emerald-500",
+};
+
 // Üretim erişim rolleri
 export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Yönetici",

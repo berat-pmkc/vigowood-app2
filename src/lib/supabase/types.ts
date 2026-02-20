@@ -382,6 +382,9 @@ export type Database = {
           qty: number;
           not_text: string | null;
           status: string;
+          durum: string;
+          operator_id: string | null;
+          operator_name: string | null;
           created_at: string;
         };
         Insert: {
@@ -395,6 +398,9 @@ export type Database = {
           qty?: number;
           not_text?: string | null;
           status?: string;
+          durum?: string;
+          operator_id?: string | null;
+          operator_name?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["pack_events"]["Insert"]>;
         Relationships: [];

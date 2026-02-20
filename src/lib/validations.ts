@@ -125,3 +125,16 @@ export const montajBatchCreateSchema = z.object({
 });
 
 export type MontajBatchCreateData = z.infer<typeof montajBatchCreateSchema>;
+
+// Paketleme seans oluşturma
+export const packSessionCreateSchema = z.object({
+  sku: z.string().min(1, "Ürün seçimi gereklidir"),
+  qty: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(500, "En fazla 500 adet olabilir"),
+  not_text: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
+});
+
+export type PackSessionCreateData = z.infer<typeof packSessionCreateSchema>;

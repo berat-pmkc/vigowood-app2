@@ -1,24 +1,111 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Package } from "lucide-react";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { PaketlemeList } from "./components/paketleme-list";
+import type { PackSessionRow } from "./components/paketleme-card";
 
-export default function PaketlemePage() {
+interface PageProps {
+  searchParams: Promise<{ durum?: string }>;
+}
+
+export default async function PaketlemePage({ searchParams }: PageProps) {
+  const user = await getCurrentUser();
+  if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
+    redirect("/");
+  }
+
+  const params = await searchParams;
+  const selectedStatus = params.durum || "all";
+
+  const supabase = await createClient();
+
+  // Son 30 gün veya aktif olanlar
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const { data: allSessions } = await supabase
+    .from("pack_events")
+    .select("session_id, email, tarih, sku, personel, start_time, end_time, qty, not_text, status, durum, operator_id, operator_name, created_at")
+    .or(`durum.neq.tamamlandi,created_at.gte.${thirtyDaysAgo.toISOString()}`)
+    .order("created_at", { ascending: false });
+
+  const sessions = (allSessions ?? []) as PackSessionRow[];
+
+  // Durum sayaçları
+  const counts: Record<string, number> = { bekliyor: 0, paketlemede: 0, tamamlandi: 0 };
+  sessions.forEach((s) => {
+    if (counts[s.durum] !== undefined) counts[s.durum]++;
+  });
+
+  // Durum filtrele
+  const filtered = selectedStatus === "all"
+    ? sessions
+    : sessions.filter((s) => s.durum === selectedStatus);
+
+  // Enrich: ürün adları
+  const skus = [...new Set(filtered.map((s) => s.sku).filter(Boolean) as string[])];
+
+  let productMap = new Map<string, string>();
+  if (skus.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skus);
+
+    productMap = new Map(
+      (products ?? []).map((p) => [p.sku, p.urun_adi ?? ""])
+    );
+  }
+
+  const enriched: PackSessionRow[] = filtered.map((s) => ({
+    ...s,
+    urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
+  }));
+
+  // Günlük özet — bugünün seansları
+  const today = new Date().toISOString().split("T")[0];
+  const todaySessions = sessions.filter((s) => {
+    const d = s.tarih ? s.tarih.split("T")[0] : s.created_at.split("T")[0];
+    return d === today;
+  });
+
+  const todayCompleted = todaySessions.filter((s) => s.durum === "tamamlandi");
+  const todayInProgress = todaySessions.filter((s) => s.durum === "paketlemede");
+  const todayTotal = todayCompleted.reduce((acc, s) => acc + s.qty, 0);
+  const todayInProgressQty = todayInProgress.reduce((acc, s) => acc + s.qty, 0);
+
+  // Ürün bazlı bugünkü tamamlanan
+  const productQtyMap = new Map<string, { sku: string; urun_adi: string; qty: number }>();
+  todayCompleted.forEach((s) => {
+    if (!s.sku) return;
+    const existing = productQtyMap.get(s.sku);
+    if (existing) {
+      existing.qty += s.qty;
+    } else {
+      productQtyMap.set(s.sku, {
+        sku: s.sku,
+        urun_adi: productMap.get(s.sku) ?? s.sku,
+        qty: s.qty,
+      });
+    }
+  });
+
+  const todayProducts = [...productQtyMap.values()].sort((a, b) => b.qty - a.qty);
+
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center pb-20 md:pb-6">
-      <Card className="w-full max-w-md text-center">
-        <CardContent className="pt-8 pb-8">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-purple-50">
-            <Package className="h-8 w-8 text-purple-600" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground">Paketleme</h2>
-          <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
-            Paketleme seans yonetimi ve stok hareketleri burada yer alacak.
-          </p>
-          <Badge variant="outline" className="mt-4">
-            Katman 13
-          </Badge>
-        </CardContent>
-      </Card>
+    <div className="pb-20 md:pb-6">
+      <PaketlemeList
+        sessions={enriched}
+        counts={counts}
+        selectedStatus={selectedStatus}
+        todaySummary={{
+          todayTotal,
+          todayCompleted: todayCompleted.length,
+          todayInProgress: todayInProgress.length,
+          todayProducts,
+        }}
+      />
     </div>
   );
 }

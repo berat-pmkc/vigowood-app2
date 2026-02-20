@@ -305,9 +305,9 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Malzeme yeterliliği kontrolü
 - [x] YarıMamulStok'a otomatik OUT
 
-### KATMAN 13: Üretim — Paketleme
-- [ ] Seans yönetimi
-- [ ] StockMovements'a otomatik IN
+### KATMAN 13: Üretim — Paketleme ✅
+- [x] Seans yönetimi
+- [x] StockMovements'a otomatik IN
 
 ### KATMAN 14: Üretim — Kutu-Koli
 - [ ] Kutu kesim/üretim + stok takibi
