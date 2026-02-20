@@ -200,6 +200,28 @@ export const PACK_STATUS_BORDER_COLORS: Record<PackStatus, string> = {
   tamamlandi: "border-l-emerald-500",
 };
 
+// Kutu-Koli durum sabitleri
+export const KUTU_STATUS = ["bekliyor", "uretimde", "tamamlandi"] as const;
+export type KutuStatus = (typeof KUTU_STATUS)[number];
+
+export const KUTU_STATUS_LABELS: Record<KutuStatus, string> = {
+  bekliyor: "Bekliyor",
+  uretimde: "Üretimde",
+  tamamlandi: "Tamamlandı",
+};
+
+export const KUTU_STATUS_COLORS: Record<KutuStatus, { bg: string; text: string; border: string }> = {
+  bekliyor: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  uretimde: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  tamamlandi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+export const KUTU_STATUS_BORDER_COLORS: Record<KutuStatus, string> = {
+  bekliyor: "border-l-amber-400",
+  uretimde: "border-l-blue-500",
+  tamamlandi: "border-l-emerald-500",
+};
+
 // Üretim erişim rolleri
 export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Yönetici",

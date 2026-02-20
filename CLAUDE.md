@@ -309,8 +309,8 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Seans yönetimi
 - [x] StockMovements'a otomatik IN
 
-### KATMAN 14: Üretim — Kutu-Koli
-- [ ] Kutu kesim/üretim + stok takibi
+### KATMAN 14: Üretim — Kutu-Koli ✅
+- [x] Kutu kesim/üretim + stok takibi
 
 ### KATMAN 15: Stok — Mamül
 - [ ] Stok dashboard + hareketler + trend grafik

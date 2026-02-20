@@ -548,6 +548,41 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["montaj_batches"]["Insert"]>;
         Relationships: [];
       };
+      kutu_uretim: {
+        Row: {
+          session_id: string;
+          email: string | null;
+          tarih: string | null;
+          part_id: string | null;
+          part_adi: string | null;
+          part_type: string | null;
+          qty: number;
+          not_text: string | null;
+          durum: string;
+          operator_id: string | null;
+          operator_name: string | null;
+          start_time: string | null;
+          bitis_zamani: string | null;
+          created_at: string;
+        };
+        Insert: {
+          session_id: string;
+          email?: string | null;
+          tarih?: string | null;
+          part_id?: string | null;
+          part_adi?: string | null;
+          part_type?: string | null;
+          qty?: number;
+          not_text?: string | null;
+          durum?: string;
+          operator_id?: string | null;
+          operator_name?: string | null;
+          start_time?: string | null;
+          bitis_zamani?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["kutu_uretim"]["Insert"]>;
+        Relationships: [];
+      };
       yari_mamul_stok: {
         Row: {
           yms_id: string;

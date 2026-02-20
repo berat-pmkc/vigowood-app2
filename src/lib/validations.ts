@@ -138,3 +138,16 @@ export const packSessionCreateSchema = z.object({
 });
 
 export type PackSessionCreateData = z.infer<typeof packSessionCreateSchema>;
+
+// Kutu-Koli seans oluşturma
+export const kutuSessionCreateSchema = z.object({
+  part_id: z.string().min(1, "Parça seçimi gereklidir"),
+  qty: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(1000, "En fazla 1000 adet olabilir"),
+  not_text: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
+});
+
+export type KutuSessionCreateData = z.infer<typeof kutuSessionCreateSchema>;
