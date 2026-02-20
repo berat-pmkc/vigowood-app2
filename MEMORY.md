@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 13: Üretim — Paketleme** — Sırada
+**Katman 16: Stok — Yarı Mamül** — Sırada
 
 ---
 
@@ -185,6 +185,24 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 - Validations: montajBatchCreateSchema
 - Yeni shadcn: textarea
 - Dosya yapısı: uretim/montaj/{page.tsx, actions.ts, yeni/page.tsx, components/7-dosya}
+
+### Katman 15: Stok — Mamül ✅ (2026-02-20)
+- Admin pattern'ını izler: Server Component → Client Component → URL params
+- Sayfa yapısı: KPI Cards (4 kart) + Tabs (Stok Özeti | Hareketler)
+- Stok Özeti tab: Trend chart (Recharts AreaChart) + TanStack Table
+- Hareketler tab: stock_movements TanStack Table + source filtre
+- Migration: 013_mamul_stok_kritik.sql — products tablosuna mamul_stok_kritik kolonu
+- Aktif ürünlerde varsayılan kritik stok = 5
+- Kritik stok göstergesi: Kırmızı (stok < kritik), Sarı (stok <= kritik*1.5), Yeşil (yeterli)
+- KPI kartları: Toplam stok, kritik sayısı, bugünkü üretim, bugünkü hareket sayısı
+- Recharts v3.7.0: TooltipProps tipi değişti — custom interface kullan (TooltipProps<> artık payload içermiyor)
+- Chart: AreaChart with dual series (Giriş=yeşil, Çıkış=kırmızı), 30 gün gradient fill
+- Stok tablosu: son hareket tarihi stock_movements'tan lookup
+- Hareketler tablosu: SKU adı products'tan lookup, source badge renkleri
+- Server action: updateKritikStok (STOCK_ACCESS_ROLES guard)
+- URL params: tab, page/pageSize/search/kategori/sortBy/sortOrder (stok), mPage/mPageSize/mSearch/mSource/mSortBy/mSortOrder (hareketler)
+- Yeni bağımlılık: recharts ^3.7.0
+- Dosya yapısı: stok/mamul/{page.tsx, actions.ts, components/5-dosya}
 
 ---
 

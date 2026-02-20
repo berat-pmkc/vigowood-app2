@@ -94,6 +94,7 @@ export type Database = {
           gunluk_satis: number;
           gecen_ay_uretim: number;
           aylik_uretim: number;
+          mamul_stok_kritik: number;
           created_at: string;
           updated_at: string;
         };
@@ -109,6 +110,7 @@ export type Database = {
           gunluk_satis?: number;
           gecen_ay_uretim?: number;
           aylik_uretim?: number;
+          mamul_stok_kritik?: number;
         };
         Update: {
           sku?: string;
@@ -122,6 +124,7 @@ export type Database = {
           gunluk_satis?: number;
           gecen_ay_uretim?: number;
           aylik_uretim?: number;
+          mamul_stok_kritik?: number;
         };
         Relationships: [];
       };

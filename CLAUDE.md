@@ -312,8 +312,8 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 ### KATMAN 14: Üretim — Kutu-Koli ✅
 - [x] Kutu kesim/üretim + stok takibi
 
-### KATMAN 15: Stok — Mamül
-- [ ] Stok dashboard + hareketler + trend grafik
+### KATMAN 15: Stok — Mamül ✅
+- [x] Stok dashboard + hareketler + trend grafik
 
 ### KATMAN 16: Stok — Yarı Mamül
 - [ ] Parça bazlı stok + eksik uyarısı
