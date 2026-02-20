@@ -10,13 +10,13 @@ type ActionResult = { success: true } | { success: false; error: string };
 async function requireProductionAccess() {
   const user = await getCurrentUser();
   if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
-    throw new Error("Yetkisiz erisim");
+    throw new Error("Yetkisiz erişim");
   }
   return user;
 }
 
 /**
- * Temizlik baslat: Bir cut_batch'in tum cut_lines'i icin clean record olustur
+ * Temizlik başlat: Bir cut_batch'in tüm cut_lines'ı için clean record oluştur
  * bekliyor → temizleniyor
  */
 export async function startClean(cutId: string): Promise<ActionResult> {
@@ -24,13 +24,13 @@ export async function startClean(cutId: string): Promise<ActionResult> {
     const user = await requireProductionAccess();
     const supabase = await createClient();
 
-    // Operator bilgisi
+    // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
     const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
     const operatorName = authUser?.user_metadata?.selected_operator_name ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
-    // cut_batch kontrolu
+    // cut_batch kontrolü
     const { data: batchData } = await supabase
       .from("cut_batches")
       .select("cut_id, durum")
@@ -38,9 +38,9 @@ export async function startClean(cutId: string): Promise<ActionResult> {
       .single();
 
     const batch = batchData as { cut_id: string; durum: string } | null;
-    if (!batch) return { success: false, error: "Kesim bulunamadi" };
+    if (!batch) return { success: false, error: "Kesim bulunamadı" };
     if (batch.durum !== "tamamlandi") {
-      return { success: false, error: "Sadece tamamlanmis kesimler temizlige baslayabilir" };
+      return { success: false, error: "Sadece tamamlanmış kesimler temizliğe başlayabilir" };
     }
 
     // Cut lines al
@@ -50,12 +50,12 @@ export async function startClean(cutId: string): Promise<ActionResult> {
       .eq("cut_id", cutId);
 
     if (!lines || lines.length === 0) {
-      return { success: false, error: "Bu kesime ait parca bulunamadi" };
+      return { success: false, error: "Bu kesime ait parça bulunamadı" };
     }
 
     const cutLineIds = lines.map((l) => l.cut_line_id);
 
-    // Mevcut clean kayitlari kontrol (idempotency)
+    // Mevcut clean kayıtları kontrol (idempotency)
     const { data: existingCleans } = await supabase
       .from("clean")
       .select("cutline_id, status")
@@ -65,15 +65,15 @@ export async function startClean(cutId: string): Promise<ActionResult> {
       (existingCleans ?? []).map((c) => [c.cutline_id, c.status])
     );
 
-    // Zaten temizleniyor veya tamamlandi olan varsa baslatma
+    // Zaten temizleniyor veya tamamlandı olan varsa başlatma
     const hasActive = Array.from(existingMap.values()).some(
       (s) => s === "temizleniyor" || s === "tamamlandi"
     );
     if (hasActive) {
-      return { success: false, error: "Bu kesimin temizligi zaten baslamis veya tamamlanmis" };
+      return { success: false, error: "Bu kesimin temizliği zaten başlamış veya tamamlanmış" };
     }
 
-    // clean_batch_id olustur (CLN-XXXX)
+    // clean_batch_id oluştur (CLN-XXXX)
     const { data: lastClean } = await supabase
       .from("clean")
       .select("clean_batch_id")
@@ -127,7 +127,7 @@ export async function startClean(cutId: string): Promise<ActionResult> {
     revalidatePath("/uretim/temizlik");
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata olustu" };
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
 
@@ -146,12 +146,12 @@ export async function completeClean(cutId: string): Promise<ActionResult> {
       .eq("cut_id", cutId);
 
     if (!lines || lines.length === 0) {
-      return { success: false, error: "Parca bulunamadi" };
+      return { success: false, error: "Parça bulunamadı" };
     }
 
     const cutLineIds = lines.map((l) => l.cut_line_id);
 
-    // Temizleniyor durumunda olduklarini kontrol et
+    // Temizleniyor durumunda olduklarını kontrol et
     const { data: cleans } = await supabase
       .from("clean")
       .select("cutline_id, status")
@@ -159,7 +159,7 @@ export async function completeClean(cutId: string): Promise<ActionResult> {
       .eq("status", "temizleniyor");
 
     if (!cleans || cleans.length === 0) {
-      return { success: false, error: "Temizleniyor durumunda kayit bulunamadi" };
+      return { success: false, error: "Temizleniyor durumunda kayıt bulunamadı" };
     }
 
     const now = new Date().toISOString();
@@ -175,12 +175,12 @@ export async function completeClean(cutId: string): Promise<ActionResult> {
     revalidatePath("/uretim/temizlik");
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata olustu" };
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
 
 /**
- * Temizlik iptal: temizleniyor → bekliyor (yanlis baslatma duzeltme)
+ * Temizlik iptal: temizleniyor → bekliyor (yanlış başlatma düzeltme)
  */
 export async function cancelClean(cutId: string): Promise<ActionResult> {
   try {
@@ -193,7 +193,7 @@ export async function cancelClean(cutId: string): Promise<ActionResult> {
       .eq("cut_id", cutId);
 
     if (!lines || lines.length === 0) {
-      return { success: false, error: "Parca bulunamadi" };
+      return { success: false, error: "Parça bulunamadı" };
     }
 
     const cutLineIds = lines.map((l) => l.cut_line_id);
@@ -209,6 +209,6 @@ export async function cancelClean(cutId: string): Promise<ActionResult> {
     revalidatePath("/uretim/temizlik");
     return { success: true };
   } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata olustu" };
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
