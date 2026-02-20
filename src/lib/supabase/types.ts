@@ -728,6 +728,39 @@ export type Database = {
           },
         ];
       };
+      sevkiyat_palet_sablon: {
+        Row: {
+          id: number;
+          country_code: string;
+          sku: string;
+          urun_adi: string | null;
+          palet_boyut: string;
+          palet_yukseklik: number;
+          en: number;
+          boy: number;
+          yuk: number;
+          koli_adedi: number;
+          palette_koli: number;
+          koli_agirlik: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          country_code: string;
+          sku: string;
+          urun_adi?: string | null;
+          palet_boyut: string;
+          palet_yukseklik: number;
+          en: number;
+          boy: number;
+          yuk: number;
+          koli_adedi: number;
+          palette_koli: number;
+          koli_agirlik: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["sevkiyat_palet_sablon"]["Insert"]>;
+        Relationships: [];
+      };
       yari_mamul_stok: {
         Row: {
           yms_id: string;

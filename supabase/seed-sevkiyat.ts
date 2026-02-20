@@ -185,16 +185,16 @@ async function seedSevkiyatlar() {
       const en = Number(dRow["EN"] ?? 0);
       const boy = Number(dRow["BOY"] ?? 0);
       const yuk = Number(dRow["YÜKS"] ?? 0);
-      const koliAdedi = Number(dRow["ADET"] ?? 1);
-      const paletteKoli = Number(dRow["PALETTE KOLİ"] ?? 1);
-      const toplamKoli = Number(dRow["TOPLAM KOLİ"] ?? 0);
+      const koliAdedi = Math.round(Number(dRow["ADET"] ?? 1));
+      const paletteKoli = Math.round(Number(dRow["PALETTE KOLİ"] ?? 1));
+      const toplamKoli = Math.round(Number(dRow["TOPLAM KOLİ"] ?? 0));
       const hacim = Number(dRow["HACİM (m3)"] ?? 0);
       const desi = Number(dRow["DESİ"] ?? 0);
       const koliAgirlik = Number(dRow["KOLİ AĞIRLIK"] ?? 0);
       const agirlik = Number(dRow["AĞIRLIK (kg)"] ?? 0);
       const grup = dRow["GRUP"] ? String(dRow["GRUP"]).trim() : null;
-      const paletSayisi = Number(dRow["PALET_1"] ?? 0);
-      const qty = Number(dRow["Adet"] ?? toplamKoli * koliAdedi);
+      const paletSayisi = Math.round(Number(dRow["PALET_1"] ?? 0));
+      const qty = Math.round(Number(dRow["Adet"] ?? toplamKoli * koliAdedi));
 
       // Fiyat bilgisini çek
       let birimFiyat = 0;
@@ -245,6 +245,126 @@ async function seedSevkiyatlar() {
   console.log(`  ✅ ${sevkInserted} sevkiyat + ${itemsInserted} kalem eklendi`);
 }
 
+// ─── 3. Palet Şablonları Seed ─────────────────────────────────
+
+async function seedPaletSablonlari() {
+  console.log("\n📐 Palet şablonları seed başlatılıyor...");
+
+  const wb = XLSX.readFile(resolve(process.cwd(), "..", "data", "VIGO WOOD Sevkiyat Planları.xlsx"));
+
+  // Ürün adları cache (products tablosundan çekelim)
+  const { data: productsData } = await supabase
+    .from("products")
+    .select("sku, urun_adi");
+  const productNames: Record<string, string> = {};
+  for (const p of (productsData ?? []) as { sku: string; urun_adi: string | null }[]) {
+    if (p.urun_adi) productNames[p.sku] = p.urun_adi;
+  }
+
+  // Tüm detay sheet'lerini tara — en son sheet'i öncelikli tut
+  const sheetOrder = [
+    "DE17", "DE18", "DE19", "DE20",
+    "UK26", "UK27", "UK28",
+    "USA21", "USA22", "USA23", "USA24",
+  ];
+
+  // country_code+sku → şablon verileri (son sheet kazanır)
+  const sablonMap = new Map<string, {
+    country_code: string;
+    sku: string;
+    urun_adi: string | null;
+    palet_boyut: string;
+    palet_yukseklik: number;
+    en: number;
+    boy: number;
+    yuk: number;
+    koli_adedi: number;
+    palette_koli: number;
+    koli_agirlik: number;
+  }>();
+
+  for (const sheetName of sheetOrder) {
+    const ws = wb.Sheets[sheetName];
+    if (!ws) continue;
+
+    const countryCode = parseCountryCode(sheetName);
+    if (!countryCode) continue;
+
+    const rows = XLSX.utils.sheet_to_json(ws) as Record<string, unknown>[];
+
+    for (const row of rows) {
+      const sku = String(row["KODU"] ?? "").trim();
+      if (!sku) continue;
+
+      const paletBoyut = String(row["PALET"] ?? (countryCode === "DE" ? "80x120" : "100x120"));
+      const paletYukseklik = Number(row["Palet Yükseklik\n CM"] ?? row["Palet Yükseklik CM"] ?? 0);
+      const en = Number(row["EN"] ?? 0);
+      const boy = Number(row["BOY"] ?? 0);
+      const yuk = Number(row["YÜKS"] ?? 0);
+      const koliAdedi = Math.round(Number(row["ADET"] ?? 0));
+      const paletteKoli = Math.round(Number(row["PALETTE KOLİ"] ?? 0));
+      const koliAgirlik = Number(row["KOLİ AĞIRLIK"] ?? 0);
+
+      // Geçersiz verileri atla
+      if (!koliAdedi || !paletteKoli || !koliAgirlik) continue;
+
+      const key = `${countryCode}:${sku}`;
+
+      // İlk kez eklenen veya son sheet override
+      if (!sablonMap.has(key)) {
+        sablonMap.set(key, {
+          country_code: countryCode,
+          sku,
+          urun_adi: productNames[sku] ?? (row["ÜRÜN"] ? String(row["ÜRÜN"]) : null),
+          palet_boyut: paletBoyut,
+          palet_yukseklik: paletYukseklik || 125,
+          en,
+          boy,
+          yuk,
+          koli_adedi: koliAdedi,
+          palette_koli: paletteKoli,
+          koli_agirlik: koliAgirlik,
+        });
+      } else {
+        // Son sheet'teki değerler kazanır
+        sablonMap.set(key, {
+          country_code: countryCode,
+          sku,
+          urun_adi: productNames[sku] ?? (row["ÜRÜN"] ? String(row["ÜRÜN"]) : null),
+          palet_boyut: paletBoyut,
+          palet_yukseklik: paletYukseklik || 125,
+          en,
+          boy,
+          yuk,
+          koli_adedi: koliAdedi,
+          palette_koli: paletteKoli,
+          koli_agirlik: koliAgirlik,
+        });
+      }
+    }
+  }
+
+  const records = Array.from(sablonMap.values());
+  console.log(`  ${records.length} benzersiz şablon bulundu`);
+
+  // Batch upsert
+  const batchSize = 50;
+  let inserted = 0;
+  for (let i = 0; i < records.length; i += batchSize) {
+    const batch = records.slice(i, i + batchSize);
+    const { error } = await supabase.from("sevkiyat_palet_sablon").upsert(batch, {
+      onConflict: "country_code,sku",
+    });
+    if (error) {
+      console.error(`  Batch ${i / batchSize + 1} hata:`, error.message);
+    } else {
+      inserted += batch.length;
+    }
+  }
+
+  console.log(`  ✅ ${inserted} palet şablonu eklendi/güncellendi`);
+}
+
 // ─── Main ──────────────────────────────────────────────────────
 
 async function main() {
@@ -252,6 +372,7 @@ async function main() {
 
   await seedFiyatlar();
   await seedSevkiyatlar();
+  await seedPaletSablonlari();
 
   console.log("\n✅ Seed tamamlandı!");
 }

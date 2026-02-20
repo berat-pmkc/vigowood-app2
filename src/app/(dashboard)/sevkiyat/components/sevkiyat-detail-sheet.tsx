@@ -21,9 +21,7 @@ import {
 import type { SevkiyatStatus } from "@/lib/constants";
 import {
   KONTEYNER_TYPE_LABELS,
-  SEVKIYAT_COUNTRIES,
   type KonteynerType,
-  type SevkiyatCountryCode,
 } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 import {
@@ -51,9 +49,6 @@ export function SevkiyatDetailSheet({ sevkiyat, open, onOpenChange }: SevkiyatDe
   const [actionLoading, setActionLoading] = useState(false);
   const durum = sevkiyat.durum as SevkiyatStatus;
   const isReadonly = durum === "yolda" || durum === "teslim_edildi";
-  const country = sevkiyat.country_code
-    ? SEVKIYAT_COUNTRIES[sevkiyat.country_code as SevkiyatCountryCode]
-    : null;
 
   const handleStartPrep = async () => {
     setActionLoading(true);
@@ -137,12 +132,6 @@ export function SevkiyatDetailSheet({ sevkiyat, open, onOpenChange }: SevkiyatDe
                   <Anchor className="w-3 h-3 text-muted-foreground" />
                   <p className="font-medium">{sevkiyat.liman}</p>
                 </div>
-              </div>
-            )}
-            {country && (
-              <div>
-                <p className="text-muted-foreground">Para Birimi</p>
-                <p className="font-medium">{country.currency} ({country.currencySymbol})</p>
               </div>
             )}
             {sevkiyat.konteyner_no && (

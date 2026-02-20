@@ -226,3 +226,20 @@ export const sevkiyatFiyatSchema = z.object({
 });
 
 export type SevkiyatFiyatData = z.infer<typeof sevkiyatFiyatSchema>;
+
+// Palet Şablon
+export const paletSablonSchema = z.object({
+  country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
+  sku: z.string().min(1, "SKU gereklidir"),
+  urun_adi: z.string().max(300, "Ürün adı en fazla 300 karakter").nullable(),
+  palet_boyut: z.string().min(1, "Palet boyutu gereklidir"),
+  palet_yukseklik: z.number().min(1, "Palet yüksekliği gereklidir"),
+  en: z.number().min(1, "Koli genişliği gereklidir"),
+  boy: z.number().min(1, "Koli uzunluğu gereklidir"),
+  yuk: z.number().min(1, "Koli yüksekliği gereklidir"),
+  koli_adedi: z.number().int("Tam sayı olmalıdır").min(1, "Koli adedi gereklidir"),
+  palette_koli: z.number().int("Tam sayı olmalıdır").min(1, "Palette koli gereklidir"),
+  koli_agirlik: z.number().min(0.1, "Koli ağırlığı gereklidir"),
+});
+
+export type PaletSablonData = z.infer<typeof paletSablonSchema>;

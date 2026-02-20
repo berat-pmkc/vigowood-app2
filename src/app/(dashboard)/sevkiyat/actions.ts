@@ -122,6 +122,38 @@ export async function getFiyatlarForCountry(countryCode: string) {
   }
 }
 
+/** Palet şablonu getir (ülke + sku) */
+export async function getPaletSablon(countryCode: string, sku: string) {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("sevkiyat_palet_sablon")
+      .select("*")
+      .eq("country_code", countryCode)
+      .eq("sku", sku)
+      .single();
+
+    if (error || !data) return { success: true as const, data: null };
+    return {
+      success: true as const,
+      data: data as {
+        palet_boyut: string;
+        palet_yukseklik: number;
+        en: number;
+        boy: number;
+        yuk: number;
+        koli_adedi: number;
+        palette_koli: number;
+        koli_agirlik: number;
+      },
+    };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
 /** Yeni sevkiyat oluştur (v2 — ülke bazlı ID) */

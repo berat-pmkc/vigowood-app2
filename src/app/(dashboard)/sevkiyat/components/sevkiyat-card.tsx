@@ -10,10 +10,8 @@ import { startPreparation } from "../actions";
 import {
   SEVKIYAT_STATUS_BORDER_COLORS,
   KONTEYNER_TYPE_LABELS,
-  SEVKIYAT_COUNTRIES,
   type SevkiyatStatus,
   type KonteynerType,
-  type SevkiyatCountryCode,
 } from "@/lib/constants";
 import { formatDate, cn } from "@/lib/utils";
 import {
@@ -71,10 +69,6 @@ export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
   const durum = sevkiyat.durum as SevkiyatStatus;
   const borderColor = SEVKIYAT_STATUS_BORDER_COLORS[durum] ?? SEVKIYAT_STATUS_BORDER_COLORS.bekliyor;
   const isTeslim = durum === "teslim_edildi";
-  const country = sevkiyat.country_code
-    ? SEVKIYAT_COUNTRIES[sevkiyat.country_code as SevkiyatCountryCode]
-    : null;
-  const currencySymbol = country?.currencySymbol ?? "$";
 
   const handleStartPrep = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -157,15 +151,6 @@ export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
               )}
             </div>
           </div>
-
-          {/* Tutar */}
-          {(sevkiyat.total_fiyat ?? 0) > 0 && (
-            <div className="text-right mb-3">
-              <span className="text-sm font-bold text-foreground">
-                {currencySymbol}{sevkiyat.total_fiyat!.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-          )}
 
           {/* Footer */}
           <div className="flex items-center justify-between pt-3 border-t">

@@ -201,9 +201,25 @@ Next.js 16 + Supabase SSR'da `setAll` callback'i her istekte cookie set eder. Ne
 
 **Çözüm**: `middleware.ts`'de cookie karşılaştırma mevcut (`existingCookies` Map). Bu kodu değiştirme/kaldırma.
 
+### Migration Kuralları — KRİTİK
+- Migration'ları **kullanıcıya SQL yapıştırmasını İSTEME** — `npx supabase db push` ile uygula
+- Supabase CLI zaten login'li ve linked (proje ref: `qqoojonxpaufcyyzvfpo`)
+- Trigger fonksiyon adı: `handle_updated_at()` — `set_updated_at()` YAZMA
+- Migration listesi kontrol: `npx supabase migration list`
+- Dosya formatı: `supabase/migrations/NNN_isim.sql` (sıralı numara)
+
 ---
 
 ## ARAÇLAR
+
+### Supabase CLI
+Migration uygulama ve veritabanı yönetimi. Zaten login'li, doğrudan kullan.
+
+```bash
+npx supabase db push          # Bekleyen migration'ları uygula
+npx supabase migration list   # Local vs remote durum
+npx supabase migration new xyz  # Yeni migration dosyası oluştur
+```
 
 ### Context7 MCP
 Güncel kütüphane dokümantasyonu çeker. API'den emin olmadığında kullan.

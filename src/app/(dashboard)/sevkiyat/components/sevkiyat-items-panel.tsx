@@ -27,14 +27,15 @@ import {
 import {
   getSevkiyatItems,
   getActiveProducts,
+  getPaletSablon,
   addSevkiyatItem,
   deleteSevkiyatItem,
   type SevkiyatItemRow,
 } from "../actions";
-import { Plus, Trash2, Check, ChevronsUpDown, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Check, ChevronsUpDown, Package, ChevronDown, ChevronUp, Pencil, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { PALET_BOYUTLARI, SEVKIYAT_COUNTRIES, type SevkiyatCountryCode } from "@/lib/constants";
+import { PALET_BOYUTLARI } from "@/lib/constants";
 
 interface SevkiyatItemsPanelProps {
   sevkiyatId: string;
@@ -48,6 +49,17 @@ interface ProductOption {
   stok_aktif: number;
 }
 
+interface SablonData {
+  palet_boyut: string;
+  palet_yukseklik: number;
+  en: number;
+  boy: number;
+  yuk: number;
+  koli_adedi: number;
+  palette_koli: number;
+  koli_agirlik: number;
+}
+
 export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: SevkiyatItemsPanelProps) {
   const [items, setItems] = useState<SevkiyatItemRow[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -58,8 +70,13 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
   const [addOpen, setAddOpen] = useState(false);
   const [selectedSku, setSelectedSku] = useState("");
   const [addLoading, setAddLoading] = useState(false);
+  const [sablonLoading, setSablonLoading] = useState(false);
+  const [sablon, setSablon] = useState<SablonData | null>(null);
+  const [overrideMode, setOverrideMode] = useState(false);
+
+  // Form values (from sablon or manual)
   const [paletBoyut, setPaletBoyut] = useState<string>("80x120");
-  const [paletYukseklik, setPaletYukseklik] = useState<number>(100);
+  const [paletYukseklik, setPaletYukseklik] = useState<number>(125);
   const [en, setEn] = useState<number>(0);
   const [boy, setBoy] = useState<number>(0);
   const [yuk, setYuk] = useState<number>(0);
@@ -68,9 +85,6 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
   const [koliAgirlik, setKoliAgirlik] = useState<number>(1);
   const [paletSayisi, setPaletSayisi] = useState<number>(1);
   const [grup, setGrup] = useState<string>("");
-
-  const country = countryCode ? SEVKIYAT_COUNTRIES[countryCode as SevkiyatCountryCode] : null;
-  const currencySymbol = country?.currencySymbol ?? "$";
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -87,6 +101,45 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // SKU seçildiğinde şablonu yükle
+  const handleSkuSelect = useCallback(async (sku: string) => {
+    setSelectedSku(sku);
+    setAddOpen(false);
+    setOverrideMode(false);
+    setSablon(null);
+
+    if (!countryCode || !sku) return;
+
+    setSablonLoading(true);
+    const result = await getPaletSablon(countryCode, sku);
+    setSablonLoading(false);
+
+    if (result.success && result.data) {
+      const s = result.data;
+      setSablon(s);
+      setPaletBoyut(s.palet_boyut);
+      setPaletYukseklik(s.palet_yukseklik);
+      setEn(s.en);
+      setBoy(s.boy);
+      setYuk(s.yuk);
+      setKoliAdedi(s.koli_adedi);
+      setPaletteKoli(s.palette_koli);
+      setKoliAgirlik(s.koli_agirlik);
+      setPaletSayisi(1);
+    } else {
+      // Şablon yok — varsayılan değerler
+      setPaletBoyut(countryCode === "DE" ? "80x120" : "100x120");
+      setPaletYukseklik(125);
+      setEn(0);
+      setBoy(0);
+      setYuk(0);
+      setKoliAdedi(1);
+      setPaletteKoli(1);
+      setKoliAgirlik(1);
+      setPaletSayisi(1);
+    }
+  }, [countryCode]);
 
   const handleAdd = async () => {
     if (!selectedSku) return;
@@ -105,9 +158,12 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
       grup: grup || null,
     });
     if (result.success) {
-      toast.success("\u00dcr\u00fcn eklendi");
+      toast.success("Ürün eklendi");
       setSelectedSku("");
-      setAddFormOpen(false);
+      setSablon(null);
+      setGrup("");
+      setPaletSayisi(1);
+      setOverrideMode(false);
       loadData();
     } else {
       toast.error(result.error);
@@ -118,12 +174,17 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
   const handleDelete = async (itemId: string) => {
     const result = await deleteSevkiyatItem(itemId);
     if (result.success) {
-      toast.success("\u00dcr\u00fcn kald\u0131r\u0131ld\u0131");
+      toast.success("Ürün kaldırıldı");
       loadData();
     } else {
       toast.error(result.error);
     }
   };
+
+  // Hesaplamalar
+  const toplamKoli = paletteKoli * paletSayisi;
+  const toplamAdet = koliAdedi * toplamKoli;
+  const toplamAgirlik = koliAgirlik * toplamKoli;
 
   // Toplamlar
   const totalQty = items.reduce((sum, i) => sum + i.qty, 0);
@@ -131,12 +192,11 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
   const totalKoli = items.reduce((sum, i) => sum + (i.toplam_koli ?? 0), 0);
   const totalAgirlik = items.reduce((sum, i) => sum + (i.agirlik ?? 0), 0);
   const totalHacim = items.reduce((sum, i) => sum + (i.hacim ?? 0), 0);
-  const totalFiyat = items.reduce((sum, i) => sum + (i.toplam_fiyat ?? 0), 0);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-        Y\u00fckleniyor...
+        Yükleniyor...
       </div>
     );
   }
@@ -145,7 +205,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium text-foreground">
-          \u00dcr\u00fcnler ({items.length} kalem)
+          Ürünler ({items.length} kalem)
         </h4>
       </div>
 
@@ -153,20 +213,19 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
       {items.length === 0 ? (
         <div className="text-center py-6 text-sm text-muted-foreground">
           <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          Hen\u00fcz \u00fcr\u00fcn eklenmemi\u015f
+          Henüz ürün eklenmemiş
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b text-muted-foreground">
-                <th className="text-left py-2 pr-2">\u00dcr\u00fcn</th>
+                <th className="text-left py-2 pr-2">Ürün</th>
                 <th className="text-right py-2 px-1">Plt</th>
                 <th className="text-right py-2 px-1">Koli</th>
                 <th className="text-right py-2 px-1">Adet</th>
                 <th className="text-right py-2 px-1 hidden sm:table-cell">kg</th>
-                <th className="text-right py-2 px-1 hidden sm:table-cell">m\u00b3</th>
-                <th className="text-right py-2 px-1">Tutar</th>
+                <th className="text-right py-2 px-1 hidden sm:table-cell">m³</th>
                 {!readonly && <th className="w-8"></th>}
               </tr>
             </thead>
@@ -175,7 +234,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                 <tr key={item.item_id} className="border-b last:border-0">
                   <td className="py-2 pr-2">
                     <p className="font-medium truncate max-w-[140px]">{item.urun_adi ?? item.sku}</p>
-                    <p className="text-muted-foreground">{item.sku}</p>
+                    <p className="text-muted-foreground">{item.sku}{item.grup ? ` · ${item.grup}` : ""}</p>
                   </td>
                   <td className="text-right py-2 px-1 tabular-nums">{item.palet_sayisi ?? "-"}</td>
                   <td className="text-right py-2 px-1 tabular-nums">{item.toplam_koli ?? "-"}</td>
@@ -185,9 +244,6 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                   </td>
                   <td className="text-right py-2 px-1 tabular-nums hidden sm:table-cell">
                     {item.hacim ? item.hacim.toFixed(2) : "-"}
-                  </td>
-                  <td className="text-right py-2 px-1 tabular-nums font-semibold">
-                    {item.toplam_fiyat ? `${currencySymbol}${item.toplam_fiyat.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "-"}
                   </td>
                   {!readonly && (
                     <td className="py-2 pl-1">
@@ -213,9 +269,6 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                   <td className="text-right py-2 px-1 tabular-nums">{totalQty}</td>
                   <td className="text-right py-2 px-1 tabular-nums hidden sm:table-cell">{Math.round(totalAgirlik)}</td>
                   <td className="text-right py-2 px-1 tabular-nums hidden sm:table-cell">{totalHacim.toFixed(2)}</td>
-                  <td className="text-right py-2 px-1 tabular-nums">
-                    {currencySymbol}{totalFiyat.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </td>
                   {!readonly && <td></td>}
                 </tr>
               </tfoot>
@@ -234,7 +287,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
           >
             <span className="flex items-center gap-1">
               <Plus className="w-3.5 h-3.5" />
-              \u00dcr\u00fcn Ekle
+              Ürün Ekle
             </span>
             {addFormOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
@@ -243,7 +296,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
             <div className="space-y-3 pt-2">
               {/* SKU */}
               <div>
-                <Label className="text-xs">\u00dcr\u00fcn *</Label>
+                <Label className="text-xs">Ürün *</Label>
                 <Popover open={addOpen} onOpenChange={setAddOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -254,24 +307,21 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                     >
                       {selectedSku
                         ? products.find((p) => p.sku === selectedSku)?.urun_adi ?? selectedSku
-                        : "\u00dcr\u00fcn se\u00e7in..."}
+                        : "Ürün seçin..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
-                      <CommandInput placeholder="\u00dcr\u00fcn ara..." />
+                      <CommandInput placeholder="Ürün ara..." />
                       <CommandList>
-                        <CommandEmpty>\u00dcr\u00fcn bulunamad\u0131</CommandEmpty>
+                        <CommandEmpty>Ürün bulunamadı</CommandEmpty>
                         <CommandGroup>
                           {products.map((p) => (
                             <CommandItem
                               key={p.sku}
                               value={`${p.sku} ${p.urun_adi ?? ""}`}
-                              onSelect={() => {
-                                setSelectedSku(p.sku);
-                                setAddOpen(false);
-                              }}
+                              onSelect={() => handleSkuSelect(p.sku)}
                             >
                               <Check
                                 className={cn(
@@ -294,76 +344,159 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                 </Popover>
               </div>
 
-              {/* Palet & Koli bilgileri */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Palet Boyut</Label>
-                  <Select value={paletBoyut} onValueChange={setPaletBoyut}>
-                    <SelectTrigger className="h-8 text-xs mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PALET_BOYUTLARI.map((b) => (
-                        <SelectItem key={b} value={b}>{b} cm</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Palet Y\u00fckseklik (cm)</Label>
-                  <Input type="number" value={paletYukseklik} onChange={(e) => setPaletYukseklik(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-              </div>
+              {/* Şablon yükleniyor */}
+              {sablonLoading && (
+                <p className="text-xs text-muted-foreground">Şablon yükleniyor...</p>
+              )}
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs">En (cm)</Label>
-                  <Input type="number" value={en || ""} onChange={(e) => setEn(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-                <div>
-                  <Label className="text-xs">Boy (cm)</Label>
-                  <Input type="number" value={boy || ""} onChange={(e) => setBoy(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-                <div>
-                  <Label className="text-xs">Y\u00fck (cm)</Label>
-                  <Input type="number" value={yuk || ""} onChange={(e) => setYuk(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div>
-                  <Label className="text-xs">Koli Adedi</Label>
-                  <Input type="number" value={koliAdedi} onChange={(e) => setKoliAdedi(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-                <div>
-                  <Label className="text-xs">Palette Koli</Label>
-                  <Input type="number" value={paletteKoli} onChange={(e) => setPaletteKoli(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-                <div>
-                  <Label className="text-xs">Koli A\u011f\u0131rl\u0131k (kg)</Label>
-                  <Input type="number" step="0.1" value={koliAgirlik} onChange={(e) => setKoliAgirlik(Number(e.target.value))} className="h-8 text-xs mt-1" min={0.1} />
-                </div>
-                <div>
-                  <Label className="text-xs">Palet Say\u0131s\u0131</Label>
-                  <Input type="number" value={paletSayisi} onChange={(e) => setPaletSayisi(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs">Grup</Label>
-                <Input value={grup} onChange={(e) => setGrup(e.target.value)} className="h-8 text-xs mt-1" placeholder="Opsiyonel" />
-              </div>
-
-              {/* Auto-calculated preview */}
-              {selectedSku && koliAdedi > 0 && paletteKoli > 0 && paletSayisi > 0 && (
-                <div className="rounded border bg-muted/30 p-2 text-xs space-y-1">
-                  <p className="font-medium text-muted-foreground">Hesaplanan De\u011ferler:</p>
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-1">
-                    <span>Toplam Koli: <strong>{paletteKoli * paletSayisi}</strong></span>
-                    <span>Adet: <strong>{koliAdedi * paletteKoli * paletSayisi}</strong></span>
-                    <span>A\u011f\u0131rl\u0131k: <strong>{(koliAgirlik * paletteKoli * paletSayisi).toFixed(1)} kg</strong></span>
+              {/* Şablon bulundu — readonly bilgi + Düzenle toggle */}
+              {selectedSku && !sablonLoading && sablon && !overrideMode && (
+                <div className="rounded border bg-muted/30 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Info className="w-3 h-3" />
+                      Şablon Bilgileri
+                    </p>
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                      onClick={() => setOverrideMode(true)}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      Düzenle
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs">
+                    <span>Palet: <strong>{sablon.palet_boyut}</strong></span>
+                    <span>Yüks: <strong>{sablon.palet_yukseklik}cm</strong></span>
+                    <span>Koli: <strong>{sablon.en}×{sablon.boy}×{sablon.yuk}cm</strong></span>
+                    <span>kg/Koli: <strong>{sablon.koli_agirlik}</strong></span>
+                    <span>Koli/Plt: <strong>{sablon.palette_koli}</strong></span>
+                    <span>Adet/Koli: <strong>{sablon.koli_adedi}</strong></span>
                   </div>
                 </div>
+              )}
+
+              {/* Şablon yok veya override modu — tam form */}
+              {selectedSku && !sablonLoading && (!sablon || overrideMode) && (
+                <>
+                  {!sablon && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      <Info className="w-3 h-3" />
+                      Bu ürün için şablon bulunamadı, değerleri elle girin.
+                    </p>
+                  )}
+
+                  {overrideMode && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Şablon değerleri düzenleniyor</p>
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => {
+                          // Şablona geri dön
+                          if (sablon) {
+                            setPaletBoyut(sablon.palet_boyut);
+                            setPaletYukseklik(sablon.palet_yukseklik);
+                            setEn(sablon.en);
+                            setBoy(sablon.boy);
+                            setYuk(sablon.yuk);
+                            setKoliAdedi(sablon.koli_adedi);
+                            setPaletteKoli(sablon.palette_koli);
+                            setKoliAgirlik(sablon.koli_agirlik);
+                          }
+                          setOverrideMode(false);
+                        }}
+                      >
+                        Şablona Dön
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Palet Boyut</Label>
+                      <Select value={paletBoyut} onValueChange={setPaletBoyut}>
+                        <SelectTrigger className="h-8 text-xs mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PALET_BOYUTLARI.map((b) => (
+                            <SelectItem key={b} value={b}>{b} cm</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Palet Yükseklik (cm)</Label>
+                      <Input type="number" value={paletYukseklik} onChange={(e) => setPaletYukseklik(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">En (cm)</Label>
+                      <Input type="number" value={en || ""} onChange={(e) => setEn(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Boy (cm)</Label>
+                      <Input type="number" value={boy || ""} onChange={(e) => setBoy(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Yük (cm)</Label>
+                      <Input type="number" value={yuk || ""} onChange={(e) => setYuk(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">Adet/Koli</Label>
+                      <Input type="number" value={koliAdedi} onChange={(e) => setKoliAdedi(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Koli/Palet</Label>
+                      <Input type="number" value={paletteKoli} onChange={(e) => setPaletteKoli(Number(e.target.value))} className="h-8 text-xs mt-1" min={1} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">kg/Koli</Label>
+                      <Input type="number" step="0.1" value={koliAgirlik} onChange={(e) => setKoliAgirlik(Number(e.target.value))} className="h-8 text-xs mt-1" min={0.1} />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Grup + Palet Sayısı — her zaman görünür (sku seçildikten sonra) */}
+              {selectedSku && !sablonLoading && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Grup</Label>
+                      <Input value={grup} onChange={(e) => setGrup(e.target.value)} className="h-8 text-xs mt-1" placeholder="Opsiyonel (DTM1, LEJ3...)" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-foreground">Palet Adedi *</Label>
+                      <Input
+                        type="number"
+                        value={paletSayisi}
+                        onChange={(e) => setPaletSayisi(Number(e.target.value))}
+                        className="h-8 text-xs mt-1 border-primary/50 font-semibold"
+                        min={1}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Auto-calculated preview */}
+                  {koliAdedi > 0 && paletteKoli > 0 && paletSayisi > 0 && (
+                    <div className="rounded border bg-muted/30 p-2 text-xs space-y-1">
+                      <p className="font-medium text-muted-foreground">Hesaplanan Değerler:</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1">
+                        <span>Toplam Koli: <strong>{toplamKoli}</strong></span>
+                        <span>Adet: <strong>{toplamAdet}</strong></span>
+                        <span>Ağırlık: <strong>{toplamAgirlik.toFixed(1)} kg</strong></span>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <Button
@@ -373,7 +506,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                 disabled={!selectedSku || addLoading}
               >
                 <Plus className="w-4 h-4 mr-1" />
-                {addLoading ? "Ekleniyor..." : "\u00dcr\u00fcn Ekle"}
+                {addLoading ? "Ekleniyor..." : "Ürün Ekle"}
               </Button>
             </div>
           )}
