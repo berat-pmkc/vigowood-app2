@@ -41,7 +41,7 @@ Veritabanı yapısını, kolon isimlerini, ilişkileri ve veri tiplerini bu dosy
 | Tailwind CSS + shadcn/ui | Styling + UI |
 | Tremor | Dashboard kartları, KPI |
 | Recharts | Grafikler |
-| Tanstack Table | Veri tabloları |
+| TanStack Table | Veri tabloları |
 | Lucide React | İkonlar |
 | Hetzner VPS | Python worker, cron, n8n (mevcut) |
 
@@ -243,14 +243,14 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] stock_movements, yari_mamul_stok (234K satır)
 - [x] hazir_eleman_akis, iade_giris, attendance, notifications
 
-### KATMAN 6: Admin — Ürün Yönetimi
-- [ ] Ürün listesi, arama, filtre
-- [ ] Ürün CRUD
-- [ ] Toplu aktif/pasif
+### KATMAN 6: Admin — Ürün Yönetimi ✅
+- [x] Ürün listesi, arama, filtre
+- [x] Ürün CRUD
+- [x] Toplu aktif/pasif
 
-### KATMAN 7: Admin — Parça Yönetimi
-- [ ] Parça listesi (tip bazlı filtre)
-- [ ] Parça CRUD + kritik stok seviyesi
+### KATMAN 7: Admin — Parça Yönetimi ✅
+- [x] Parça listesi (tip bazlı filtre)
+- [x] Parça CRUD + kritik stok seviyesi
 
 ### KATMAN 8: Admin — Plaka Yönetimi
 - [ ] Plaka listesi + CRUD

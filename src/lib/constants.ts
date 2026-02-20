@@ -69,6 +69,37 @@ export const STATION_EMAILS = [
   "kutu@vigowood.com",
 ] as const;
 
+// Part types (matches part_type enum in DB)
+export const PART_TYPES = [
+  "YARIMAMUL",
+  "HAZIR",
+  "KUTU",
+  "KARTON",
+] as const;
+
+export type PartType = (typeof PART_TYPES)[number];
+
+export const PART_TYPE_LABELS: Record<PartType, string> = {
+  YARIMAMUL: "Yarı Mamül",
+  HAZIR: "Hazır Eleman",
+  KUTU: "Kutu",
+  KARTON: "Karton",
+};
+
+// Product categories (matches product_category enum in DB)
+export const PRODUCT_CATEGORIES = [
+  "AT EVİ",
+  "TELEFON STANDI",
+  "KİTAP OKUMA STANDI",
+  "BASAMAK",
+  "LAPTOP SEHPASI",
+  "KABAK LİFİ",
+  "KİTAPLIK",
+  "MİNDER",
+  "ORGANİZER",
+  "TABLO",
+] as const;
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;

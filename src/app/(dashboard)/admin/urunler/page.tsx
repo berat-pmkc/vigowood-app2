@@ -1,0 +1,102 @@
+import { createClient } from "@/lib/supabase/server";
+import { ProductsDataTable } from "./components/products-data-table";
+import type { Database, ProductCategory } from "@/lib/supabase/types";
+
+type Product = Database["public"]["Tables"]["products"]["Row"];
+
+interface PageProps {
+  searchParams: Promise<{
+    page?: string;
+    pageSize?: string;
+    search?: string;
+    kategori?: string;
+    aktif?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }>;
+}
+
+export default async function UrunlerPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+
+  const page = Math.max(0, Number(params.page || "0"));
+  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
+    ? Number(params.pageSize)
+    : 25;
+  const search = params.search?.trim() || "";
+  const kategori = params.kategori || "";
+  const aktif = params.aktif || "";
+  const sortBy = params.sortBy || "sku";
+  const sortOrder = params.sortOrder === "desc" ? false : true; // ascending = true
+
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("products")
+    .select("*", { count: "exact" });
+
+  // Search filter
+  if (search) {
+    query = query.or(`sku.ilike.%${search}%,urun_adi.ilike.%${search}%`);
+  }
+
+  // Category filter
+  if (kategori) {
+    query = query.eq("kategori", kategori as ProductCategory);
+  }
+
+  // Active filter
+  if (aktif === "true") {
+    query = query.eq("aktif_mi", true);
+  } else if (aktif === "false") {
+    query = query.eq("aktif_mi", false);
+  }
+
+  // Sorting
+  const validSortColumns: (keyof Product)[] = [
+    "sku", "urun_adi", "kategori", "aktif_mi", "stok_aktif",
+    "gunluk_satis", "aylik_uretim",
+  ];
+  const sortColumn = validSortColumns.includes(sortBy as keyof Product)
+    ? sortBy
+    : "sku";
+  query = query.order(sortColumn, { ascending: sortOrder });
+
+  // Pagination
+  query = query.range(from, to);
+
+  const { data: products, count, error } = await query;
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <p className="text-destructive">Veri yüklenirken hata oluştu: {error.message}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 pb-6 sm:px-6">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold tracking-tight">Ürün Yönetimi</h1>
+        <p className="text-sm text-muted-foreground">
+          Ürün listesi, arama, filtreleme ve toplu işlemler
+        </p>
+      </div>
+      <ProductsDataTable
+        data={(products as Product[]) ?? []}
+        totalCount={count ?? 0}
+        pageIndex={page}
+        pageSize={pageSize}
+        search={search}
+        kategori={kategori}
+        aktif={aktif}
+        sortBy={sortColumn}
+        sortOrder={sortOrder ? "asc" : "desc"}
+      />
+    </div>
+  );
+}
