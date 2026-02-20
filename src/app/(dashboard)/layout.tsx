@@ -1,40 +1,32 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import type { UserRole } from "@/lib/constants";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const profile = await getCurrentUser();
 
-  if (!user) {
+  if (!profile) {
     redirect("/login");
   }
 
-  // Get user profile
-  const { data: profile } = await supabase
-    .from("users")
-    .select("full_name, role, station")
-    .eq("auth_id", user.id)
-    .single();
-
   // For station accounts, show selected operator name
-  const operatorName = user.user_metadata?.selected_operator_name as string | undefined;
-  const displayName = operatorName || profile?.full_name || user.email || "";
-  const userRole = (profile?.role || "Üretim") as UserRole;
-  const displayRole = userRole;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const operatorName = user?.user_metadata?.selected_operator_name as string | undefined;
+  const displayName = operatorName || profile.full_name || profile.email || "";
+  const userRole = profile.role as UserRole;
 
   return (
     <DashboardShell
       userRole={userRole}
       displayName={displayName}
-      displayRole={displayRole}
+      displayRole={userRole}
     >
       {children}
     </DashboardShell>

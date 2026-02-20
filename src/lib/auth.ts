@@ -21,13 +21,36 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 
   if (!authUser) return null;
 
+  // Önce auth_id ile ara
   const { data: profile } = await supabase
     .from("users")
     .select("user_id, auth_id, email, full_name, role, station, is_active, created_at, updated_at")
     .eq("auth_id", authUser.id)
     .single();
 
-  return profile ?? null;
+  if (profile) return profile;
+
+  // auth_id eşleşmezse email ile fallback + auth_id'yi otomatik bağla
+  if (authUser.email) {
+    const { data: emailProfile } = await supabase
+      .from("users")
+      .select("user_id, auth_id, email, full_name, role, station, is_active, created_at, updated_at")
+      .eq("email", authUser.email)
+      .single();
+
+    if (emailProfile) {
+      // auth_id'yi bağla (bir kere)
+      if (!emailProfile.auth_id) {
+        await supabase
+          .from("users")
+          .update({ auth_id: authUser.id })
+          .eq("user_id", emailProfile.user_id);
+      }
+      return { ...emailProfile, auth_id: authUser.id };
+    }
+  }
+
+  return null;
 }
 
 /**
