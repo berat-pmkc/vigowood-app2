@@ -252,10 +252,10 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Parça listesi (tip bazlı filtre)
 - [x] Parça CRUD + kritik stok seviyesi
 
-### KATMAN 8: Admin — Plaka Yönetimi
-- [ ] Plaka listesi + CRUD
-- [ ] PlakaParts yönetimi
-- [ ] Makine bazlı kesim süresi
+### KATMAN 8: Admin — Plaka Yönetimi ✅
+- [x] Plaka listesi + CRUD
+- [x] PlakaParts yönetimi
+- [x] Makine bazlı kesim süresi
 
 ### KATMAN 9: Admin — BOM ve Montaj
 - [ ] Montaj adımları (sıralama, drag-drop)

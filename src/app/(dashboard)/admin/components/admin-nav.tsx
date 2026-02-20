@@ -13,7 +13,7 @@ const adminTabs: {
 }[] = [
   { label: "Ürünler", href: "/admin/urunler", icon: Package },
   { label: "Parçalar", href: "/admin/parcalar", icon: Puzzle },
-  { label: "Plakalar", href: "/admin/plakalar", icon: Layers, disabled: true },
+  { label: "Plakalar", href: "/admin/plakalar", icon: Layers },
   { label: "BOM", href: "/admin/bom", icon: GitBranch, disabled: true },
 ];
 

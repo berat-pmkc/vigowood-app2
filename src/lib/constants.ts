@@ -100,6 +100,17 @@ export const PRODUCT_CATEGORIES = [
   "TABLO",
 ] as const;
 
+// Kesim makinesi IDs (matches kesim_makinesi table)
+export const MAKINE_IDS = ["BÜYÜK", "KÜÇÜK", "KUTU"] as const;
+
+export type MakineId = (typeof MAKINE_IDS)[number];
+
+export const MAKINE_LABELS: Record<MakineId, string> = {
+  BÜYÜK: "Büyük Lazer (600W)",
+  KÜÇÜK: "Küçük Lazer (300W)",
+  KUTU: "Kutu (BALA)",
+};
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;
