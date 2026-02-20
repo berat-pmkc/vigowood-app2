@@ -1,24 +1,75 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Wrench } from "lucide-react";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { MontajList } from "./components/montaj-list";
+import type { MontajBatchRow } from "./components/montaj-card";
 
-export default function MontajPage() {
+interface PageProps {
+  searchParams: Promise<{ durum?: string }>;
+}
+
+export default async function MontajPage({ searchParams }: PageProps) {
+  const user = await getCurrentUser();
+  if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
+    redirect("/");
+  }
+
+  const params = await searchParams;
+  const selectedStatus = params.durum || "all";
+
+  const supabase = await createClient();
+
+  // Son 30 gün veya aktif olanlar
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const { data: allBatches } = await supabase
+    .from("montaj_batches")
+    .select("montaj_id, sku, adet, durum, current_step_no, total_steps, operator_id, operator_name, email, baslama_zamani, bitis_zamani, notes, created_at")
+    .or(`durum.neq.tamamlandi,created_at.gte.${thirtyDaysAgo.toISOString()}`)
+    .order("created_at", { ascending: false });
+
+  const batches = (allBatches ?? []) as MontajBatchRow[];
+
+  // Durum sayaçları
+  const counts: Record<string, number> = { bekliyor: 0, montajda: 0, tamamlandi: 0 };
+  batches.forEach((b) => {
+    if (counts[b.durum] !== undefined) counts[b.durum]++;
+  });
+
+  // Durum filtrele
+  const filtered = selectedStatus === "all"
+    ? batches
+    : batches.filter((b) => b.durum === selectedStatus);
+
+  // Enrich: ürün adları
+  const skus = [...new Set(filtered.map((b) => b.sku).filter(Boolean))];
+
+  let productMap = new Map<string, string>();
+  if (skus.length > 0) {
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skus);
+
+    productMap = new Map(
+      (products ?? []).map((p) => [p.sku, p.urun_adi ?? ""])
+    );
+  }
+
+  const enriched: MontajBatchRow[] = filtered.map((b) => ({
+    ...b,
+    urun_adi: productMap.get(b.sku) ?? undefined,
+  }));
+
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center pb-20 md:pb-6">
-      <Card className="w-full max-w-md text-center">
-        <CardContent className="pt-8 pb-8">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
-            <Wrench className="h-8 w-8 text-vw-success" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground">Montaj</h2>
-          <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
-            Montaj giris formu, adim bazli malzeme listesi ve malzeme yeterliligi kontrolu burada yer alacak.
-          </p>
-          <Badge variant="outline" className="mt-4">
-            Katman 12
-          </Badge>
-        </CardContent>
-      </Card>
+    <div className="pb-20 md:pb-6">
+      <MontajList
+        batches={enriched}
+        counts={counts}
+        selectedStatus={selectedStatus}
+      />
     </div>
   );
 }

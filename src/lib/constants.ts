@@ -156,6 +156,28 @@ export const CLEAN_STATUS_BORDER_COLORS: Record<CleanStatus, string> = {
   tamamlandi: "border-l-emerald-500",
 };
 
+// Montaj durum sabitleri
+export const MONTAJ_STATUS = ["bekliyor", "montajda", "tamamlandi"] as const;
+export type MontajStatus = (typeof MONTAJ_STATUS)[number];
+
+export const MONTAJ_STATUS_LABELS: Record<MontajStatus, string> = {
+  bekliyor: "Bekliyor",
+  montajda: "Montajda",
+  tamamlandi: "Tamamlandı",
+};
+
+export const MONTAJ_STATUS_COLORS: Record<MontajStatus, { bg: string; text: string; border: string }> = {
+  bekliyor: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  montajda: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  tamamlandi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+export const MONTAJ_STATUS_BORDER_COLORS: Record<MontajStatus, string> = {
+  bekliyor: "border-l-amber-400",
+  montajda: "border-l-blue-500",
+  tamamlandi: "border-l-emerald-500",
+};
+
 // Üretim erişim rolleri
 export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Yönetici",

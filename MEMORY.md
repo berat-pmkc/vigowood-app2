@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 6: Admin — Ürün Yönetimi** — Sırada
+**Katman 13: Üretim — Paketleme** — Sırada
 
 ---
 
@@ -164,6 +164,27 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 - PackEvents.Personel: virgülle ayrık VW### — TEXT olarak saklanıyor (ileride normalize)
 - Notifications.TargetUser: aynı pattern, TEXT
 - Attendance.Employee: isim bazlı, VW### değil — user mapping ileride yapılacak
+
+---
+
+### Katman 12 ✅ (2026-02-20)
+- Migration: 010_montaj_tables.sql — montaj_batches tablosu
+- Durum akışı: bekliyor → montajda → tamamlandi (cancelMontaj ile geri alınabilir)
+- current_step_no ile adım bazlı ilerleme (0=başlamadı, 1..N=aktif adım)
+- Tamamlandığında YARIMAMUL parçalar için yari_mamul_stok OUT kayıtları
+- ASM referanslar (Alt Montaj) stok düşüşünden atlanır — internal DAG
+- HAZIR/KUTU/KARTON parçalar stok düşüşünden atlanır (Katman 17'de ele alınacak)
+- Idempotency: source_id kontrolü ile çift stok girişi önlenir
+- Auto-ID: MON-XXXX (montaj_batches), YMS-XXXXXX (yari_mamul_stok)
+- 3 adımlı yeni montaj wizard: SKU Seç → Malzeme Kontrolü → Oluştur
+- Malzeme yeterliliği: YARIMAMUL → SUM(IN-OUT) from yari_mamul_stok, HAZIR → all_parts.hazir_eleman_aktif_stok
+- Detay sheet: Adım listesi (tamamlanan=yeşil, aktif=mavi, bekleyen=gri) + aktif adım BOM paneli
+- RLS: has_production_access() (SECURITY DEFINER), is_admin() delete
+- Realtime: use-montaj-realtime.ts — montaj_batches tablosunu dinler
+- Constants: MONTAJ_STATUS, labels, colors, border colors
+- Validations: montajBatchCreateSchema
+- Yeni shadcn: textarea
+- Dosya yapısı: uretim/montaj/{page.tsx, actions.ts, yeni/page.tsx, components/7-dosya}
 
 ---
 

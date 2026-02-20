@@ -299,11 +299,11 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Bekleyen işler listesi
 - [x] Başlat/bitir + durum renkleri
 
-### KATMAN 12: Üretim — Montaj
-- [ ] Montaj giriş formu
-- [ ] Adım bazlı malzeme listesi
-- [ ] Malzeme yeterliliği kontrolü
-- [ ] YarıMamulStok'a otomatik OUT
+### KATMAN 12: Üretim — Montaj ✅
+- [x] Montaj giriş formu
+- [x] Adım bazlı malzeme listesi
+- [x] Malzeme yeterliliği kontrolü
+- [x] YarıMamulStok'a otomatik OUT
 
 ### KATMAN 13: Üretim — Paketleme
 - [ ] Seans yönetimi

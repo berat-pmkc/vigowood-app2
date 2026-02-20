@@ -112,3 +112,16 @@ export const cutBatchCreateSchema = z.object({
 });
 
 export type CutBatchCreateData = z.infer<typeof cutBatchCreateSchema>;
+
+// Montaj Batch oluşturma
+export const montajBatchCreateSchema = z.object({
+  sku: z.string().min(1, "Ürün seçimi gereklidir"),
+  adet: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(50, "En fazla 50 adet olabilir"),
+  notes: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
+});
+
+export type MontajBatchCreateData = z.infer<typeof montajBatchCreateSchema>;

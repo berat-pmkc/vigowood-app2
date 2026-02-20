@@ -509,6 +509,39 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["stock_movements"]["Insert"]>;
         Relationships: [];
       };
+      montaj_batches: {
+        Row: {
+          montaj_id: string;
+          sku: string;
+          adet: number;
+          durum: string;
+          current_step_no: number;
+          total_steps: number;
+          operator_id: string | null;
+          operator_name: string | null;
+          email: string | null;
+          baslama_zamani: string | null;
+          bitis_zamani: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          montaj_id: string;
+          sku: string;
+          adet?: number;
+          durum?: string;
+          current_step_no?: number;
+          total_steps?: number;
+          operator_id?: string | null;
+          operator_name?: string | null;
+          email?: string | null;
+          baslama_zamani?: string | null;
+          bitis_zamani?: string | null;
+          notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["montaj_batches"]["Insert"]>;
+        Relationships: [];
+      };
       yari_mamul_stok: {
         Row: {
           yms_id: string;
