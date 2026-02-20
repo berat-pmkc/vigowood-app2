@@ -318,11 +318,12 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 ### KATMAN 16: Stok — Yarı Mamül ✅
 - [x] Parça bazlı stok + eksik uyarısı
 
-### KATMAN 17: Stok — Hazır Eleman + İade
-- [ ] Kritik stok uyarıları + stok giriş + iade
+### KATMAN 17: Stok — Hazır Eleman + İade ✅
+- [x] Kritik stok uyarıları + stok giriş + iade
 
-### KATMAN 18: Sevkiyat
-- [ ] Sevkiyat listesi + konteyner yönetimi
+### KATMAN 18: Sevkiyat ✅
+- [x] Sevkiyat listesi + konteyner yönetimi
+- [x] 18A: Ülke bazlı ID (DE21/UK29), lojistik kolonlar, sevkiyat_fiyatlar, Admin Fiyatlar, seed
 
 ### KATMAN 19: Satış
 - [ ] Satış listesi + hedefler + kampanyalar

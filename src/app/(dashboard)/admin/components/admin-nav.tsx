@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Package, Puzzle, Layers, GitBranch } from "lucide-react";
+import { Package, Puzzle, Layers, GitBranch, DollarSign } from "lucide-react";
 
 const adminTabs: {
   label: string;
@@ -15,6 +15,7 @@ const adminTabs: {
   { label: "Parçalar", href: "/admin/parcalar", icon: Puzzle },
   { label: "Plakalar", href: "/admin/plakalar", icon: Layers },
   { label: "BOM", href: "/admin/bom", icon: GitBranch },
+  { label: "Fiyatlar", href: "/admin/fiyatlar", icon: DollarSign },
 ];
 
 export function AdminNav() {

@@ -594,6 +594,140 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["kutu_uretim"]["Insert"]>;
         Relationships: [];
       };
+      sevkiyat: {
+        Row: {
+          sevkiyat_id: string;
+          musteri: string;
+          ulke: string | null;
+          sevk_tarihi: string | null;
+          konteyner_no: string | null;
+          konteyner_tipi: string | null;
+          durum: string;
+          not_text: string | null;
+          operator_id: string | null;
+          operator_name: string | null;
+          email: string | null;
+          hazirlama_zamani: string | null;
+          gonderim_zamani: string | null;
+          teslim_zamani: string | null;
+          country_code: string | null;
+          shipment_number: number | null;
+          sevkiyat_adi: string | null;
+          liman: string | null;
+          teslimat_tipi: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          sevkiyat_id: string;
+          musteri: string;
+          ulke?: string | null;
+          sevk_tarihi?: string | null;
+          konteyner_no?: string | null;
+          konteyner_tipi?: string | null;
+          durum?: string;
+          not_text?: string | null;
+          operator_id?: string | null;
+          operator_name?: string | null;
+          email?: string | null;
+          hazirlama_zamani?: string | null;
+          gonderim_zamani?: string | null;
+          teslim_zamani?: string | null;
+          country_code?: string | null;
+          shipment_number?: number | null;
+          sevkiyat_adi?: string | null;
+          liman?: string | null;
+          teslimat_tipi?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["sevkiyat"]["Insert"]>;
+        Relationships: [];
+      };
+      sevkiyat_fiyatlar: {
+        Row: {
+          id: number;
+          country_code: string;
+          sku: string;
+          urun_adi_en: string | null;
+          gtip: string | null;
+          birim_fiyat: number;
+          kategori: string | null;
+          package_qty: number | null;
+          asin: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          country_code: string;
+          sku: string;
+          urun_adi_en?: string | null;
+          gtip?: string | null;
+          birim_fiyat?: number;
+          kategori?: string | null;
+          package_qty?: number | null;
+          asin?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["sevkiyat_fiyatlar"]["Insert"]>;
+        Relationships: [];
+      };
+      sevkiyat_items: {
+        Row: {
+          item_id: string;
+          sevkiyat_id: string;
+          sku: string;
+          urun_adi: string | null;
+          qty: number;
+          palet_boyut: string | null;
+          palet_yukseklik: number | null;
+          en: number | null;
+          boy: number | null;
+          yuk: number | null;
+          koli_adedi: number | null;
+          palette_koli: number | null;
+          toplam_koli: number | null;
+          hacim: number | null;
+          desi: number | null;
+          koli_agirlik: number | null;
+          agirlik: number | null;
+          grup: string | null;
+          palet_sayisi: number | null;
+          birim_fiyat: number | null;
+          toplam_fiyat: number | null;
+          created_at: string;
+        };
+        Insert: {
+          item_id: string;
+          sevkiyat_id: string;
+          sku: string;
+          urun_adi?: string | null;
+          qty?: number;
+          palet_boyut?: string | null;
+          palet_yukseklik?: number | null;
+          en?: number | null;
+          boy?: number | null;
+          yuk?: number | null;
+          koli_adedi?: number | null;
+          palette_koli?: number | null;
+          toplam_koli?: number | null;
+          hacim?: number | null;
+          desi?: number | null;
+          koli_agirlik?: number | null;
+          agirlik?: number | null;
+          grup?: string | null;
+          palet_sayisi?: number | null;
+          birim_fiyat?: number | null;
+          toplam_fiyat?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["sevkiyat_items"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "sevkiyat_items_sevkiyat_id_fkey";
+            columns: ["sevkiyat_id"];
+            isOneToOne: false;
+            referencedRelation: "sevkiyat";
+            referencedColumns: ["sevkiyat_id"];
+          },
+        ];
+      };
       yari_mamul_stok: {
         Row: {
           yms_id: string;

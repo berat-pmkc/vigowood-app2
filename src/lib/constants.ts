@@ -256,6 +256,88 @@ export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Üretim",
 ];
 
+// Sevkiyat durum sabitleri
+export const SEVKIYAT_STATUS = ["bekliyor", "hazirlaniyor", "yolda", "teslim_edildi"] as const;
+export type SevkiyatStatus = (typeof SEVKIYAT_STATUS)[number];
+
+export const SEVKIYAT_STATUS_LABELS: Record<SevkiyatStatus, string> = {
+  bekliyor: "Bekliyor",
+  hazirlaniyor: "Hazırlanıyor",
+  yolda: "Yolda",
+  teslim_edildi: "Teslim Edildi",
+};
+
+export const SEVKIYAT_STATUS_COLORS: Record<SevkiyatStatus, { bg: string; text: string; border: string }> = {
+  bekliyor: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  hazirlaniyor: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  yolda: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
+  teslim_edildi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+export const SEVKIYAT_STATUS_BORDER_COLORS: Record<SevkiyatStatus, string> = {
+  bekliyor: "border-l-amber-400",
+  hazirlaniyor: "border-l-blue-500",
+  yolda: "border-l-purple-500",
+  teslim_edildi: "border-l-emerald-500",
+};
+
+// Sevkiyat erişim rolleri
+export const SEVKIYAT_ACCESS_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "Sevkiyat Sorumlusu",
+  "E-Ticaret Müdürü",
+  "Dış Ticaret Müdürü",
+];
+
+// Sevkiyat ülke konfigürasyonları
+export const SEVKIYAT_COUNTRIES = {
+  DE: {
+    code: "DE",
+    name: "Almanya",
+    nameEN: "Germany",
+    currency: "EUR",
+    currencySymbol: "\u20ac",
+    port: "Muratbey",
+    buyer: "HAS-MOB ORMAN URUNLERI SAN. VE TIC. LTD. STI.",
+  },
+  UK: {
+    code: "UK",
+    name: "\u0130ngiltere",
+    nameEN: "United Kingdom",
+    currency: "GBP",
+    currencySymbol: "\u00a3",
+    port: "Gemlik",
+    buyer: "HAS-MOB ORMAN URUNLERI SAN. VE TIC. LTD. STI.",
+  },
+  USA: {
+    code: "USA",
+    name: "Amerika",
+    nameEN: "United States",
+    currency: "USD",
+    currencySymbol: "$",
+    port: "Gemlik",
+    buyer: "HAS-MOB ORMAN URUNLERI SAN. VE TIC. LTD. STI.",
+  },
+} as const;
+
+export type SevkiyatCountryCode = keyof typeof SEVKIYAT_COUNTRIES;
+
+export const SEVKIYAT_COUNTRY_CODES = ["DE", "UK", "USA"] as const;
+
+export const PALET_BOYUTLARI = ["80x120", "100x120"] as const;
+export const PALET_WEIGHT_KG = 15;
+
+// Konteyner tipleri
+export const KONTEYNER_TYPES = ["20ft", "40ft", "40ft HC"] as const;
+export type KonteynerType = (typeof KONTEYNER_TYPES)[number];
+
+export const KONTEYNER_TYPE_LABELS: Record<KonteynerType, string> = {
+  "20ft": "20' Konteyner",
+  "40ft": "40' Konteyner",
+  "40ft HC": "40' HC Konteyner",
+};
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;

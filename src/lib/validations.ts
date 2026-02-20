@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -184,3 +184,45 @@ export const iadeGirisSchema = z.object({
 });
 
 export type IadeGirisData = z.infer<typeof iadeGirisSchema>;
+
+// Sevkiyat oluşturma (v2 — ülke bazlı)
+export const sevkiyatCreateSchema = z.object({
+  country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
+  konteyner_no: z.string().max(50, "Konteyner no en fazla 50 karakter").nullable(),
+  konteyner_tipi: z.string().nullable(),
+  sevk_tarihi: z.string().nullable(),
+  not_text: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
+});
+
+export type SevkiyatCreateData = z.infer<typeof sevkiyatCreateSchema>;
+
+// Sevkiyat item (v2 — lojistik bilgiler)
+export const sevkiyatItemSchema = z.object({
+  sku: z.string().min(1, "Ürün seçimi gereklidir"),
+  palet_boyut: z.string().min(1, "Palet boyutu gereklidir"),
+  palet_yukseklik: z.number().min(1, "Palet yüksekliği gereklidir"),
+  en: z.number().min(1, "Ürün genişliği gereklidir"),
+  boy: z.number().min(1, "Ürün uzunluğu gereklidir"),
+  yuk: z.number().min(1, "Ürün yüksekliği gereklidir"),
+  koli_adedi: z.number().int("Tam sayı olmalıdır").min(1, "Koli adedi gereklidir"),
+  palette_koli: z.number().int("Tam sayı olmalıdır").min(1, "Palette koli gereklidir"),
+  koli_agirlik: z.number().min(0.1, "Koli ağırlığı gereklidir"),
+  palet_sayisi: z.number().int("Tam sayı olmalıdır").min(1, "Palet sayısı gereklidir"),
+  grup: z.string().nullable(),
+});
+
+export type SevkiyatItemData = z.infer<typeof sevkiyatItemSchema>;
+
+// Sevkiyat fiyat
+export const sevkiyatFiyatSchema = z.object({
+  country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
+  sku: z.string().min(1, "SKU gereklidir"),
+  urun_adi_en: z.string().max(300, "Ürün adı en fazla 300 karakter").nullable(),
+  gtip: z.string().max(30, "GTIP en fazla 30 karakter").nullable(),
+  birim_fiyat: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  kategori: z.string().max(50, "Kategori en fazla 50 karakter").nullable(),
+  package_qty: z.number().int("Tam sayı olmalıdır").nullable(),
+  asin: z.string().max(50, "ASIN en fazla 50 karakter").nullable(),
+});
+
+export type SevkiyatFiyatData = z.infer<typeof sevkiyatFiyatSchema>;
