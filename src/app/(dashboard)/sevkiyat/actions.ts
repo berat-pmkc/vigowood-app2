@@ -154,6 +154,275 @@ export async function getPaletSablon(countryCode: string, sku: string) {
   }
 }
 
+/** Sevkiyat + items + şablon bilgileriyle birlikte getir (planlama sayfası) */
+export async function getSevkiyatWithItems(sevkiyatId: string) {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    const { data: sevkData, error: sevkErr } = await supabase
+      .from("sevkiyat")
+      .select("*")
+      .eq("sevkiyat_id", sevkiyatId)
+      .single();
+
+    if (sevkErr || !sevkData) return { success: false as const, error: "Sevkiyat bulunamadı" };
+
+    const { data: items, error: itemsErr } = await supabase
+      .from("sevkiyat_items")
+      .select("*")
+      .eq("sevkiyat_id", sevkiyatId)
+      .order("created_at");
+
+    if (itemsErr) return { success: false as const, error: itemsErr.message };
+
+    return {
+      success: true as const,
+      data: {
+        sevkiyat: sevkData as SevkiyatRow,
+        items: (items ?? []) as SevkiyatItemRow[],
+      },
+    };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export interface SevkiyatRow {
+  sevkiyat_id: string;
+  musteri: string;
+  ulke: string | null;
+  sevk_tarihi: string | null;
+  konteyner_no: string | null;
+  konteyner_tipi: string | null;
+  durum: string;
+  not_text: string | null;
+  operator_id: string | null;
+  operator_name: string | null;
+  email: string | null;
+  hazirlama_zamani: string | null;
+  gonderim_zamani: string | null;
+  teslim_zamani: string | null;
+  country_code: string | null;
+  shipment_number: number | null;
+  sevkiyat_adi: string | null;
+  liman: string | null;
+  teslimat_tipi: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Proforma için — fiyat bilgileri dahil */
+export async function getProformaData(sevkiyatId: string) {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    const { data: sevkData } = await supabase
+      .from("sevkiyat")
+      .select("*")
+      .eq("sevkiyat_id", sevkiyatId)
+      .single();
+
+    const sev = sevkData as SevkiyatRow | null;
+    if (!sev) return { success: false as const, error: "Sevkiyat bulunamadı" };
+
+    const { data: items } = await supabase
+      .from("sevkiyat_items")
+      .select("*")
+      .eq("sevkiyat_id", sevkiyatId)
+      .order("created_at");
+
+    const itemRows = (items ?? []) as SevkiyatItemRow[];
+
+    // Fiyat bilgilerini getir
+    let fiyatlar: Record<string, { urun_adi_en: string; gtip: string; birim_fiyat: number }> = {};
+    if (sev.country_code) {
+      const { data: fData } = await supabase
+        .from("sevkiyat_fiyatlar")
+        .select("sku, urun_adi_en, gtip, birim_fiyat")
+        .eq("country_code", sev.country_code);
+
+      if (fData) {
+        for (const row of fData as { sku: string; urun_adi_en: string | null; gtip: string | null; birim_fiyat: number }[]) {
+          fiyatlar[row.sku] = {
+            urun_adi_en: row.urun_adi_en ?? row.sku,
+            gtip: row.gtip ?? "",
+            birim_fiyat: row.birim_fiyat,
+          };
+        }
+      }
+    }
+
+    return { success: true as const, data: { sevkiyat: sev, items: itemRows, fiyatlar } };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Packing list için — brüt ağırlık hesabı dahil */
+export async function getPackingListData(sevkiyatId: string) {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    const { data: sevkData } = await supabase
+      .from("sevkiyat")
+      .select("*")
+      .eq("sevkiyat_id", sevkiyatId)
+      .single();
+
+    const sev = sevkData as SevkiyatRow | null;
+    if (!sev) return { success: false as const, error: "Sevkiyat bulunamadı" };
+
+    const { data: items } = await supabase
+      .from("sevkiyat_items")
+      .select("*")
+      .eq("sevkiyat_id", sevkiyatId)
+      .order("created_at");
+
+    const itemRows = (items ?? []) as SevkiyatItemRow[];
+
+    // İngilizce ürün isimlerini getir
+    let productNames: Record<string, string> = {};
+    if (sev.country_code) {
+      const { data: fData } = await supabase
+        .from("sevkiyat_fiyatlar")
+        .select("sku, urun_adi_en")
+        .eq("country_code", sev.country_code);
+
+      if (fData) {
+        for (const row of fData as { sku: string; urun_adi_en: string | null }[]) {
+          if (row.urun_adi_en) productNames[row.sku] = row.urun_adi_en;
+        }
+      }
+    }
+
+    return { success: true as const, data: { sevkiyat: sev, items: itemRows, productNames } };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Inline palet sayısı güncelleme (spreadsheet edit) */
+export async function updateItemPaletSayisi(
+  itemId: string,
+  paletSayisi: number
+): Promise<ActionResult> {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    if (paletSayisi < 1) return { success: false, error: "Palet sayısı en az 1 olmalıdır" };
+
+    const { data: itemData } = await supabase
+      .from("sevkiyat_items")
+      .select("sevkiyat_id, palet_boyut, palet_yukseklik, koli_adedi, palette_koli, koli_agirlik, birim_fiyat")
+      .eq("item_id", itemId)
+      .single();
+
+    const item = itemData as {
+      sevkiyat_id: string;
+      palet_boyut: string | null;
+      palet_yukseklik: number | null;
+      koli_adedi: number | null;
+      palette_koli: number | null;
+      koli_agirlik: number | null;
+      birim_fiyat: number | null;
+    } | null;
+    if (!item) return { success: false, error: "Kalem bulunamadı" };
+
+    // Sevkiyat durum kontrolü
+    const { data: sevkData } = await supabase
+      .from("sevkiyat")
+      .select("durum")
+      .eq("sevkiyat_id", item.sevkiyat_id)
+      .single();
+
+    const sev = sevkData as { durum: string } | null;
+    if (!sev) return { success: false, error: "Sevkiyat bulunamadı" };
+    if (sev.durum !== "bekliyor" && sev.durum !== "hazirlaniyor") {
+      return { success: false, error: "Bu durumda düzenlenemez" };
+    }
+
+    const calc = calculateLogistics({
+      palet_boyut: item.palet_boyut ?? "80x120",
+      palet_yukseklik: item.palet_yukseklik ?? 100,
+      koli_adedi: item.koli_adedi ?? 1,
+      palette_koli: item.palette_koli ?? 1,
+      koli_agirlik: item.koli_agirlik ?? 0,
+      palet_sayisi: paletSayisi,
+    });
+
+    const birimFiyat = item.birim_fiyat ?? 0;
+    const toplamFiyat = calc.qty * birimFiyat;
+
+    const { error } = await supabase
+      .from("sevkiyat_items")
+      .update({
+        palet_sayisi: paletSayisi,
+        toplam_koli: calc.toplam_koli,
+        qty: calc.qty,
+        agirlik: calc.agirlik,
+        hacim: calc.hacim,
+        desi: calc.desi,
+        toplam_fiyat: Math.round(toplamFiyat * 100) / 100,
+      })
+      .eq("item_id", itemId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/sevkiyat");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Inline grup güncelleme */
+export async function updateItemGrup(
+  itemId: string,
+  grup: string | null
+): Promise<ActionResult> {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    const { data: itemData } = await supabase
+      .from("sevkiyat_items")
+      .select("sevkiyat_id")
+      .eq("item_id", itemId)
+      .single();
+
+    const item = itemData as { sevkiyat_id: string } | null;
+    if (!item) return { success: false, error: "Kalem bulunamadı" };
+
+    const { data: sevkData } = await supabase
+      .from("sevkiyat")
+      .select("durum")
+      .eq("sevkiyat_id", item.sevkiyat_id)
+      .single();
+
+    const sev = sevkData as { durum: string } | null;
+    if (!sev) return { success: false, error: "Sevkiyat bulunamadı" };
+    if (sev.durum !== "bekliyor" && sev.durum !== "hazirlaniyor") {
+      return { success: false, error: "Bu durumda düzenlenemez" };
+    }
+
+    const { error } = await supabase
+      .from("sevkiyat_items")
+      .update({ grup: grup || null })
+      .eq("item_id", itemId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/sevkiyat");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
 /** Yeni sevkiyat oluştur (v2 — ülke bazlı ID) */

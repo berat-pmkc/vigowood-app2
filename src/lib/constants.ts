@@ -343,3 +343,98 @@ export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;
   return STATION_EMAILS.includes(email as (typeof STATION_EMAILS)[number]);
 }
+
+// ─── Proforma Fatura Konfigürasyonu ────────────────────────────
+
+export const PROFORMA_CONFIG = {
+  EXPORTER: {
+    companyName: "HAS-MOB ORMAN ÜRÜNLERİ MOBİLYA SANAYİ VE TİCARET LİMİTED SİRKETİ",
+    taxInfo: "Vergi No: TR4580342463 / Unye",
+    address: "ÇATALPINAR MH. MERKEZ MÜCAVİR SK. NO:5 ÜNYE, ORDU",
+    phone: "+90 452 324 7878",
+    email: "info@hasmob.com.tr",
+    web: "hasmob.com.tr",
+  },
+  BUYER_CONTACT: {
+    phone: "+90 544 774 01 01",
+    email: "sinan@vigowood.com",
+    contact: "Sinan Colakoglu",
+  },
+  BANK_BY_COUNTRY: {
+    DE: {
+      beneficiary: "HAS-MOB ORMAN URUNLERI MOBILYA SANAYI TICARET LIMITED SIRKETI",
+      bankName: "VAKIFBANK",
+      branchName: "UNYE",
+      swiftCode: "TVBATR2AXXX",
+      currencyLabel: "EUR",
+      iban: "TR780001500158048020763636",
+    },
+    UK: {
+      beneficiary: "HAS-MOB ORMAN URUNLERI MOBILYA SANAYI TICARET LIMITED SIRKETI",
+      bankName: "VAKIFBANK",
+      branchName: "UNYE",
+      swiftCode: "TVBATR2AXXX",
+      currencyLabel: "GBP",
+      iban: "TR950001500158048023394261",
+    },
+    USA: {
+      beneficiary: "HAS-MOB ORMAN URUNLERI MOBILYA SANAYI TICARET LIMITED SIRKETI",
+      bankName: "HALKBANK",
+      branchName: "UNYE",
+      swiftCode: "TVBATR2AXXX",
+      currencyLabel: "USD",
+      iban: "TR180001500158048023593333",
+    },
+  } as Record<string, { beneficiary: string; bankName: string; branchName: string; swiftCode: string; currencyLabel: string; iban: string }>,
+  COUNTRY_FORMAT: {
+    DE: { currencySymbol: "€", position: "after" as const, decimal: ",", thousand: "." },
+    UK: { currencySymbol: "£", position: "before" as const, decimal: ".", thousand: "," },
+    USA: { currencySymbol: "$", position: "before" as const, decimal: ".", thousand: "," },
+  } as Record<string, { currencySymbol: string; position: "before" | "after"; decimal: string; thousand: string }>,
+} as const;
+
+// ─── Paket Listesi (Packing List) Konfigürasyonu ─────────────
+
+export const PACKING_LIST_CONFIG = {
+  EXPORTER: {
+    companyName: "HAS-MOB ORMAN ÜRÜNLERİ MOBİLYA SAN.TİC.LTD.ŞTİ",
+    address1: "Çatalpınar Mah. Merkez Mücavir Sok. No: 5",
+    address2: "52300 Ünye/Ordu VN: TR4580342463 / Unye",
+    phone: "+90 (452) 324 78 78",
+  },
+  SIGNATORY: {
+    placeOfIssue: "Ünye / Ordu",
+    company: "HAS-MOB ORMAN ÜRÜNLERİ MOBİLYA SAN.TİC.LTD.ŞTİ",
+    authorizedName: "HASAN ÇOLAKOĞLU",
+  },
+  CONTACT: {
+    name: "Sinan Çolakoğlu",
+    phone: "+90 544 774 01 01",
+    email: "sinan@vigowood.com",
+  },
+  COUNTRY_DISPATCH: {
+    DE: { name: "Germany", method: "Road Transport" },
+    UK: { name: "United Kingdom", method: "Sea Freight" },
+    USA: { name: "United States", method: "Sea Freight" },
+  } as Record<string, { name: string; method: string }>,
+  COUNTRY_BUYER: {
+    DE: {
+      name1: "HAS-MOB ORMAN URUNLERI",
+      name2: "MOBILYA SANAYI VE TICARET LIMITED SIRKETI (Germany)",
+      vat: "DE350448756",
+      address: "Catalpinar Mah. 5\n52300 Ordu",
+    },
+    UK: {
+      name1: "HAS-MOB ORMAN URUNLERI",
+      name2: "MOBILYA SANAYI VE TICARET LIMITED SIRKETI",
+      vat: "0368836738",
+      address: "346 WINSTON HOUSE 2-4 DOLLIS PARK LONDON",
+    },
+    USA: {
+      name1: "Hass Woodtech LLC",
+      name2: "",
+      vat: "",
+      address: "8 THE GREEN STREET STE:4000, DOVER, DE 19901 DE, USA",
+    },
+  } as Record<string, { name1: string; name2: string; vat: string; address: string }>,
+} as const;

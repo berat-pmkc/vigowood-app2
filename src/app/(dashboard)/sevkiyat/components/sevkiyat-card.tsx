@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SevkiyatStatusBadge } from "./sevkiyat-status-badge";
-import { SevkiyatDetailSheet } from "./sevkiyat-detail-sheet";
 import { startPreparation } from "../actions";
 import {
   SEVKIYAT_STATUS_BORDER_COLORS,
@@ -63,8 +63,8 @@ interface SevkiyatCardProps {
 }
 
 export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   const durum = sevkiyat.durum as SevkiyatStatus;
   const borderColor = SEVKIYAT_STATUS_BORDER_COLORS[durum] ?? SEVKIYAT_STATUS_BORDER_COLORS.bekliyor;
@@ -75,136 +75,132 @@ export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
     setLoading(true);
     const result = await startPreparation(sevkiyat.sevkiyat_id);
     if (!result.success) toast.error(result.error);
-    else toast.success("Haz\u0131rl\u0131k ba\u015flat\u0131ld\u0131");
+    else toast.success("Hazırlık başlatıldı");
     setLoading(false);
   };
 
+  const handleNavigate = () => {
+    router.push(`/sevkiyat/${sevkiyat.sevkiyat_id}`);
+  };
+
   return (
-    <>
-      <Card
-        className={cn(
-          "border-l-4 cursor-pointer transition-all hover:shadow-md",
-          borderColor,
-          isTeslim && "opacity-70"
-        )}
-        onClick={() => setSheetOpen(true)}
-      >
-        <div className="p-4">
-          {/* Header */}
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="font-mono text-xs">
-                {sevkiyat.sevkiyat_id}
+    <Card
+      className={cn(
+        "border-l-4 cursor-pointer transition-all hover:shadow-md",
+        borderColor,
+        isTeslim && "opacity-70"
+      )}
+      onClick={handleNavigate}
+    >
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="font-mono text-xs">
+              {sevkiyat.sevkiyat_id}
+            </Badge>
+            {sevkiyat.country_code && (
+              <Badge variant="outline" className="text-xs font-semibold">
+                {sevkiyat.country_code}
               </Badge>
-              {sevkiyat.country_code && (
-                <Badge variant="outline" className="text-xs font-semibold">
-                  {sevkiyat.country_code}
-                </Badge>
-              )}
-            </div>
-            <SevkiyatStatusBadge durum={sevkiyat.durum} />
+            )}
           </div>
+          <SevkiyatStatusBadge durum={sevkiyat.durum} />
+        </div>
 
-          {/* Body */}
-          <div className="mb-3">
-            <p className="font-medium text-foreground truncate">
-              {sevkiyat.sevkiyat_adi || sevkiyat.musteri}
+        {/* Body */}
+        <div className="mb-3">
+          <p className="font-medium text-foreground truncate">
+            {sevkiyat.sevkiyat_adi || sevkiyat.musteri}
+          </p>
+          {sevkiyat.liman && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              {sevkiyat.liman}
             </p>
-            {sevkiyat.liman && (
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {sevkiyat.liman}
-              </p>
+          )}
+        </div>
+
+        {/* Konteyner + Lojistik */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            {sevkiyat.konteyner_tipi && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Container className="w-3 h-3" />
+                {KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ?? sevkiyat.konteyner_tipi}
+              </div>
             )}
           </div>
-
-          {/* Konteyner + Lojistik */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              {sevkiyat.konteyner_tipi && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Container className="w-3 h-3" />
-                  {KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ?? sevkiyat.konteyner_tipi}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {(sevkiyat.total_palet ?? 0) > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <Box className="w-3 h-3" />
-                  <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_palet}</span> plt
-                </span>
-              )}
-              {(sevkiyat.total_koli ?? 0) > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <Package className="w-3 h-3" />
-                  <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_koli}</span> koli
-                </span>
-              )}
-              {(sevkiyat.total_agirlik ?? 0) > 0 && (
-                <span className="flex items-center gap-0.5 hidden sm:flex">
-                  <Weight className="w-3 h-3" />
-                  <span className="font-semibold tabular-nums text-foreground">
-                    {Math.round(sevkiyat.total_agirlik!)}
-                  </span> kg
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-3 border-t">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="w-3 h-3" />
-              {sevkiyat.sevk_tarihi
-                ? formatDate(sevkiyat.sevk_tarihi)
-                : formatDate(sevkiyat.created_at)}
-            </div>
-
-            {durum === "bekliyor" && (
-              <Button
-                size="sm"
-                className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={handleStartPrep}
-                disabled={loading}
-              >
-                <PackageCheck className="w-4 h-4 mr-1" />
-                Haz\u0131rla
-              </Button>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {(sevkiyat.total_palet ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5">
+                <Box className="w-3 h-3" />
+                <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_palet}</span> plt
+              </span>
             )}
-
-            {durum === "hazirlaniyor" && (
-              <Button
-                size="sm"
-                className="h-10 px-4"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSheetOpen(true);
-                }}
-              >
-                <Package className="w-4 h-4 mr-1" />
-                Detay
-              </Button>
+            {(sevkiyat.total_koli ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5">
+                <Package className="w-3 h-3" />
+                <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_koli}</span> koli
+              </span>
             )}
-
-            {durum === "yolda" && (
-              <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-300">
-                Yolda
-              </Badge>
-            )}
-
-            {isTeslim && (
-              <CheckCircle className="w-5 h-5 text-emerald-500" />
+            {(sevkiyat.total_agirlik ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 hidden sm:flex">
+                <Weight className="w-3 h-3" />
+                <span className="font-semibold tabular-nums text-foreground">
+                  {Math.round(sevkiyat.total_agirlik!)}
+                </span> kg
+              </span>
             )}
           </div>
         </div>
-      </Card>
 
-      <SevkiyatDetailSheet
-        sevkiyat={sevkiyat}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-      />
-    </>
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-3 border-t">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Calendar className="w-3 h-3" />
+            {sevkiyat.sevk_tarihi
+              ? formatDate(sevkiyat.sevk_tarihi)
+              : formatDate(sevkiyat.created_at)}
+          </div>
+
+          {durum === "bekliyor" && (
+            <Button
+              size="sm"
+              className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleStartPrep}
+              disabled={loading}
+            >
+              <PackageCheck className="w-4 h-4 mr-1" />
+              Hazırla
+            </Button>
+          )}
+
+          {durum === "hazirlaniyor" && (
+            <Button
+              size="sm"
+              className="h-10 px-4"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNavigate();
+              }}
+            >
+              <Package className="w-4 h-4 mr-1" />
+              Detay
+            </Button>
+          )}
+
+          {durum === "yolda" && (
+            <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-300">
+              Yolda
+            </Badge>
+          )}
+
+          {isTeslim && (
+            <CheckCircle className="w-5 h-5 text-emerald-500" />
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
