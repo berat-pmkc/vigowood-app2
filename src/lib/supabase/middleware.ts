@@ -14,6 +14,14 @@ const STATION_EMAILS = [
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Capture existing cookie values to compare later
+  const existingCookies = new Map<string, string>();
+  for (const cookie of request.cookies.getAll()) {
+    existingCookies.set(cookie.name, cookie.value);
+  }
+
+  let cookiesChanged = false;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,6 +31,14 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
+          // Check if cookies actually changed
+          const hasChanges = cookiesToSet.some(({ name, value }) => {
+            return existingCookies.get(name) !== value;
+          });
+
+          if (!hasChanges) return;
+
+          cookiesChanged = true;
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
