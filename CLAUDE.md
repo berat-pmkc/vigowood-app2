@@ -315,8 +315,8 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 ### KATMAN 15: Stok — Mamül ✅
 - [x] Stok dashboard + hareketler + trend grafik
 
-### KATMAN 16: Stok — Yarı Mamül
-- [ ] Parça bazlı stok + eksik uyarısı
+### KATMAN 16: Stok — Yarı Mamül ✅
+- [x] Parça bazlı stok + eksik uyarısı
 
 ### KATMAN 17: Stok — Hazır Eleman + İade
 - [ ] Kritik stok uyarıları + stok giriş + iade
