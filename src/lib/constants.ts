@@ -222,6 +222,32 @@ export const KUTU_STATUS_BORDER_COLORS: Record<KutuStatus, string> = {
   tamamlandi: "border-l-emerald-500",
 };
 
+// Hazır Eleman parça tipleri (HAZIR + KUTU + KARTON)
+export const HAZIR_ELEMAN_PART_TYPES: PartType[] = ["HAZIR", "KUTU", "KARTON"];
+
+// İade durumları
+export const IADE_DURUM = ["Kullanilabilir", "Kullanilamaz"] as const;
+export type IadeDurum = (typeof IADE_DURUM)[number];
+
+export const IADE_DURUM_LABELS: Record<IadeDurum, string> = {
+  Kullanilabilir: "Kullanılabilir",
+  Kullanilamaz: "Kullanılamaz",
+};
+
+export const IADE_DURUM_COLORS: Record<IadeDurum, { bg: string; text: string }> = {
+  Kullanilabilir: { bg: "bg-emerald-100", text: "text-emerald-800" },
+  Kullanilamaz: { bg: "bg-red-100", text: "text-red-800" },
+};
+
+// Stok erişim rolleri
+export const STOCK_ACCESS_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "E-Ticaret Müdürü",
+  "Dış Ticaret Müdürü",
+  "Muhasebe",
+];
+
 // Üretim erişim rolleri
 export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Yönetici",

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -151,3 +151,36 @@ export const kutuSessionCreateSchema = z.object({
 });
 
 export type KutuSessionCreateData = z.infer<typeof kutuSessionCreateSchema>;
+
+// Hazır Eleman stok girişi
+export const hazirElemanGirisSchema = z.object({
+  part_id: z.string().min(1, "Parça seçimi gereklidir"),
+  qty: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(10000, "En fazla 10.000 adet olabilir"),
+  not_text: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
+});
+
+export type HazirElemanGirisData = z.infer<typeof hazirElemanGirisSchema>;
+
+// İade girişi
+export const iadeGirisSchema = z.object({
+  sku: z.string().min(1, "Ürün seçimi gereklidir"),
+  qty: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(500, "En fazla 500 adet olabilir"),
+  durum: z.enum(IADE_DURUM, {
+    error: "Geçerli bir durum seçiniz",
+  }),
+  iade_nedeni: z
+    .string()
+    .min(1, "İade nedeni gereklidir")
+    .max(500, "İade nedeni en fazla 500 karakter olabilir"),
+  musteri_bilgisi: z.string().max(300, "Müşteri bilgisi en fazla 300 karakter olabilir").nullable(),
+});
+
+export type IadeGirisData = z.infer<typeof iadeGirisSchema>;

@@ -415,6 +415,7 @@ export type Database = {
           part_id: string | null;
           qty: number;
           operator: string | null;
+          not_text: string | null;
           created_at: string;
         };
         Insert: {
@@ -423,6 +424,7 @@ export type Database = {
           part_id?: string | null;
           qty?: number;
           operator?: string | null;
+          not_text?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["hazir_eleman_akis"]["Insert"]>;
         Relationships: [];
@@ -434,6 +436,9 @@ export type Database = {
           sku: string | null;
           qty: number;
           durum: string | null;
+          iade_nedeni: string | null;
+          musteri_bilgisi: string | null;
+          operator: string | null;
           created_at: string;
         };
         Insert: {
@@ -442,6 +447,9 @@ export type Database = {
           sku?: string | null;
           qty?: number;
           durum?: string | null;
+          iade_nedeni?: string | null;
+          musteri_bilgisi?: string | null;
+          operator?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["iade_giris"]["Insert"]>;
         Relationships: [];
