@@ -134,6 +134,28 @@ export const CUT_STATUS_BORDER_COLORS: Record<CutStatus, string> = {
   tamamlandi: "border-l-emerald-500",
 };
 
+// Temizlik durum sabitleri
+export const CLEAN_STATUS = ["bekliyor", "temizleniyor", "tamamlandi"] as const;
+export type CleanStatus = (typeof CLEAN_STATUS)[number];
+
+export const CLEAN_STATUS_LABELS: Record<CleanStatus, string> = {
+  bekliyor: "Bekliyor",
+  temizleniyor: "Temizleniyor",
+  tamamlandi: "Tamamlandi",
+};
+
+export const CLEAN_STATUS_COLORS: Record<CleanStatus, { bg: string; text: string; border: string }> = {
+  bekliyor: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  temizleniyor: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  tamamlandi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+export const CLEAN_STATUS_BORDER_COLORS: Record<CleanStatus, string> = {
+  bekliyor: "border-l-amber-400",
+  temizleniyor: "border-l-blue-500",
+  tamamlandi: "border-l-emerald-500",
+};
+
 // Üretim erişim rolleri
 export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Yönetici",

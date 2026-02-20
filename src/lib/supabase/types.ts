@@ -352,6 +352,8 @@ export type Database = {
           status: string;
           not_text: string | null;
           email: string | null;
+          operator_id: string | null;
+          operator_name: string | null;
           created_at: string;
         };
         Insert: {
@@ -362,6 +364,8 @@ export type Database = {
           status?: string;
           not_text?: string | null;
           email?: string | null;
+          operator_id?: string | null;
+          operator_name?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["clean"]["Insert"]>;
         Relationships: [];

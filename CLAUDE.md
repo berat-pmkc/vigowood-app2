@@ -267,9 +267,9 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] CutLines otomatik oluşturma
 - [x] YarıMamulStok'a otomatik IN
 
-### KATMAN 11: Üretim — Temizlik
-- [ ] Bekleyen işler listesi
-- [ ] Başlat/bitir + durum renkleri
+### KATMAN 11: Üretim — Temizlik ✅
+- [x] Bekleyen işler listesi
+- [x] Başlat/bitir + durum renkleri
 
 ### KATMAN 12: Üretim — Montaj
 - [ ] Montaj giriş formu
