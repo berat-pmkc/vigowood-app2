@@ -568,3 +568,92 @@ export async function deleteBomItem(
     };
   }
 }
+
+export async function exportBomData(sku: string): Promise<
+  | {
+      success: true;
+      data: {
+        step_id: string;
+        step_name: string | null;
+        seq_no: number | null;
+        step_bom_id: string;
+        part_id: string;
+        part_name: string | null;
+        qty_per: number;
+      }[];
+    }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    // Get steps
+    const { data: steps } = await supabase
+      .from("assembly_steps")
+      .select("step_id, step_name, seq_no")
+      .eq("sku", sku)
+      .order("seq_no");
+
+    if (!steps || steps.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    // Get BOM items
+    const stepIds = steps.map((s) => s.step_id);
+    const { data: bomItems } = await supabase
+      .from("step_bom")
+      .select("step_bom_id, step_id, part_id, qty_per")
+      .in("step_id", stepIds)
+      .order("step_bom_id");
+
+    // Get part names
+    const partIds = [...new Set((bomItems ?? []).map((b) => b.part_id).filter((id) => !id.startsWith("ASM-")))];
+    const partNameMap = new Map<string, string>();
+
+    if (partIds.length > 0) {
+      const { data: parts } = await supabase
+        .from("all_parts")
+        .select("part_id, part_adi")
+        .in("part_id", partIds);
+      if (parts) {
+        for (const p of parts) {
+          partNameMap.set(p.part_id, p.part_adi || "");
+        }
+      }
+    }
+
+    // Get ASM step names
+    const asmIds = [...new Set((bomItems ?? []).map((b) => b.part_id).filter((id) => id.startsWith("ASM-")))];
+    if (asmIds.length > 0) {
+      const { data: asmSteps } = await supabase
+        .from("assembly_steps")
+        .select("step_id, step_name")
+        .in("step_id", asmIds);
+      if (asmSteps) {
+        for (const s of asmSteps) {
+          partNameMap.set(s.step_id, s.step_name || s.step_id);
+        }
+      }
+    }
+
+    const stepMap = new Map(steps.map((s) => [s.step_id, s]));
+
+    const result = (bomItems ?? []).map((b) => {
+      const step = stepMap.get(b.step_id);
+      return {
+        step_id: b.step_id,
+        step_name: step?.step_name ?? null,
+        seq_no: step?.seq_no ?? null,
+        step_bom_id: b.step_bom_id,
+        part_id: b.part_id,
+        part_name: partNameMap.get(b.part_id) ?? null,
+        qty_per: b.qty_per,
+      };
+    });
+
+    return { success: true, data: result };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}

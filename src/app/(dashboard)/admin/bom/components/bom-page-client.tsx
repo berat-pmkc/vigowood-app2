@@ -1,16 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, List, GitBranch } from "lucide-react";
+import { Plus, List, GitBranch, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductSelector } from "./product-selector";
 import { AssemblyStepsList } from "./assembly-steps-list";
 import { StepEditDialog } from "./step-edit-dialog";
 import { RecipeTreeView } from "./recipe-tree-view";
-import { createStep } from "../actions";
+import { createStep, exportBomData } from "../actions";
+import { exportToExcel, type ExcelColumn } from "@/lib/excel-utils";
 import type { AssemblyStepFormData } from "@/lib/validations";
+
+const BOM_EXPORT_COLUMNS: ExcelColumn[] = [
+  { key: "step_id", header: "Adım ID", width: 15 },
+  { key: "step_name", header: "Adım Adı", width: 30 },
+  { key: "seq_no", header: "Sıra No", width: 10 },
+  { key: "step_bom_id", header: "BOM ID", width: 15 },
+  { key: "part_id", header: "Parça ID", width: 20 },
+  { key: "part_name", header: "Parça Adı", width: 30 },
+  { key: "qty_per", header: "Miktar", width: 10 },
+];
 
 interface AssemblyStepWithBomCount {
   step_id: string;
@@ -39,6 +50,7 @@ export function BomPageClient({
   const [view, setView] = useState<"steps" | "tree">("steps");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [, startExportTransition] = useTransition();
 
   function handleSkuSelect(sku: string) {
     if (sku) {
@@ -70,6 +82,23 @@ export function BomPageClient({
     steps.length > 0
       ? Math.max(...steps.map((s) => s.seq_no || 0)) + 1
       : 1;
+
+  function handleExport() {
+    if (!selectedSku) return;
+    startExportTransition(async () => {
+      const result = await exportBomData(selectedSku);
+      if (result.success) {
+        exportToExcel(
+          result.data as unknown as Record<string, unknown>[],
+          BOM_EXPORT_COLUMNS,
+          `vigowood-bom-${selectedSku}`
+        );
+        toast.success(`${result.data.length} BOM satırı dışa aktarıldı`);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -104,6 +133,16 @@ export function BomPageClient({
                 Reçete Ağacı
               </Button>
             </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleExport}
+              title="Excel'e Aktar"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </Button>
 
             {view === "steps" && (
               <Button

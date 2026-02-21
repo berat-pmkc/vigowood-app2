@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { toast } from "sonner";
-import { GitBranch, ChevronRight, Package, Loader2 } from "lucide-react";
+import {
+  GitBranch,
+  ChevronRight,
+  Package,
+  Loader2,
+  Check,
+  X,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { getRecipeTree } from "../actions";
+import { getRecipeTree, updateBomItem } from "../actions";
 import { PART_TYPE_LABELS } from "@/lib/constants";
 
 interface RecipeTreeItem {
@@ -38,6 +47,8 @@ interface RecipeTreeViewProps {
 export function RecipeTreeView({ sku }: RecipeTreeViewProps) {
   const [tree, setTree] = useState<RecipeTreeNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editQty, setEditQty] = useState("");
 
   useEffect(() => {
     loadTree();
@@ -53,6 +64,38 @@ export function RecipeTreeView({ sku }: RecipeTreeViewProps) {
     }
     setLoading(false);
   }
+
+  const handleStartEdit = (stepBomId: string, currentQty: number) => {
+    setEditingId(stepBomId);
+    setEditQty(String(currentQty));
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditQty("");
+  };
+
+  const handleSaveEdit = async (stepBomId: string, partId: string) => {
+    const qty = parseFloat(editQty);
+    if (isNaN(qty) || qty <= 0) {
+      toast.error("Miktar 0'dan büyük olmalıdır");
+      return;
+    }
+
+    const result = await updateBomItem(stepBomId, {
+      part_id: partId,
+      qty_per: qty,
+    });
+
+    if (result.success) {
+      toast.success("Miktar güncellendi");
+      setEditingId(null);
+      setEditQty("");
+      await loadTree();
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   if (loading) {
     return (
@@ -73,19 +116,43 @@ export function RecipeTreeView({ sku }: RecipeTreeViewProps) {
   return (
     <div className="space-y-1">
       {tree.map((node) => (
-        <TreeNodeComponent key={node.step_id} node={node} depth={0} />
+        <TreeNodeComponent
+          key={node.step_id}
+          node={node}
+          depth={0}
+          editingId={editingId}
+          editQty={editQty}
+          onStartEdit={handleStartEdit}
+          onCancelEdit={handleCancelEdit}
+          onSaveEdit={handleSaveEdit}
+          onEditQtyChange={setEditQty}
+        />
       ))}
     </div>
   );
 }
 
+interface TreeNodeProps {
+  node: RecipeTreeNode;
+  depth: number;
+  editingId: string | null;
+  editQty: string;
+  onStartEdit: (stepBomId: string, currentQty: number) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (stepBomId: string, partId: string) => Promise<void>;
+  onEditQtyChange: (value: string) => void;
+}
+
 function TreeNodeComponent({
   node,
   depth,
-}: {
-  node: RecipeTreeNode;
-  depth: number;
-}) {
+  editingId,
+  editQty,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditQtyChange,
+}: TreeNodeProps) {
   const [isOpen, setIsOpen] = useState(depth < 2);
 
   return (
@@ -133,6 +200,12 @@ function TreeNodeComponent({
                     key={item.step_bom_id}
                     item={item}
                     depth={depth}
+                    editingId={editingId}
+                    editQty={editQty}
+                    onStartEdit={onStartEdit}
+                    onCancelEdit={onCancelEdit}
+                    onSaveEdit={onSaveEdit}
+                    onEditQtyChange={onEditQtyChange}
                   />
                 ))}
               </div>
@@ -148,13 +221,45 @@ function TreeNodeComponent({
   );
 }
 
+interface TreeItemProps {
+  item: RecipeTreeItem;
+  depth: number;
+  editingId: string | null;
+  editQty: string;
+  onStartEdit: (stepBomId: string, currentQty: number) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (stepBomId: string, partId: string) => Promise<void>;
+  onEditQtyChange: (value: string) => void;
+}
+
 function TreeItemComponent({
   item,
   depth,
-}: {
-  item: RecipeTreeItem;
-  depth: number;
-}) {
+  editingId,
+  editQty,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onEditQtyChange,
+}: TreeItemProps) {
+  const isEditing = editingId === item.step_bom_id;
+  const [isPending, startTransition] = useTransition();
+
+  const handleSave = () => {
+    startTransition(async () => {
+      await onSaveEdit(item.step_bom_id, item.part_id);
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === "Escape") {
+      onCancelEdit();
+    }
+  };
+
   return (
     <div>
       {/* Item Row */}
@@ -186,15 +291,66 @@ function TreeItemComponent({
           </Badge>
         ) : null}
 
-        <span className="font-mono text-xs text-muted-foreground shrink-0 w-12 text-right">
-          x{item.qty_per}
-        </span>
+        {/* Qty — inline edit */}
+        {isEditing ? (
+          <div className="flex items-center gap-1 shrink-0">
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={editQty}
+              onChange={(e) => onEditQtyChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="h-6 w-16 text-xs font-mono px-1"
+              autoFocus
+              disabled={isPending}
+            />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={handleSave}
+              disabled={isPending}
+            >
+              <Check className="h-3 w-3 text-vw-success" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={onCancelEdit}
+              disabled={isPending}
+            >
+              <X className="h-3 w-3 text-muted-foreground" />
+            </Button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEdit(item.step_bom_id, item.qty_per);
+            }}
+            className="font-mono text-xs text-muted-foreground shrink-0 w-12 text-right hover:text-primary hover:underline cursor-pointer"
+            title="Tıklayarak miktarı düzenleyin"
+          >
+            x{item.qty_per}
+          </button>
+        )}
       </div>
 
       {/* Sub-tree for ASM references */}
       {item.sub_tree && (
         <div className="ml-4 mb-1">
-          <TreeNodeComponent node={item.sub_tree} depth={depth + 1} />
+          <TreeNodeComponent
+            node={item.sub_tree}
+            depth={depth + 1}
+            editingId={editingId}
+            editQty={editQty}
+            onStartEdit={onStartEdit}
+            onCancelEdit={onCancelEdit}
+            onSaveEdit={onSaveEdit}
+            onEditQtyChange={onEditQtyChange}
+          />
         </div>
       )}
     </div>

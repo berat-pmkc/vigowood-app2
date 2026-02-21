@@ -43,6 +43,27 @@ export const partUpdateSchema = z.object({
 
 export type PartUpdateData = z.infer<typeof partUpdateSchema>;
 
+export const partCreateSchema = z.object({
+  part_id: z
+    .string()
+    .min(1, "Parça ID gereklidir")
+    .max(30, "Parça ID en fazla 30 karakter olabilir")
+    .regex(/^[A-Za-z0-9\-_]+$/, "Geçersiz ID formatı (harf, rakam, tire, alt çizgi)"),
+  part_adi: z
+    .string()
+    .min(1, "Parça adı gereklidir")
+    .max(200, "Parça adı en fazla 200 karakter olabilir"),
+  part_type: z.enum(PART_TYPES, {
+    error: "Geçerli bir parça tipi seçiniz",
+  }),
+  hazir_eleman_kritik_stok: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(0, "Kritik stok 0 veya üzeri olmalıdır"),
+});
+
+export type PartCreateData = z.infer<typeof partCreateSchema>;
+
 export const plakaUpdateSchema = z.object({
   plaka_adi: z
     .string()
@@ -62,6 +83,15 @@ export const plakaUpdateSchema = z.object({
 });
 
 export type PlakaUpdateData = z.infer<typeof plakaUpdateSchema>;
+
+export const plakaCreateSchema = plakaUpdateSchema.extend({
+  plaka_id: z
+    .string()
+    .min(1, "Plaka grubu ID gereklidir")
+    .max(30, "Plaka grubu ID en fazla 30 karakter olabilir"),
+});
+
+export type PlakaCreateData = z.infer<typeof plakaCreateSchema>;
 
 export const plakaPartSchema = z.object({
   part_id: z.string().min(1, "Parça seçimi gereklidir"),

@@ -41,7 +41,7 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
   // Search filter
   if (search) {
     query = query.or(
-      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%`
+      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%,sku.ilike.%${search}%`
     );
   }
 

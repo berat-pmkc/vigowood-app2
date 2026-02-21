@@ -1,18 +1,33 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
 import { PART_TYPE_LABELS } from "@/lib/constants";
 import { formatNumber } from "@/lib/utils";
+import { deletePart } from "../actions";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import type { Database, PartType } from "@/lib/supabase/types";
 
 type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
@@ -46,6 +61,83 @@ const typeBadgeColors: Record<PartType, string> = {
   KUTU: "bg-amber-100 text-amber-800 border-amber-200",
   KARTON: "bg-purple-100 text-purple-800 border-purple-200",
 };
+
+function PartActionsCell({
+  part,
+  onEdit,
+}: {
+  part: AllPart;
+  onEdit: (part: AllPart) => void;
+}) {
+  const router = useRouter();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deletePart(part.part_id);
+      if (result.success) {
+        toast.success("Parça silindi");
+        setDeleteOpen(false);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+            <span className="sr-only">Menü</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onEdit(part)}>
+            Düzenle
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteOpen(true);
+            }}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Sil
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parçayı Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{part.part_id}</strong> — {part.part_adi || "İsimsiz"}{" "}
+              parçasını silmek istediğinize emin misiniz? Bu işlem geri
+              alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isPending ? "Siliniyor..." : "Sil"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
 
 export function getPartColumns({
   onSort,
@@ -99,8 +191,6 @@ export function getPartColumns({
           column={column}
           title="Stok"
           onSort={(id, desc) => {
-            // Sort by the underlying column based on current filter
-            // Default to hazir_eleman_aktif_stok for mixed views
             onSort("hazir_eleman_aktif_stok", desc);
           }}
           className="justify-end"
@@ -189,21 +279,7 @@ export function getPartColumns({
       id: "actions",
       cell: ({ row }) => {
         const part = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Menü</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(part)}>
-                Düzenle
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
+        return <PartActionsCell part={part} onEdit={onEdit} />;
       },
       size: 50,
     },

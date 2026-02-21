@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { plakaUpdateSchema, plakaPartSchema } from "@/lib/validations";
+import { plakaUpdateSchema, plakaCreateSchema, plakaPartSchema } from "@/lib/validations";
+import type { Database } from "@/lib/supabase/types";
 
 type ActionResult = { success: true } | { success: false; error: string };
+type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -13,6 +15,70 @@ async function requireAdmin() {
     throw new Error("Yetkisiz erişim");
   }
   return user;
+}
+
+export async function createPlaka(
+  formData: {
+    plaka_id: string;
+    plaka_adi: string;
+    tipi: string | null;
+    renk: string | null;
+    makine_id: string;
+    std_kesim_suresi_dk: number | null;
+    sku: string | null;
+  }
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const parsed = plakaCreateSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
+      return { success: false, error: firstError };
+    }
+
+    const supabase = await createClient();
+
+    // Generate next plakalar_id (PL-0001 format)
+    const { data: lastPlaka } = await supabase
+      .from("plakalar")
+      .select("plakalar_id")
+      .like("plakalar_id", "PL-%")
+      .order("plakalar_id", { ascending: false })
+      .limit(1);
+
+    let nextNum = 1;
+    if (lastPlaka && lastPlaka.length > 0) {
+      const match = lastPlaka[0].plakalar_id.match(/PL-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    const plakalarId = `PL-${String(nextNum).padStart(4, "0")}`;
+
+    const { error } = await supabase.from("plakalar").insert({
+      plakalar_id: plakalarId,
+      plaka_id: parsed.data.plaka_id,
+      plaka_adi: parsed.data.plaka_adi,
+      tipi: parsed.data.tipi,
+      renk: parsed.data.renk,
+      makine_id: parsed.data.makine_id,
+      std_kesim_suresi_dk: parsed.data.std_kesim_suresi_dk,
+      sku: parsed.data.sku,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/admin/plakalar");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Bir hata oluştu",
+    };
+  }
 }
 
 export async function updatePlaka(
@@ -227,5 +293,163 @@ export async function deletePlakaPart(
       success: false,
       error: e instanceof Error ? e.message : "Bir hata oluştu",
     };
+  }
+}
+
+export async function deletePlaka(plakalarId: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    // Get plaka_id for this plakalar_id
+    const { data: plaka } = await supabase
+      .from("plakalar")
+      .select("plaka_id")
+      .eq("plakalar_id", plakalarId)
+      .single();
+
+    if (!plaka) {
+      return { success: false, error: "Plaka bulunamadı" };
+    }
+
+    // Check cut_batches references
+    const { data: cutRefs } = await supabase
+      .from("cut_batches")
+      .select("batch_id")
+      .eq("plaka_id", plaka.plaka_id)
+      .limit(1);
+
+    if (cutRefs && cutRefs.length > 0) {
+      return {
+        success: false,
+        error: "Bu plaka üretimde kullanılmış, silinemez",
+      };
+    }
+
+    // Delete plaka_parts for this plaka_id
+    await supabase
+      .from("plaka_parts")
+      .delete()
+      .eq("plaka_id", plaka.plaka_id);
+
+    // Delete the plaka
+    const { error } = await supabase
+      .from("plakalar")
+      .delete()
+      .eq("plakalar_id", plakalarId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/admin/plakalar");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Bir hata oluştu",
+    };
+  }
+}
+
+export async function exportPlakalar(): Promise<
+  { success: true; data: Plaka[] } | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("plakalar")
+      .select("*")
+      .order("plakalar_id");
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data ?? []) as Plaka[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function importPlakalar(
+  rows: {
+    plakalar_id?: string;
+    plaka_id: string;
+    plaka_adi: string;
+    tipi?: string;
+    renk?: string;
+    makine_id: string;
+    std_kesim_suresi_dk?: string;
+    sku?: string;
+  }[]
+): Promise<ActionResult & { count?: number }> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    let count = 0;
+    for (const row of rows) {
+      if (!row.plaka_id || !row.plaka_adi) continue;
+
+      const sureDk = row.std_kesim_suresi_dk ? parseInt(row.std_kesim_suresi_dk, 10) : null;
+
+      if (row.plakalar_id) {
+        // Upsert by plakalar_id
+        const { error } = await supabase
+          .from("plakalar")
+          .upsert(
+            {
+              plakalar_id: row.plakalar_id,
+              plaka_id: row.plaka_id,
+              plaka_adi: row.plaka_adi,
+              tipi: row.tipi || null,
+              renk: row.renk || null,
+              makine_id: row.makine_id || "BÜYÜK",
+              std_kesim_suresi_dk: sureDk,
+              sku: row.sku || null,
+            },
+            { onConflict: "plakalar_id" }
+          );
+
+        if (error) {
+          return { success: false, error: `Satır ${row.plakalar_id}: ${error.message}` };
+        }
+      } else {
+        // Auto-generate plakalar_id for new rows
+        const { data: lastPlaka } = await supabase
+          .from("plakalar")
+          .select("plakalar_id")
+          .like("plakalar_id", "PL-%")
+          .order("plakalar_id", { ascending: false })
+          .limit(1);
+
+        let nextNum = 1;
+        if (lastPlaka && lastPlaka.length > 0) {
+          const match = lastPlaka[0].plakalar_id.match(/PL-(\d+)/);
+          if (match) nextNum = parseInt(match[1], 10) + 1;
+        }
+        const plakalarId = `PL-${String(nextNum).padStart(4, "0")}`;
+
+        const { error } = await supabase.from("plakalar").insert({
+          plakalar_id: plakalarId,
+          plaka_id: row.plaka_id,
+          plaka_adi: row.plaka_adi,
+          tipi: row.tipi || null,
+          renk: row.renk || null,
+          makine_id: row.makine_id || "BÜYÜK",
+          std_kesim_suresi_dk: sureDk,
+          sku: row.sku || null,
+        });
+
+        if (error) {
+          return { success: false, error: `Yeni plaka: ${error.message}` };
+        }
+      }
+      count++;
+    }
+
+    revalidatePath("/admin/plakalar");
+    return { success: true, count };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

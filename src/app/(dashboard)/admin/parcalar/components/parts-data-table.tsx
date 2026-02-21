@@ -7,6 +7,8 @@ import {
   getCoreRowModel,
   type SortingState,
 } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { PartsToolbar } from "./parts-toolbar";
@@ -41,6 +43,7 @@ export function PartsDataTable({
   const searchParams = useSearchParams();
   const [editPart, setEditPart] = useState<AllPart | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"create" | "edit">("edit");
   const [, startTransition] = useTransition();
 
   const buildUrl = useCallback(
@@ -85,6 +88,13 @@ export function PartsDataTable({
 
   const handleEdit = useCallback((part: AllPart) => {
     setEditPart(part);
+    setSheetMode("edit");
+    setSheetOpen(true);
+  }, []);
+
+  const handleCreate = useCallback(() => {
+    setEditPart(null);
+    setSheetMode("create");
     setSheetOpen(true);
   }, []);
 
@@ -113,12 +123,20 @@ export function PartsDataTable({
 
   return (
     <div className="space-y-4">
-      <PartsToolbar
-        search={search}
-        tip={tip}
-        onSearchChange={(v) => navigate({ search: v || undefined, page: "0" })}
-        onTipChange={(v) => navigate({ tip: v || undefined, page: "0" })}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1">
+          <PartsToolbar
+            search={search}
+            tip={tip}
+            onSearchChange={(v) => navigate({ search: v || undefined, page: "0" })}
+            onTipChange={(v) => navigate({ tip: v || undefined, page: "0" })}
+          />
+        </div>
+        <Button onClick={handleCreate} size="sm" className="shrink-0">
+          <Plus className="mr-1 h-4 w-4" />
+          Yeni Parça
+        </Button>
+      </div>
 
       <DataTable
         table={table}
@@ -137,6 +155,7 @@ export function PartsDataTable({
 
       <PartEditSheet
         part={editPart}
+        mode={sheetMode}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         onSaved={() => router.refresh()}

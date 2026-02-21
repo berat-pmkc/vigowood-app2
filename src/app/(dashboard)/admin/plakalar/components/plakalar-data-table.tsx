@@ -7,6 +7,8 @@ import {
   getCoreRowModel,
   type SortingState,
 } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { PlakalarToolbar } from "./plakalar-toolbar";
@@ -45,6 +47,7 @@ export function PlakalarDataTable({
   const searchParams = useSearchParams();
   const [editPlaka, setEditPlaka] = useState<Plaka | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"create" | "edit">("edit");
   const [, startTransition] = useTransition();
 
   const buildUrl = useCallback(
@@ -89,6 +92,13 @@ export function PlakalarDataTable({
 
   const handleEdit = useCallback((plaka: Plaka) => {
     setEditPlaka(plaka);
+    setSheetMode("edit");
+    setSheetOpen(true);
+  }, []);
+
+  const handleCreate = useCallback(() => {
+    setEditPlaka(null);
+    setSheetMode("create");
     setSheetOpen(true);
   }, []);
 
@@ -117,19 +127,27 @@ export function PlakalarDataTable({
 
   return (
     <div className="space-y-4">
-      <PlakalarToolbar
-        search={search}
-        makine={makine}
-        sku={sku}
-        skuOptions={skuOptions}
-        onSearchChange={(v) =>
-          navigate({ search: v || undefined, page: "0" })
-        }
-        onMakineChange={(v) =>
-          navigate({ makine: v || undefined, page: "0" })
-        }
-        onSkuChange={(v) => navigate({ sku: v || undefined, page: "0" })}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1">
+          <PlakalarToolbar
+            search={search}
+            makine={makine}
+            sku={sku}
+            skuOptions={skuOptions}
+            onSearchChange={(v) =>
+              navigate({ search: v || undefined, page: "0" })
+            }
+            onMakineChange={(v) =>
+              navigate({ makine: v || undefined, page: "0" })
+            }
+            onSkuChange={(v) => navigate({ sku: v || undefined, page: "0" })}
+          />
+        </div>
+        <Button onClick={handleCreate} size="sm" className="shrink-0">
+          <Plus className="mr-1 h-4 w-4" />
+          Yeni Plaka
+        </Button>
+      </div>
 
       <DataTable
         table={table}
@@ -148,6 +166,7 @@ export function PlakalarDataTable({
 
       <PlakaEditSheet
         plaka={editPlaka}
+        mode={sheetMode}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         onSaved={() => router.refresh()}
