@@ -459,40 +459,6 @@ export async function deleteReport(
   }
 }
 
-// ─── DASHBOARD QUERIES ──────────────────────────────────────────
+// ─── TYPES ──────────────────────────────────────────────────────
 
 export type PeriodType = "today" | "week" | "month" | "all";
-
-export function getPeriodDates(period: PeriodType): {
-  start: string | null;
-  end: string | null;
-} {
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
-
-  switch (period) {
-    case "today":
-      return { start: todayStr, end: todayStr };
-    case "week": {
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay() + 1);
-      return {
-        start: startOfWeek.toISOString().split("T")[0],
-        end: todayStr,
-      };
-    }
-    case "month": {
-      const startOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        1,
-      );
-      return {
-        start: startOfMonth.toISOString().split("T")[0],
-        end: todayStr,
-      };
-    }
-    case "all":
-      return { start: null, end: null };
-  }
-}

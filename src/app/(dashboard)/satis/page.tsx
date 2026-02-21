@@ -4,7 +4,27 @@ import type { SatisKpiData } from "./components/kpi-cards";
 import type { DailySalesData } from "./components/satis-chart";
 import type { SkuSalesRow } from "./components/satis-table";
 import { isExportChannel } from "@/lib/constants";
-import { getPeriodDates, type PeriodType } from "./actions";
+import type { PeriodType } from "./actions";
+
+function getPeriodDates(period: PeriodType): { start: string | null; end: string | null } {
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  switch (period) {
+    case "today":
+      return { start: todayStr, end: todayStr };
+    case "week": {
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - now.getDay() + 1);
+      return { start: startOfWeek.toISOString().split("T")[0], end: todayStr };
+    }
+    case "month": {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start: startOfMonth.toISOString().split("T")[0], end: todayStr };
+    }
+    case "all":
+      return { start: null, end: null };
+  }
+}
 
 interface PageProps {
   searchParams: Promise<{ period?: string; kanal?: string }>;
