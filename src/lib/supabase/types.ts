@@ -582,6 +582,7 @@ export type Database = {
       }
       pack_events: {
         Row: {
+          birim_paketleme_dk: number | null
           created_at: string
           durum: string
           email: string | null
@@ -596,8 +597,11 @@ export type Database = {
           start_time: string | null
           status: string
           tarih: string | null
+          worker_count: number | null
+          workers: Json | null
         }
         Insert: {
+          birim_paketleme_dk?: number | null
           created_at?: string
           durum?: string
           email?: string | null
@@ -612,8 +616,11 @@ export type Database = {
           start_time?: string | null
           status?: string
           tarih?: string | null
+          worker_count?: number | null
+          workers?: Json | null
         }
         Update: {
+          birim_paketleme_dk?: number | null
           created_at?: string
           durum?: string
           email?: string | null
@@ -628,6 +635,8 @@ export type Database = {
           start_time?: string | null
           status?: string
           tarih?: string | null
+          worker_count?: number | null
+          workers?: Json | null
         }
         Relationships: []
       }
@@ -1772,5 +1781,5 @@ export const Constants = {
 // ─── Custom type aliases ────────────────────────────────────────
 export type UserRole = Database["public"]["Enums"]["user_role"];
 export type Station = Database["public"]["Enums"]["station"];
-export type PartType = Database["public"]["Enums"]["part_type"];
 export type ProductCategory = Database["public"]["Enums"]["product_category"];
+export type PartType = Database["public"]["Enums"]["part_type"];

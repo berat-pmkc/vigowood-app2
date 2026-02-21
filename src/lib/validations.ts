@@ -139,6 +139,26 @@ export const packSessionCreateSchema = z.object({
 
 export type PackSessionCreateData = z.infer<typeof packSessionCreateSchema>;
 
+// Paketleme seans kapatma
+export const packSessionCloseSchema = z.object({
+  qty: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(9999, "En fazla 9999 adet olabilir"),
+  workers: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+      })
+    )
+    .min(1, "En az 1 çalışan seçilmelidir")
+    .max(5, "En fazla 5 çalışan seçilebilir"),
+});
+
+export type PackSessionCloseData = z.infer<typeof packSessionCloseSchema>;
+
 // Kutu-Koli seans oluşturma
 export const kutuSessionCreateSchema = z.object({
   part_id: z.string().min(1, "Parça seçimi gereklidir"),

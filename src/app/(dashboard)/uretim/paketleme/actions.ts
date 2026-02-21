@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { packSessionCreateSchema } from "@/lib/validations";
+import { packSessionCloseSchema } from "@/lib/validations";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -37,21 +37,124 @@ export async function getActiveProducts() {
   }
 }
 
+/** Paketleme operatörlerini getir */
+export async function getPackOperators() {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("user_id, full_name, role")
+      .eq("is_active", true)
+      .in("role", ["Üretim", "Hat"])
+      .order("full_name");
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data ?? [] };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Analiz verisi */
+export async function getAnalytics(period: "today" | "week" | "month") {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const now = new Date();
+    let since: Date;
+    if (period === "today") {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (period === "week") {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    } else {
+      since = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    }
+
+    const { data, error } = await supabase
+      .from("pack_events")
+      .select("session_id, qty, start_time, end_time, worker_count, workers, birim_paketleme_dk")
+      .eq("durum", "tamamlandi")
+      .gte("end_time", since.toISOString());
+
+    if (error) return { success: false as const, error: error.message };
+
+    const sessions = data ?? [];
+    const totalQty = sessions.reduce((sum, s) => sum + (s.qty || 0), 0);
+
+    // Benzersiz çalışan sayısı (workers jsonb'den)
+    const workerIds = new Set<string>();
+    sessions.forEach((s) => {
+      const workers = s.workers as Array<{ id: string; name: string }> | null;
+      if (workers && Array.isArray(workers)) {
+        workers.forEach((w) => workerIds.add(w.id));
+      }
+    });
+
+    // Toplam seans süresi (dk)
+    let totalMinutes = 0;
+    sessions.forEach((s) => {
+      if (s.start_time && s.end_time) {
+        const diff = new Date(s.end_time).getTime() - new Date(s.start_time).getTime();
+        totalMinutes += diff / 60000;
+      }
+    });
+
+    const avgBirimDk =
+      sessions.length > 0
+        ? sessions.reduce((sum, s) => sum + (s.birim_paketleme_dk || 0), 0) / sessions.filter((s) => s.birim_paketleme_dk).length || 0
+        : 0;
+
+    return {
+      success: true as const,
+      data: {
+        totalQty,
+        uniqueWorkers: workerIds.size,
+        totalMinutes: Math.round(totalMinutes),
+        sessionCount: sessions.length,
+        avgBirimDk: Math.round(avgBirimDk * 100) / 100,
+      },
+    };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Ürün bazlı trend verisi */
+export async function getProductTrend(sku: string, days: number = 30) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const { data, error } = await supabase
+      .from("pack_events")
+      .select("session_id, end_time, qty, birim_paketleme_dk, worker_count")
+      .eq("durum", "tamamlandi")
+      .eq("sku", sku)
+      .gte("end_time", since.toISOString())
+      .order("end_time", { ascending: true });
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data ?? [] };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
-/** Yeni paketleme seansı oluştur */
-export async function createPackSession(formData: {
-  sku: string;
-  qty: number;
-  not_text: string | null;
-}): Promise<ActionResult> {
+/** Yeni paketleme seansı oluştur (sadece SKU, qty yok) */
+export async function createPackSession(sku: string): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
 
-    const parsed = packSessionCreateSchema.safeParse(formData);
-    if (!parsed.success) {
-      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
-      return { success: false, error: firstError };
+    if (!sku || sku.trim().length === 0) {
+      return { success: false, error: "Ürün seçimi gereklidir" };
     }
 
     const supabase = await createClient();
@@ -77,22 +180,24 @@ export async function createPackSession(formData: {
       .limit(1);
 
     if (existing && existing.length > 0) {
-      sessionId = `${sessionId}-${pad(now.getMilliseconds())}`;
+      sessionId = `${sessionId}-${String(now.getMilliseconds()).padStart(3, "0")}`;
     }
 
-    // INSERT
+    // INSERT — doğrudan "paketlemede" olarak başlat, qty=0
     const { error } = await supabase.from("pack_events").insert({
       session_id: sessionId,
       email: email,
       tarih: now.toISOString(),
-      sku: parsed.data.sku,
+      sku: sku,
       personel: operatorId,
-      qty: parsed.data.qty,
-      not_text: parsed.data.not_text,
+      qty: 0,
       status: "Open",
-      durum: "bekliyor",
+      durum: "paketlemede",
+      start_time: now.toISOString(),
       operator_id: operatorId,
       operator_name: operatorName,
+      worker_count: 1,
+      workers: JSON.stringify([]),
     });
 
     if (error) return { success: false, error: error.message };
@@ -103,6 +208,149 @@ export async function createPackSession(formData: {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
+
+/** Seansı kapat: paketlemede → tamamlandi + stock_movements IN */
+export async function closePackSession(
+  sessionId: string,
+  formData: { qty: number; workers: { id: string; name: string }[] }
+): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+
+    const parsed = packSessionCloseSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
+      return { success: false, error: firstError };
+    }
+
+    const supabase = await createClient();
+
+    // Seans bilgileri
+    const { data } = await supabase
+      .from("pack_events")
+      .select("session_id, durum, sku, start_time")
+      .eq("session_id", sessionId)
+      .single();
+
+    const session = data as {
+      session_id: string;
+      durum: string;
+      sku: string | null;
+      start_time: string | null;
+    } | null;
+
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "paketlemede") return { success: false, error: "Seans aktif değil" };
+
+    const now = new Date();
+    const endTime = now.toISOString();
+    const { qty, workers } = parsed.data;
+
+    // Birim paketleme süresi hesapla
+    let birimDk: number | null = null;
+    if (session.start_time && qty > 0 && workers.length > 0) {
+      const diffMs = now.getTime() - new Date(session.start_time).getTime();
+      const totalMinutes = diffMs / 60000;
+      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+    }
+
+    // Update pack_events
+    const { error: updateError } = await supabase
+      .from("pack_events")
+      .update({
+        durum: "tamamlandi",
+        status: "Closed",
+        end_time: endTime,
+        qty: qty,
+        worker_count: workers.length,
+        workers: workers,
+        birim_paketleme_dk: birimDk,
+      })
+      .eq("session_id", sessionId);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    // Idempotency: stock_movements'da bu session_id var mı?
+    const { data: existingMov } = await supabase
+      .from("stock_movements")
+      .select("id")
+      .eq("source_row_id", sessionId)
+      .limit(1);
+
+    if (existingMov && existingMov.length > 0) {
+      revalidatePath("/uretim/paketleme");
+      return { success: true };
+    }
+
+    // Generate mov_id: SM-XXXXXX
+    const { data: lastMov } = await supabase
+      .from("stock_movements")
+      .select("mov_id")
+      .like("mov_id", "SM-%")
+      .order("mov_id", { ascending: false })
+      .limit(1);
+
+    let movNum = 1;
+    if (lastMov && lastMov.length > 0) {
+      const match = lastMov[0].mov_id?.match(/SM-(\d+)/);
+      if (match) movNum = parseInt(match[1], 10) + 1;
+    }
+    const movId = `SM-${String(movNum).padStart(6, "0")}`;
+
+    // stock_movements INSERT — mamül stok IN
+    const { error: movError } = await supabase.from("stock_movements").insert({
+      mov_id: movId,
+      tarih: endTime,
+      sku: session.sku,
+      qty: qty,
+      source: "Paketleme",
+      source_row_id: sessionId,
+      batch_id: sessionId,
+    });
+
+    if (movError) return { success: false, error: movError.message };
+
+    revalidatePath("/uretim/paketleme");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Devam eden seansı iptal et (sil) */
+export async function cancelSession(sessionId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("pack_events")
+      .select("durum")
+      .eq("session_id", sessionId)
+      .single();
+
+    const session = data as { durum: string } | null;
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "paketlemede") {
+      return { success: false, error: "Sadece devam eden seans iptal edilebilir" };
+    }
+
+    const { error } = await supabase
+      .from("pack_events")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("durum", "paketlemede");
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/uretim/paketleme");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// ─── LEGACY ACTIONS (eski verilerle uyumluluk) ─────────────────
 
 /** Paketlemeyi başlat: bekliyor → paketlemede */
 export async function startPack(sessionId: string): Promise<ActionResult> {
@@ -137,13 +385,12 @@ export async function startPack(sessionId: string): Promise<ActionResult> {
   }
 }
 
-/** Paketlemeyi tamamla: paketlemede → tamamlandi + stock_movements IN */
+/** Paketlemeyi tamamla (legacy): paketlemede → tamamlandi + stock_movements IN */
 export async function completePack(sessionId: string): Promise<ActionResult> {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    // Seans bilgileri
     const { data } = await supabase
       .from("pack_events")
       .select("session_id, durum, sku, qty, operator_id")
@@ -163,7 +410,6 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
 
     const now = new Date().toISOString();
 
-    // Update durum
     const { error: updateError } = await supabase
       .from("pack_events")
       .update({
@@ -175,7 +421,7 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
 
     if (updateError) return { success: false, error: updateError.message };
 
-    // Idempotency: stock_movements'da bu session_id var mı?
+    // Idempotency
     const { data: existingMov } = await supabase
       .from("stock_movements")
       .select("id")
@@ -183,12 +429,10 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
       .limit(1);
 
     if (existingMov && existingMov.length > 0) {
-      // Zaten kayıt var
       revalidatePath("/uretim/paketleme");
       return { success: true };
     }
 
-    // Generate mov_id: SM-XXXXXX
     const { data: lastMov } = await supabase
       .from("stock_movements")
       .select("mov_id")
@@ -203,51 +447,17 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
     }
     const movId = `SM-${String(movNum).padStart(6, "0")}`;
 
-    // stock_movements INSERT — mamül stok IN
     const { error: movError } = await supabase.from("stock_movements").insert({
       mov_id: movId,
       tarih: now,
       sku: session.sku,
-      qty: session.qty, // positive = production in
+      qty: session.qty,
       source: "Paketleme",
       source_row_id: sessionId,
       batch_id: sessionId,
     });
 
     if (movError) return { success: false, error: movError.message };
-
-    revalidatePath("/uretim/paketleme");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Paketlemeyi iptal et: paketlemede → bekliyor */
-export async function cancelPack(sessionId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    const { data } = await supabase
-      .from("pack_events")
-      .select("durum")
-      .eq("session_id", sessionId)
-      .single();
-
-    const session = data as { durum: string } | null;
-    if (!session) return { success: false, error: "Seans bulunamadı" };
-    if (session.durum !== "paketlemede") return { success: false, error: "Sadece paketlemede durumundaki seans iptal edilebilir" };
-
-    const { error } = await supabase
-      .from("pack_events")
-      .update({
-        durum: "bekliyor",
-        start_time: null,
-      })
-      .eq("session_id", sessionId);
-
-    if (error) return { success: false, error: error.message };
 
     revalidatePath("/uretim/paketleme");
     return { success: true };
