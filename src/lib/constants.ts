@@ -462,6 +462,42 @@ export const PAZARYERI_OPTIONS = [
   "Etsy",
 ] as const;
 
+// ─── Personel & Yoklama Sabitleri ────────────────────────────
+
+/** Yoklama departmanları */
+export const ATTENDANCE_DEPARTMENTS = [
+  "Kesim",
+  "Temizlik",
+  "Montaj",
+  "Paketleme",
+  "Paketleme Hatti",
+] as const;
+
+export type AttendanceDepartment = (typeof ATTENDANCE_DEPARTMENTS)[number];
+
+export const ATTENDANCE_DEPARTMENT_LABELS: Record<AttendanceDepartment, string> = {
+  Kesim: "Kesim",
+  Temizlik: "Temizlik",
+  Montaj: "Montaj",
+  Paketleme: "Paketleme",
+  "Paketleme Hatti": "Paketleme Hattı",
+};
+
+export const ATTENDANCE_DEPARTMENT_COLORS: Record<AttendanceDepartment, { bg: string; text: string }> = {
+  Kesim: { bg: "bg-blue-100", text: "text-blue-800" },
+  Temizlik: { bg: "bg-emerald-100", text: "text-emerald-800" },
+  Montaj: { bg: "bg-purple-100", text: "text-purple-800" },
+  Paketleme: { bg: "bg-amber-100", text: "text-amber-800" },
+  "Paketleme Hatti": { bg: "bg-orange-100", text: "text-orange-800" },
+};
+
+/** Personel erişim rolleri (Yönetici + Endüstri Mühendisi + Hat) */
+export const PERSONEL_ACCESS_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "Hat",
+];
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;

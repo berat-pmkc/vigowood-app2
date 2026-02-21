@@ -1,28 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "./use-realtime-subscription";
 
 export function useMontajRealtime() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    const channel = supabase
-      .channel("montaj-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "montaj_batches" },
-        () => {
-          router.refresh();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  return useRealtimeSubscription({
+    channelName: "montaj-realtime",
+    subscriptions: [
+      { event: "*", table: "montaj_batches" },
+    ],
+    debounceMs: 1000,
+  });
 }

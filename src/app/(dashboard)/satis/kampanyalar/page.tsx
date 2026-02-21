@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { KampanyalarClient } from "./components/kampanyalar-client";
+
+export const metadata: Metadata = { title: "Kampanyalar" };
 
 export default async function KampanyalarPage() {
   const supabase = await createClient();

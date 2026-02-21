@@ -18,15 +18,18 @@ export default async function DashboardLayout({
   // For station accounts, show selected operator name
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const operatorId = user?.user_metadata?.selected_operator_id as string | undefined;
   const operatorName = user?.user_metadata?.selected_operator_name as string | undefined;
   const displayName = operatorName || profile.full_name || profile.email || "";
   const userRole = profile.role as UserRole;
+  const effectiveUserId = operatorId || profile.user_id;
 
   return (
     <DashboardShell
       userRole={userRole}
       displayName={displayName}
       displayRole={userRole}
+      userId={effectiveUserId}
     >
       {children}
     </DashboardShell>

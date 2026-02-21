@@ -357,8 +357,13 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] TR Pazarlama CRUD
 - [x] Kampanyalar CRUD
 
-### KATMAN 20: Analiz & Dashboard
-- [ ] KPI kartları + grafikler + raporlar
+### KATMAN 20: Analiz & Dashboard ✅
+- [x] 4 sekmeli dashboard (Genel Özet, Üretim, Satış, Stok)
+- [x] Dönem filtresi (Bugün/Hafta/Ay/Tüm Zamanlar) URL params ile
+- [x] 16 KPI kartı (4 per tab)
+- [x] 6 grafik (ComposedChart, AreaChart, BarChart, stacked BarChart, horizontal BarChart)
+- [x] 2 veri tablosu (en çok satan ürünler, kritik stok)
+- [x] 14 paralel Supabase sorgusu (server-side)
 
 ### KATMAN 21: Personel & Yoklama
 - [ ] Yoklama giriş/liste + mesai

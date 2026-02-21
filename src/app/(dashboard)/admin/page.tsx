@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { formatNumber } from "@/lib/utils";
 import { PRODUCT_CATEGORIES, PART_TYPE_LABELS } from "@/lib/constants";
@@ -22,6 +23,8 @@ import {
   Settings,
 } from "lucide-react";
 import { AdminBarChart } from "./components/admin-bar-chart";
+
+export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient();

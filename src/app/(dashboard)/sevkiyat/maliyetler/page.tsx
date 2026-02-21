@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_COST_ROLES } from "@/lib/constants";
 import { MaliyetlerClient } from "./maliyetler-client";
 import type { SevkiyatRow, SevkiyatMaliyetRow, DovizKuruRow } from "../actions";
+
+export const metadata: Metadata = { title: "Sevkiyat Maliyetleri" };
 
 export type LojistikToplam = { desi: number; agirlik: number; hacim: number };
 

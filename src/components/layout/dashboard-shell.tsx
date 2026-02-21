@@ -14,6 +14,7 @@ type DashboardShellProps = {
   userRole: UserRole;
   displayName: string;
   displayRole: string;
+  userId?: string;
 };
 
 export function DashboardShell({
@@ -21,6 +22,7 @@ export function DashboardShell({
   userRole,
   displayName,
   displayRole,
+  userId,
 }: DashboardShellProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -44,7 +46,7 @@ export function DashboardShell({
           onLogout={handleLogout}
         />
         <SidebarInset>
-          <TopNavbar displayName={displayName} displayRole={displayRole} />
+          <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} />
           <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">
             {children}
           </main>

@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { KurlarClient } from "./kurlar-client";
 import type { DovizKuruRow } from "../actions";
+
+export const metadata: Metadata = { title: "Doviz Kurlari" };
 
 export default async function KurlarPage() {
   const user = await getCurrentUser();

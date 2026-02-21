@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -5,6 +6,8 @@ import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { KutuList } from "./components/kutu-list";
 import type { KutuSessionRow } from "./components/kutu-card";
 import type { KritikStokItem } from "./components/kritik-stok-panel";
+
+export const metadata: Metadata = { title: "Kutu-Koli" };
 
 interface PageProps {
   searchParams: Promise<{ durum?: string }>;

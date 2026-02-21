@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -6,6 +7,8 @@ import { YeniKesimForm } from "../components/yeni-kesim-form";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Yeni Kesim" };
 
 export default async function YeniKesimPage() {
   const user = await getCurrentUser();

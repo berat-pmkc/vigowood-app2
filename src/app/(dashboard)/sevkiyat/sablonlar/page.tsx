@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { SablonDataTable } from "./components/sablon-data-table";
 import type { PaletSablonRow } from "./actions";
+
+export const metadata: Metadata = { title: "Palet Sablonlari" };
 
 interface PageProps {
   searchParams: Promise<{

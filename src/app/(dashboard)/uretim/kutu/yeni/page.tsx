@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
@@ -5,6 +6,8 @@ import { YeniKutuForm } from "../components/yeni-kutu-form";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Yeni Kutu Uretim" };
 
 export default async function YeniKutuPage() {
   const user = await getCurrentUser();

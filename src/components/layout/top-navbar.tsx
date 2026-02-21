@@ -5,13 +5,18 @@ import { Separator } from "@/components/ui/separator";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { useUnreadCount } from "@/hooks/use-unread-count";
+import { RealtimeIndicator } from "@/components/shared/realtime-indicator";
 
 type TopNavbarProps = {
   displayName: string;
   displayRole: string;
+  userId?: string;
 };
 
-export function TopNavbar({ displayName, displayRole }: TopNavbarProps) {
+export function TopNavbar({ displayName, displayRole, userId }: TopNavbarProps) {
+  const unreadCount = useUnreadCount(userId ?? null);
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-4">
       <SidebarTrigger className="-ml-1" />
@@ -23,9 +28,16 @@ export function TopNavbar({ displayName, displayRole }: TopNavbarProps) {
 
         {/* Right side — user info + notifications */}
         <div className="flex items-center gap-3">
+          <RealtimeIndicator />
+
           <Button variant="ghost" size="icon" asChild className="relative">
             <Link href="/bildirimler">
               <Bell className="size-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           </Button>
 

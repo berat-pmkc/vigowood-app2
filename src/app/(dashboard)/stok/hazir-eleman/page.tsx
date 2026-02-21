@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { STOCK_ACCESS_ROLES } from "@/lib/constants";
@@ -26,6 +27,8 @@ interface PageProps {
     mSortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Hazir Eleman Stok" };
 
 export default async function HazirElemanPage({ searchParams }: PageProps) {
   const params = await searchParams;

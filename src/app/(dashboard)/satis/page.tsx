@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { SatisDashboard } from "./components/satis-dashboard";
 import type { SatisKpiData } from "./components/kpi-cards";
@@ -29,6 +30,8 @@ function getPeriodDates(period: PeriodType): { start: string | null; end: string
 interface PageProps {
   searchParams: Promise<{ period?: string; kanal?: string }>;
 }
+
+export const metadata: Metadata = { title: "Satis" };
 
 export default async function SatisPage({ searchParams }: PageProps) {
   const params = await searchParams;

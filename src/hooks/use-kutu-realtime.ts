@@ -1,28 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useRealtimeSubscription } from "./use-realtime-subscription";
 
 export function useKutuRealtime() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    const channel = supabase
-      .channel("kutu-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "kutu_uretim" },
-        () => {
-          router.refresh();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [router]);
+  return useRealtimeSubscription({
+    channelName: "kutu-realtime",
+    subscriptions: [
+      { event: "*", table: "kutu_uretim" },
+    ],
+    debounceMs: 1000,
+  });
 }

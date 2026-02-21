@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI, ATTENDANCE_DEPARTMENTS } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -411,3 +411,47 @@ export const kampanyaSchema = z.object({
 });
 
 export type KampanyaData = z.infer<typeof kampanyaSchema>;
+
+// ─── Personel & Yoklama ───────────────────────────────────────
+
+// ─── Bildirimler ─────────────────────────────────────────────
+
+export const notificationCreateSchema = z.object({
+  title: z.string().min(1, "Başlık gereklidir").max(200, "Başlık en fazla 200 karakter olabilir"),
+  message: z.string().max(2000, "Mesaj en fazla 2000 karakter olabilir").nullable(),
+  target_users: z.array(z.string()).default([]),
+});
+
+export type NotificationCreateData = z.infer<typeof notificationCreateSchema>;
+
+// ─── Personel & Yoklama ───────────────────────────────────────
+
+export const attendanceCreateSchema = z.object({
+  employee: z
+    .string()
+    .min(1, "Çalışan seçimi gereklidir"),
+  tarih: z
+    .string()
+    .min(1, "Tarih gereklidir"),
+  department: z.enum(ATTENDANCE_DEPARTMENTS, {
+    error: "Geçerli bir departman seçiniz",
+  }),
+  start_time: z
+    .string()
+    .min(1, "Giriş saati gereklidir")
+    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)"),
+  end_time: z
+    .string()
+    .min(1, "Çıkış saati gereklidir")
+    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)"),
+  not_text: z
+    .string()
+    .max(500, "Not en fazla 500 karakter olabilir")
+    .nullable(),
+});
+
+export type AttendanceCreateData = z.infer<typeof attendanceCreateSchema>;
+
+export const attendanceUpdateSchema = attendanceCreateSchema;
+
+export type AttendanceUpdateData = z.infer<typeof attendanceUpdateSchema>;

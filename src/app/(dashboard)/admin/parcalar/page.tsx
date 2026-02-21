@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PartsDataTable } from "./components/parts-data-table";
 import type { Database, PartType } from "@/lib/supabase/types";
@@ -14,6 +15,8 @@ interface PageProps {
     sortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Parca Yonetimi" };
 
 export default async function ParcalarPage({ searchParams }: PageProps) {
   const params = await searchParams;

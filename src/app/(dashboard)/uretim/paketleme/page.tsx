@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -5,6 +6,8 @@ import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { PaketlemeDashboard } from "./components/paketleme-dashboard";
 import type { ActiveSession } from "./components/session-card";
 import type { CompletedSession } from "./components/completed-sessions";
+
+export const metadata: Metadata = { title: "Paketleme" };
 
 export default async function PaketlemePage() {
   const user = await getCurrentUser();

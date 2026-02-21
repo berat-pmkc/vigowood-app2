@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { FiyatlarDataTable } from "./components/fiyatlar-data-table";
 import type { FiyatRow } from "./actions";
+
+export const metadata: Metadata = { title: "Sevkiyat Fiyatlari" };
 
 interface PageProps {
   searchParams: Promise<{

@@ -53,3 +53,22 @@ export function formatElapsed(start: string | null): string {
   if (isNaN(s.getTime())) return "—";
   return formatDuration(start, new Date().toISOString());
 }
+
+/** Relative time: "5 dk önce", "2 saat önce", "3 gün önce" */
+export function formatDistanceToNow(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const diffMs = Date.now() - d.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return "Az önce";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} dk önce`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} saat önce`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 30) return `${diffDay} gün önce`;
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMonth < 12) return `${diffMonth} ay önce`;
+  return formatDate(iso);
+}

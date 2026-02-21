@@ -7,6 +7,8 @@ import { KpiCards } from "./kpi-cards";
 import { TrendChart, type DailyChartData } from "./trend-chart";
 import { StokDataTable, type StokProduct } from "./stok-data-table";
 import { HareketlerDataTable, type StokMovement } from "./hareketler-data-table";
+import { useStokMamulRealtime } from "@/hooks/use-stok-mamul-realtime";
+import { LastUpdatedBadge } from "@/components/shared/last-updated-badge";
 
 interface KpiData {
   totalStock: number;
@@ -66,6 +68,7 @@ export function MamulStokClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const { lastUpdated } = useStokMamulRealtime();
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams();
@@ -79,11 +82,14 @@ export function MamulStokClient({
 
   return (
     <div className="space-y-4 pb-20 md:pb-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mamül Stok</h1>
-        <p className="text-sm text-muted-foreground">
-          Bitmiş ürün stok takibi, hareketler ve trend analizi
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Mamül Stok</h1>
+          <p className="text-sm text-muted-foreground">
+            Bitmiş ürün stok takibi, hareketler ve trend analizi
+          </p>
+        </div>
+        <LastUpdatedBadge lastUpdated={lastUpdated} />
       </div>
 
       <KpiCards data={kpiData} />

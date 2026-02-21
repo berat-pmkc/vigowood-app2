@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { YariMamulStokClient } from "./components/yari-mamul-stok-client";
 import type { ParcaStok } from "./components/parca-stok-data-table";
@@ -26,6 +27,8 @@ interface PageProps {
     mSortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Yari Mamul Stok" };
 
 export default async function YariMamulStokPage({ searchParams }: PageProps) {
   const params = await searchParams;

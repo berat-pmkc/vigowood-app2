@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { SevkiyatList } from "./components/sevkiyat-list";
 import type { SevkiyatRow } from "./components/sevkiyat-card";
+
+export const metadata: Metadata = { title: "Sevkiyatlar" };
 
 interface PageProps {
   searchParams: Promise<{ durum?: string; ulke?: string }>;

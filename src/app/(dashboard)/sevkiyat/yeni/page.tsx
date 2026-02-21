@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { YeniSevkiyatForm } from "../components/yeni-sevkiyat-form";
+
+export const metadata: Metadata = { title: "Yeni Sevkiyat" };
 
 export default async function YeniSevkiyatPage() {
   const user = await getCurrentUser();

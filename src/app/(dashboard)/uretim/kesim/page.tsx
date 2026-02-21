@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { KesimList } from "./components/kesim-list";
 import type { CutBatchRow } from "./components/kesim-card";
+
+export const metadata: Metadata = { title: "Kesim" };
 
 interface PageProps {
   searchParams: Promise<{ tarih?: string; durum?: string }>;

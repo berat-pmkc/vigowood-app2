@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { MamulStokClient } from "./components/mamul-stok-client";
 import type { StokProduct } from "./components/stok-data-table";
@@ -26,6 +27,8 @@ interface PageProps {
     mSortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Mamul Stok" };
 
 export default async function MamulStokPage({ searchParams }: PageProps) {
   const params = await searchParams;

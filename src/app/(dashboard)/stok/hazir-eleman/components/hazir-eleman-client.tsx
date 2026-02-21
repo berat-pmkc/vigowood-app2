@@ -8,6 +8,8 @@ import { TrendChart, type DailyChartData } from "./trend-chart";
 import { ParcaStokDataTable, type HazirElemanStok } from "./parca-stok-data-table";
 import { HareketlerDataTable, type HazirElemanHareket } from "./hareketler-data-table";
 import { StokGirisDialog } from "./stok-giris-dialog";
+import { useStokHazirElemanRealtime } from "@/hooks/use-stok-hazir-eleman-realtime";
+import { LastUpdatedBadge } from "@/components/shared/last-updated-badge";
 
 interface HazirElemanClientProps {
   activeTab: string;
@@ -54,6 +56,7 @@ export function HazirElemanClient({
 }: HazirElemanClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const { lastUpdated } = useStokHazirElemanRealtime();
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams();
@@ -74,7 +77,10 @@ export function HazirElemanClient({
             Hazır eleman, kutu ve karton stok takibi, kritik uyarılar ve giriş işlemleri
           </p>
         </div>
-        {canAddStock && <StokGirisDialog />}
+        <div className="flex items-center gap-2">
+          <LastUpdatedBadge lastUpdated={lastUpdated} />
+          {canAddStock && <StokGirisDialog />}
+        </div>
       </div>
 
       <KpiCards data={kpiData} />

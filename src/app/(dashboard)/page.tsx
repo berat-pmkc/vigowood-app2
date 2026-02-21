@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -29,6 +30,9 @@ import {
   Wrench,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
+import { DashboardRealtimeWrapper } from "./components/dashboard-realtime-wrapper";
+
+export const metadata: Metadata = { title: "Ana Sayfa" };
 
 export default async function DashboardPage() {
   const profile = await getCurrentUser();
@@ -136,6 +140,7 @@ export default async function DashboardPage() {
   const isAdmin = ["Yönetici", "Endüstri Mühendisi"].includes(userRole);
 
   return (
+    <DashboardRealtimeWrapper>
     <div className="space-y-6">
       {/* Welcome Banner */}
       <div className="rounded-xl bg-gradient-to-r from-vw-deep to-vw-dark p-6 text-white">
@@ -393,6 +398,7 @@ export default async function DashboardPage() {
         </div>
       </div>
     </div>
+    </DashboardRealtimeWrapper>
   );
 }
 

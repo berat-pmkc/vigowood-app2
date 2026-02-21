@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { RaporlarClient } from "./components/raporlar-client";
+
+export const metadata: Metadata = { title: "Satis Raporlari" };
 
 export default async function RaporlarPage() {
   const supabase = await createClient();

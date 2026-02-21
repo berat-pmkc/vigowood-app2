@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PlakalarDataTable } from "./components/plakalar-data-table";
 import type { Database } from "@/lib/supabase/types";

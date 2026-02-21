@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
@@ -5,6 +6,8 @@ import { YeniMontajForm } from "../components/yeni-montaj-form";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+
+export const metadata: Metadata = { title: "Yeni Montaj" };
 
 export default async function YeniMontajPage() {
   const user = await getCurrentUser();

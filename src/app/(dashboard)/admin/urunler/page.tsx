@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { ProductsDataTable } from "./components/products-data-table";
 import type { Database, ProductCategory } from "@/lib/supabase/types";
@@ -15,6 +16,8 @@ interface PageProps {
     sortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Urun Yonetimi" };
 
 export default async function UrunlerPage({ searchParams }: PageProps) {
   const params = await searchParams;

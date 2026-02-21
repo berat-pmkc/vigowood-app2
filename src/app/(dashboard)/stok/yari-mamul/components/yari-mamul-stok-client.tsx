@@ -7,6 +7,8 @@ import { KpiCards, type YariMamulKpiData } from "./kpi-cards";
 import { TrendChart, type DailyChartData } from "./trend-chart";
 import { ParcaStokDataTable, type ParcaStok } from "./parca-stok-data-table";
 import { HareketlerDataTable, type YariMamulHareket } from "./hareketler-data-table";
+import { useStokYariMamulRealtime } from "@/hooks/use-stok-yari-mamul-realtime";
+import { LastUpdatedBadge } from "@/components/shared/last-updated-badge";
 
 interface YariMamulStokClientProps {
   // Tab
@@ -57,6 +59,7 @@ export function YariMamulStokClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const { lastUpdated } = useStokYariMamulRealtime();
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams();
@@ -70,11 +73,14 @@ export function YariMamulStokClient({
 
   return (
     <div className="space-y-4 pb-20 md:pb-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Yarı Mamül Stok</h1>
-        <p className="text-sm text-muted-foreground">
-          Parça bazlı yarı mamül stok takibi, hareketler ve trend analizi
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Yarı Mamül Stok</h1>
+          <p className="text-sm text-muted-foreground">
+            Parça bazlı yarı mamül stok takibi, hareketler ve trend analizi
+          </p>
+        </div>
+        <LastUpdatedBadge lastUpdated={lastUpdated} />
       </div>
 
       <KpiCards data={kpiData} />

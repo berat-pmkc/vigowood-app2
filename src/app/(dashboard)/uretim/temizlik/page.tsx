@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -5,6 +6,8 @@ import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { TemizlikList } from "./components/temizlik-list";
 import type { TemizlikBatchRow } from "./components/temizlik-card";
 import type { CleanStatus } from "@/lib/constants";
+
+export const metadata: Metadata = { title: "Temizlik" };
 
 interface PageProps {
   searchParams: Promise<{ durum?: string }>;

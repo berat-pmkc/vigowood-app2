@@ -92,6 +92,7 @@ export type Database = {
           not_text: string | null
           start_time: string | null
           tarih: string
+          updated_at: string
         }
         Insert: {
           att_id: string
@@ -102,6 +103,7 @@ export type Database = {
           not_text?: string | null
           start_time?: string | null
           tarih: string
+          updated_at?: string
         }
         Update: {
           att_id?: string
@@ -112,6 +114,7 @@ export type Database = {
           not_text?: string | null
           start_time?: string | null
           tarih?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -547,6 +550,35 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_reads: {
+        Row: {
+          id: number
+          notif_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          notif_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: never
+          notif_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_notif_id_fkey"
+            columns: ["notif_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["notif_id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           attachments: string | null
@@ -557,6 +589,7 @@ export type Database = {
           status: string
           target_user: string | null
           title: string
+          updated_at: string
         }
         Insert: {
           attachments?: string | null
@@ -567,6 +600,7 @@ export type Database = {
           status?: string
           target_user?: string | null
           title: string
+          updated_at?: string
         }
         Update: {
           attachments?: string | null
@@ -577,6 +611,7 @@ export type Database = {
           status?: string
           target_user?: string | null
           title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1563,6 +1598,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_personel_access: { Args: never; Returns: boolean }
       has_production_access: { Args: never; Returns: boolean }
       has_sales_access: { Args: never; Returns: boolean }
       has_sevkiyat_access: { Args: never; Returns: boolean }
@@ -1778,7 +1814,7 @@ export const Constants = {
   },
 } as const
 
-// ─── Custom type aliases ────────────────────────────────────────
+// ─── Custom Type Aliases ──────────────────────────────────────
 export type UserRole = Database["public"]["Enums"]["user_role"];
 export type Station = Database["public"]["Enums"]["station"];
 export type ProductCategory = Database["public"]["Enums"]["product_category"];

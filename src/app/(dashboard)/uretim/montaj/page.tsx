@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { MontajList } from "./components/montaj-list";
 import type { MontajBatchRow } from "./components/montaj-card";
+
+export const metadata: Metadata = { title: "Montaj" };
 
 interface PageProps {
   searchParams: Promise<{ durum?: string }>;

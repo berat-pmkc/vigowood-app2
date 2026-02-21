@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { STOCK_ACCESS_ROLES } from "@/lib/constants";
@@ -18,6 +19,8 @@ interface PageProps {
     sortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Iade" };
 
 export default async function IadeGirisPage({ searchParams }: PageProps) {
   const params = await searchParams;
