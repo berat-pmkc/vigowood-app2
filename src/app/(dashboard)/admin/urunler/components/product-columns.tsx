@@ -87,6 +87,7 @@ export function getProductColumns({
           </Badge>
         );
       },
+      meta: { className: "hidden md:table-cell" },
       size: 160,
     },
     {
@@ -146,7 +147,7 @@ export function getProductColumns({
           {formatNumber(row.getValue("gunluk_satis"))}
         </div>
       ),
-      meta: { className: "hidden sm:table-cell" },
+      meta: { className: "hidden lg:table-cell" },
       size: 110,
     },
     {
@@ -164,7 +165,7 @@ export function getProductColumns({
           {formatNumber(row.getValue("aylik_uretim"))}
         </div>
       ),
-      meta: { className: "hidden sm:table-cell" },
+      meta: { className: "hidden lg:table-cell" },
       size: 110,
     },
     {

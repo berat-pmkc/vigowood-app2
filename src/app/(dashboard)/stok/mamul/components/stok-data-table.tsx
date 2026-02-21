@@ -103,6 +103,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
           {row.original.kategori || "—"}
         </span>
       ),
+      meta: { className: "hidden md:table-cell" },
       size: 140,
     },
     {
@@ -144,6 +145,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
             : "—"}
         </span>
       ),
+      meta: { className: "hidden lg:table-cell" },
       size: 110,
     },
     {
@@ -156,6 +158,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
           {formatDate(row.original.son_hareket_tarihi)}
         </span>
       ),
+      meta: { className: "hidden lg:table-cell" },
       size: 120,
     },
     {

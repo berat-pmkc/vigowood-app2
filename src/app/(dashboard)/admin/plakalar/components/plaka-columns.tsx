@@ -219,6 +219,7 @@ export function getPlakaColumns({
           <span className="text-sm text-muted-foreground">—</span>
         );
       },
+      meta: { className: "hidden md:table-cell" },
       size: 100,
     },
     {
@@ -229,6 +230,7 @@ export function getPlakaColumns({
       ),
       size: 180,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
     {
       accessorKey: "sku",

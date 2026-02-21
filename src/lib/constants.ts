@@ -527,6 +527,10 @@ export function isStationEmail(email: string | undefined): boolean {
   return STATION_EMAILS.includes(email as (typeof STATION_EMAILS)[number]);
 }
 
+// ─── Kritik Stok Hesaplama Sabitleri ───────────────────────────
+export const KRITIK_STOK_DEFAULT_GUN = 30;
+export const KRITIK_STOK_DEFAULT_LOOKBACK_DAYS = 90;
+
 // ─── Proforma Fatura Konfigürasyonu ────────────────────────────
 /** @deprecated DB'den okunacak (sevkiyat_firmalar). Fallback olarak kalıyor. */
 

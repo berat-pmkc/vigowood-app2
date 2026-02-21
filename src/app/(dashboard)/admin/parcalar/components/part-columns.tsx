@@ -234,7 +234,7 @@ export function getPartColumns({
           </div>
         );
       },
-      meta: { className: "hidden sm:table-cell" },
+      meta: { className: "hidden lg:table-cell" },
       size: 110,
     },
     {
@@ -273,6 +273,7 @@ export function getPartColumns({
         );
       },
       enableSorting: false,
+      meta: { className: "hidden md:table-cell" },
       size: 90,
     },
     {

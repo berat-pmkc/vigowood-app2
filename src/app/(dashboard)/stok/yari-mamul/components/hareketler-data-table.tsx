@@ -156,6 +156,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Yari
       ),
       size: 140,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
   ];
 }

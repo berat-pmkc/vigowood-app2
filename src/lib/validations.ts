@@ -411,6 +411,23 @@ export const kampanyaSchema = z.object({
 
 export type KampanyaData = z.infer<typeof kampanyaSchema>;
 
+// ─── Kritik Stok Ayarları ────────────────────────────────────
+
+export const appSettingSchema = z.object({
+  kritik_stok_gun: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 gün olmalıdır")
+    .max(365, "En fazla 365 gün olabilir"),
+  kritik_stok_lookback_days: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(7, "En az 7 gün olmalıdır")
+    .max(365, "En fazla 365 gün olabilir"),
+});
+
+export type AppSettingData = z.infer<typeof appSettingSchema>;
+
 // ─── Personel & Yoklama ───────────────────────────────────────
 
 // ─── Bildirimler ─────────────────────────────────────────────

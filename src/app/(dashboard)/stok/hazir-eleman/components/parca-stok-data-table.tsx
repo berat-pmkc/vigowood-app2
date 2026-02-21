@@ -115,6 +115,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Hazi
           </Badge>
         );
       },
+      meta: { className: "hidden lg:table-cell" },
       size: 120,
     },
     {
@@ -154,6 +155,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Hazi
           {formatDate(row.original.son_hareket_tarihi)}
         </span>
       ),
+      meta: { className: "hidden lg:table-cell" },
       size: 120,
     },
     {

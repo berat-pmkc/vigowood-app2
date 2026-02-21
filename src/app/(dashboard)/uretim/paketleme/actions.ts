@@ -146,6 +146,69 @@ export async function getProductTrend(sku: string, days: number = 30) {
   }
 }
 
+/** Son 3 ayda en çok paketlenen ürünleri getir (top N) */
+export async function getTopPackagedProducts(limit: number = 10) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const since = new Date();
+    since.setMonth(since.getMonth() - 3);
+
+    const { data, error } = await supabase
+      .from("pack_events")
+      .select("sku, qty")
+      .eq("durum", "tamamlandi")
+      .not("sku", "is", null)
+      .gte("end_time", since.toISOString());
+
+    if (error) return { success: false as const, error: error.message };
+
+    // SKU bazlı toplam qty ve seans sayısı
+    const skuMap = new Map<string, { totalQty: number; sessionCount: number }>();
+    for (const row of data ?? []) {
+      if (!row.sku) continue;
+      const existing = skuMap.get(row.sku);
+      if (existing) {
+        existing.totalQty += row.qty || 0;
+        existing.sessionCount += 1;
+      } else {
+        skuMap.set(row.sku, { totalQty: row.qty || 0, sessionCount: 1 });
+      }
+    }
+
+    // Sırala: toplam adet DESC
+    const sorted = Array.from(skuMap.entries())
+      .sort((a, b) => b[1].totalQty - a[1].totalQty)
+      .slice(0, limit);
+
+    // Ürün isimlerini çek
+    const skus = sorted.map(([sku]) => sku);
+    if (skus.length === 0) return { success: true as const, data: [] };
+
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skus);
+
+    const productMap = new Map<string, string>();
+    for (const p of products ?? []) {
+      productMap.set(p.sku, p.urun_adi ?? p.sku);
+    }
+
+    const result = sorted.map(([sku, stats]) => ({
+      sku,
+      urun_adi: productMap.get(sku) ?? sku,
+      totalQty: stats.totalQty,
+      sessionCount: stats.sessionCount,
+    }));
+
+    return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
 /** Yeni paketleme seansı oluştur (sadece SKU, qty yok) */
