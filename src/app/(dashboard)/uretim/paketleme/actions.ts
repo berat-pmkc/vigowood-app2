@@ -350,6 +350,90 @@ export async function cancelSession(sessionId: string): Promise<ActionResult> {
   }
 }
 
+/** Tamamlanmış seansı düzenle (qty, workers) */
+export async function updateCompletedSession(
+  sessionId: string,
+  formData: { qty: number; workers: { id: string; name: string }[] }
+): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+
+    const parsed = packSessionCloseSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
+      return { success: false, error: firstError };
+    }
+
+    const supabase = await createClient();
+
+    // Seans bilgileri
+    const { data } = await supabase
+      .from("pack_events")
+      .select("session_id, durum, sku, start_time, end_time, qty")
+      .eq("session_id", sessionId)
+      .single();
+
+    const session = data as {
+      session_id: string;
+      durum: string;
+      sku: string | null;
+      start_time: string | null;
+      end_time: string | null;
+      qty: number;
+    } | null;
+
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "tamamlandi") {
+      return { success: false, error: "Sadece tamamlanan seanslar düzenlenebilir" };
+    }
+
+    const { qty, workers } = parsed.data;
+    const oldQty = session.qty;
+
+    // Birim paketleme süresi yeniden hesapla
+    let birimDk: number | null = null;
+    if (session.start_time && session.end_time && qty > 0 && workers.length > 0) {
+      const diffMs = new Date(session.end_time).getTime() - new Date(session.start_time).getTime();
+      const totalMinutes = diffMs / 60000;
+      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+    }
+
+    // Update pack_events
+    const { error: updateError } = await supabase
+      .from("pack_events")
+      .update({
+        qty: qty,
+        worker_count: workers.length,
+        workers: workers,
+        birim_paketleme_dk: birimDk,
+      })
+      .eq("session_id", sessionId);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    // stock_movements güncelle (qty farkı)
+    if (qty !== oldQty && session.sku) {
+      const { data: existingMov } = await supabase
+        .from("stock_movements")
+        .select("id, mov_id")
+        .eq("source_row_id", sessionId)
+        .limit(1);
+
+      if (existingMov && existingMov.length > 0) {
+        await supabase
+          .from("stock_movements")
+          .update({ qty: qty })
+          .eq("id", existingMov[0].id);
+      }
+    }
+
+    revalidatePath("/uretim/paketleme");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── LEGACY ACTIONS (eski verilerle uyumluluk) ─────────────────
 
 /** Paketlemeyi başlat: bekliyor → paketlemede */

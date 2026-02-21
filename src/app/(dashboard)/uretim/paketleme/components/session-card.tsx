@@ -29,17 +29,15 @@ function LiveTimer({ startTime }: { startTime: string }) {
     const calc = () => {
       const diff = Date.now() - new Date(startTime).getTime();
       if (diff < 0) return "0dk";
-      const totalSec = Math.floor(diff / 1000);
-      const hours = Math.floor(totalSec / 3600);
-      const mins = Math.floor((totalSec % 3600) / 60);
-      const secs = totalSec % 60;
+      const totalMin = Math.floor(diff / 60000);
+      const hours = Math.floor(totalMin / 60);
+      const mins = totalMin % 60;
       if (hours > 0) return `${hours}s ${mins}dk`;
-      if (mins > 0) return `${mins}dk ${secs}sn`;
-      return `${secs}sn`;
+      return `${mins}dk`;
     };
 
     setElapsed(calc());
-    const interval = setInterval(() => setElapsed(calc()), 1000);
+    const interval = setInterval(() => setElapsed(calc()), 60000);
     return () => clearInterval(interval);
   }, [startTime]);
 
