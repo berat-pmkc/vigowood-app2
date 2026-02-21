@@ -1365,7 +1365,6 @@ export type Database = {
       sevkiyat_palet_sablon: {
         Row: {
           boy: number
-          country_code: string
           created_at: string | null
           en: number
           id: number
@@ -1376,12 +1375,10 @@ export type Database = {
           palette_koli: number
           sku: string
           updated_at: string | null
-          urun_adi: string | null
           yuk: number
         }
         Insert: {
           boy: number
-          country_code: string
           created_at?: string | null
           en: number
           id?: number
@@ -1392,12 +1389,10 @@ export type Database = {
           palette_koli: number
           sku: string
           updated_at?: string | null
-          urun_adi?: string | null
           yuk: number
         }
         Update: {
           boy?: number
-          country_code?: string
           created_at?: string | null
           en?: number
           id?: number
@@ -1408,7 +1403,6 @@ export type Database = {
           palette_koli?: number
           sku?: string
           updated_at?: string | null
-          urun_adi?: string | null
           yuk?: number
         }
         Relationships: []
@@ -1852,7 +1846,7 @@ export const Constants = {
       ],
     },
   },
-} as const
+} as const;
 
 // ─── Custom Type Aliases ────────────────────────────────────
 export type PartType = Database["public"]["Enums"]["part_type"];

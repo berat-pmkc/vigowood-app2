@@ -27,7 +27,7 @@ import {
 import {
   getSevkiyatItems,
   getActiveProducts,
-  getPaletSablon,
+  getPaletSablonlar,
   addSevkiyatItem,
   deleteSevkiyatItem,
   type SevkiyatItemRow,
@@ -109,14 +109,14 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
     setOverrideMode(false);
     setSablon(null);
 
-    if (!countryCode || !sku) return;
+    if (!sku) return;
 
     setSablonLoading(true);
-    const result = await getPaletSablon(countryCode, sku);
+    const result = await getPaletSablonlar(sku);
     setSablonLoading(false);
 
-    if (result.success && result.data) {
-      const s = result.data;
+    if (result.success && result.data && result.data.length > 0) {
+      const s = result.data[0];
       setSablon(s);
       setPaletBoyut(s.palet_boyut);
       setPaletYukseklik(s.palet_yukseklik);
@@ -129,7 +129,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
       setPaletSayisi(1);
     } else {
       // Şablon yok — varsayılan değerler
-      setPaletBoyut(countryCode === "DE" ? "80x120" : "100x120");
+      setPaletBoyut("80x120");
       setPaletYukseklik(125);
       setEn(0);
       setBoy(0);
@@ -139,7 +139,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
       setKoliAgirlik(1);
       setPaletSayisi(1);
     }
-  }, [countryCode]);
+  }, []);
 
   const handleAdd = async () => {
     if (!selectedSku) return;

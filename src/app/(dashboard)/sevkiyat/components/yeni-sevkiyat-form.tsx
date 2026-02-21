@@ -144,10 +144,9 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
     setSkuOpen(false);
     setSablonLoading(true);
 
-    const cc = countryCode ?? "DE";
-    const result = await getPaletSablon(cc, sku);
-    if (result.success && result.data) {
-      const s = result.data;
+    const result = await getPaletSablonlar(sku);
+    if (result.success && result.data && result.data.length > 0) {
+      const s = result.data[0];
       setItemForm({
         palet_boyut: s.palet_boyut,
         palet_yukseklik: s.palet_yukseklik,
@@ -163,7 +162,7 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
       setHasSablon(false);
     }
     setSablonLoading(false);
-  }, [countryCode]);
+  }, []);
 
   const handleAddItem = () => {
     if (!selectedSku) return toast.error("Ürün seçiniz");
