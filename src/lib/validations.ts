@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -185,12 +185,14 @@ export const iadeGirisSchema = z.object({
 
 export type IadeGirisData = z.infer<typeof iadeGirisSchema>;
 
-// Sevkiyat oluşturma (v2 — ülke bazlı)
+// Sevkiyat oluşturma (v3 — ülke bazlı + araç tipi + tarih)
 export const sevkiyatCreateSchema = z.object({
   country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
+  arac_tipi: z.enum(["konteyner", "tir"]),
   konteyner_no: z.string().max(50, "Konteyner no en fazla 50 karakter").nullable(),
   konteyner_tipi: z.string().nullable(),
-  sevk_tarihi: z.string().nullable(),
+  tir_plaka: z.string().max(20, "Tır plaka en fazla 20 karakter").nullable(),
+  planlanan_sevk_tarihi: z.string().nullable(),
   not_text: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
 });
 
@@ -243,3 +245,61 @@ export const paletSablonSchema = z.object({
 });
 
 export type PaletSablonData = z.infer<typeof paletSablonSchema>;
+
+// Firma profili
+export const sevkiyatFirmaSchema = z.object({
+  firma_tipi: z.enum(FIRMA_TIPLERI, { message: "Firma tipi gereklidir" }),
+  country_code: z.string().max(10).nullable(),
+  profil_adi: z.string().min(1, "Profil adı gereklidir").max(200),
+  firma_adi: z.string().max(300).nullable(),
+  adres_satir1: z.string().max(500).nullable(),
+  adres_satir2: z.string().max(500).nullable(),
+  telefon: z.string().max(50).nullable(),
+  email: z.string().max(100).nullable(),
+  web: z.string().max(100).nullable(),
+  vergi_no: z.string().max(50).nullable(),
+  vat_no: z.string().max(50).nullable(),
+  banka_adi: z.string().max(100).nullable(),
+  sube_adi: z.string().max(100).nullable(),
+  swift_code: z.string().max(20).nullable(),
+  iban: z.string().max(50).nullable(),
+  para_birimi: z.string().max(10).nullable(),
+  sevk_yontemi: z.string().max(50).nullable(),
+  yetkili_adi: z.string().max(100).nullable(),
+  imza_yeri: z.string().max(100).nullable(),
+  aktif: z.boolean(),
+  varsayilan: z.boolean(),
+});
+
+export type SevkiyatFirmaData = z.infer<typeof sevkiyatFirmaSchema>;
+
+// Sevkiyat maliyet
+export const sevkiyatMaliyetSchema = z.object({
+  navlun: z.number().min(0).default(0),
+  navlun_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("USD"),
+  ic_nakliye: z.number().min(0).default(0),
+  ic_nakliye_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  ara_depo: z.number().min(0).default(0),
+  ara_depo_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  amazon_pickup: z.number().min(0).default(0),
+  amazon_pickup_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("USD"),
+  ydg: z.number().min(0).default(0),
+  ydg_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("USD"),
+  tr_gumruk: z.number().min(0).default(0),
+  tr_gumruk_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  diger: z.number().min(0).default(0),
+  diger_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  not_text: z.string().max(500).nullable(),
+});
+
+export type SevkiyatMaliyetData = z.infer<typeof sevkiyatMaliyetSchema>;
+
+// Döviz kuru
+export const dovizKuruSchema = z.object({
+  tarih: z.string().min(1, "Tarih gereklidir"),
+  usd_try: z.number().min(0, "USD/TRY gereklidir"),
+  eur_try: z.number().min(0, "EUR/TRY gereklidir"),
+  gbp_try: z.number().min(0, "GBP/TRY gereklidir"),
+});
+
+export type DovizKuruData = z.infer<typeof dovizKuruSchema>;

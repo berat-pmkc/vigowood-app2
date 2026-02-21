@@ -7,6 +7,7 @@ import { ShipmentTable } from "./shipment-table";
 import { AddItemRow } from "./add-item-row";
 import { ShipmentSummary } from "./shipment-summary";
 import { ShipmentActions } from "./shipment-actions";
+import { ShipmentCosts } from "./shipment-costs";
 import type { SevkiyatRow, SevkiyatItemRow } from "../../actions";
 
 interface ShipmentPlanningProps {
@@ -40,14 +41,13 @@ export function ShipmentPlanning({
       adet: acc.adet + (item.qty ?? 0),
       agirlik: acc.agirlik + (item.agirlik ?? 0),
       hacim: acc.hacim + (item.hacim ?? 0),
+      desi: acc.desi + (item.desi ?? 0),
     }),
-    { palet: 0, koli: 0, adet: 0, agirlik: 0, hacim: 0 }
+    { palet: 0, koli: 0, adet: 0, agirlik: 0, hacim: 0, desi: 0 }
   );
 
   const handleItemAdded = useCallback(() => {
     router.refresh();
-    // Items will be refreshed by server component re-render
-    // but we need a way to update local state too
   }, [router]);
 
   const handleItemUpdated = useCallback(() => {
@@ -94,6 +94,11 @@ export function ShipmentPlanning({
       )}
 
       <ShipmentSummary totals={totals} />
+
+      <ShipmentCosts
+        sevkiyatId={sevkiyat.sevkiyat_id}
+        totalDesi={totals.desi}
+      />
 
       <ShipmentActions
         sevkiyat={sevkiyat}

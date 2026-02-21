@@ -1,0 +1,21 @@
+{
+  "name": "VigoWood Platform",
+  "short_name": "VigoWood",
+  "description": "Ahşap mobilya entegre iş yönetim platformu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0ede1",
+  "theme_color": "#474237",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

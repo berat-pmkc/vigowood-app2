@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Sidebar,
@@ -15,7 +16,7 @@ import {
   SidebarMenuButton,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { LogOut, ChevronUp } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { getFilteredNavGroups, type NavGroup } from "@/lib/navigation";
 import type { UserRole } from "@/lib/constants";
 
@@ -47,13 +48,21 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary">
-                  <span className="text-sm font-bold text-sidebar-primary-foreground">
-                    VW
-                  </span>
-                </div>
+                <Image
+                  src="/logo-yuvarlak.svg"
+                  alt="VigoWood"
+                  width={32}
+                  height={32}
+                  className="size-8 shrink-0 rounded-full"
+                />
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">VigoWood</span>
+                  <Image
+                    src="/logo-yatay-white.png"
+                    alt="VigoWood"
+                    width={100}
+                    height={23}
+                    className="h-4 w-auto"
+                  />
                   <span className="text-xs text-sidebar-foreground/60">
                     Platform
                   </span>

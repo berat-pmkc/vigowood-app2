@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SevkiyatCard, type SevkiyatRow } from "./sevkiyat-card";
 import { SEVKIYAT_STATUS, SEVKIYAT_STATUS_LABELS, SEVKIYAT_COUNTRIES } from "@/lib/constants";
 import { useSevkiyatRealtime } from "@/hooks/use-sevkiyat-realtime";
-import { Plus, Truck } from "lucide-react";
+import { Plus, Truck, LayoutTemplate, Coins } from "lucide-react";
 import Link from "next/link";
 
 interface SevkiyatListProps {
@@ -50,11 +50,23 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
             Sevkiyat
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Sevkiyat listesi ve konteyner y\u00f6netimi
+            Sevkiyat listesi ve konteyner y&ouml;netimi
           </p>
         </div>
-        <div className="hidden md:block">
-          <Button asChild>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="hidden md:flex gap-1.5" asChild>
+            <Link href="/sevkiyat/sablonlar">
+              <LayoutTemplate className="w-4 h-4" />
+              <span className="hidden lg:inline">Şablonlar</span>
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" className="hidden md:flex gap-1.5" asChild>
+            <Link href="/sevkiyat/kurlar">
+              <Coins className="w-4 h-4" />
+              <span className="hidden lg:inline">Kurlar</span>
+            </Link>
+          </Button>
+          <Button asChild className="hidden md:flex">
             <Link href="/sevkiyat/yeni">
               <Plus className="w-4 h-4 mr-1" />
               Yeni Sevkiyat
@@ -71,7 +83,7 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
           className="h-8 text-xs"
           onClick={() => handleCountryChange("all")}
         >
-          T\u00fcm\u00fc
+          Tümü
         </Button>
         {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
           <Button
@@ -90,7 +102,7 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
       <Tabs value={selectedStatus} onValueChange={handleStatusChange}>
         <TabsList className="w-full grid grid-cols-5">
           <TabsTrigger value="all" className="gap-1 text-xs sm:text-sm">
-            T\u00fcm\u00fc
+            Tümü
             <Badge variant="secondary" className="ml-1 text-xs">{totalCount}</Badge>
           </TabsTrigger>
           {SEVKIYAT_STATUS.map((status) => (
@@ -116,11 +128,11 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
       {sevkiyatlar.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <Truck className="w-12 h-12 mb-3 opacity-30" />
-          <p className="text-lg font-medium">Sevkiyat bulunamad\u0131</p>
-          <p className="text-sm mt-1">Se\u00e7ili filtre i\u00e7in kay\u0131t yok</p>
+          <p className="text-lg font-medium">Sevkiyat bulunamadı</p>
+          <p className="text-sm mt-1">Seçili filtre için kayıt yok</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
           {sevkiyatlar.map((s) => (
             <SevkiyatCard key={s.sevkiyat_id} sevkiyat={s} />
           ))}

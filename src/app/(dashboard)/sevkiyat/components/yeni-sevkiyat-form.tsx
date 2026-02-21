@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -16,21 +17,93 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { sevkiyatCreateSchema, type SevkiyatCreateData } from "@/lib/validations";
 import {
   KONTEYNER_TYPES,
   KONTEYNER_TYPE_LABELS,
   SEVKIYAT_COUNTRIES,
+  ARAC_TIPLERI,
   type SevkiyatCountryCode,
 } from "@/lib/constants";
-import { createSevkiyat } from "../actions";
-import { ArrowLeft, Truck, MapPin, Building2, Banknote } from "lucide-react";
+import { createSevkiyatWithItems, getPaletSablon } from "../actions";
+import {
+  ArrowLeft,
+  Truck,
+  MapPin,
+  Building2,
+  Banknote,
+  Plus,
+  Trash2,
+  ChevronsUpDown,
+  Check,
+  AlertTriangle,
+  Loader2,
+  Package,
+  Container,
+} from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-export function YeniSevkiyatForm() {
+interface LocalItem {
+  id: string;
+  sku: string;
+  urun_adi: string;
+  palet_boyut: string;
+  palet_yukseklik: number;
+  en: number;
+  boy: number;
+  yuk: number;
+  koli_adedi: number;
+  palette_koli: number;
+  koli_agirlik: number;
+  palet_sayisi: number;
+  grup: string | null;
+  hasSablon: boolean;
+}
+
+interface YeniSevkiyatFormProps {
+  products: {
+    sku: string;
+    urun_adi: string | null;
+    kategori: string | null;
+    stok_aktif: number;
+  }[];
+}
+
+export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<LocalItem[]>([]);
+
+  // Item ekleme state
+  const [skuOpen, setSkuOpen] = useState(false);
+  const [selectedSku, setSelectedSku] = useState("");
+  const [sablonLoading, setSablonLoading] = useState(false);
+  const [hasSablon, setHasSablon] = useState(false);
+  const [itemForm, setItemForm] = useState({
+    palet_boyut: "80x120",
+    palet_yukseklik: 0,
+    en: 0, boy: 0, yuk: 0,
+    koli_adedi: 0,
+    palette_koli: 0,
+    koli_agirlik: 0,
+    palet_sayisi: 1,
+    grup: "",
+  });
 
   const {
     register,
@@ -42,38 +115,126 @@ export function YeniSevkiyatForm() {
     resolver: zodResolver(sevkiyatCreateSchema),
     defaultValues: {
       country_code: "DE",
-      sevk_tarihi: null,
+      arac_tipi: "konteyner",
+      planlanan_sevk_tarihi: null,
       konteyner_no: null,
       konteyner_tipi: null,
+      tir_plaka: null,
       not_text: null,
     },
   });
 
   const countryCode = watch("country_code") as SevkiyatCountryCode | undefined;
-  const konteynerTipi = watch("konteyner_tipi");
+  const aracTipi = watch("arac_tipi") ?? "konteyner";
   const selectedCountry = countryCode ? SEVKIYAT_COUNTRIES[countryCode] : null;
+
+  const resetItemForm = () => {
+    setSelectedSku("");
+    setHasSablon(false);
+    setItemForm({
+      palet_boyut: "80x120", palet_yukseklik: 0,
+      en: 0, boy: 0, yuk: 0,
+      koli_adedi: 0, palette_koli: 0, koli_agirlik: 0,
+      palet_sayisi: 1, grup: "",
+    });
+  };
+
+  const handleSkuSelect = useCallback(async (sku: string) => {
+    setSelectedSku(sku);
+    setSkuOpen(false);
+    setSablonLoading(true);
+
+    const cc = countryCode ?? "DE";
+    const result = await getPaletSablon(cc, sku);
+    if (result.success && result.data) {
+      const s = result.data;
+      setItemForm({
+        palet_boyut: s.palet_boyut,
+        palet_yukseklik: s.palet_yukseklik,
+        en: s.en, boy: s.boy, yuk: s.yuk,
+        koli_adedi: s.koli_adedi,
+        palette_koli: s.palette_koli,
+        koli_agirlik: s.koli_agirlik,
+        palet_sayisi: 1,
+        grup: "",
+      });
+      setHasSablon(true);
+    } else {
+      setHasSablon(false);
+    }
+    setSablonLoading(false);
+  }, [countryCode]);
+
+  const handleAddItem = () => {
+    if (!selectedSku) return toast.error("Ürün seçiniz");
+    if (itemForm.palet_sayisi < 1) return toast.error("Palet sayısı en az 1 olmalıdır");
+    if (!hasSablon && (itemForm.palet_yukseklik < 1 || itemForm.koli_adedi < 1 || itemForm.palette_koli < 1)) {
+      return toast.error("Şablon bulunamadı. Lütfen tüm alanları doldurun.");
+    }
+
+    const product = products.find((p) => p.sku === selectedSku);
+    setItems((prev) => [
+      ...prev,
+      {
+        id: `local-${Date.now()}`,
+        sku: selectedSku,
+        urun_adi: product?.urun_adi ?? selectedSku,
+        ...itemForm,
+        grup: itemForm.grup || null,
+        hasSablon,
+      },
+    ]);
+    resetItemForm();
+    toast.success("Ürün listeye eklendi");
+  };
+
+  const handleRemoveItem = (id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  };
 
   const onSubmit = async (data: SevkiyatCreateData) => {
     setLoading(true);
-    const result = await createSevkiyat({
-      country_code: data.country_code,
-      sevk_tarihi: data.sevk_tarihi || null,
-      konteyner_no: data.konteyner_no || null,
-      konteyner_tipi: data.konteyner_tipi || null,
-      not_text: data.not_text || null,
-    });
 
-    if (result.success) {
-      toast.success("Sevkiyat olu\u015fturuldu");
-      router.push("/sevkiyat");
+    const result = await createSevkiyatWithItems(
+      {
+        country_code: data.country_code,
+        arac_tipi: data.arac_tipi,
+        konteyner_no: data.konteyner_no || null,
+        konteyner_tipi: data.konteyner_tipi || null,
+        tir_plaka: data.tir_plaka || null,
+        planlanan_sevk_tarihi: data.planlanan_sevk_tarihi || null,
+        not_text: data.not_text || null,
+      },
+      items.map((item) => ({
+        sku: item.sku,
+        palet_boyut: item.palet_boyut,
+        palet_yukseklik: item.palet_yukseklik,
+        en: item.en,
+        boy: item.boy,
+        yuk: item.yuk,
+        koli_adedi: item.koli_adedi,
+        palette_koli: item.palette_koli,
+        koli_agirlik: item.koli_agirlik,
+        palet_sayisi: item.palet_sayisi,
+        grup: item.grup,
+      }))
+    );
+
+    if (result.success && result.sevkiyatId) {
+      toast.success("Sevkiyat oluşturuldu");
+      router.push(`/sevkiyat/${result.sevkiyatId}`);
     } else {
-      toast.error(result.error);
+      toast.error(result.success ? "Sevkiyat oluşturulamadı" : result.error);
     }
     setLoading(false);
   };
 
+  const selectedProduct = products.find((p) => p.sku === selectedSku);
+  const toplamKoli = itemForm.palette_koli * itemForm.palet_sayisi;
+  const adet = itemForm.koli_adedi * toplamKoli;
+
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-4xl mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
@@ -87,99 +248,134 @@ export function YeniSevkiyatForm() {
             Yeni Sevkiyat
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            \u00dclke se\u00e7in, sevkiyat bilgilerini girin
+            Ülke seçin, bilgileri girin ve ürünleri ekleyin
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">\u00dclke ve Sevkiyat Bilgileri</CardTitle>
+        {/* --- Sevkiyat Bilgileri --- */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Sevkiyat Bilgileri</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* \u00dclke Se\u00e7imi */}
-            <div className="space-y-2">
-              <Label>\u00dclke *</Label>
-              <Select
-                value={countryCode ?? "DE"}
-                onValueChange={(v) => setValue("country_code", v as SevkiyatCreateData["country_code"])}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="\u00dclke se\u00e7in" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      {c.code} - {c.name} ({c.currencySymbol})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.country_code && (
-                <p className="text-sm text-destructive">{errors.country_code.message}</p>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Ülke */}
+              <div className="space-y-2">
+                <Label>Ülke *</Label>
+                <Select
+                  value={countryCode ?? "DE"}
+                  onValueChange={(v) => setValue("country_code", v as SevkiyatCreateData["country_code"])}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ülke seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.code} - {c.name} ({c.currencySymbol})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.country_code && (
+                  <p className="text-sm text-destructive">{errors.country_code.message}</p>
+                )}
+              </div>
+
+              {/* Planlanan Tarih */}
+              <div className="space-y-2">
+                <Label htmlFor="planlanan_sevk_tarihi">Planlanan Sevk Tarihi</Label>
+                <Input
+                  id="planlanan_sevk_tarihi"
+                  type="date"
+                  {...register("planlanan_sevk_tarihi", { setValueAs: (v: string) => v === "" ? null : v })}
+                />
+              </div>
             </div>
 
-            {/* Otomatik doldurulan bilgiler */}
+            {/* Otomatik bilgiler */}
             {selectedCountry && (
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Otomatik Doldurulacak</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">{selectedCountry.buyer}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span>Liman: {selectedCountry.port}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Banknote className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span>Para birimi: {selectedCountry.currency} ({selectedCountry.currencySymbol})</span>
-                  </div>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-xs">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-muted-foreground" />
+                    {selectedCountry.buyer}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-muted-foreground" />
+                    {selectedCountry.port}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Banknote className="w-3 h-3 text-muted-foreground" />
+                    {selectedCountry.currency}
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Sevk Tarihi */}
-            <div className="space-y-2">
-              <Label htmlFor="sevk_tarihi">Sevk Tarihi</Label>
-              <Input
-                id="sevk_tarihi"
-                type="date"
-                {...register("sevk_tarihi", { setValueAs: (v: string) => v === "" ? null : v })}
-              />
-            </div>
+            {/* Araç Tipi */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Araç Tipi</Label>
+                <Select
+                  value={aracTipi}
+                  onValueChange={(v) => setValue("arac_tipi", v as "konteyner" | "tir")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ARAC_TIPLERI).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        {key === "konteyner" ? <Container className="w-4 h-4 inline mr-1" /> : <Truck className="w-4 h-4 inline mr-1" />}
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Konteyner No */}
-            <div className="space-y-2">
-              <Label htmlFor="konteyner_no">Konteyner No</Label>
-              <Input
-                id="konteyner_no"
-                placeholder="ABCD1234567"
-                {...register("konteyner_no", { setValueAs: (v: string) => v === "" ? null : v })}
-              />
-            </div>
-
-            {/* Konteyner Tipi */}
-            <div className="space-y-2">
-              <Label>Konteyner Tipi</Label>
-              <Select
-                value={konteynerTipi ?? ""}
-                onValueChange={(v) => setValue("konteyner_tipi", v === "" ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Konteyner tipi se\u00e7in" />
-                </SelectTrigger>
-                <SelectContent>
-                  {KONTEYNER_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {KONTEYNER_TYPE_LABELS[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {aracTipi === "konteyner" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="konteyner_no">Konteyner No</Label>
+                    <Input
+                      id="konteyner_no"
+                      placeholder="ABCD1234567"
+                      {...register("konteyner_no", { setValueAs: (v: string) => v === "" ? null : v })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Konteyner Tipi</Label>
+                    <Select
+                      value={watch("konteyner_tipi") ?? ""}
+                      onValueChange={(v) => setValue("konteyner_tipi", v === "" ? null : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tipi seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {KONTEYNER_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {KONTEYNER_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="tir_plaka">Tır Plaka</Label>
+                  <Input
+                    id="tir_plaka"
+                    placeholder="34 ABC 123"
+                    {...register("tir_plaka", { setValueAs: (v: string) => v === "" ? null : v })}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Not */}
@@ -188,32 +384,244 @@ export function YeniSevkiyatForm() {
               <Textarea
                 id="not_text"
                 placeholder="Ek bilgi veya not..."
-                rows={3}
+                rows={2}
                 {...register("not_text", { setValueAs: (v: string) => v === "" ? null : v })}
               />
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Submit */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                className="flex-1 h-12"
-                disabled={loading}
-              >
-                <Truck className="w-5 h-5 mr-2" />
-                {loading ? "Olu\u015fturuluyor..." : "Sevkiyat Olu\u015ftur"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12"
-                onClick={() => router.push("/sevkiyat")}
-              >
-                \u0130ptal
-              </Button>
+        {/* --- Ürünler --- */}
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Ürünler
+              </span>
+              {items.length > 0 && (
+                <Badge variant="secondary">{items.length} ürün</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Eklenen ürünler listesi */}
+            {items.map((item) => {
+              const tKoli = item.palette_koli * item.palet_sayisi;
+              const tAdet = item.koli_adedi * tKoli;
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 p-2.5 rounded-lg border bg-muted/20 text-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
+                      <span className="truncate font-medium">{item.urun_adi}</span>
+                    </div>
+                    <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">
+                      <span>{item.palet_sayisi} plt</span>
+                      <span>{tKoli} koli</span>
+                      <span>{tAdet.toLocaleString("tr-TR")} adet</span>
+                      {item.grup && <Badge variant="outline" className="text-[10px] h-4">{item.grup}</Badge>}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 h-8 w-8 text-destructive hover:text-destructive"
+                    onClick={() => handleRemoveItem(item.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
+
+            {/* Ürün ekleme formu */}
+            <div className="border-t pt-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground">Ürün Ekle</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <Label className="text-xs">Ürün (SKU)</Label>
+                  <Popover open={skuOpen} onOpenChange={setSkuOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between h-9 text-xs"
+                      >
+                        {selectedSku
+                          ? `${selectedSku} — ${selectedProduct?.urun_adi ?? ""}`
+                          : "Ürün seçiniz..."}
+                        <ChevronsUpDown className="w-3 h-3 ml-1 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="SKU veya ürün adı ara..." className="text-xs" />
+                        <CommandList>
+                          <CommandEmpty>Ürün bulunamadı.</CommandEmpty>
+                          <CommandGroup>
+                            {products.map((p) => (
+                              <CommandItem
+                                key={p.sku}
+                                value={`${p.sku} ${p.urun_adi ?? ""}`}
+                                onSelect={() => handleSkuSelect(p.sku)}
+                                className="text-xs"
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-1 h-3 w-3",
+                                    selectedSku === p.sku ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <span className="font-mono mr-2">{p.sku}</span>
+                                <span className="truncate flex-1">{p.urun_adi}</span>
+                                <span className="text-muted-foreground ml-1">({p.stok_aktif})</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div>
+                  <Label className="text-xs">Palet Sayısı</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="h-9 text-xs"
+                    value={itemForm.palet_sayisi || ""}
+                    onChange={(e) => setItemForm((f) => ({ ...f, palet_sayisi: parseInt(e.target.value, 10) || 0 }))}
+                  />
+                </div>
+              </div>
+
+              {/* Şablon yükleniyor */}
+              {sablonLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Şablon yükleniyor...
+                </div>
+              )}
+
+              {/* Şablon bulundu */}
+              {selectedSku && !sablonLoading && hasSablon && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded p-2.5 text-xs">
+                  <p className="font-medium text-emerald-700 mb-1">Şablon yüklendi</p>
+                  <div className="grid grid-cols-4 gap-1.5 text-emerald-700">
+                    <span>Palet: <b>{itemForm.palet_boyut}</b></span>
+                    <span>Yüks: <b>{itemForm.palet_yukseklik}</b></span>
+                    <span>Koli/Adet: <b>{itemForm.koli_adedi}</b></span>
+                    <span>Plt Koli: <b>{itemForm.palette_koli}</b></span>
+                  </div>
+                </div>
+              )}
+
+              {/* Şablon bulunamadı — full form */}
+              {selectedSku && !sablonLoading && !hasSablon && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-amber-600">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Şablon bulunamadı. Lütfen değerleri girin.
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-xs">Palet Boyut</Label>
+                      <Input className="h-8 text-xs" value={itemForm.palet_boyut} onChange={(e) => setItemForm((f) => ({ ...f, palet_boyut: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Palet Yükseklik</Label>
+                      <Input type="number" className="h-8 text-xs" value={itemForm.palet_yukseklik || ""} onChange={(e) => setItemForm((f) => ({ ...f, palet_yukseklik: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">En (cm)</Label>
+                      <Input type="number" className="h-8 text-xs" value={itemForm.en || ""} onChange={(e) => setItemForm((f) => ({ ...f, en: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Boy (cm)</Label>
+                      <Input type="number" className="h-8 text-xs" value={itemForm.boy || ""} onChange={(e) => setItemForm((f) => ({ ...f, boy: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Yükseklik (cm)</Label>
+                      <Input type="number" className="h-8 text-xs" value={itemForm.yuk || ""} onChange={(e) => setItemForm((f) => ({ ...f, yuk: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Adet/Koli</Label>
+                      <Input type="number" className="h-8 text-xs" value={itemForm.koli_adedi || ""} onChange={(e) => setItemForm((f) => ({ ...f, koli_adedi: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Palette Koli</Label>
+                      <Input type="number" className="h-8 text-xs" value={itemForm.palette_koli || ""} onChange={(e) => setItemForm((f) => ({ ...f, palette_koli: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Koli Ağırlık (kg)</Label>
+                      <Input type="number" step="0.1" className="h-8 text-xs" value={itemForm.koli_agirlik || ""} onChange={(e) => setItemForm((f) => ({ ...f, koli_agirlik: Number(e.target.value) }))} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Grup + Preview + Ekle */}
+              {selectedSku && !sablonLoading && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                  <div>
+                    <Label className="text-xs">Grup (Opsiyonel)</Label>
+                    <Input
+                      className="h-9 text-xs"
+                      placeholder="DTM1, DTM2..."
+                      value={itemForm.grup}
+                      onChange={(e) => setItemForm((f) => ({ ...f, grup: e.target.value }))}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <p>T. Koli: <b>{toplamKoli}</b></p>
+                    <p>Adet: <b>{adet.toLocaleString("tr-TR")}</b></p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddItem}
+                    className="h-9"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Listeye Ekle
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* --- Submit --- */}
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            className="flex-1 h-12"
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              <Truck className="w-5 h-5 mr-2" />
+            )}
+            {loading ? "Oluşturuluyor..." : `Sevkiyat Oluştur${items.length > 0 ? ` (${items.length} ürün)` : ""}`}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12"
+            onClick={() => router.push("/sevkiyat")}
+          >
+            İptal
+          </Button>
+        </div>
       </form>
     </div>
   );

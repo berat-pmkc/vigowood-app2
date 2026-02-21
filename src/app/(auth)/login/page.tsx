@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, type LoginFormData } from "@/lib/validations";
-import { APP_NAME, isStationEmail } from "@/lib/constants";
+import { isStationEmail } from "@/lib/constants";
 import {
   Card,
   CardContent,
@@ -72,10 +73,25 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-vw-light p-4">
       <Card className="w-full max-w-md border-vw-side/30">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-xl bg-vw-dark">
-            <span className="text-2xl font-bold text-vw-light">VW</span>
+          <div className="mx-auto mb-3">
+            <Image
+              src="/logo-yuvarlak.png"
+              alt="VigoWood"
+              width={72}
+              height={72}
+              className="rounded-full"
+              priority
+            />
           </div>
-          <CardTitle className="text-xl text-vw-dark">{APP_NAME}</CardTitle>
+          <CardTitle className="text-xl text-vw-dark">
+            <Image
+              src="/logo-yatay.svg"
+              alt="VigoWood"
+              width={160}
+              height={37}
+              className="mx-auto h-7 w-auto"
+            />
+          </CardTitle>
           <CardDescription>Devam etmek için giriş yapın</CardDescription>
         </CardHeader>
         <CardContent>

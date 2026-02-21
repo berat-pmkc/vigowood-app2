@@ -338,6 +338,25 @@ export const KONTEYNER_TYPE_LABELS: Record<KonteynerType, string> = {
   "40ft HC": "40' HC Konteyner",
 };
 
+// Araç tipleri
+export const ARAC_TIPLERI = { konteyner: "Konteyner", tir: "Tır" } as const;
+export type AracTipi = keyof typeof ARAC_TIPLERI;
+
+// Maliyet para birimleri
+export const MALIYET_PARA_BIRIMLERI = ["USD", "EUR", "GBP", "TRY"] as const;
+export type MaliyetParaBirimi = (typeof MALIYET_PARA_BIRIMLERI)[number];
+
+// Firma tipleri
+export const FIRMA_TIPLERI = ["ihracatci", "alici", "banka", "imzalayan", "contact"] as const;
+export type FirmaTipi = (typeof FIRMA_TIPLERI)[number];
+export const FIRMA_TIPI_LABELS: Record<FirmaTipi, string> = {
+  ihracatci: "İhracatçı",
+  alici: "Alıcı",
+  banka: "Banka",
+  imzalayan: "İmzalayan",
+  contact: "İletişim",
+};
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;
@@ -345,6 +364,7 @@ export function isStationEmail(email: string | undefined): boolean {
 }
 
 // ─── Proforma Fatura Konfigürasyonu ────────────────────────────
+/** @deprecated DB'den okunacak (sevkiyat_firmalar). Fallback olarak kalıyor. */
 
 export const PROFORMA_CONFIG = {
   EXPORTER: {
@@ -394,6 +414,7 @@ export const PROFORMA_CONFIG = {
 } as const;
 
 // ─── Paket Listesi (Packing List) Konfigürasyonu ─────────────
+/** @deprecated DB'den okunacak (sevkiyat_firmalar). Fallback olarak kalıyor. */
 
 export const PACKING_LIST_CONFIG = {
   EXPORTER: {

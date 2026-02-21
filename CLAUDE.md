@@ -340,6 +340,8 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 ### KATMAN 18: Sevkiyat ✅
 - [x] Sevkiyat listesi + konteyner yönetimi
 - [x] 18A: Ülke bazlı ID (DE21/UK29), lojistik kolonlar, sevkiyat_fiyatlar, Admin Fiyatlar, seed
+- [x] 18C: Palet şablon sistemi, Admin Şablonlar sayfası
+- [x] 18D: Planlama sayfası (/sevkiyat/[id]), Proforma PDF, Paket Listesi PDF
 
 ### KATMAN 19: Satış
 - [ ] Satış listesi + hedefler + kampanyalar

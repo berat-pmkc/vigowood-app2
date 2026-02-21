@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { ProformaDocument } from "@/lib/pdf/proforma-template";
-import type { ProformaData, ProformaItem } from "@/lib/pdf/proforma-template";
-import type { SevkiyatItemRow } from "@/app/(dashboard)/sevkiyat/actions";
+import type { ProformaData, ProformaItem, ProformaExporterConfig, ProformaBuyerConfig, ProformaBuyerContactConfig, ProformaBankConfig } from "@/lib/pdf/proforma-template";
+import type { SevkiyatItemRow, SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
 import React from "react";
 
 interface RouteParams {
@@ -41,7 +41,91 @@ export async function GET(_request: Request, { params }: RouteParams) {
       liman: string | null;
       konteyner_no: string | null;
       teslimat_tipi: string | null;
+      ihracatci_firma_id: number | null;
+      alici_firma_id: number | null;
+      banka_firma_id: number | null;
     };
+
+    // Fetch firma data from DB if available
+    let exporterConfig: ProformaExporterConfig | undefined;
+    let buyerConfigOverride: ProformaBuyerConfig | undefined;
+    let buyerContactConfig: ProformaBuyerContactConfig | undefined;
+    let bankConfig: ProformaBankConfig | undefined;
+
+    const firmaIds = [sev.ihracatci_firma_id, sev.alici_firma_id, sev.banka_firma_id].filter(Boolean) as number[];
+    if (firmaIds.length > 0) {
+      const { data: firmaData } = await supabase
+        .from("sevkiyat_firmalar")
+        .select("*")
+        .in("id", firmaIds);
+
+      const firmaMap = new Map((firmaData as SevkiyatFirmaRow[] ?? []).map(f => [f.id, f]));
+
+      // İhracatçı firma
+      const ihracatci = sev.ihracatci_firma_id ? firmaMap.get(sev.ihracatci_firma_id) : null;
+      if (ihracatci) {
+        exporterConfig = {
+          companyName: ihracatci.firma_adi ?? ihracatci.profil_adi,
+          taxInfo: ihracatci.vergi_no ? `Tax No: ${ihracatci.vergi_no}` : "",
+          address: [ihracatci.adres_satir1, ihracatci.adres_satir2].filter(Boolean).join("\n"),
+          phone: ihracatci.telefon ?? "",
+          email: ihracatci.email ?? "",
+          web: ihracatci.web ?? "",
+        };
+      }
+
+      // Alıcı firma
+      const alici = sev.alici_firma_id ? firmaMap.get(sev.alici_firma_id) : null;
+      if (alici) {
+        buyerConfigOverride = {
+          businessName: alici.firma_adi ?? alici.profil_adi,
+          vat: alici.vat_no ?? "",
+          address: [alici.adres_satir1, alici.adres_satir2].filter(Boolean).join("\n"),
+        };
+      }
+
+      // Contact bilgisi (alıcı firmanın iletişim bilgileri)
+      if (alici) {
+        buyerContactConfig = {
+          phone: alici.telefon ?? "",
+          email: alici.email ?? "",
+          contact: alici.yetkili_adi ?? "",
+        };
+      }
+
+      // Banka firma
+      const banka = sev.banka_firma_id ? firmaMap.get(sev.banka_firma_id) : null;
+      if (banka) {
+        bankConfig = {
+          beneficiary: banka.firma_adi ?? banka.profil_adi,
+          bankName: banka.banka_adi ?? "",
+          branchName: banka.sube_adi ?? "",
+          swiftCode: banka.swift_code ?? "",
+          currencyLabel: banka.para_birimi ?? "EUR",
+          iban: banka.iban ?? "",
+        };
+      }
+    }
+
+    // Contact firma (ayrı sorgu — firma_tipi = 'contact')
+    if (!buyerContactConfig) {
+      const { data: contactData } = await supabase
+        .from("sevkiyat_firmalar")
+        .select("*")
+        .eq("firma_tipi", "contact")
+        .eq("varsayilan", true)
+        .limit(1)
+        .single();
+
+      if (contactData) {
+        const c = contactData as SevkiyatFirmaRow;
+        buyerContactConfig = {
+          phone: c.telefon ?? "",
+          email: c.email ?? "",
+          contact: c.yetkili_adi ?? c.profil_adi,
+        };
+      }
+    }
 
     // Items
     const { data: items } = await supabase
@@ -96,6 +180,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
       konteyner_no: sev.konteyner_no,
       teslimat_tipi: sev.teslimat_tipi,
       items: proformaItems,
+      exporterConfig,
+      buyerConfig: buyerConfigOverride,
+      buyerContactConfig,
+      bankConfig,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

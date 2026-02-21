@@ -1,30 +1,22 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SevkiyatStatusBadge } from "./sevkiyat-status-badge";
-import { startPreparation } from "../actions";
 import {
   SEVKIYAT_STATUS_BORDER_COLORS,
-  KONTEYNER_TYPE_LABELS,
   type SevkiyatStatus,
-  type KonteynerType,
 } from "@/lib/constants";
 import { formatDate, cn } from "@/lib/utils";
 import {
-  PackageCheck,
-  CheckCircle,
-  MapPin,
   Calendar,
   Container,
   Package,
   Weight,
   Box,
+  TruckIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 
 export interface SevkiyatRow {
   sevkiyat_id: string;
@@ -46,6 +38,13 @@ export interface SevkiyatRow {
   sevkiyat_adi: string | null;
   liman: string | null;
   teslimat_tipi: string | null;
+  arac_tipi: string | null;
+  tir_plaka: string | null;
+  planlanan_sevk_tarihi: string | null;
+  gerceklesen_sevk_tarihi: string | null;
+  ihracatci_firma_id: number | null;
+  alici_firma_id: number | null;
+  banka_firma_id: number | null;
   created_at: string;
   updated_at: string;
   // Enriched
@@ -64,140 +63,82 @@ interface SevkiyatCardProps {
 
 export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
 
   const durum = sevkiyat.durum as SevkiyatStatus;
   const borderColor = SEVKIYAT_STATUS_BORDER_COLORS[durum] ?? SEVKIYAT_STATUS_BORDER_COLORS.bekliyor;
   const isTeslim = durum === "teslim_edildi";
 
-  const handleStartPrep = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoading(true);
-    const result = await startPreparation(sevkiyat.sevkiyat_id);
-    if (!result.success) toast.error(result.error);
-    else toast.success("Hazırlık başlatıldı");
-    setLoading(false);
-  };
-
   const handleNavigate = () => {
     router.push(`/sevkiyat/${sevkiyat.sevkiyat_id}`);
   };
+
+  // Tarih
+  const tarih = sevkiyat.planlanan_sevk_tarihi ?? sevkiyat.sevk_tarihi ?? sevkiyat.created_at;
+
+  // Araç bilgisi
+  const aracInfo = sevkiyat.arac_tipi === "tir" && sevkiyat.tir_plaka
+    ? sevkiyat.tir_plaka
+    : sevkiyat.konteyner_no ?? null;
+  const AracIcon = sevkiyat.arac_tipi === "tir" ? TruckIcon : Container;
 
   return (
     <Card
       className={cn(
         "border-l-4 cursor-pointer transition-all hover:shadow-md",
         borderColor,
-        isTeslim && "opacity-70"
+        isTeslim && "opacity-60"
       )}
       onClick={handleNavigate}
     >
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="font-mono text-xs">
+      <div className="px-3 py-2.5">
+        {/* Row 1: ID + Name + Status */}
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Badge variant="secondary" className="font-mono text-[10px] px-1.5 py-0 h-5 shrink-0">
               {sevkiyat.sevkiyat_id}
             </Badge>
-            {sevkiyat.country_code && (
-              <Badge variant="outline" className="text-xs font-semibold">
-                {sevkiyat.country_code}
-              </Badge>
-            )}
+            <span className="text-sm font-medium text-foreground truncate">
+              {sevkiyat.sevkiyat_adi || sevkiyat.musteri}
+            </span>
           </div>
           <SevkiyatStatusBadge durum={sevkiyat.durum} />
         </div>
 
-        {/* Body */}
-        <div className="mb-3">
-          <p className="font-medium text-foreground truncate">
-            {sevkiyat.sevkiyat_adi || sevkiyat.musteri}
-          </p>
-          {sevkiyat.liman && (
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {sevkiyat.liman}
-            </p>
-          )}
-        </div>
-
-        {/* Konteyner + Lojistik */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            {sevkiyat.konteyner_tipi && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Container className="w-3 h-3" />
-                {KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ?? sevkiyat.konteyner_tipi}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {(sevkiyat.total_palet ?? 0) > 0 && (
-              <span className="flex items-center gap-0.5">
-                <Box className="w-3 h-3" />
-                <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_palet}</span> plt
-              </span>
-            )}
-            {(sevkiyat.total_koli ?? 0) > 0 && (
-              <span className="flex items-center gap-0.5">
-                <Package className="w-3 h-3" />
-                <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_koli}</span> koli
-              </span>
-            )}
-            {(sevkiyat.total_agirlik ?? 0) > 0 && (
-              <span className="flex items-center gap-0.5 hidden sm:flex">
-                <Weight className="w-3 h-3" />
-                <span className="font-semibold tabular-nums text-foreground">
-                  {Math.round(sevkiyat.total_agirlik!)}
-                </span> kg
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        {/* Row 2: Date | Vehicle | Stats — single line */}
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+          <span className="flex items-center gap-0.5 shrink-0">
             <Calendar className="w-3 h-3" />
-            {sevkiyat.sevk_tarihi
-              ? formatDate(sevkiyat.sevk_tarihi)
-              : formatDate(sevkiyat.created_at)}
-          </div>
+            {formatDate(tarih)}
+          </span>
 
-          {durum === "bekliyor" && (
-            <Button
-              size="sm"
-              className="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={handleStartPrep}
-              disabled={loading}
-            >
-              <PackageCheck className="w-4 h-4 mr-1" />
-              Hazırla
-            </Button>
+          {aracInfo && (
+            <span className="flex items-center gap-0.5 shrink-0">
+              <AracIcon className="w-3 h-3" />
+              <span className="truncate max-w-[80px]">{aracInfo}</span>
+            </span>
           )}
 
-          {durum === "hazirlaniyor" && (
-            <Button
-              size="sm"
-              className="h-10 px-4"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNavigate();
-              }}
-            >
-              <Package className="w-4 h-4 mr-1" />
-              Detay
-            </Button>
-          )}
+          <span className="flex-1" />
 
-          {durum === "yolda" && (
-            <Badge variant="secondary" className="bg-purple-50 text-purple-700 border-purple-300">
-              Yolda
-            </Badge>
+          {(sevkiyat.total_palet ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5">
+              <Box className="w-3 h-3" />
+              <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_palet}</span>plt
+            </span>
           )}
-
-          {isTeslim && (
-            <CheckCircle className="w-5 h-5 text-emerald-500" />
+          {(sevkiyat.total_koli ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5">
+              <Package className="w-3 h-3" />
+              <span className="font-semibold tabular-nums text-foreground">{sevkiyat.total_koli}</span>koli
+            </span>
+          )}
+          {(sevkiyat.total_agirlik ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5 hidden sm:flex">
+              <Weight className="w-3 h-3" />
+              <span className="font-semibold tabular-nums text-foreground">
+                {Math.round(sevkiyat.total_agirlik! / 1000)}t
+              </span>
+            </span>
           )}
         </div>
       </div>

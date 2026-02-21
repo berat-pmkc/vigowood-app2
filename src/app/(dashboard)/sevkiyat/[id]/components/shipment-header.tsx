@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   MapPin,
   Calendar,
+  CalendarCheck,
   Container,
   User,
   Truck,
@@ -26,6 +27,8 @@ interface ShipmentHeaderProps {
 
 export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
   const router = useRouter();
+
+  const isTir = sevkiyat.arac_tipi === "tir";
 
   return (
     <div className="space-y-3">
@@ -80,34 +83,64 @@ export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
           <div className="flex items-start gap-2">
             <Calendar className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Sevk Tarihi</p>
+              <p className="text-xs text-muted-foreground">Planlanan Tarih</p>
               <p className="font-medium">
-                {sevkiyat.sevk_tarihi
-                  ? formatDate(sevkiyat.sevk_tarihi)
-                  : "—"}
+                {sevkiyat.planlanan_sevk_tarihi
+                  ? formatDate(sevkiyat.planlanan_sevk_tarihi)
+                  : sevkiyat.sevk_tarihi
+                    ? formatDate(sevkiyat.sevk_tarihi)
+                    : "—"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-start gap-2">
-            <Container className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">Konteyner</p>
-              <p className="font-medium">
-                {sevkiyat.konteyner_no ?? "—"}
-              </p>
+          {sevkiyat.gerceklesen_sevk_tarihi ? (
+            <div className="flex items-start gap-2">
+              <CalendarCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Gerçekleşen</p>
+                <p className="font-medium text-emerald-700">
+                  {formatDate(sevkiyat.gerceklesen_sevk_tarihi)}
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-start gap-2">
+              {isTir ? (
+                <Truck className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              ) : (
+                <Container className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+              )}
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {isTir ? "Tır Plaka" : "Konteyner"}
+                </p>
+                <p className="font-medium">
+                  {isTir
+                    ? (sevkiyat.tir_plaka ?? "—")
+                    : (sevkiyat.konteyner_no ?? "—")}
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-start gap-2">
-            <Container className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+            {isTir ? (
+              <Truck className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+            ) : (
+              <Container className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+            )}
             <div>
-              <p className="text-xs text-muted-foreground">Tip</p>
+              <p className="text-xs text-muted-foreground">
+                {isTir ? "Araç" : "Tip"}
+              </p>
               <p className="font-medium">
-                {sevkiyat.konteyner_tipi
-                  ? (KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ??
-                      sevkiyat.konteyner_tipi)
-                  : "—"}
+                {isTir
+                  ? "Tır"
+                  : sevkiyat.konteyner_tipi
+                    ? (KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ??
+                        sevkiyat.konteyner_tipi)
+                    : "—"}
               </p>
             </div>
           </div>

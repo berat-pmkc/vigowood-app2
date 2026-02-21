@@ -1,9 +1,11 @@
 import React from "react";
+import path from "path";
 import {
   Document,
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
 } from "@react-pdf/renderer";
 import { PACKING_LIST_CONFIG, PALET_WEIGHT_KG } from "@/lib/constants";
@@ -110,6 +112,37 @@ export interface PackingListItem {
   hacim: number;
 }
 
+export interface PLExporterConfig {
+  companyName: string;
+  address1: string;
+  address2: string;
+  phone: string;
+}
+
+export interface PLBuyerConfig {
+  name1: string;
+  name2: string;
+  vat: string;
+  address: string;
+}
+
+export interface PLDispatchConfig {
+  name: string;
+  method: string;
+}
+
+export interface PLSignatoryConfig {
+  placeOfIssue: string;
+  company: string;
+  authorizedName: string;
+}
+
+export interface PLContactConfig {
+  name: string;
+  phone: string;
+  email: string;
+}
+
 export interface PackingListData {
   sevkiyat_id: string;
   country_code: string;
@@ -117,12 +150,21 @@ export interface PackingListData {
   sevk_tarihi: string | null;
   konteyner_no: string | null;
   items: PackingListItem[];
+  // Optional DB-driven firma overrides (fallback to PACKING_LIST_CONFIG)
+  exporterConfig?: PLExporterConfig;
+  buyerConfig?: PLBuyerConfig;
+  dispatchConfig?: PLDispatchConfig;
+  signatoryConfig?: PLSignatoryConfig;
+  contactConfig?: PLContactConfig;
 }
 
 export function PackingListDocument({ data }: { data: PackingListData }) {
   const cc = data.country_code;
-  const dispatch = PACKING_LIST_CONFIG.COUNTRY_DISPATCH[cc] ?? { name: "", method: "" };
-  const buyer = PACKING_LIST_CONFIG.COUNTRY_BUYER[cc] ?? { name1: "", name2: "", vat: "", address: "" };
+  const dispatch = data.dispatchConfig ?? PACKING_LIST_CONFIG.COUNTRY_DISPATCH[cc] ?? { name: "", method: "" };
+  const buyer = data.buyerConfig ?? PACKING_LIST_CONFIG.COUNTRY_BUYER[cc] ?? { name1: "", name2: "", vat: "", address: "" };
+  const exporterInfo = data.exporterConfig ?? PACKING_LIST_CONFIG.EXPORTER;
+  const signatoryInfo = data.signatoryConfig ?? PACKING_LIST_CONFIG.SIGNATORY;
+  const contactInfo = data.contactConfig ?? PACKING_LIST_CONFIG.CONTACT;
 
   const plNumber = `PL-${data.sevkiyat_id}`;
   const dateStr = formatPdfDate(data.sevk_tarihi);
@@ -171,10 +213,12 @@ export function PackingListDocument({ data }: { data: PackingListData }) {
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Text style={styles.companyName}>{PACKING_LIST_CONFIG.EXPORTER.companyName}</Text>
-            <Text style={styles.value}>{PACKING_LIST_CONFIG.EXPORTER.address1}</Text>
-            <Text style={styles.value}>{PACKING_LIST_CONFIG.EXPORTER.address2}</Text>
-            <Text style={styles.value}>{PACKING_LIST_CONFIG.EXPORTER.phone}</Text>
+            {/* eslint-disable-next-line */}
+            <Image src={path.join(process.cwd(), "public", "logo-yatay.png")} style={{ width: 120, height: 27, marginBottom: 4 }} />
+            <Text style={styles.companyName}>{exporterInfo.companyName}</Text>
+            <Text style={styles.value}>{exporterInfo.address1}</Text>
+            <Text style={styles.value}>{exporterInfo.address2}</Text>
+            <Text style={styles.value}>{exporterInfo.phone}</Text>
           </View>
           <View style={styles.headerRight}>
             <View style={{ flexDirection: "row", marginBottom: 2 }}>
@@ -305,22 +349,22 @@ export function PackingListDocument({ data }: { data: PackingListData }) {
         <View style={styles.footerSection}>
           <View style={styles.footerRow}>
             <Text style={styles.footerLabel}>Place of Issue / Veriliş Yeri:</Text>
-            <Text style={styles.footerValue}>{PACKING_LIST_CONFIG.SIGNATORY.placeOfIssue}</Text>
+            <Text style={styles.footerValue}>{signatoryInfo.placeOfIssue}</Text>
           </View>
           <View style={styles.footerRow}>
             <Text style={styles.footerLabel}>Signatory Company / İmzalayan:</Text>
-            <Text style={styles.footerValue}>{PACKING_LIST_CONFIG.SIGNATORY.company}</Text>
+            <Text style={styles.footerValue}>{signatoryInfo.company}</Text>
           </View>
           <View style={styles.footerRow}>
             <Text style={styles.footerLabel}>Authorized Signatory / Yetkili Adı:</Text>
-            <Text style={styles.footerValue}>{PACKING_LIST_CONFIG.SIGNATORY.authorizedName}</Text>
+            <Text style={styles.footerValue}>{signatoryInfo.authorizedName}</Text>
           </View>
         </View>
 
         <View style={styles.contactSection}>
           <Text style={{ fontSize: 7 }}>For questions about the shipment, please contact:</Text>
           <Text style={{ fontSize: 7, marginTop: 2 }}>
-            {PACKING_LIST_CONFIG.CONTACT.name} | Phone: {PACKING_LIST_CONFIG.CONTACT.phone} | E-Mail: {PACKING_LIST_CONFIG.CONTACT.email}
+            {contactInfo.name} | Phone: {contactInfo.phone} | E-Mail: {contactInfo.email}
           </Text>
         </View>
 

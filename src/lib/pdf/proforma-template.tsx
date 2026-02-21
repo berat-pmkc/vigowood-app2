@@ -1,9 +1,11 @@
 import React from "react";
+import path from "path";
 import {
   Document,
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
 } from "@react-pdf/renderer";
 import { PROFORMA_CONFIG, PALET_WEIGHT_KG } from "@/lib/constants";
@@ -155,6 +157,36 @@ export interface ProformaItem {
   toplam_fiyat: number;
 }
 
+export interface ProformaExporterConfig {
+  companyName: string;
+  taxInfo: string;
+  address: string;
+  phone: string;
+  email: string;
+  web: string;
+}
+
+export interface ProformaBuyerConfig {
+  businessName: string;
+  vat: string;
+  address: string;
+}
+
+export interface ProformaBuyerContactConfig {
+  phone: string;
+  email: string;
+  contact: string;
+}
+
+export interface ProformaBankConfig {
+  beneficiary: string;
+  bankName: string;
+  branchName: string;
+  swiftCode: string;
+  currencyLabel: string;
+  iban: string;
+}
+
 export interface ProformaData {
   sevkiyat_id: string;
   country_code: string;
@@ -164,13 +196,20 @@ export interface ProformaData {
   konteyner_no: string | null;
   teslimat_tipi: string | null;
   items: ProformaItem[];
+  // Optional DB-driven firma overrides (fallback to PROFORMA_CONFIG)
+  exporterConfig?: ProformaExporterConfig;
+  buyerConfig?: ProformaBuyerConfig;
+  buyerContactConfig?: ProformaBuyerContactConfig;
+  bankConfig?: ProformaBankConfig;
 }
 
 export function ProformaDocument({ data }: { data: ProformaData }) {
   const cc = data.country_code;
   const countryFormat = PROFORMA_CONFIG.COUNTRY_FORMAT[cc];
-  const bankDetails = PROFORMA_CONFIG.BANK_BY_COUNTRY[cc];
-  const buyerConfig = {
+  const bankDetails = data.bankConfig ?? PROFORMA_CONFIG.BANK_BY_COUNTRY[cc];
+  const exporterInfo = data.exporterConfig ?? PROFORMA_CONFIG.EXPORTER;
+  const buyerContactInfo = data.buyerContactConfig ?? PROFORMA_CONFIG.BUYER_CONTACT;
+  const buyerConfig = data.buyerConfig ?? ({
     DE: {
       businessName: "HAS-MOB ORMAN URUNLERI MOBILYA SANAYI VE TICARET LIMITED SIRKETI",
       vat: "DE350448756",
@@ -186,7 +225,7 @@ export function ProformaDocument({ data }: { data: ProformaData }) {
       vat: "",
       address: "8 THE GREEN STREET STE:4000, DOVER, DE 19901 DE, USA",
     },
-  }[cc] ?? { businessName: "", vat: "", address: "" };
+  }[cc] ?? { businessName: "", vat: "", address: "" });
 
   const dateISO = formatPdfDateISO(data.sevk_tarihi);
   const invoiceDateStr = formatInvoiceDateStr(data.sevk_tarihi);
@@ -256,20 +295,22 @@ export function ProformaDocument({ data }: { data: ProformaData }) {
         {/* Exporter / Buyer Details */}
         <View style={styles.twoCol}>
           <View style={[styles.halfBox, { borderRightWidth: 0, borderTopWidth: 0 }]}>
-            <Text>{PROFORMA_CONFIG.EXPORTER.companyName}</Text>
-            <Text>{PROFORMA_CONFIG.EXPORTER.taxInfo}</Text>
-            <Text style={{ marginTop: 2 }}>{PROFORMA_CONFIG.EXPORTER.address}</Text>
-            <Text style={{ marginTop: 2 }}>Tel: {PROFORMA_CONFIG.EXPORTER.phone}</Text>
-            <Text>E-mail: {PROFORMA_CONFIG.EXPORTER.email}</Text>
-            <Text>Web: {PROFORMA_CONFIG.EXPORTER.web}</Text>
+            {/* eslint-disable-next-line */}
+            <Image src={path.join(process.cwd(), "public", "logo-yatay.png")} style={{ width: 100, height: 23, marginBottom: 4 }} />
+            <Text>{exporterInfo.companyName}</Text>
+            <Text>{exporterInfo.taxInfo}</Text>
+            <Text style={{ marginTop: 2 }}>{exporterInfo.address}</Text>
+            <Text style={{ marginTop: 2 }}>Tel: {exporterInfo.phone}</Text>
+            <Text>E-mail: {exporterInfo.email}</Text>
+            <Text>Web: {exporterInfo.web}</Text>
           </View>
           <View style={[styles.halfBox, { borderTopWidth: 0 }]}>
             <Text>Business name: {buyerConfig.businessName}</Text>
             {buyerConfig.vat ? <Text>Vat #: {buyerConfig.vat}</Text> : null}
             <Text style={{ marginTop: 2 }}>{buyerConfig.address}</Text>
-            <Text style={{ marginTop: 2 }}>Tel: {PROFORMA_CONFIG.BUYER_CONTACT.phone}</Text>
-            <Text>E-mail: {PROFORMA_CONFIG.BUYER_CONTACT.email}</Text>
-            <Text>Contact: {PROFORMA_CONFIG.BUYER_CONTACT.contact}</Text>
+            <Text style={{ marginTop: 2 }}>Tel: {buyerContactInfo.phone}</Text>
+            <Text>E-mail: {buyerContactInfo.email}</Text>
+            <Text>Contact: {buyerContactInfo.contact}</Text>
           </View>
         </View>
 

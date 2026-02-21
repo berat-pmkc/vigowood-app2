@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VigoWood Platform",
   description: "Ahşap mobilya entegre iş yönetim platformu",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

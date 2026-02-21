@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { PackingListDocument } from "@/lib/pdf/packing-list-template";
-import type { PackingListData, PackingListItem } from "@/lib/pdf/packing-list-template";
-import type { SevkiyatItemRow } from "@/app/(dashboard)/sevkiyat/actions";
+import type { PackingListData, PackingListItem, PLExporterConfig, PLBuyerConfig, PLDispatchConfig, PLSignatoryConfig, PLContactConfig } from "@/lib/pdf/packing-list-template";
+import type { SevkiyatItemRow, SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
 import React from "react";
 
 interface RouteParams {
@@ -39,7 +39,76 @@ export async function GET(_request: Request, { params }: RouteParams) {
       shipment_number: number | null;
       sevk_tarihi: string | null;
       konteyner_no: string | null;
+      ihracatci_firma_id: number | null;
+      alici_firma_id: number | null;
+      banka_firma_id: number | null;
     };
+
+    // Fetch firma data from DB if available
+    let plExporter: PLExporterConfig | undefined;
+    let plBuyer: PLBuyerConfig | undefined;
+    let plDispatch: PLDispatchConfig | undefined;
+    let plSignatory: PLSignatoryConfig | undefined;
+    let plContact: PLContactConfig | undefined;
+
+    const firmaIds = [sev.ihracatci_firma_id, sev.alici_firma_id].filter(Boolean) as number[];
+    // Also fetch signatory + contact by type
+    const { data: allFirma } = await supabase
+      .from("sevkiyat_firmalar")
+      .select("*")
+      .eq("aktif", true);
+
+    const firmaRows = (allFirma as SevkiyatFirmaRow[] ?? []);
+    const firmaById = new Map(firmaRows.map(f => [f.id, f]));
+
+    // İhracatçı
+    const ihracatci = sev.ihracatci_firma_id ? firmaById.get(sev.ihracatci_firma_id) : null;
+    if (ihracatci) {
+      plExporter = {
+        companyName: ihracatci.firma_adi ?? ihracatci.profil_adi,
+        address1: ihracatci.adres_satir1 ?? "",
+        address2: ihracatci.adres_satir2 ?? "",
+        phone: ihracatci.telefon ?? "",
+      };
+    }
+
+    // Alıcı
+    const alici = sev.alici_firma_id ? firmaById.get(sev.alici_firma_id) : null;
+    if (alici) {
+      plBuyer = {
+        name1: alici.firma_adi ?? alici.profil_adi,
+        name2: "",
+        vat: alici.vat_no ?? "",
+        address: [alici.adres_satir1, alici.adres_satir2].filter(Boolean).join(", "),
+      };
+      // Dispatch from alici's sevk_yontemi
+      if (alici.sevk_yontemi) {
+        plDispatch = {
+          name: alici.country_code ?? sev.country_code ?? "",
+          method: alici.sevk_yontemi,
+        };
+      }
+    }
+
+    // İmzalayan
+    const imzalayan = firmaRows.find(f => f.firma_tipi === "imzalayan" && f.varsayilan);
+    if (imzalayan) {
+      plSignatory = {
+        placeOfIssue: imzalayan.imza_yeri ?? "",
+        company: imzalayan.firma_adi ?? imzalayan.profil_adi,
+        authorizedName: imzalayan.yetkili_adi ?? "",
+      };
+    }
+
+    // Contact
+    const contact = firmaRows.find(f => f.firma_tipi === "contact" && f.varsayilan);
+    if (contact) {
+      plContact = {
+        name: contact.yetkili_adi ?? contact.profil_adi,
+        phone: contact.telefon ?? "",
+        email: contact.email ?? "",
+      };
+    }
 
     // Items
     const { data: items } = await supabase
@@ -86,6 +155,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
       sevk_tarihi: sev.sevk_tarihi,
       konteyner_no: sev.konteyner_no,
       items: plItems,
+      exporterConfig: plExporter,
+      buyerConfig: plBuyer,
+      dispatchConfig: plDispatch,
+      signatoryConfig: plSignatory,
+      contactConfig: plContact,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
