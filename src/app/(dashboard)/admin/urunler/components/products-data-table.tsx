@@ -145,6 +145,15 @@ export function ProductsDataTable({
 
   return (
     <div className="space-y-4">
+      {/* TEMPORARY DEBUG — remove after diagnosis */}
+      <div className="rounded border border-green-300 bg-green-50 p-3 text-xs font-mono">
+        <p><strong>CLIENT DEBUG:</strong></p>
+        <p>data.length: {data.length}</p>
+        <p>totalCount: {totalCount}</p>
+        <p>table rows: {table.getRowModel().rows.length}</p>
+        <p>columns: {columns.length}</p>
+        <p>first item: {data[0] ? JSON.stringify({ sku: (data[0] as Product).sku }) : "EMPTY"}</p>
+      </div>
       <ProductsToolbar
         table={table}
         search={search}

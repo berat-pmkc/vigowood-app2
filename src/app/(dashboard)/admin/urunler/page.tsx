@@ -80,6 +80,15 @@ export default async function UrunlerPage({ searchParams }: PageProps) {
 
   return (
     <div className="px-4 pb-6 sm:px-6">
+      {/* TEMPORARY DEBUG — remove after diagnosis */}
+      <div className="mb-4 rounded border border-blue-300 bg-blue-50 p-3 text-xs font-mono">
+        <p><strong>SERVER DEBUG:</strong></p>
+        <p>products length: {products?.length ?? "NULL"}</p>
+        <p>count: {count ?? "NULL"}</p>
+        <p>error: none (passed check)</p>
+        <p>first item: {products?.[0] ? JSON.stringify({ sku: products[0].sku, urun_adi: products[0].urun_adi }) : "EMPTY"}</p>
+      </div>
+
       <div className="mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Ürün Yönetimi</h1>
         <p className="text-sm text-muted-foreground">
