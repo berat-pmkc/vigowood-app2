@@ -123,11 +123,22 @@ function parseExcelRows(buffer: Buffer): ParsedRow[] {
     const miktar = parseNumber(miktarVal);
 
     if (!sku || miktar === 0) continue;
+    // Footer/summary row detection
     const firstVal = String(Object.values(row)[0] || "");
     if (firstVal.includes("Listelenen:") || firstVal.includes("Toplam:")) continue;
+    // Skip rows without a valid date (footer/total rows)
+    const parsedDate = parseExcelDate(tarihVal);
+    if (!parsedDate && !faturaNo) continue;
+
+    // Clamp KDV to valid range (footer sums can be huge)
+    let kdvOrani: number | null = null;
+    if (kdvVal != null && kdvVal !== "") {
+      const kdvNum = parseNumber(kdvVal);
+      kdvOrani = kdvNum >= 0 && kdvNum <= 100 ? kdvNum : null;
+    }
 
     rows.push({
-      tarih: parseExcelDate(tarihVal),
+      tarih: parsedDate,
       satis_kanali: satisElemani ? String(satisElemani).trim().toUpperCase() : null,
       fatura_no: faturaNo ? String(faturaNo).trim() : null,
       musteri_adi: unvan ? String(unvan).trim() : null,
@@ -135,7 +146,7 @@ function parseExcelRows(buffer: Buffer): ParsedRow[] {
       miktar: Math.round(miktar),
       birim_fiyat: parseNumber(birimFiyatVal),
       toplam_tutar: parseNumber(toplamTutarVal),
-      kdv_orani: kdvVal != null && kdvVal !== "" ? parseNumber(kdvVal) : null,
+      kdv_orani: kdvOrani,
       doviz: dovizVal ? String(dovizVal).trim() : "TL",
       is_hizmet: isServiceSku(sku),
     });
