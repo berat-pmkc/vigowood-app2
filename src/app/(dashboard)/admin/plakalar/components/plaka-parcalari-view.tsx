@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   getAllPlakalar,
+  getAllPartsForSelect,
   getPlakaParts,
   updatePlakaPart,
   addPlakaPart,
@@ -69,30 +70,46 @@ export function PlakaParcalariView({ initialPlaka }: PlakaParcalariViewProps) {
   const [parts, setParts] = useState<PlakaPartRow[]>([]);
   const [partsLoading, setPartsLoading] = useState(false);
 
+  // All parts for combobox
+  const [allParts, setAllParts] = useState<{ part_id: string; part_adi: string }[]>([]);
+  const [allPartsLoading, setAllPartsLoading] = useState(true);
+
   // New part form
   const [newPartId, setNewPartId] = useState("");
   const [newQty, setNewQty] = useState("");
+  const [partSelectOpen, setPartSelectOpen] = useState(false);
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState("");
 
-  // Load all plakalar for selector
+  // Load all plakalar for selector + all parts for combobox
   useEffect(() => {
     async function load() {
       setPlakaLoading(true);
-      const result = await getAllPlakalar();
-      if (result.success) {
-        setPlakalar(result.data);
-        // If initialPlaka is set, find it
+      setAllPartsLoading(true);
+
+      const [plakaResult, partsResult] = await Promise.all([
+        getAllPlakalar(),
+        getAllPartsForSelect(),
+      ]);
+
+      if (plakaResult.success) {
+        setPlakalar(plakaResult.data);
         if (initialPlaka) {
-          const found = result.data.find((p) => p.plaka_id === initialPlaka);
+          const found = plakaResult.data.find((p) => p.plaka_id === initialPlaka);
           if (found) setSelectedPlakaObj(found);
         }
       } else {
-        toast.error(result.error);
+        toast.error(plakaResult.error);
       }
+
+      if (partsResult.success) {
+        setAllParts(partsResult.data);
+      }
+
       setPlakaLoading(false);
+      setAllPartsLoading(false);
     }
     load();
   }, [initialPlaka]);
@@ -362,13 +379,61 @@ export function PlakaParcalariView({ initialPlaka }: PlakaParcalariViewProps) {
               {/* Add new part */}
               <div className="flex items-end gap-2 pt-2">
                 <div className="flex-1 space-y-1">
-                  <label className="text-xs text-muted-foreground">Parça ID</label>
-                  <Input
-                    placeholder="ör: P001"
-                    value={newPartId}
-                    onChange={(e) => setNewPartId(e.target.value)}
-                    className="h-9 text-sm"
-                  />
+                  <label className="text-xs text-muted-foreground">Parça Seçin</label>
+                  <Popover open={partSelectOpen} onOpenChange={setPartSelectOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={partSelectOpen}
+                        className="w-full justify-between h-9 text-sm font-normal"
+                        disabled={allPartsLoading}
+                      >
+                        {allPartsLoading ? (
+                          <span className="text-muted-foreground">Yükleniyor...</span>
+                        ) : newPartId ? (
+                          <span className="truncate">
+                            <span className="font-mono text-xs mr-1.5">{newPartId}</span>
+                            {allParts.find((p) => p.part_id === newPartId)?.part_adi ?? ""}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Parça seçin...</span>
+                        )}
+                        <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Parça ara (ID veya ad)..." />
+                        <CommandList>
+                          <CommandEmpty>Parça bulunamadı.</CommandEmpty>
+                          <CommandGroup>
+                            {allParts.map((part) => (
+                              <CommandItem
+                                key={part.part_id}
+                                value={`${part.part_id} ${part.part_adi}`}
+                                onSelect={() => {
+                                  setNewPartId(part.part_id);
+                                  setPartSelectOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    newPartId === part.part_id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <span className="font-mono text-xs mr-2 text-muted-foreground">
+                                  {part.part_id}
+                                </span>
+                                <span className="flex-1 truncate">{part.part_adi}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="w-[100px] space-y-1">
                   <label className="text-xs text-muted-foreground">Miktar</label>

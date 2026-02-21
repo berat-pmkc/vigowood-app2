@@ -490,6 +490,27 @@ export async function importPlakalar(
   }
 }
 
+/** Tüm parçaları getir (parça seçici combobox için) */
+export async function getAllPartsForSelect(): Promise<
+  | { success: true; data: { part_id: string; part_adi: string }[] }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("all_parts")
+      .select("part_id, part_adi")
+      .order("part_id");
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data ?? []) as { part_id: string; part_adi: string }[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 /** Tüm plakaları getir (plaka seçici için — pagination yok) */
 export async function getAllPlakalar(): Promise<
   | { success: true; data: { plaka_id: string; plaka_adi: string; sku: string | null }[] }
