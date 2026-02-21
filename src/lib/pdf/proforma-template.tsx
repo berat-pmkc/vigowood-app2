@@ -10,14 +10,18 @@ import {
 } from "@react-pdf/renderer";
 import { PROFORMA_CONFIG, PALET_WEIGHT_KG } from "@/lib/constants";
 import {
+  registerTurkishFonts,
   formatPdfCurrency,
   formatPdfNumber,
   formatPdfDateISO,
   formatInvoiceDateStr,
 } from "./pdf-utils";
 
+// Register Roboto for Turkish character support
+registerTurkishFonts();
+
 const styles = StyleSheet.create({
-  page: { padding: 30, fontSize: 8, fontFamily: "Helvetica" },
+  page: { padding: 30, fontSize: 8, fontFamily: "Roboto" },
   title: {
     fontSize: 14,
     fontWeight: "bold",
