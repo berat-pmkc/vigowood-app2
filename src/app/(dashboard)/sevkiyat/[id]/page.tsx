@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { SEVKIYAT_ACCESS_ROLES, SEVKIYAT_COST_ROLES } from "@/lib/constants";
+import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { ShipmentPlanning } from "./components/shipment-planning";
 import type { SevkiyatRow, SevkiyatItemRow } from "../actions";
 
@@ -54,14 +54,11 @@ export default async function SevkiyatDetailPage({ params }: PageProps) {
     stok_aktif: number;
   }[];
 
-  const showCosts = SEVKIYAT_COST_ROLES.includes(user.role);
-
   return (
     <ShipmentPlanning
       sevkiyat={sevkiyat}
       initialItems={itemRows}
       products={productList}
-      showCosts={showCosts}
     />
   );
 }

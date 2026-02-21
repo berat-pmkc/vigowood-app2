@@ -5,6 +5,8 @@ import { SEVKIYAT_COST_ROLES } from "@/lib/constants";
 import { MaliyetlerClient } from "./maliyetler-client";
 import type { SevkiyatRow, SevkiyatMaliyetRow, DovizKuruRow } from "../actions";
 
+export type LojistikToplam = { desi: number; agirlik: number; hacim: number };
+
 export default async function MaliyetlerPage() {
   const user = await getCurrentUser();
   if (!user || !SEVKIYAT_COST_ROLES.includes(user.role)) {
@@ -25,19 +27,35 @@ export default async function MaliyetlerPage() {
 
   const sevkiyatlar = (sevkData ?? []) as Pick<SevkiyatRow, "sevkiyat_id" | "sevkiyat_adi" | "country_code" | "durum" | "created_at">[];
 
-  // Tüm maliyetler
+  // Tüm maliyetler + lojistik toplamları
   const sevkIds = sevkiyatlar.map((s) => s.sevkiyat_id);
   let maliyetMap: Record<string, SevkiyatMaliyetRow> = {};
+  const lojistikMap: Record<string, LojistikToplam> = {};
+
   if (sevkIds.length > 0) {
-    const { data: malData } = await supabase
-      .from("sevkiyat_maliyetler")
-      .select("*")
-      .in("sevkiyat_id", sevkIds);
+    const [{ data: malData }, { data: itemsData }] = await Promise.all([
+      supabase
+        .from("sevkiyat_maliyetler")
+        .select("*")
+        .in("sevkiyat_id", sevkIds),
+      supabase
+        .from("sevkiyat_items")
+        .select("sevkiyat_id, desi, agirlik, hacim")
+        .in("sevkiyat_id", sevkIds),
+    ]);
 
     if (malData) {
       for (const m of malData as SevkiyatMaliyetRow[]) {
         maliyetMap[m.sevkiyat_id] = m;
       }
+    }
+
+    for (const item of (itemsData ?? []) as { sevkiyat_id: string; desi: number | null; agirlik: number | null; hacim: number | null }[]) {
+      const e = lojistikMap[item.sevkiyat_id] ?? { desi: 0, agirlik: 0, hacim: 0 };
+      e.desi += item.desi ?? 0;
+      e.agirlik += item.agirlik ?? 0;
+      e.hacim += item.hacim ?? 0;
+      lojistikMap[item.sevkiyat_id] = e;
     }
   }
 
@@ -54,12 +72,13 @@ export default async function MaliyetlerPage() {
       <div className="mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Sevkiyat Maliyetleri</h1>
         <p className="text-sm text-muted-foreground">
-          Tüm sevkiyatların maliyet özetleri
+          Tüm sevkiyatların maliyet özetleri — satır düzenle ile maliyet girişi yapabilirsiniz
         </p>
       </div>
       <MaliyetlerClient
         sevkiyatlar={sevkiyatlar}
         maliyetMap={maliyetMap}
+        lojistikMap={lojistikMap}
         sonKur={kurData as DovizKuruRow | null}
       />
     </div>

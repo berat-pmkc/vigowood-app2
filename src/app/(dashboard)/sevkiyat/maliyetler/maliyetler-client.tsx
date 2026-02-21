@@ -1,15 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SevkiyatStatusBadge } from "../components/sevkiyat-status-badge";
 import { SEVKIYAT_COUNTRIES, type SevkiyatCountryCode } from "@/lib/constants";
+import { MaliyetEditSheet } from "./maliyet-edit-sheet";
 import type { SevkiyatRow, SevkiyatMaliyetRow, DovizKuruRow } from "../actions";
+import type { LojistikToplam } from "./page";
+import { Pencil } from "lucide-react";
 
 interface MaliyetlerClientProps {
   sevkiyatlar: Pick<SevkiyatRow, "sevkiyat_id" | "sevkiyat_adi" | "country_code" | "durum" | "created_at">[];
   maliyetMap: Record<string, SevkiyatMaliyetRow>;
+  lojistikMap: Record<string, LojistikToplam>;
   sonKur: DovizKuruRow | null;
 }
 
@@ -36,8 +42,13 @@ function getMaliyetToplamUsd(m: SevkiyatMaliyetRow, kur: DovizKuruRow | null): n
   );
 }
 
-export function MaliyetlerClient({ sevkiyatlar, maliyetMap, sonKur }: MaliyetlerClientProps) {
+export function MaliyetlerClient({ sevkiyatlar, maliyetMap, lojistikMap, sonKur }: MaliyetlerClientProps) {
   const router = useRouter();
+  const [editTarget, setEditTarget] = useState<{
+    sevkiyatId: string;
+    sevkiyatAdi: string;
+    totalDesi: number;
+  } | null>(null);
 
   if (sevkiyatlar.length === 0) {
     return (
@@ -46,6 +57,10 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, sonKur }: Maliyetler
       </Card>
     );
   }
+
+  const handleSaved = () => {
+    router.refresh();
+  };
 
   return (
     <div className="space-y-3">
@@ -62,34 +77,33 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, sonKur }: Maliyetler
               <th className="pb-2 pr-3 font-medium">Sevkiyat</th>
               <th className="pb-2 pr-3 font-medium">Ülke</th>
               <th className="pb-2 pr-3 font-medium">Durum</th>
-              <th className="pb-2 pr-2 font-medium text-right">Navlun</th>
-              <th className="pb-2 pr-2 font-medium text-right hidden md:table-cell">İç Nak.</th>
-              <th className="pb-2 pr-2 font-medium text-right hidden md:table-cell">Ara Depo</th>
-              <th className="pb-2 pr-2 font-medium text-right hidden lg:table-cell">Amazon</th>
-              <th className="pb-2 pr-2 font-medium text-right hidden lg:table-cell">YDG</th>
-              <th className="pb-2 pr-2 font-medium text-right hidden lg:table-cell">Gümrük</th>
-              <th className="pb-2 pr-2 font-medium text-right hidden lg:table-cell">Diğer</th>
-              <th className="pb-2 font-medium text-right">Toplam $</th>
+              <th className="pb-2 pr-2 font-medium text-right">Desi</th>
+              <th className="pb-2 pr-2 font-medium text-right hidden md:table-cell">Ağırlık</th>
+              <th className="pb-2 pr-2 font-medium text-right hidden md:table-cell">Hacim</th>
+              <th className="pb-2 pr-2 font-medium text-right">Toplam $</th>
+              <th className="pb-2 pr-2 font-medium text-right">$/desi</th>
+              <th className="pb-2 font-medium text-center">İşlem</th>
             </tr>
           </thead>
           <tbody>
             {sevkiyatlar.map((s) => {
               const m = maliyetMap[s.sevkiyat_id];
+              const loj = lojistikMap[s.sevkiyat_id] ?? { desi: 0, agirlik: 0, hacim: 0 };
               const toplamUsd = m ? getMaliyetToplamUsd(m, sonKur) : 0;
+              const desiUsd = loj.desi > 0 && toplamUsd > 0 ? toplamUsd / loj.desi : 0;
               const countryCode = s.country_code as SevkiyatCountryCode;
 
               return (
                 <tr
                   key={s.sevkiyat_id}
-                  className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => router.push(`/sevkiyat/${s.sevkiyat_id}`)}
+                  className="border-b hover:bg-muted/50 transition-colors"
                 >
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-1.5">
                       <Badge variant="secondary" className="font-mono text-[10px] px-1.5 h-5">
                         {s.sevkiyat_id}
                       </Badge>
-                      <span className="truncate max-w-[120px] text-xs">
+                      <span className="truncate max-w-[120px] text-xs hidden sm:inline">
                         {s.sevkiyat_adi}
                       </span>
                     </div>
@@ -103,28 +117,38 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, sonKur }: Maliyetler
                     <SevkiyatStatusBadge durum={s.durum} />
                   </td>
                   <td className="py-2 pr-2 text-right font-mono text-xs">
-                    {m ? `${m.navlun.toLocaleString()} ${m.navlun_currency}` : "—"}
+                    {loj.desi > 0 ? loj.desi.toFixed(1) : "—"}
                   </td>
                   <td className="py-2 pr-2 text-right font-mono text-xs hidden md:table-cell">
-                    {m ? `${m.ic_nakliye.toLocaleString()} ${m.ic_nakliye_currency}` : "—"}
+                    {loj.agirlik > 0 ? `${loj.agirlik.toFixed(1)} kg` : "—"}
                   </td>
                   <td className="py-2 pr-2 text-right font-mono text-xs hidden md:table-cell">
-                    {m ? `${m.ara_depo.toLocaleString()} ${m.ara_depo_currency}` : "—"}
+                    {loj.hacim > 0 ? `${loj.hacim.toFixed(3)} m³` : "—"}
                   </td>
-                  <td className="py-2 pr-2 text-right font-mono text-xs hidden lg:table-cell">
-                    {m ? `${m.amazon_pickup.toLocaleString()} ${m.amazon_pickup_currency}` : "—"}
-                  </td>
-                  <td className="py-2 pr-2 text-right font-mono text-xs hidden lg:table-cell">
-                    {m ? `${m.ydg.toLocaleString()} ${m.ydg_currency}` : "—"}
-                  </td>
-                  <td className="py-2 pr-2 text-right font-mono text-xs hidden lg:table-cell">
-                    {m ? `${m.tr_gumruk.toLocaleString()} ${m.tr_gumruk_currency}` : "—"}
-                  </td>
-                  <td className="py-2 pr-2 text-right font-mono text-xs hidden lg:table-cell">
-                    {m ? `${m.diger.toLocaleString()} ${m.diger_currency}` : "—"}
-                  </td>
-                  <td className="py-2 text-right font-mono text-xs font-semibold">
+                  <td className="py-2 pr-2 text-right font-mono text-xs font-semibold">
                     {toplamUsd > 0 ? `$${toplamUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : "—"}
+                  </td>
+                  <td className="py-2 pr-2 text-right font-mono text-xs">
+                    {desiUsd > 0 ? (
+                      <Badge variant="outline" className="text-[10px] font-mono">
+                        ${desiUsd.toFixed(2)}
+                      </Badge>
+                    ) : "—"}
+                  </td>
+                  <td className="py-2 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setEditTarget({
+                        sevkiyatId: s.sevkiyat_id,
+                        sevkiyatAdi: s.sevkiyat_adi ?? "",
+                        totalDesi: loj.desi,
+                      })}
+                    >
+                      <Pencil className="w-3.5 h-3.5 mr-1" />
+                      Düzenle
+                    </Button>
                   </td>
                 </tr>
               );
@@ -132,6 +156,18 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, sonKur }: Maliyetler
           </tbody>
         </table>
       </div>
+
+      {editTarget && (
+        <MaliyetEditSheet
+          open={!!editTarget}
+          onOpenChange={(open) => { if (!open) setEditTarget(null); }}
+          sevkiyatId={editTarget.sevkiyatId}
+          sevkiyatAdi={editTarget.sevkiyatAdi}
+          totalDesi={editTarget.totalDesi}
+          sonKur={sonKur}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 }
