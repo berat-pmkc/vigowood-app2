@@ -1228,6 +1228,8 @@ export interface DovizKuruRow {
   usd_try: number | null;
   eur_try: number | null;
   gbp_try: number | null;
+  pln_try: number | null;
+  sek_try: number | null;
   eur_usd: number | null;
   gbp_usd: number | null;
   gbp_eur: number | null;
@@ -1277,12 +1279,69 @@ export async function getKurHistory(days: number = 30) {
   }
 }
 
-/** Yeni döviz kuru ekle/güncelle */
+/** Frankfurter API'den güncel kurları çek ve kaydet */
+export async function fetchKurFromApi(): Promise<ActionResult & { data?: DovizKuruRow }> {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    // Frankfurter API — 1 TRY → USD, EUR, GBP, PLN, SEK
+    const res = await fetch("https://api.frankfurter.app/latest?from=TRY&to=USD,EUR,GBP,PLN,SEK", {
+      next: { revalidate: 3600 }, // 1 saat cache
+    });
+
+    if (!res.ok) return { success: false, error: `API hatası: ${res.status}` };
+
+    const json = await res.json() as {
+      date: string;
+      rates: { USD: number; EUR: number; GBP: number; PLN: number; SEK: number };
+    };
+
+    // Ters çevir: 1 USD = ? TRY
+    const usd_try = Math.round((1 / json.rates.USD) * 10000) / 10000;
+    const eur_try = Math.round((1 / json.rates.EUR) * 10000) / 10000;
+    const gbp_try = Math.round((1 / json.rates.GBP) * 10000) / 10000;
+    const pln_try = Math.round((1 / json.rates.PLN) * 10000) / 10000;
+    const sek_try = Math.round((1 / json.rates.SEK) * 10000) / 10000;
+
+    // Çapraz kurlar
+    const eur_usd = Math.round((eur_try / usd_try) * 10000) / 10000;
+    const gbp_usd = Math.round((gbp_try / usd_try) * 10000) / 10000;
+    const gbp_eur = Math.round((gbp_try / eur_try) * 10000) / 10000;
+
+    const { data, error } = await supabase.from("doviz_kurlari").upsert(
+      {
+        tarih: json.date,
+        usd_try,
+        eur_try,
+        gbp_try,
+        pln_try,
+        sek_try,
+        eur_usd,
+        gbp_usd,
+        gbp_eur,
+        kaynak: "frankfurter",
+      },
+      { onConflict: "tarih" }
+    ).select().single();
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/sevkiyat/kurlar");
+    return { success: true, data: data as DovizKuruRow };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "API bağlantı hatası" };
+  }
+}
+
+/** Yeni döviz kuru ekle/güncelle (manuel) */
 export async function createKur(formData: {
   tarih: string;
   usd_try: number;
   eur_try: number;
   gbp_try: number;
+  pln_try?: number;
+  sek_try?: number;
 }): Promise<ActionResult> {
   try {
     await requireSevkiyatAccess();
@@ -1299,6 +1358,8 @@ export async function createKur(formData: {
         usd_try: formData.usd_try,
         eur_try: formData.eur_try,
         gbp_try: formData.gbp_try,
+        pln_try: formData.pln_try ?? null,
+        sek_try: formData.sek_try ?? null,
         eur_usd,
         gbp_usd,
         gbp_eur,

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { createKur, type DovizKuruRow } from "../actions";
-import { ArrowLeft, Coins, Loader2, Save } from "lucide-react";
+import { createKur, fetchKurFromApi, type DovizKuruRow } from "../actions";
+import { ArrowLeft, Coins, Loader2, Save, RefreshCw, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
@@ -20,12 +20,24 @@ interface KurlarClientProps {
 export function KurlarClient({ kurlar }: KurlarClientProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [apiLoading, setApiLoading] = useState(false);
 
   const today = new Date().toISOString().split("T")[0];
   const [tarih, setTarih] = useState(today);
   const [usdTry, setUsdTry] = useState("");
   const [eurTry, setEurTry] = useState("");
   const [gbpTry, setGbpTry] = useState("");
+
+  // Bugünün kuru var mı?
+  const todayKur = kurlar.find((k) => k.tarih === today);
+
+  // Sayfa açıldığında bugünün kuru yoksa otomatik çek
+  useEffect(() => {
+    if (!todayKur) {
+      handleFetchFromApi();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Hesaplanan çapraz kurlar
   const usd = parseFloat(usdTry) || 0;
@@ -35,6 +47,18 @@ export function KurlarClient({ kurlar }: KurlarClientProps) {
   const eurUsd = usd > 0 ? (eur / usd).toFixed(4) : "—";
   const gbpUsd = usd > 0 ? (gbp / usd).toFixed(4) : "—";
   const gbpEur = eur > 0 ? (gbp / eur).toFixed(4) : "—";
+
+  const handleFetchFromApi = async () => {
+    setApiLoading(true);
+    const result = await fetchKurFromApi();
+    if (result.success) {
+      toast.success("Kurlar Frankfurter API'den güncellendi");
+      router.refresh();
+    } else {
+      toast.error(result.error ?? "API hatası");
+    }
+    setApiLoading(false);
+  };
 
   const handleSave = async () => {
     if (!usd || !eur || !gbp) {
@@ -71,21 +95,87 @@ export function KurlarClient({ kurlar }: KurlarClientProps) {
             <ArrowLeft className="w-5 h-5" />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Coins className="w-6 h-6" />
             Döviz Kurları
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manuel kur girişi ve geçmiş kurlar
+            Frankfurter API ile otomatik kur güncelleme
           </p>
         </div>
+        <Button
+          onClick={handleFetchFromApi}
+          disabled={apiLoading}
+          variant="default"
+          className="gap-2"
+        >
+          {apiLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
+          Kurları Güncelle
+        </Button>
       </div>
 
-      {/* Kur Giriş Formu */}
+      {/* Güncel Kur Kartı */}
+      {todayKur && (
+        <Card className="border-emerald-200 bg-emerald-50/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-4 h-4 text-emerald-600" />
+              <span className="text-sm font-medium text-emerald-700">
+                Güncel Kurlar — {formatDate(todayKur.tarih)}
+              </span>
+              <Badge variant="outline" className="text-[10px] ml-auto">
+                {todayKur.kaynak}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">USD/TRY</p>
+                <p className="text-lg font-bold tabular-nums">{todayKur.usd_try?.toFixed(4)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">EUR/TRY</p>
+                <p className="text-lg font-bold tabular-nums">{todayKur.eur_try?.toFixed(4)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">GBP/TRY</p>
+                <p className="text-lg font-bold tabular-nums">{todayKur.gbp_try?.toFixed(4)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">PLN/TRY</p>
+                <p className="text-lg font-bold tabular-nums">{todayKur.pln_try?.toFixed(4) ?? "—"}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">SEK/TRY</p>
+                <p className="text-lg font-bold tabular-nums">{todayKur.sek_try?.toFixed(4) ?? "—"}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mt-2 pt-2 border-t border-emerald-200">
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">EUR/USD</p>
+                <p className="text-sm font-semibold tabular-nums">{todayKur.eur_usd?.toFixed(4)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">GBP/USD</p>
+                <p className="text-sm font-semibold tabular-nums">{todayKur.gbp_usd?.toFixed(4)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] text-muted-foreground">GBP/EUR</p>
+                <p className="text-sm font-semibold tabular-nums">{todayKur.gbp_eur?.toFixed(4)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Manuel Kur Giriş Formu */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Yeni Kur Girişi</CardTitle>
+          <CardTitle className="text-lg">Manuel Kur Girişi</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -142,9 +232,9 @@ export function KurlarClient({ kurlar }: KurlarClientProps) {
             </div>
           )}
 
-          <Button onClick={handleSave} disabled={loading} className="w-full sm:w-auto">
+          <Button onClick={handleSave} disabled={loading} variant="outline" className="w-full sm:w-auto">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Kaydet
+            Manuel Kaydet
           </Button>
         </CardContent>
       </Card>
@@ -166,8 +256,9 @@ export function KurlarClient({ kurlar }: KurlarClientProps) {
                     <th className="text-right py-2 px-2">USD/TRY</th>
                     <th className="text-right py-2 px-2">EUR/TRY</th>
                     <th className="text-right py-2 px-2">GBP/TRY</th>
-                    <th className="text-right py-2 px-2 hidden sm:table-cell">EUR/USD</th>
-                    <th className="text-right py-2 px-2 hidden sm:table-cell">GBP/USD</th>
+                    <th className="text-right py-2 px-2 hidden sm:table-cell">PLN/TRY</th>
+                    <th className="text-right py-2 px-2 hidden sm:table-cell">SEK/TRY</th>
+                    <th className="text-right py-2 px-2 hidden md:table-cell">EUR/USD</th>
                     <th className="text-right py-2 pl-2">Kaynak</th>
                   </tr>
                 </thead>
@@ -178,10 +269,20 @@ export function KurlarClient({ kurlar }: KurlarClientProps) {
                       <td className="py-2 px-2 text-right tabular-nums">{kur.usd_try?.toFixed(4) ?? "—"}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{kur.eur_try?.toFixed(4) ?? "—"}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{kur.gbp_try?.toFixed(4) ?? "—"}</td>
-                      <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{kur.eur_usd?.toFixed(4) ?? "—"}</td>
-                      <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{kur.gbp_usd?.toFixed(4) ?? "—"}</td>
+                      <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{kur.pln_try?.toFixed(4) ?? "—"}</td>
+                      <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{kur.sek_try?.toFixed(4) ?? "—"}</td>
+                      <td className="py-2 px-2 text-right tabular-nums hidden md:table-cell">{kur.eur_usd?.toFixed(4) ?? "—"}</td>
                       <td className="py-2 pl-2 text-right">
-                        <Badge variant="outline" className="text-[10px]">{kur.kaynak}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            kur.kaynak === "frankfurter"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : ""
+                          }`}
+                        >
+                          {kur.kaynak === "frankfurter" ? "API" : kur.kaynak}
+                        </Badge>
                       </td>
                     </tr>
                   ))}
