@@ -457,21 +457,30 @@ export type Database = {
       kesim_makinesi: {
         Row: {
           aciklama: string | null
+          aktif: boolean
+          bolum: string
           created_at: string
           makine_id: string
           tipi: string
+          updated_at: string
         }
         Insert: {
           aciklama?: string | null
+          aktif?: boolean
+          bolum?: string
           created_at?: string
           makine_id: string
           tipi: string
+          updated_at?: string
         }
         Update: {
           aciklama?: string | null
+          aktif?: boolean
+          bolum?: string
           created_at?: string
           makine_id?: string
           tipi?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1834,7 +1843,8 @@ export const Constants = {
   },
 } as const
 
-export type UserRole = Database["public"]["Enums"]["user_role"]
-export type Station = Database["public"]["Enums"]["station"]
-export type ProductCategory = Database["public"]["Enums"]["product_category"]
-export type PartType = Database["public"]["Enums"]["part_type"]
+// ─── Custom Type Aliases ────────────────────────────────────
+export type PartType = Database["public"]["Enums"]["part_type"];
+export type ProductCategory = Database["public"]["Enums"]["product_category"];
+export type UserRole = Database["public"]["Enums"]["user_role"];
+export type Station = Database["public"]["Enums"]["station"];
