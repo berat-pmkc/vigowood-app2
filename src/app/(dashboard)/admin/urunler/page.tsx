@@ -26,8 +26,8 @@ export default async function UrunlerPage({ searchParams }: PageProps) {
   const search = params.search?.trim() || "";
   const kategori = params.kategori || "";
   const aktif = params.aktif || "";
-  const sortBy = params.sortBy || "sku";
-  const sortOrder = params.sortOrder === "desc" ? false : true;
+  const sortBy = params.sortBy || "gunluk_satis";
+  const sortOrder = params.sortOrder === "asc" ? true : false;
 
   const from = page * pageSize;
   const to = from + pageSize - 1;
@@ -38,7 +38,7 @@ export default async function UrunlerPage({ searchParams }: PageProps) {
   ];
   const sortColumn = validSortColumns.includes(sortBy as keyof Product)
     ? sortBy
-    : "sku";
+    : "gunluk_satis";
 
   const supabase = await createClient();
   const q = supabase.from("products").select("*", { count: "exact" });

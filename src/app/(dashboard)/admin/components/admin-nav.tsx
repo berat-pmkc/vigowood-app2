@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Package, Puzzle, Layers, GitBranch, DollarSign, LayoutTemplate, Building2 } from "lucide-react";
+import { LayoutDashboard, Package, Puzzle, Layers, GitBranch, DollarSign, LayoutTemplate, Building2 } from "lucide-react";
 
 const adminTabs: {
   label: string;
   href: string;
   icon: typeof Package;
   disabled?: boolean;
+  exact?: boolean;
 }[] = [
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
   { label: "Ürünler", href: "/admin/urunler", icon: Package },
   { label: "Parçalar", href: "/admin/parcalar", icon: Puzzle },
   { label: "Plakalar", href: "/admin/plakalar", icon: Layers },
@@ -26,7 +28,9 @@ export function AdminNav() {
   return (
     <nav className="flex gap-1 border-b px-4 sm:px-6">
       {adminTabs.map((tab) => {
-        const isActive = pathname.startsWith(tab.href);
+        const isActive = tab.exact
+          ? pathname === tab.href
+          : pathname.startsWith(tab.href);
         const Icon = tab.icon;
 
         if (tab.disabled) {
