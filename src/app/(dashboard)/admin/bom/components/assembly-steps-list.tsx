@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -44,9 +44,11 @@ export function AssemblyStepsList({
   onRefresh,
 }: AssemblyStepsListProps) {
   const [steps, setSteps] = useState(initialSteps);
+  const prevInitialRef = useRef(initialSteps);
 
-  // Update local state when props change
-  if (initialSteps !== steps && initialSteps.length !== steps.length) {
+  // Update local state when server data changes (after router.refresh)
+  if (prevInitialRef.current !== initialSteps) {
+    prevInitialRef.current = initialSteps;
     setSteps(initialSteps);
   }
 

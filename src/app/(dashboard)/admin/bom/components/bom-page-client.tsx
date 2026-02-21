@@ -144,16 +144,17 @@ export function BomPageClient({
               <Download className="h-3.5 w-3.5" />
             </Button>
 
-            {view === "steps" && (
-              <Button
-                size="sm"
-                className="h-8"
-                onClick={() => setCreateDialogOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Yeni Adım
-              </Button>
-            )}
+            <Button
+              size="sm"
+              className="h-8"
+              onClick={() => {
+                if (view !== "steps") setView("steps");
+                setCreateDialogOpen(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Yeni Adım
+            </Button>
           </div>
         )}
       </div>
@@ -174,7 +175,11 @@ export function BomPageClient({
           onRefresh={handleRefresh}
         />
       ) : (
-        <RecipeTreeView sku={selectedSku} />
+        <RecipeTreeView
+          sku={selectedSku}
+          onSwitchToSteps={() => setView("steps")}
+          onRefresh={handleRefresh}
+        />
       )}
 
       {/* Create Dialog */}

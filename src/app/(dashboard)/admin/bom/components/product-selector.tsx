@@ -43,8 +43,13 @@ export function ProductSelector({
           className="w-full justify-between sm:w-[400px]"
         >
           {selectedProduct ? (
-            <span className="truncate font-mono">
-              {selectedProduct.sku}
+            <span className="truncate">
+              <span className="font-mono">{selectedProduct.sku}</span>
+              {selectedProduct.urun_adi && (
+                <span className="text-muted-foreground text-xs ml-2">
+                  — {selectedProduct.urun_adi}
+                </span>
+              )}
             </span>
           ) : (
             <span className="text-muted-foreground">Ürün seçiniz...</span>

@@ -202,7 +202,7 @@ export function StepBomPanel({
     }
 
     setAddLoading(true);
-    const result = await addBomItem(stepId, null, {
+    const result = await addBomItem(stepId, sku, {
       part_id: addPartId,
       qty_per: qty,
     });
