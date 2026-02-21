@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { BomPageClient } from "./components/bom-page-client";
 
@@ -6,6 +7,8 @@ interface PageProps {
     sku?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "BOM ve Montaj" };
 
 export default async function BomPage({ searchParams }: PageProps) {
   const params = await searchParams;

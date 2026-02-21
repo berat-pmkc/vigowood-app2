@@ -17,6 +17,8 @@ interface PageProps {
   }>;
 }
 
+export const metadata: Metadata = { title: "Plaka Yonetimi" };
+
 export default async function PlakalarPage({ searchParams }: PageProps) {
   const params = await searchParams;
 

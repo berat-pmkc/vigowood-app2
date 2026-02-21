@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { SablonDataTable } from "./components/sablon-data-table";
 import type { PaletSablonRow } from "./actions";

@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ADMIN_ROLES } from "@/lib/auth";
 import { FirmalarClient } from "./components/firmalar-client";
 import type { SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
+
+export const metadata: Metadata = { title: "Firmalar" };
 
 export default async function FirmalarPage() {
   const user = await getCurrentUser();

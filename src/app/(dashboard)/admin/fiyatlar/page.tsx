@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { FiyatlarDataTable } from "./components/fiyatlar-data-table";
 import type { FiyatRow } from "./actions";
@@ -12,6 +13,8 @@ interface PageProps {
     sortOrder?: string;
   }>;
 }
+
+export const metadata: Metadata = { title: "Fiyatlar" };
 
 export default async function FiyatlarPage({ searchParams }: PageProps) {
   const params = await searchParams;

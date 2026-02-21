@@ -368,8 +368,13 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 ### KATMAN 21: Personel & Yoklama
 - [ ] Yoklama giriş/liste + mesai
 
-### KATMAN 22: Bildirimler
-- [ ] Uygulama içi bildirim sistemi
+### KATMAN 22: Bildirimler ✅
+- [x] notification_reads junction tablosu + migration (025_bildirimler_v2.sql)
+- [x] Admin bildirim oluşturma/silme (hedefli veya herkese)
+- [x] Kişiye özel okundu takibi (markAsRead, markAllAsRead)
+- [x] Navbar badge (realtime unread count)
+- [x] Bildirimler sayfası: kart listesi, filtre tabs, arama
+- [x] Supabase Realtime (notifications + notification_reads)
 
 ### KATMAN 23: Realtime & Polish
 - [ ] Supabase Realtime + performans + UX iyileştirmeleri
