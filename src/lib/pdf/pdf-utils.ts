@@ -1,6 +1,29 @@
+import fs from "fs";
 import path from "path";
 import { Font } from "@react-pdf/renderer";
 import { PROFORMA_CONFIG } from "@/lib/constants";
+
+/**
+ * Resolve font source: local file path if accessible, otherwise URL via CDN.
+ */
+function resolveFontSrc(filename: string): string {
+  // Try local file first (works in dev + some Vercel configs)
+  const localPath = path.join(process.cwd(), "public", "fonts", filename);
+  try {
+    fs.accessSync(localPath, fs.constants.R_OK);
+    return localPath;
+  } catch {
+    // File not on disk — use the app's public URL
+    const host =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : "http://localhost:3000");
+    return `${host}/fonts/${filename}`;
+  }
+}
 
 /**
  * Register Roboto font family (supports Turkish characters: ş, ğ, ı, İ, Ş, Ğ)
@@ -15,11 +38,11 @@ export function registerTurkishFonts() {
     family: "Roboto",
     fonts: [
       {
-        src: path.join(process.cwd(), "public", "fonts", "Roboto-Regular.ttf"),
+        src: resolveFontSrc("Roboto-Regular.ttf"),
         fontWeight: 400,
       },
       {
-        src: path.join(process.cwd(), "public", "fonts", "Roboto-Bold.ttf"),
+        src: resolveFontSrc("Roboto-Bold.ttf"),
         fontWeight: 700,
       },
     ],

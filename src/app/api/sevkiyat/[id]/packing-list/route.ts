@@ -175,8 +175,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     });
   } catch (error) {
     console.error("Packing List PDF error:", error);
+    const msg = error instanceof Error ? error.message : "Bilinmeyen hata";
     return NextResponse.json(
-      { error: "PDF oluşturulurken hata oluştu" },
+      { error: `PDF oluşturulurken hata oluştu: ${msg}` },
       { status: 500 }
     );
   }
