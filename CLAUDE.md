@@ -291,20 +291,28 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Ürün listesi, arama, filtre
 - [x] Ürün CRUD
 - [x] Toplu aktif/pasif
+- [x] Excel Export / Import
 
 ### KATMAN 7: Admin — Parça Yönetimi ✅
 - [x] Parça listesi (tip bazlı filtre)
 - [x] Parça CRUD + kritik stok seviyesi
+- [x] Parça oluşturma (create) + silme (delete, referans kontrolü)
+- [x] Excel Export / Import
 
 ### KATMAN 8: Admin — Plaka Yönetimi ✅
 - [x] Plaka listesi + CRUD
 - [x] PlakaParts yönetimi
 - [x] Makine bazlı kesim süresi
+- [x] Plaka oluşturma (create, auto-ID) + silme (delete, referans kontrolü)
+- [x] SKU bazlı arama
+- [x] Excel Export / Import
 
 ### KATMAN 9: Admin — BOM ve Montaj ✅
 - [x] Montaj adımları (sıralama, drag-drop)
 - [x] StepBOM + ASM referans desteği
 - [x] Reçete ağaç görünümü
+- [x] Reçete ağacı inline miktar düzenleme
+- [x] BOM Excel Export
 
 ### KATMAN 10: Üretim — Kesim ✅
 - [x] Kesim listesi + yeni kesim formu
