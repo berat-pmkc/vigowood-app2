@@ -505,10 +505,12 @@ export const ATTENDANCE_DEPARTMENT_COLORS: Record<AttendanceDepartment, { bg: st
   "Paketleme Hatti": { bg: "bg-orange-100", text: "text-orange-800" },
 };
 
-/** Personel erişim rolleri (Yönetici + Endüstri Mühendisi + Hat) */
+/** Personel erişim rolleri (Yönetici + Endüstri Mühendisi + Müdürler + Hat) */
 export const PERSONEL_ACCESS_ROLES: UserRole[] = [
   "Yönetici",
   "Endüstri Mühendisi",
+  "E-Ticaret Müdürü",
+  "Dış Ticaret Müdürü",
   "Hat",
 ];
 

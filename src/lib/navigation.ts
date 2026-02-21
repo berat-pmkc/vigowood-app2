@@ -13,6 +13,7 @@ import {
   Truck,
   BarChart3,
   Users,
+  ClipboardList,
   Settings,
   Bell,
   LayoutTemplate,
@@ -114,7 +115,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Personel",
     items: [
-      { title: "Yoklama", href: "/personel", icon: Users, roles: ["Yönetici", "Endüstri Mühendisi", "Hat"] },
+      { title: "Personel Listesi", href: "/personel/liste", icon: ClipboardList, roles: ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Hat"] },
+      { title: "Yoklama", href: "/personel", icon: Users, roles: ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Hat"] },
     ],
   },
   {
