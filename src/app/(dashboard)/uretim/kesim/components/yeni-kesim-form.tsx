@@ -186,7 +186,7 @@ export function YeniKesimForm({ products }: YeniKesimFormProps) {
                   className="w-full max-w-md justify-between h-12 text-left"
                 >
                   {selectedProduct
-                    ? `${selectedProduct.urun_adi ?? selectedProduct.sku}`
+                    ? selectedProduct.sku
                     : "Ürün seçin..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -210,8 +210,8 @@ export function YeniKesimForm({ products }: YeniKesimFormProps) {
                             )}
                           />
                           <div>
-                            <p className="font-medium">{p.urun_adi ?? p.sku}</p>
-                            <p className="text-xs text-muted-foreground">{p.sku}</p>
+                            <p className="font-medium font-mono">{p.sku}</p>
+                            <p className="text-xs text-muted-foreground">{p.urun_adi}</p>
                           </div>
                         </CommandItem>
                       ))}
@@ -256,7 +256,7 @@ export function YeniKesimForm({ products }: YeniKesimFormProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Ürün</span>
-                <span className="font-medium">{selectedProduct?.urun_adi ?? sku}</span>
+                <span className="font-medium font-mono">{sku}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Plaka</span>

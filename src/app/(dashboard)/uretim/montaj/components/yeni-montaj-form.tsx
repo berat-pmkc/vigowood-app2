@@ -214,7 +214,7 @@ export function YeniMontajForm() {
                       className="w-full justify-between h-12 text-left"
                     >
                       {selectedProduct
-                        ? `${selectedProduct.urun_adi ?? selectedProduct.sku}`
+                        ? selectedProduct.sku
                         : "Ürün seçin..."}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -238,11 +238,11 @@ export function YeniMontajForm() {
                                 )}
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">
-                                  {product.urun_adi ?? product.sku}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="font-medium font-mono truncate">
                                   {product.sku}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {product.urun_adi}
                                   {product.kategori && ` • ${product.kategori}`}
                                 </p>
                               </div>
@@ -256,8 +256,8 @@ export function YeniMontajForm() {
 
                 {selectedProduct && (
                   <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                    <p className="font-medium">{selectedProduct.urun_adi}</p>
-                    <p className="text-muted-foreground">{selectedProduct.sku}</p>
+                    <p className="font-medium font-mono">{selectedProduct.sku}</p>
+                    <p className="text-muted-foreground">{selectedProduct.urun_adi}</p>
                     {selectedProduct.kategori && (
                       <Badge variant="outline" className="mt-1">{selectedProduct.kategori}</Badge>
                     )}
@@ -284,7 +284,7 @@ export function YeniMontajForm() {
           <CardHeader>
             <CardTitle className="text-lg">Malzeme Kontrolü</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {selectedProduct?.urun_adi ?? selectedSku} — {assemblySteps.length} adım
+              {selectedSku} — {assemblySteps.length} adım
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -372,7 +372,7 @@ export function YeniMontajForm() {
             <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Ürün</span>
-                <span className="font-medium">{selectedProduct?.urun_adi ?? selectedSku}</span>
+                <span className="font-medium font-mono">{selectedSku}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">SKU</span>

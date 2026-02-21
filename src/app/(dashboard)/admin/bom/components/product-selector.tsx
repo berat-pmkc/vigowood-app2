@@ -43,11 +43,8 @@ export function ProductSelector({
           className="w-full justify-between sm:w-[400px]"
         >
           {selectedProduct ? (
-            <span className="truncate">
-              <span className="font-mono text-xs text-muted-foreground mr-2">
-                {selectedProduct.sku}
-              </span>
-              {selectedProduct.urun_adi}
+            <span className="truncate font-mono">
+              {selectedProduct.sku}
             </span>
           ) : (
             <span className="text-muted-foreground">Ürün seçiniz...</span>
@@ -78,10 +75,10 @@ export function ProductSelector({
                         : "opacity-0"
                     )}
                   />
-                  <span className="font-mono text-xs text-muted-foreground mr-2">
+                  <span className="font-mono mr-2">
                     {product.sku}
                   </span>
-                  <span className="truncate">{product.urun_adi}</span>
+                  <span className="truncate text-muted-foreground text-xs">{product.urun_adi}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

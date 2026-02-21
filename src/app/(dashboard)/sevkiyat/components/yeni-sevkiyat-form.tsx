@@ -477,7 +477,7 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
                         className="w-full justify-between h-9 text-xs"
                       >
                         {selectedSku
-                          ? `${selectedSku} — ${selectedProduct?.urun_adi ?? ""}`
+                          ? selectedSku
                           : "Ürün seçiniz..."}
                         <ChevronsUpDown className="w-3 h-3 ml-1 opacity-50" />
                       </Button>
@@ -502,7 +502,7 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
                                   )}
                                 />
                                 <span className="font-mono mr-2">{p.sku}</span>
-                                <span className="truncate flex-1">{p.urun_adi}</span>
+                                <span className="truncate flex-1 text-muted-foreground">{p.urun_adi}</span>
                                 <span className="text-muted-foreground ml-1">({p.stok_aktif})</span>
                               </CommandItem>
                             ))}

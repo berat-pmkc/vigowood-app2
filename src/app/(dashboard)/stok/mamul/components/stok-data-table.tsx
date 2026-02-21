@@ -13,17 +13,9 @@ import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { formatNumber, formatDate } from "@/lib/utils";
-import { PRODUCT_CATEGORIES } from "@/lib/constants";
-import type { Database, ProductCategory } from "@/lib/supabase/types";
+import { formatNumber } from "@/lib/utils";
+import type { Database } from "@/lib/supabase/types";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
 
@@ -74,7 +66,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
     {
       accessorKey: "sku",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
+        <DataTableColumnHeader column={column} title="Ürün Kodu" onSort={onSort} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-sm">{row.original.sku}</span>
@@ -82,29 +74,18 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
       size: 130,
     },
     {
-      accessorKey: "urun_adi",
+      accessorKey: "gunluk_satis",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ürün Adı" onSort={onSort} />
+        <DataTableColumnHeader column={column} title="Günlük Satış" onSort={onSort} />
       ),
       cell: ({ row }) => (
-        <span className="max-w-[200px] truncate text-sm">
-          {row.original.urun_adi || "—"}
+        <span className="tabular-nums text-sm">
+          {row.original.gunluk_satis > 0
+            ? formatNumber(row.original.gunluk_satis)
+            : "—"}
         </span>
       ),
-      size: 220,
-    },
-    {
-      accessorKey: "kategori",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Kategori" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {row.original.kategori || "—"}
-        </span>
-      ),
-      meta: { className: "hidden md:table-cell" },
-      size: 140,
+      size: 110,
     },
     {
       accessorKey: "stok_aktif",
@@ -122,7 +103,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
     {
       accessorKey: "mamul_stok_kritik",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Kritik Eşik" onSort={onSort} />
+        <DataTableColumnHeader column={column} title="Kritik Stok" onSort={onSort} />
       ),
       cell: ({ row }) => (
         <span className="tabular-nums text-sm text-muted-foreground">
@@ -132,34 +113,6 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
         </span>
       ),
       size: 100,
-    },
-    {
-      accessorKey: "gunluk_satis",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Günlük Satış" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="tabular-nums text-sm">
-          {row.original.gunluk_satis > 0
-            ? formatNumber(row.original.gunluk_satis)
-            : "—"}
-        </span>
-      ),
-      meta: { className: "hidden lg:table-cell" },
-      size: 110,
-    },
-    {
-      accessorKey: "son_hareket_tarihi",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Son Hareket" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {formatDate(row.original.son_hareket_tarihi)}
-        </span>
-      ),
-      meta: { className: "hidden lg:table-cell" },
-      size: 120,
     },
     {
       id: "durum",
@@ -274,7 +227,7 @@ export function StokDataTable({
         <div className="relative flex-1">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="SKU veya ürün adı ara..."
+            placeholder="Ürün kodu ara..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -290,24 +243,6 @@ export function StokDataTable({
             className="pl-9"
           />
         </div>
-        <Select
-          value={kategori || "all"}
-          onValueChange={(v) =>
-            navigate({ kategori: v === "all" ? undefined : v, page: "0" })
-          }
-        >
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Tüm Kategoriler" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tüm Kategoriler</SelectItem>
-            {PRODUCT_CATEGORIES.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <DataTable table={table} emptyMessage="Ürün bulunamadı." />

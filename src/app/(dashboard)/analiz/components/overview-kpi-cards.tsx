@@ -30,7 +30,7 @@ export function OverviewKpiCards({ data }: { data: OverviewKpiData }) {
       iconColor: "text-vw-info",
     },
     {
-      title: "Mamül Stok",
+      title: "Ürün Stok",
       value: formatNumber(data.mamulStok),
       subtitle: "Aktif ürün toplam stok",
       icon: Warehouse,

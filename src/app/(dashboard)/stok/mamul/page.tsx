@@ -28,7 +28,7 @@ interface PageProps {
   }>;
 }
 
-export const metadata: Metadata = { title: "Mamul Stok" };
+export const metadata: Metadata = { title: "Ürün Stok" };
 
 export default async function MamulStokPage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -43,8 +43,8 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     : 25;
   const stokSearch = params.search?.trim() || "";
   const stokKategori = params.kategori || "";
-  const stokSortBy = params.sortBy || "sku";
-  const stokSortOrder = params.sortOrder === "desc" ? "desc" as const : "asc" as const;
+  const stokSortBy = params.sortBy || "gunluk_satis";
+  const stokSortOrder = params.sortOrder === "asc" ? "asc" as const : "desc" as const;
 
   // ---------- MOVEMENTS TABLE PARAMS ----------
   const mPage = Math.max(0, Number(params.mPage || "0"));

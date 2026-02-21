@@ -140,7 +140,7 @@ export function IadeGirisDialog() {
                   )}
                 >
                   {selectedProduct
-                    ? `${selectedProduct.sku} — ${selectedProduct.urun_adi || ""}`
+                    ? selectedProduct.sku
                     : "Ürün seçiniz..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -168,8 +168,8 @@ export function IadeGirisDialog() {
                           />
                           <div className="flex flex-1 items-center justify-between">
                             <div>
-                              <span className="font-mono text-sm">{product.sku}</span>
-                              <span className="ml-2 text-sm text-muted-foreground">
+                              <span className="font-mono text-sm font-medium">{product.sku}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">
                                 {product.urun_adi}
                               </span>
                             </div>

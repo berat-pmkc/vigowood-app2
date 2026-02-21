@@ -21,8 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { makineCreateSchema, makineUpdateSchema, type MakineCreateData, type MakineUpdateData } from "@/lib/validations";
+import { makineCreateSchema, type MakineCreateData } from "@/lib/validations";
 import { MAKINE_BOLUMLERI, MAKINE_BOLUM_LABELS } from "@/lib/constants";
 import { createMakine, updateMakine } from "../actions";
 
@@ -47,7 +46,7 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
   const [loading, setLoading] = useState(false);
 
   const form = useForm<MakineCreateData>({
-    resolver: zodResolver(isEdit ? makineUpdateSchema : makineCreateSchema),
+    resolver: zodResolver(makineCreateSchema),
     defaultValues: {
       makine_id: makine?.makine_id ?? "",
       tipi: makine?.tipi ?? "",
@@ -56,7 +55,6 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
     },
   });
 
-  // Reset form when sheet opens with new data
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen) {
       form.reset({
@@ -73,13 +71,12 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
     setLoading(true);
     try {
       if (isEdit) {
-        const updateData: MakineUpdateData = {
+        const result = await updateMakine(makine.makine_id, {
           tipi: data.tipi,
           bolum: data.bolum,
           aciklama: data.aciklama,
-          aktif: makine?.aktif ?? true,
-        };
-        const result = await updateMakine(makine.makine_id, updateData);
+          aktif: makine.aktif,
+        });
         if (result.success) {
           toast.success("Makine güncellendi");
           handleOpenChange(false);
@@ -114,7 +111,7 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
           {/* Makine ID — sadece create'te */}
-          {!isEdit && (
+          {!isEdit ? (
             <div className="space-y-2">
               <Label htmlFor="makine_id">Makine ID</Label>
               <Input
@@ -127,6 +124,11 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
                   {form.formState.errors.makine_id.message}
                 </p>
               )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Makine ID</Label>
+              <Input value={makine.makine_id} disabled className="bg-muted" />
             </div>
           )}
 

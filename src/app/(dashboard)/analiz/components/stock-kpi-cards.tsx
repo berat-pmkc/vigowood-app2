@@ -14,7 +14,7 @@ export interface StockKpiData {
 export function StockKpiCards({ data }: { data: StockKpiData }) {
   const cards = [
     {
-      title: "Mamül Stok",
+      title: "Ürün Stok",
       value: formatNumber(data.mamulStok),
       subtitle: "Aktif ürün toplam stok",
       icon: Warehouse,

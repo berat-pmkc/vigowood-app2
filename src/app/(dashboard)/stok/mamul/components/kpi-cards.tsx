@@ -14,7 +14,7 @@ interface KpiData {
 export function KpiCards({ data }: { data: KpiData }) {
   const cards = [
     {
-      title: "Toplam Mamül Stok",
+      title: "Toplam Ürün Stok",
       value: formatNumber(data.totalStock),
       subtitle: "Aktif ürünlerin toplam stoku",
       icon: Warehouse,

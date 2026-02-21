@@ -80,7 +80,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Stok",
     items: [
-      { title: "Mamül Stok", href: "/stok/mamul", icon: Warehouse, roles: ALL_INTERNAL },
+      { title: "Ürün Stok", href: "/stok/mamul", icon: Warehouse, roles: ALL_INTERNAL },
       { title: "Yarı Mamül", href: "/stok/yari-mamul", icon: Layers, roles: ALL_INTERNAL },
       { title: "Hazır Eleman", href: "/stok/hazir-eleman", icon: Component, roles: ALL_INTERNAL },
       { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: ALL_INTERNAL },

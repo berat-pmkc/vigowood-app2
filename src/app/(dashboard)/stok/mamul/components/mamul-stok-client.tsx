@@ -84,9 +84,9 @@ export function MamulStokClient({
     <div className="space-y-4 pb-20 md:pb-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mamül Stok</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Ürün Stok</h1>
           <p className="text-sm text-muted-foreground">
-            Bitmiş ürün stok takibi, hareketler ve trend analizi
+            Ürün stok takibi, hareketler ve trend analizi
           </p>
         </div>
         <LastUpdatedBadge lastUpdated={lastUpdated} />
