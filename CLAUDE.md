@@ -343,8 +343,11 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] 18C: Palet şablon sistemi, Admin Şablonlar sayfası
 - [x] 18D: Planlama sayfası (/sevkiyat/[id]), Proforma PDF, Paket Listesi PDF
 
-### KATMAN 19: Satış
-- [ ] Satış listesi + hedefler + kampanyalar
+### KATMAN 19: Satış ✅
+- [x] Satış dashboard + Excel upload + stok düşümü
+- [x] Raporlar sayfası + PDF rapor (@react-pdf/renderer)
+- [x] TR Pazarlama CRUD
+- [x] Kampanyalar CRUD
 
 ### KATMAN 20: Analiz & Dashboard
 - [ ] KPI kartları + grafikler + raporlar

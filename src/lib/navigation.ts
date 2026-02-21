@@ -19,6 +19,9 @@ import {
   DollarSign,
   Receipt,
   Coins,
+  FileText,
+  Target,
+  Megaphone,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
@@ -87,6 +90,9 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Satış",
     items: [
       { title: "Satışlar", href: "/satis", icon: ShoppingCart, roles: MANAGEMENT_ROLES },
+      { title: "Raporlar", href: "/satis/raporlar", icon: FileText, roles: MANAGEMENT_ROLES },
+      { title: "Pazarlama", href: "/satis/pazarlama", icon: Target, roles: MANAGEMENT_ROLES },
+      { title: "Kampanyalar", href: "/satis/kampanyalar", icon: Megaphone, roles: MANAGEMENT_ROLES },
     ],
   },
   {

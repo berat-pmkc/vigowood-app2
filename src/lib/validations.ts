@@ -305,3 +305,59 @@ export const dovizKuruSchema = z.object({
 });
 
 export type DovizKuruData = z.infer<typeof dovizKuruSchema>;
+
+// TR Pazarlama
+export const trPazarlamaSchema = z.object({
+  yil: z
+    .number()
+    .int()
+    .min(2020, "Yıl 2020 veya üzeri olmalıdır")
+    .max(2030),
+  ay: z.number().int().min(1, "Ay 1-12 arası olmalıdır").max(12),
+  pazaryeri: z.string().min(1, "Pazaryeri seçimi gereklidir"),
+  hedef_ciro: z.number().min(0, "Hedef ciro 0 veya üzeri olmalıdır"),
+  gercek_ciro: z.number().min(0, "Gerçek ciro 0 veya üzeri olmalıdır"),
+  siparis_sayisi: z
+    .number()
+    .int()
+    .min(0, "Sipariş sayısı 0 veya üzeri olmalıdır"),
+  ziyaretci: z
+    .number()
+    .int()
+    .min(0, "Ziyaretçi 0 veya üzeri olmalıdır"),
+  donusum_orani: z
+    .number()
+    .min(0)
+    .max(100, "Dönüşüm oranı 0-100 arası olmalıdır"),
+  iadeler: z
+    .number()
+    .int()
+    .min(0, "İade sayısı 0 veya üzeri olmalıdır"),
+  ortalama_sepet: z.number().min(0).nullable(),
+  reklam_harcamasi: z.number().min(0).nullable(),
+  not_text: z
+    .string()
+    .max(500, "Not en fazla 500 karakter olabilir")
+    .nullable(),
+});
+
+export type TrPazarlamaData = z.infer<typeof trPazarlamaSchema>;
+
+// Kampanya
+export const kampanyaSchema = z.object({
+  kampanya_adi: z
+    .string()
+    .min(1, "Kampanya adı gereklidir")
+    .max(200),
+  baslangic_tarihi: z.string().min(1, "Başlangıç tarihi gereklidir"),
+  bitis_tarihi: z.string().min(1, "Bitiş tarihi gereklidir"),
+  ana_hedef: z.string().max(500).nullable(),
+  ziyaretci: z.number().int().min(0).nullable(),
+  siparis_sayisi: z.number().int().min(0).nullable(),
+  ciro: z.number().min(0).nullable(),
+  donusum_orani: z.number().min(0).max(100).nullable(),
+  ortalama_sepet: z.number().min(0).nullable(),
+  notlar: z.string().max(1000).nullable(),
+});
+
+export type KampanyaData = z.infer<typeof kampanyaSchema>;

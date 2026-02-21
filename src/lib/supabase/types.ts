@@ -272,6 +272,8 @@ export type Database = {
           gbp_usd: number | null
           id: number
           kaynak: string | null
+          pln_try: number | null
+          sek_try: number | null
           tarih: string
           usd_try: number | null
         }
@@ -284,6 +286,8 @@ export type Database = {
           gbp_usd?: number | null
           id?: number
           kaynak?: string | null
+          pln_try?: number | null
+          sek_try?: number | null
           tarih?: string
           usd_try?: number | null
         }
@@ -296,6 +300,8 @@ export type Database = {
           gbp_usd?: number | null
           id?: number
           kaynak?: string | null
+          pln_try?: number | null
+          sek_try?: number | null
           tarih?: string
           usd_try?: number | null
         }
@@ -364,6 +370,60 @@ export type Database = {
           qty?: number
           sku?: string | null
           tarih?: string | null
+        }
+        Relationships: []
+      }
+      kampanyalar: {
+        Row: {
+          aktif_mi: boolean
+          ana_hedef: string | null
+          baslangic_tarihi: string
+          bitis_tarihi: string
+          ciro: number | null
+          created_at: string
+          donusum_orani: number | null
+          id: string
+          kampanya_adi: string
+          kodu: string
+          notlar: string | null
+          ortalama_sepet: number | null
+          siparis_sayisi: number | null
+          updated_at: string
+          ziyaretci: number | null
+        }
+        Insert: {
+          aktif_mi?: boolean
+          ana_hedef?: string | null
+          baslangic_tarihi: string
+          bitis_tarihi: string
+          ciro?: number | null
+          created_at?: string
+          donusum_orani?: number | null
+          id?: string
+          kampanya_adi: string
+          kodu: string
+          notlar?: string | null
+          ortalama_sepet?: number | null
+          siparis_sayisi?: number | null
+          updated_at?: string
+          ziyaretci?: number | null
+        }
+        Update: {
+          aktif_mi?: boolean
+          ana_hedef?: string | null
+          baslangic_tarihi?: string
+          bitis_tarihi?: string
+          ciro?: number | null
+          created_at?: string
+          donusum_orani?: number | null
+          id?: string
+          kampanya_adi?: string
+          kodu?: string
+          notlar?: string | null
+          ortalama_sepet?: number | null
+          siparis_sayisi?: number | null
+          updated_at?: string
+          ziyaretci?: number | null
         }
         Relationships: []
       }
@@ -715,6 +775,119 @@ export type Database = {
         }
         Relationships: []
       }
+      satis_raporlari: {
+        Row: {
+          created_at: string
+          dosya_adi: string | null
+          durum: string
+          id: string
+          ihracat_tutar: number
+          rapor_id: string
+          rapor_tarihi: string
+          toplam_adet: number
+          toplam_satir: number
+          toplam_tutar: number
+          tr_tutar: number
+          updated_at: string
+          yukleme_tarihi: string
+          yukleyen_adi: string | null
+          yukleyen_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          dosya_adi?: string | null
+          durum?: string
+          id?: string
+          ihracat_tutar?: number
+          rapor_id: string
+          rapor_tarihi: string
+          toplam_adet?: number
+          toplam_satir?: number
+          toplam_tutar?: number
+          tr_tutar?: number
+          updated_at?: string
+          yukleme_tarihi?: string
+          yukleyen_adi?: string | null
+          yukleyen_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          dosya_adi?: string | null
+          durum?: string
+          id?: string
+          ihracat_tutar?: number
+          rapor_id?: string
+          rapor_tarihi?: string
+          toplam_adet?: number
+          toplam_satir?: number
+          toplam_tutar?: number
+          tr_tutar?: number
+          updated_at?: string
+          yukleme_tarihi?: string
+          yukleyen_adi?: string | null
+          yukleyen_id?: string | null
+        }
+        Relationships: []
+      }
+      satis_satirlari: {
+        Row: {
+          birim_fiyat: number
+          created_at: string
+          doviz: string
+          fatura_no: string | null
+          id: string
+          is_hizmet: boolean
+          kdv_orani: number | null
+          miktar: number
+          musteri_adi: string | null
+          rapor_id: string
+          satis_kanali: string | null
+          sku: string | null
+          tarih: string | null
+          toplam_tutar: number
+        }
+        Insert: {
+          birim_fiyat?: number
+          created_at?: string
+          doviz?: string
+          fatura_no?: string | null
+          id?: string
+          is_hizmet?: boolean
+          kdv_orani?: number | null
+          miktar?: number
+          musteri_adi?: string | null
+          rapor_id: string
+          satis_kanali?: string | null
+          sku?: string | null
+          tarih?: string | null
+          toplam_tutar?: number
+        }
+        Update: {
+          birim_fiyat?: number
+          created_at?: string
+          doviz?: string
+          fatura_no?: string | null
+          id?: string
+          is_hizmet?: boolean
+          kdv_orani?: number | null
+          miktar?: number
+          musteri_adi?: string | null
+          rapor_id?: string
+          satis_kanali?: string | null
+          sku?: string | null
+          tarih?: string | null
+          toplam_tutar?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "satis_satirlari_rapor_id_fkey"
+            columns: ["rapor_id"]
+            isOneToOne: false
+            referencedRelation: "satis_raporlari"
+            referencedColumns: ["rapor_id"]
+          },
+        ]
+      }
       sevkiyat: {
         Row: {
           alici_firma_id: number | null
@@ -722,6 +895,7 @@ export type Database = {
           banka_firma_id: number | null
           country_code: string | null
           created_at: string
+          dorse_plaka: string | null
           durum: string
           email: string | null
           gerceklesen_sevk_tarihi: string | null
@@ -740,6 +914,7 @@ export type Database = {
           sevkiyat_adi: string | null
           sevkiyat_id: string
           shipment_number: number | null
+          tasiyici_firma: string | null
           teslim_zamani: string | null
           teslimat_tipi: string | null
           tir_plaka: string | null
@@ -752,6 +927,7 @@ export type Database = {
           banka_firma_id?: number | null
           country_code?: string | null
           created_at?: string
+          dorse_plaka?: string | null
           durum?: string
           email?: string | null
           gerceklesen_sevk_tarihi?: string | null
@@ -770,6 +946,7 @@ export type Database = {
           sevkiyat_adi?: string | null
           sevkiyat_id: string
           shipment_number?: number | null
+          tasiyici_firma?: string | null
           teslim_zamani?: string | null
           teslimat_tipi?: string | null
           tir_plaka?: string | null
@@ -782,6 +959,7 @@ export type Database = {
           banka_firma_id?: number | null
           country_code?: string | null
           created_at?: string
+          dorse_plaka?: string | null
           durum?: string
           email?: string | null
           gerceklesen_sevk_tarihi?: string | null
@@ -800,6 +978,7 @@ export type Database = {
           sevkiyat_adi?: string | null
           sevkiyat_id?: string
           shipment_number?: number | null
+          tasiyici_firma?: string | null
           teslim_zamani?: string | null
           teslimat_tipi?: string | null
           tir_plaka?: string | null
@@ -1235,6 +1414,63 @@ export type Database = {
         }
         Relationships: []
       }
+      tr_pazarlama: {
+        Row: {
+          ay: number
+          created_at: string
+          donusum_orani: number
+          gercek_ciro: number
+          hedef_ciro: number
+          iadeler: number
+          id: string
+          kodu: string
+          not_text: string | null
+          ortalama_sepet: number | null
+          pazaryeri: string
+          reklam_harcamasi: number | null
+          siparis_sayisi: number
+          updated_at: string
+          yil: number
+          ziyaretci: number
+        }
+        Insert: {
+          ay: number
+          created_at?: string
+          donusum_orani?: number
+          gercek_ciro?: number
+          hedef_ciro?: number
+          iadeler?: number
+          id?: string
+          kodu: string
+          not_text?: string | null
+          ortalama_sepet?: number | null
+          pazaryeri: string
+          reklam_harcamasi?: number | null
+          siparis_sayisi?: number
+          updated_at?: string
+          yil: number
+          ziyaretci?: number
+        }
+        Update: {
+          ay?: number
+          created_at?: string
+          donusum_orani?: number
+          gercek_ciro?: number
+          hedef_ciro?: number
+          iadeler?: number
+          id?: string
+          kodu?: string
+          not_text?: string | null
+          ortalama_sepet?: number | null
+          pazaryeri?: string
+          reklam_harcamasi?: number | null
+          siparis_sayisi?: number
+          updated_at?: string
+          yil?: number
+          ziyaretci?: number
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           auth_id: string | null
@@ -1319,6 +1555,7 @@ export type Database = {
     }
     Functions: {
       has_production_access: { Args: never; Returns: boolean }
+      has_sales_access: { Args: never; Returns: boolean }
       has_sevkiyat_access: { Args: never; Returns: boolean }
       has_stock_access: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
@@ -1532,8 +1769,8 @@ export const Constants = {
   },
 } as const
 
-// Custom type aliases
+// ─── Custom type aliases ────────────────────────────────────────
 export type UserRole = Database["public"]["Enums"]["user_role"];
-export type ProductCategory = Database["public"]["Enums"]["product_category"];
+export type Station = Database["public"]["Enums"]["station"];
 export type PartType = Database["public"]["Enums"]["part_type"];
-export type Station = "Kesim" | "Temizlik" | "Montaj" | "Paketleme" | "Kutu";
+export type ProductCategory = Database["public"]["Enums"]["product_category"];

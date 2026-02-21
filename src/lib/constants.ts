@@ -366,6 +366,102 @@ export const FIRMA_TIPI_LABELS: Record<FirmaTipi, string> = {
   contact: "İletişim",
 };
 
+// ─── Satış Sabitleri ──────────────────────────────────────────
+
+export const SALES_CHANNELS = [
+  "TRENDYOL",
+  "VIGOWOOD",
+  "HEPSIBURADA",
+  "AMAZON",
+  "HAS-DE",
+  "HAS-UK",
+  "HAS-ABD",
+  "N11",
+  "TEMU",
+  "PAZARAMA",
+  "ÇİÇEKSEPETİ",
+  "ETSY",
+  "TOPTAN",
+  "DIGER",
+  "MAĞAZA",
+  "FUAR",
+] as const;
+
+export type SalesChannel = (typeof SALES_CHANNELS)[number];
+
+export const SALES_CHANNEL_LABELS: Record<string, string> = {
+  TRENDYOL: "Trendyol",
+  VIGOWOOD: "VigoWood",
+  HEPSIBURADA: "Hepsiburada",
+  AMAZON: "Amazon",
+  "HAS-DE": "HAS Almanya",
+  "HAS-UK": "HAS İngiltere",
+  "HAS-ABD": "HAS Amerika",
+  N11: "N11",
+  TEMU: "Temu",
+  PAZARAMA: "Pazarama",
+  ÇİÇEKSEPETİ: "Çiçek Sepeti",
+  ETSY: "Etsy",
+  TOPTAN: "Toptan",
+  DIGER: "Diğer",
+  MAĞAZA: "Mağaza",
+  FUAR: "Fuar",
+};
+
+/** İhracat kanalları (HAS- prefix) */
+export const EXPORT_CHANNELS = ["HAS-DE", "HAS-UK", "HAS-ABD"] as const;
+
+/** Hizmet SKU'ları — stoktan düşülmez */
+export const SERVICE_SKUS = [
+  "KARGO",
+  "HIZMET",
+  "YEDEK PARCA",
+  "TS-M",
+  "FIYAT FARKI",
+  "DIS KUTU",
+  "KOLI",
+  "KUTU",
+  "MONTAJ",
+  "AMBALAJ",
+] as const;
+
+/** İhracat kanalı mı? */
+export function isExportChannel(channel: string): boolean {
+  return channel.startsWith("HAS-");
+}
+
+/** Hizmet SKU'su mu? (stoktan düşülmez) */
+export function isServiceSku(sku: string): boolean {
+  if (!sku) return false;
+  const upper = sku.toUpperCase().trim();
+  return SERVICE_SKUS.some((s) => upper === s || upper.startsWith(s + " "));
+}
+
+/** Satış erişim rolleri */
+export const SATIS_ACCESS_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "E-Ticaret Müdürü",
+  "Dış Ticaret Müdürü",
+  "Muhasebe",
+  "Pazaryeri Sorumlusu",
+  "Mimar",
+  "Sevkiyat Sorumlusu",
+];
+
+/** Pazaryeri seçenekleri (TR Pazarlama) */
+export const PAZARYERI_OPTIONS = [
+  "vigowood.com",
+  "Trendyol",
+  "Hepsiburada",
+  "Amazon",
+  "N11",
+  "Temu",
+  "Pazarama",
+  "Çiçek Sepeti",
+  "Etsy",
+] as const;
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;
