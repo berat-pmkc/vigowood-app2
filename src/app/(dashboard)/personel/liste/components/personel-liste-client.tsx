@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Users,
   UserCheck,
@@ -12,12 +19,14 @@ import {
   CheckCircle2,
   Loader2,
   Clock,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   quickToggleAttendance,
   bulkQuickAttendance,
   bulkRemoveAttendance,
+  updateAttendanceTime,
 } from "../actions";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +84,10 @@ export function PersonelListeClient({
   const [isPending, startTransition] = useTransition();
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
   const [loadingDept, setLoadingDept] = useState<string | null>(null);
+  const [timeEditId, setTimeEditId] = useState<string | null>(null);
+  const [editStart, setEditStart] = useState("08:00");
+  const [editEnd, setEditEnd] = useState("18:00");
+  const [savingTime, setSavingTime] = useState(false);
 
   // Yoklama setini oluştur (isim bazlı)
   const attendanceSet = useMemo(
@@ -118,6 +131,29 @@ export function PersonelListeClient({
         } else {
           toast.info(`${emp.full_name} — yoklama kaldırıldı`);
         }
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  // Saat düzenleme popover aç
+  const openTimeEdit = (attendance: AttendanceRecord) => {
+    setTimeEditId(attendance.att_id);
+    setEditStart(attendance.start_time?.slice(0, 5) || "08:00");
+    setEditEnd(attendance.end_time?.slice(0, 5) || "18:00");
+  };
+
+  // Saat kaydet
+  const handleSaveTime = (attId: string) => {
+    setSavingTime(true);
+    startTransition(async () => {
+      const result = await updateAttendanceTime(attId, editStart, editEnd);
+      setSavingTime(false);
+      if (result.success) {
+        toast.success(`Saat güncellendi: ${editStart}-${editEnd}`);
+        setTimeEditId(null);
         router.refresh();
       } else {
         toast.error(result.error);
@@ -316,47 +352,112 @@ export function PersonelListeClient({
                   const attendance = todayAttendance.find((a) => a.employee === emp.full_name);
 
                   return (
-                    <button
+                    <div
                       key={emp.user_id}
-                      onClick={() => handleToggle(emp)}
-                      disabled={isPending}
                       className={cn(
                         "relative flex flex-col items-center gap-1 rounded-lg border-2 p-3 transition-all",
-                        "hover:shadow-md active:scale-[0.97] disabled:opacity-60",
                         isPresent
                           ? "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
-                          : "border-border bg-card hover:border-muted-foreground/30"
+                          : "border-border bg-card"
                       )}
                     >
-                      {/* Status indicator */}
-                      {isLoading ? (
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      ) : isPresent ? (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
-                          <CheckCircle2 className="h-5 w-5 text-white" />
-                        </div>
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                          <UserX className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
+                      {/* Tıklanabilir ana alan (toggle) */}
+                      <button
+                        onClick={() => handleToggle(emp)}
+                        disabled={isPending}
+                        className="flex flex-col items-center gap-1 hover:opacity-80 active:scale-[0.97] disabled:opacity-60"
+                      >
+                        {/* Status indicator */}
+                        {isLoading ? (
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        ) : isPresent ? (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500">
+                            <CheckCircle2 className="h-5 w-5 text-white" />
+                          </div>
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                            <UserX className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
 
-                      {/* Name */}
-                      <span className={cn(
-                        "text-center text-xs font-medium leading-tight",
-                        isPresent ? "text-emerald-800" : "text-foreground"
-                      )}>
-                        {emp.full_name}
-                      </span>
+                        {/* Name */}
+                        <span className={cn(
+                          "text-center text-xs font-medium leading-tight",
+                          isPresent ? "text-emerald-800" : "text-foreground"
+                        )}>
+                          {emp.full_name}
+                        </span>
+                      </button>
 
-                      {/* Time badge */}
+                      {/* Saat — tıklanabilir popover */}
                       {isPresent && attendance && (
-                        <div className="flex items-center gap-0.5 text-[10px] text-emerald-600">
-                          <Clock className="h-2.5 w-2.5" />
-                          {attendance.start_time?.slice(0, 5)}-{attendance.end_time?.slice(0, 5)}
-                        </div>
+                        <Popover
+                          open={timeEditId === attendance.att_id}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              openTimeEdit(attendance);
+                            } else {
+                              setTimeEditId(null);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-emerald-600 transition-colors hover:bg-emerald-200/60 hover:text-emerald-800"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Clock className="h-2.5 w-2.5" />
+                              {attendance.start_time?.slice(0, 5)}-{attendance.end_time?.slice(0, 5)}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="w-56 p-3"
+                            align="center"
+                            side="top"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {emp.full_name}
+                              </p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label className="text-[10px]">Giriş</Label>
+                                  <Input
+                                    type="time"
+                                    value={editStart}
+                                    onChange={(e) => setEditStart(e.target.value)}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-[10px]">Çıkış</Label>
+                                  <Input
+                                    type="time"
+                                    value={editEnd}
+                                    onChange={(e) => setEditEnd(e.target.value)}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                className="h-7 w-full text-xs"
+                                disabled={savingTime}
+                                onClick={() => handleSaveTime(attendance.att_id)}
+                              >
+                                {savingTime ? (
+                                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Check className="mr-1 h-3 w-3" />
+                                )}
+                                Kaydet
+                              </Button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

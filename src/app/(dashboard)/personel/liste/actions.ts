@@ -147,6 +147,34 @@ export async function bulkQuickAttendance(
   }
 }
 
+/** Yoklama saatini güncelle (inline edit) */
+export async function updateAttendanceTime(
+  attId: string,
+  startTime: string,
+  endTime: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requirePersonelAccess();
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("attendance")
+      .update({ start_time: startTime, end_time: endTime })
+      .eq("att_id", attId);
+
+    if (error) throw error;
+
+    revalidatePath("/personel/liste");
+    revalidatePath("/personel");
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Bilinmeyen hata",
+    };
+  }
+}
+
 /** Tüm departmanlar için toplu yoklama kaldır */
 export async function bulkRemoveAttendance(
   employeeNames: string[],
