@@ -58,12 +58,32 @@ export async function GET() {
     .from("users")
     .select("*", { count: "exact", head: true });
 
-  // 4. Sample query
+  // 4. Sample query (specific columns)
   const { data: sampleProduct, error: productError } = await supabase
     .from("products")
     .select("sku, urun_adi, aktif_mi")
     .limit(1)
     .maybeSingle();
+
+  // 5. EXACT same query as admin/urunler page
+  const { data: pageProducts, count: pageCount, error: pageError } = await supabase
+    .from("products")
+    .select("*", { count: "exact" })
+    .order("sku", { ascending: true })
+    .range(0, 24);
+
+  // 6. select("*") WITHOUT range
+  const { data: allProducts, error: allError } = await supabase
+    .from("products")
+    .select("*")
+    .limit(5);
+
+  // 7. select specific columns with range
+  const { data: specificProducts, error: specificError } = await supabase
+    .from("products")
+    .select("sku, urun_adi, aktif_mi, kategori")
+    .order("sku", { ascending: true })
+    .range(0, 4);
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
@@ -85,6 +105,27 @@ export async function GET() {
     },
     sampleProduct: sampleProduct ?? null,
     sampleProductError: productError?.message ?? null,
+    queryTests: {
+      pageQuery: {
+        description: "select('*', count:'exact').order('sku').range(0,24) — same as admin/urunler",
+        dataLength: pageProducts?.length ?? 0,
+        count: pageCount,
+        error: pageError?.message ?? null,
+        firstItem: pageProducts?.[0] ? { sku: (pageProducts[0] as Record<string, unknown>).sku } : null,
+      },
+      allQuery: {
+        description: "select('*').limit(5) — no range",
+        dataLength: allProducts?.length ?? 0,
+        error: allError?.message ?? null,
+        firstItem: allProducts?.[0] ? { sku: (allProducts[0] as Record<string, unknown>).sku } : null,
+      },
+      specificQuery: {
+        description: "select('sku,urun_adi,aktif_mi,kategori').range(0,4)",
+        dataLength: specificProducts?.length ?? 0,
+        error: specificError?.message ?? null,
+        firstItem: specificProducts?.[0] ?? null,
+      },
+    },
     env: {
       hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
