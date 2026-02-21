@@ -101,7 +101,7 @@ function getColumns(
       ),
       cell: ({ row }) => <DeptBadge department={row.original.department} />,
       size: 140,
-      meta: { className: "hidden sm:table-cell" },
+      meta: { className: "hidden md:table-cell" },
     },
     {
       accessorKey: "start_time",
@@ -137,7 +137,7 @@ function getColumns(
       ),
       size: 90,
       enableSorting: false,
-      meta: { className: "hidden md:table-cell" },
+      meta: { className: "hidden lg:table-cell" },
     },
     {
       accessorKey: "not_text",
@@ -149,7 +149,7 @@ function getColumns(
       ),
       size: 150,
       enableSorting: false,
-      meta: { className: "hidden md:table-cell" },
+      meta: { className: "hidden lg:table-cell" },
     },
     {
       id: "actions",

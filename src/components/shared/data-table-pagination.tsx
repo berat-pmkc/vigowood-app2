@@ -38,9 +38,9 @@ export function DataTablePagination<TData>({
           <span>Toplam {totalCount.toLocaleString("tr-TR")} ürün</span>
         )}
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Sayfa başına</span>
+          <span className="hidden sm:inline text-sm text-muted-foreground">Sayfa başına</span>
           <Select
             value={`${pageSize}`}
             onValueChange={(value) => onPageSizeChange(Number(value))}
@@ -57,14 +57,15 @@ export function DataTablePagination<TData>({
             </SelectContent>
           </Select>
         </div>
-        <div className="text-sm text-muted-foreground">
-          Sayfa {pageIndex + 1} / {pageCount || 1}
+        <div className="text-sm text-muted-foreground whitespace-nowrap">
+          <span className="sm:hidden">{pageIndex + 1}/{pageCount || 1}</span>
+          <span className="hidden sm:inline">Sayfa {pageIndex + 1} / {pageCount || 1}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8"
+            className="hidden sm:flex h-8 w-8"
             onClick={() => onPageChange(0)}
             disabled={pageIndex === 0}
           >
@@ -91,7 +92,7 @@ export function DataTablePagination<TData>({
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8"
+            className="hidden sm:flex h-8 w-8"
             onClick={() => onPageChange(pageCount - 1)}
             disabled={pageIndex >= pageCount - 1}
           >

@@ -95,6 +95,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Hazi
       ),
       size: 100,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
     {
       accessorKey: "hakis_id",
@@ -106,6 +107,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Hazi
       ),
       size: 160,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
     {
       accessorKey: "not_text",
@@ -117,6 +119,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Hazi
       ),
       size: 150,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
   ];
 }

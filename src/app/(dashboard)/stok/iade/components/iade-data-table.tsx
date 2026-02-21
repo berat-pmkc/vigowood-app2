@@ -76,6 +76,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Iade
       ),
       size: 170,
       enableSorting: false,
+      meta: { className: "hidden md:table-cell" },
     },
     {
       accessorKey: "sku",
@@ -134,6 +135,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Iade
       ),
       size: 180,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
     {
       accessorKey: "musteri_bilgisi",
@@ -145,6 +147,7 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Iade
       ),
       size: 120,
       enableSorting: false,
+      meta: { className: "hidden lg:table-cell" },
     },
   ];
 }
