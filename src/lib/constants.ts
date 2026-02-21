@@ -498,6 +498,29 @@ export const PERSONEL_ACCESS_ROLES: UserRole[] = [
   "Hat",
 ];
 
+// Kullanıcı istasyonları (matches station enum in DB)
+export const USER_STATIONS = [
+  "Yönetim", "Ofis", "Kesim", "Temizlik", "Montaj", "Paketleme", "Kutu",
+  "Kesim Hattı", "Temilik Hattı", "Montaj Hattı", "Paketleme Hattı", "Kutu Hattı",
+] as const;
+
+export type UserStation = (typeof USER_STATIONS)[number];
+
+export const USER_STATION_LABELS: Record<UserStation, string> = {
+  "Yönetim": "Yönetim",
+  "Ofis": "Ofis",
+  "Kesim": "Kesim",
+  "Temizlik": "Temizlik",
+  "Montaj": "Montaj",
+  "Paketleme": "Paketleme",
+  "Kutu": "Kutu",
+  "Kesim Hattı": "Kesim Hattı",
+  "Temilik Hattı": "Temizlik Hattı",
+  "Montaj Hattı": "Montaj Hattı",
+  "Paketleme Hattı": "Paketleme Hattı",
+  "Kutu Hattı": "Kutu Hattı",
+};
+
 /** Check if an email belongs to a shared station account */
 export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;

@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { Trash2, GitBranch, Pencil, Check, X, Plus } from "lucide-react";
+import {
+  Trash2,
+  GitBranch,
+  Pencil,
+  Check,
+  X,
+  Plus,
+  ArrowRightLeft,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +27,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   getStepBom,
   addBomItem,
@@ -43,7 +62,11 @@ interface StepBomPanelProps {
   stepId: string;
   sku: string;
   open: boolean;
-  allParts: { part_id: string; part_adi: string | null; part_type: string | null }[];
+  allParts: {
+    part_id: string;
+    part_adi: string | null;
+    part_type: string | null;
+  }[];
   assemblySteps: { step_id: string; step_name: string | null }[];
   onBomCountChange?: (count: number) => void;
 }
@@ -60,9 +83,11 @@ export function StepBomPanel({
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  // Inline edit state
+  // Inline edit state — now supports both qty and part change
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editQty, setEditQty] = useState<string>("");
+  const [editPartId, setEditPartId] = useState<string>("");
+  const [editPartOpen, setEditPartOpen] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   // Add form state
@@ -71,13 +96,10 @@ export function StepBomPanel({
   const [addOpen, setAddOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
 
-  useEffect(() => {
-    if (open && !loaded) {
-      loadBom();
-    }
-  }, [open]);
+  // Delete state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  async function loadBom() {
+  const loadBom = useCallback(async () => {
     setLoading(true);
     const result = await getStepBom(stepId);
     if (result.success) {
@@ -88,9 +110,16 @@ export function StepBomPanel({
     }
     setLoading(false);
     setLoaded(true);
-  }
+  }, [stepId, onBomCountChange]);
+
+  useEffect(() => {
+    if (open && !loaded) {
+      loadBom();
+    }
+  }, [open, loaded, loadBom]);
 
   async function handleDelete(stepBomId: string) {
+    setDeletingId(stepBomId);
     const result = await deleteBomItem(stepBomId);
     if (result.success) {
       const newItems = items.filter((i) => i.step_bom_id !== stepBomId);
@@ -100,12 +129,20 @@ export function StepBomPanel({
     } else {
       toast.error(result.error);
     }
+    setDeletingId(null);
   }
 
   function startEdit(item: StepBomItem) {
     setEditingId(item.step_bom_id);
     setEditQty(String(item.qty_per));
+    setEditPartId(item.part_id);
     setTimeout(() => editInputRef.current?.focus(), 50);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditPartId("");
+    setEditPartOpen(false);
   }
 
   async function saveEdit(item: StepBomItem) {
@@ -114,20 +151,40 @@ export function StepBomPanel({
       toast.error("Miktar 0'dan büyük olmalıdır");
       return;
     }
+    if (!editPartId) {
+      toast.error("Parça seçimi gereklidir");
+      return;
+    }
+
+    const partChanged = editPartId !== item.part_id;
+    const qtyChanged = qty !== item.qty_per;
+
+    if (!partChanged && !qtyChanged) {
+      cancelEdit();
+      return;
+    }
 
     const result = await updateBomItem(item.step_bom_id, {
-      part_id: item.part_id,
+      part_id: editPartId,
       qty_per: qty,
     });
 
     if (result.success) {
-      setItems(
-        items.map((i) =>
-          i.step_bom_id === item.step_bom_id ? { ...i, qty_per: qty } : i
-        )
+      // Resolve new part name if part changed
+      if (partChanged) {
+        // Reload to get fresh part names from server
+        await loadBom();
+      } else {
+        setItems(
+          items.map((i) =>
+            i.step_bom_id === item.step_bom_id ? { ...i, qty_per: qty } : i
+          )
+        );
+      }
+      cancelEdit();
+      toast.success(
+        partChanged ? "Malzeme güncellendi" : "Miktar güncellendi"
       );
-      setEditingId(null);
-      toast.success("Miktar güncellendi");
     } else {
       toast.error(result.error);
     }
@@ -164,6 +221,79 @@ export function StepBomPanel({
   // Filter out the current step from assembly steps options
   const asmOptions = assemblySteps.filter((s) => s.step_id !== stepId);
 
+  // Helper to get display name for a part_id
+  function getPartDisplayName(partId: string): string {
+    if (partId.startsWith("ASM-")) {
+      return (
+        asmOptions.find((s) => s.step_id === partId)?.step_name || partId
+      );
+    }
+    return allParts.find((p) => p.part_id === partId)?.part_adi || partId;
+  }
+
+  // Shared combobox content for part selection
+  function PartComboboxContent({
+    onSelect,
+    selectedPartId,
+  }: {
+    onSelect: (partId: string) => void;
+    selectedPartId?: string;
+  }) {
+    return (
+      <Command>
+        <CommandInput placeholder="ID veya isim ile ara..." />
+        <CommandList>
+          <CommandEmpty>Sonuç bulunamadı.</CommandEmpty>
+          {asmOptions.length > 0 && (
+            <CommandGroup heading="Alt Montaj Adımları">
+              {asmOptions.map((step) => (
+                <CommandItem
+                  key={step.step_id}
+                  value={`${step.step_id} ${step.step_name ?? ""}`}
+                  onSelect={() => onSelect(step.step_id)}
+                  className={
+                    selectedPartId === step.step_id ? "bg-accent" : ""
+                  }
+                >
+                  <GitBranch className="mr-2 h-3 w-3 text-blue-600" />
+                  <span className="font-mono text-xs mr-2">
+                    {step.step_id}
+                  </span>
+                  <span className="truncate">{step.step_name}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+          <CommandGroup heading="Parçalar">
+            {allParts.map((part) => (
+              <CommandItem
+                key={part.part_id}
+                value={`${part.part_id} ${part.part_adi ?? ""}`}
+                onSelect={() => onSelect(part.part_id)}
+                className={
+                  selectedPartId === part.part_id ? "bg-accent" : ""
+                }
+              >
+                <span className="font-mono text-xs mr-2">{part.part_id}</span>
+                <span className="truncate">{part.part_adi}</span>
+                {part.part_type && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto text-[10px]"
+                  >
+                    {PART_TYPE_LABELS[
+                      part.part_type as keyof typeof PART_TYPE_LABELS
+                    ] || part.part_type}
+                  </Badge>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    );
+  }
+
   if (!open) return null;
 
   if (loading && !loaded) {
@@ -176,53 +306,85 @@ export function StepBomPanel({
 
   return (
     <div className="px-4 pb-4 space-y-3">
-      {/* BOM Items Table */}
+      {/* BOM Items List */}
       {items.length > 0 ? (
-        <div className="border rounded-md overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">ID</th>
-                <th className="text-left px-3 py-2 font-medium">Ad</th>
-                <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Tip</th>
-                <th className="text-right px-3 py-2 font-medium">Miktar</th>
-                <th className="text-right px-3 py-2 font-medium w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.step_bom_id} className="border-t hover:bg-muted/30">
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {item.is_asm_reference ? (
-                      <span className="flex items-center gap-1 text-blue-600">
-                        <GitBranch className="h-3 w-3" />
-                        {item.part_id}
-                      </span>
-                    ) : (
-                      item.part_id
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className="truncate block max-w-[200px]">
-                      {item.part_name}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 hidden sm:table-cell">
-                    {item.is_asm_reference ? (
-                      <Badge variant="outline" className="text-blue-600 border-blue-300">
-                        Alt Montaj
-                      </Badge>
-                    ) : item.part_type ? (
-                      <Badge variant="secondary" className="text-xs">
-                        {PART_TYPE_LABELS[item.part_type as keyof typeof PART_TYPE_LABELS] || item.part_type}
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {editingId === item.step_bom_id ? (
-                      <div className="flex items-center gap-1 justify-end">
+        <div className="space-y-2">
+          {items.map((item) => {
+            const isEditing = editingId === item.step_bom_id;
+            const isDeleting = deletingId === item.step_bom_id;
+
+            return (
+              <div
+                key={item.step_bom_id}
+                className="border rounded-md bg-background"
+              >
+                {isEditing ? (
+                  /* ── Edit Mode ── */
+                  <div className="p-3 space-y-3">
+                    {/* Part Selector */}
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">
+                        Parça / Alt Montaj
+                      </label>
+                      <Popover
+                        open={editPartOpen}
+                        onOpenChange={setEditPartOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-start text-xs h-8"
+                          >
+                            {editPartId ? (
+                              <span className="truncate flex items-center gap-1">
+                                {editPartId.startsWith("ASM-") && (
+                                  <GitBranch className="h-3 w-3 text-blue-600 shrink-0" />
+                                )}
+                                <span className="font-mono">
+                                  {editPartId}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  —
+                                </span>
+                                <span>{getPartDisplayName(editPartId)}</span>
+                                {editPartId !== item.part_id && (
+                                  <Badge
+                                    variant="outline"
+                                    className="ml-auto text-[10px] text-amber-600 border-amber-300"
+                                  >
+                                    Değiştirildi
+                                  </Badge>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">
+                                Parça seçin...
+                              </span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-[350px] p-0"
+                          align="start"
+                        >
+                          <PartComboboxContent
+                            selectedPartId={editPartId}
+                            onSelect={(partId) => {
+                              setEditPartId(partId);
+                              setEditPartOpen(false);
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Qty + Actions */}
+                    <div className="flex items-end gap-2">
+                      <div className="w-24">
+                        <label className="text-xs text-muted-foreground mb-1 block">
+                          Miktar
+                        </label>
                         <Input
                           ref={editInputRef}
                           type="number"
@@ -230,54 +392,129 @@ export function StepBomPanel({
                           min="0.01"
                           value={editQty}
                           onChange={(e) => setEditQty(e.target.value)}
-                          className="w-20 h-7 text-right text-xs"
+                          className="h-8 text-xs"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") saveEdit(item);
-                            if (e.key === "Escape") setEditingId(null);
+                            if (e.key === "Escape") cancelEdit();
                           }}
                         />
+                      </div>
+                      <div className="flex gap-1 ml-auto">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
+                          size="sm"
+                          className="h-8"
                           onClick={() => saveEdit(item)}
                         >
-                          <Check className="h-3 w-3" />
+                          <Check className="h-3.5 w-3.5 mr-1" />
+                          Kaydet
                         </Button>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setEditingId(null)}
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={cancelEdit}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5 mr-1" />
+                          İptal
                         </Button>
                       </div>
-                    ) : (
-                      <button
-                        className="font-mono text-xs hover:underline cursor-pointer px-1"
+                    </div>
+                  </div>
+                ) : (
+                  /* ── View Mode ── */
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    {/* Part ID + Name */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {item.is_asm_reference ? (
+                          <span className="flex items-center gap-1 text-blue-600 font-mono text-xs shrink-0">
+                            <GitBranch className="h-3 w-3" />
+                            {item.part_id}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-muted-foreground shrink-0">
+                            {item.part_id}
+                          </span>
+                        )}
+                        {item.is_asm_reference ? (
+                          <Badge
+                            variant="outline"
+                            className="text-blue-600 border-blue-300 text-[10px] shrink-0"
+                          >
+                            Alt Montaj
+                          </Badge>
+                        ) : item.part_type ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] shrink-0"
+                          >
+                            {PART_TYPE_LABELS[
+                              item.part_type as keyof typeof PART_TYPE_LABELS
+                            ] || item.part_type}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-sm truncate mt-0.5">
+                        {item.part_name}
+                      </p>
+                    </div>
+
+                    {/* Qty */}
+                    <span className="font-mono text-sm font-medium tabular-nums shrink-0 px-2">
+                      ×{item.qty_per}
+                    </span>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
                         onClick={() => startEdit(item)}
-                        title="Tıkla ve düzenle"
+                        title="Düzenle"
                       >
-                        {item.qty_per}
-                        <Pencil className="h-3 w-3 ml-1 inline opacity-40" />
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(item.step_bom_id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            title="Sil"
+                            disabled={isDeleting}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Malzemeyi Sil
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              <strong>{item.part_name}</strong> ({item.part_id})
+                              malzemesini bu adımdan silmek istediğinize emin
+                              misiniz?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>İptal</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDelete(item.step_bom_id)}
+                            >
+                              Sil
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground py-2">
@@ -299,21 +536,13 @@ export function StepBomPanel({
                 className="w-full justify-start text-xs h-8"
               >
                 {addPartId ? (
-                  <span className="truncate">
-                    {addPartId.startsWith("ASM-") ? (
-                      <span className="flex items-center gap-1">
-                        <GitBranch className="h-3 w-3 text-blue-600" />
-                        {addPartId} —{" "}
-                        {asmOptions.find((s) => s.step_id === addPartId)
-                          ?.step_name || ""}
-                      </span>
-                    ) : (
-                      <>
-                        {addPartId} —{" "}
-                        {allParts.find((p) => p.part_id === addPartId)
-                          ?.part_adi || ""}
-                      </>
+                  <span className="truncate flex items-center gap-1">
+                    {addPartId.startsWith("ASM-") && (
+                      <GitBranch className="h-3 w-3 text-blue-600 shrink-0" />
                     )}
+                    <span className="font-mono">{addPartId}</span>
+                    <span className="text-muted-foreground">—</span>
+                    <span>{getPartDisplayName(addPartId)}</span>
                   </span>
                 ) : (
                   <span className="text-muted-foreground">
@@ -323,56 +552,13 @@ export function StepBomPanel({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[350px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="ID veya isim ile ara..." />
-                <CommandList>
-                  <CommandEmpty>Sonuç bulunamadı.</CommandEmpty>
-                  {asmOptions.length > 0 && (
-                    <CommandGroup heading="Alt Montaj Adımları">
-                      {asmOptions.map((step) => (
-                        <CommandItem
-                          key={step.step_id}
-                          value={`${step.step_id} ${step.step_name ?? ""}`}
-                          onSelect={() => {
-                            setAddPartId(step.step_id);
-                            setAddOpen(false);
-                          }}
-                        >
-                          <GitBranch className="mr-2 h-3 w-3 text-blue-600" />
-                          <span className="font-mono text-xs mr-2">
-                            {step.step_id}
-                          </span>
-                          <span className="truncate">
-                            {step.step_name}
-                          </span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                  <CommandGroup heading="Parçalar">
-                    {allParts.map((part) => (
-                      <CommandItem
-                        key={part.part_id}
-                        value={`${part.part_id} ${part.part_adi ?? ""}`}
-                        onSelect={() => {
-                          setAddPartId(part.part_id);
-                          setAddOpen(false);
-                        }}
-                      >
-                        <span className="font-mono text-xs mr-2">
-                          {part.part_id}
-                        </span>
-                        <span className="truncate">{part.part_adi}</span>
-                        {part.part_type && (
-                          <Badge variant="secondary" className="ml-auto text-[10px]">
-                            {PART_TYPE_LABELS[part.part_type as keyof typeof PART_TYPE_LABELS] || part.part_type}
-                          </Badge>
-                        )}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+              <PartComboboxContent
+                selectedPartId={addPartId}
+                onSelect={(partId) => {
+                  setAddPartId(partId);
+                  setAddOpen(false);
+                }}
+              />
             </PopoverContent>
           </Popover>
         </div>

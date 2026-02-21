@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI, ATTENDANCE_DEPARTMENTS } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -455,3 +455,48 @@ export type AttendanceCreateData = z.infer<typeof attendanceCreateSchema>;
 export const attendanceUpdateSchema = attendanceCreateSchema;
 
 export type AttendanceUpdateData = z.infer<typeof attendanceUpdateSchema>;
+
+// ─── Kullanıcı Yönetimi ─────────────────────────────────────
+
+export const userCreateSchema = z.object({
+  user_id: z
+    .string()
+    .min(1, "Kullanıcı ID gereklidir")
+    .regex(/^VW\d{3}$/, "Kullanıcı ID formatı VW + 3 rakam olmalıdır (ör: VW057)"),
+  full_name: z
+    .string()
+    .min(1, "Ad soyad gereklidir")
+    .max(200, "Ad soyad en fazla 200 karakter olabilir"),
+  email: z
+    .string()
+    .email("Geçerli bir e-posta adresi giriniz")
+    .nullable(),
+  role: z.enum(USER_ROLES, {
+    error: "Geçerli bir rol seçiniz",
+  }),
+  station: z.enum(USER_STATIONS, {
+    error: "Geçerli bir istasyon seçiniz",
+  }),
+});
+
+export type UserCreateData = z.infer<typeof userCreateSchema>;
+
+export const userUpdateSchema = z.object({
+  full_name: z
+    .string()
+    .min(1, "Ad soyad gereklidir")
+    .max(200, "Ad soyad en fazla 200 karakter olabilir"),
+  email: z
+    .string()
+    .email("Geçerli bir e-posta adresi giriniz")
+    .nullable(),
+  role: z.enum(USER_ROLES, {
+    error: "Geçerli bir rol seçiniz",
+  }),
+  station: z.enum(USER_STATIONS, {
+    error: "Geçerli bir istasyon seçiniz",
+  }),
+  is_active: z.boolean(),
+});
+
+export type UserUpdateData = z.infer<typeof userUpdateSchema>;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Package, Puzzle, Layers, GitBranch, DollarSign, LayoutTemplate, Building2 } from "lucide-react";
+import { LayoutDashboard, Package, Puzzle, Layers, GitBranch, DollarSign, LayoutTemplate, Building2, Users } from "lucide-react";
 
 const adminTabs: {
   label: string;
@@ -20,6 +20,7 @@ const adminTabs: {
   { label: "Fiyatlar", href: "/admin/fiyatlar", icon: DollarSign },
   { label: "Şablonlar", href: "/admin/palet-sablonlari", icon: LayoutTemplate },
   { label: "Firmalar", href: "/admin/firmalar", icon: Building2 },
+  { label: "Kullanıcılar", href: "/admin/kullanicilar", icon: Users },
 ];
 
 export function AdminNav() {

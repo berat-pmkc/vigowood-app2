@@ -381,8 +381,8 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Bildirimler sayfası: kart listesi, filtre tabs, arama
 - [x] Supabase Realtime (notifications + notification_reads)
 
-### KATMAN 23: Realtime & Polish
-- [ ] Supabase Realtime + performans + UX iyileştirmeleri
+### KATMAN 23: Realtime & Polish ✅
+- [x] Supabase Realtime + performans + UX iyileştirmeleri
 
 ### KATMAN 24+: İleri Özellikler
 - [ ] Amazon SP-API, Trendyol/Hepsiburada API
