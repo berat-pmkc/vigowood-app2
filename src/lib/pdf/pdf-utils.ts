@@ -42,8 +42,18 @@ export function registerTurkishFonts() {
         fontWeight: 400,
       },
       {
+        src: resolveFontSrc("Roboto-Italic.ttf"),
+        fontWeight: 400,
+        fontStyle: "italic",
+      },
+      {
         src: resolveFontSrc("Roboto-Bold.ttf"),
         fontWeight: 700,
+      },
+      {
+        src: resolveFontSrc("Roboto-BoldItalic.ttf"),
+        fontWeight: 700,
+        fontStyle: "italic",
       },
     ],
   });
