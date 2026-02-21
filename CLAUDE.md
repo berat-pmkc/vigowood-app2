@@ -365,8 +365,13 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] 2 veri tablosu (en çok satan ürünler, kritik stok)
 - [x] 14 paralel Supabase sorgusu (server-side)
 
-### KATMAN 21: Personel & Yoklama
-- [ ] Yoklama giriş/liste + mesai
+### KATMAN 21: Personel & Yoklama ✅
+- [x] DB Migration: updated_at + has_personel_access() RLS
+- [x] Yoklama listesi (TanStack Table, server-side pagination/sorting/filtering)
+- [x] KPI kartları (bugün toplam, ort. mesai, aktif dept, geç gelenler)
+- [x] Yeni kayıt / düzenleme (Sheet + Combobox çalışan seçimi)
+- [x] Departman filtre, tarih aralığı, çalışan arama
+- [x] Özet tab: 30 gün trend AreaChart + departman dağılım BarChart
 
 ### KATMAN 22: Bildirimler ✅
 - [x] notification_reads junction tablosu + migration (025_bildirimler_v2.sql)
