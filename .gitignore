@@ -53,3 +53,5 @@ supabase/.temp/
 .vscode/
 *.swp
 *.swo
+
+.vercel
