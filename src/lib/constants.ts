@@ -111,6 +111,20 @@ export const MAKINE_LABELS: Record<MakineId, string> = {
   KUTU: "Kutu (BALA)",
 };
 
+// Makine bölümleri
+export const MAKINE_BOLUMLERI = ["Kesim", "Kutu-Koli"] as const;
+export type MakineBolum = (typeof MAKINE_BOLUMLERI)[number];
+
+export const MAKINE_BOLUM_LABELS: Record<MakineBolum, string> = {
+  Kesim: "Kesim",
+  "Kutu-Koli": "Kutu-Koli",
+};
+
+export const MAKINE_BOLUM_COLORS: Record<MakineBolum, { bg: string; text: string }> = {
+  Kesim: { bg: "bg-blue-100", text: "text-blue-800" },
+  "Kutu-Koli": { bg: "bg-amber-100", text: "text-amber-800" },
+};
+
 // Kesim durum sabitleri
 export const CUT_STATUS = ["bekliyor", "kesiliyor", "tamamlandi"] as const;
 export type CutStatus = (typeof CUT_STATUS)[number];

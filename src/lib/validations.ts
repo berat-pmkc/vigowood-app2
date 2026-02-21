@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -63,6 +63,39 @@ export const partCreateSchema = z.object({
 });
 
 export type PartCreateData = z.infer<typeof partCreateSchema>;
+
+// ─── Makine Yönetimi ────────────────────────────────────────
+
+export const makineCreateSchema = z.object({
+  makine_id: z
+    .string()
+    .min(1, "Makine ID gereklidir")
+    .max(30, "Makine ID en fazla 30 karakter olabilir"),
+  tipi: z
+    .string()
+    .min(1, "Makine tipi gereklidir")
+    .max(100, "Makine tipi en fazla 100 karakter olabilir"),
+  bolum: z.enum(MAKINE_BOLUMLERI, {
+    error: "Geçerli bir bölüm seçiniz",
+  }),
+  aciklama: z.string().max(500, "Açıklama en fazla 500 karakter olabilir").nullable(),
+});
+
+export type MakineCreateData = z.infer<typeof makineCreateSchema>;
+
+export const makineUpdateSchema = z.object({
+  tipi: z
+    .string()
+    .min(1, "Makine tipi gereklidir")
+    .max(100, "Makine tipi en fazla 100 karakter olabilir"),
+  bolum: z.enum(MAKINE_BOLUMLERI, {
+    error: "Geçerli bir bölüm seçiniz",
+  }),
+  aciklama: z.string().max(500, "Açıklama en fazla 500 karakter olabilir").nullable(),
+  aktif: z.boolean(),
+});
+
+export type MakineUpdateData = z.infer<typeof makineUpdateSchema>;
 
 export const kesimSureleriSchema = z.object({
   "BÜYÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
