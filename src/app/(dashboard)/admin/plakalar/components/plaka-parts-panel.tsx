@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, ChevronsUpDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import {
+  getAllPartsForSelect,
   getPlakaParts,
   updatePlakaPart,
   addPlakaPart,
@@ -38,9 +53,14 @@ export function PlakaPartsPanel({ plakaId, sku, open }: PlakaPartsPanelProps) {
   const [loading, setLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  // All parts for combobox
+  const [allParts, setAllParts] = useState<{ part_id: string; part_adi: string }[]>([]);
+  const [allPartsLoaded, setAllPartsLoaded] = useState(false);
+
   // New part form
   const [newPartId, setNewPartId] = useState("");
   const [newQty, setNewQty] = useState("");
+  const [partSelectOpen, setPartSelectOpen] = useState(false);
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,8 +69,14 @@ export function PlakaPartsPanel({ plakaId, sku, open }: PlakaPartsPanelProps) {
   useEffect(() => {
     if (open && plakaId) {
       loadParts();
+      if (!allPartsLoaded) {
+        getAllPartsForSelect().then((result) => {
+          if (result.success) setAllParts(result.data);
+          setAllPartsLoaded(true);
+        });
+      }
     }
-  }, [open, plakaId]);
+  }, [open, plakaId, allPartsLoaded]);
 
   const loadParts = async () => {
     setLoading(true);
@@ -211,13 +237,61 @@ export function PlakaPartsPanel({ plakaId, sku, open }: PlakaPartsPanelProps) {
       {/* Add new part */}
       <div className="flex items-end gap-2">
         <div className="flex-1 space-y-1">
-          <label className="text-xs text-muted-foreground">Parça ID</label>
-          <Input
-            placeholder="ör: P001"
-            value={newPartId}
-            onChange={(e) => setNewPartId(e.target.value)}
-            className="h-8 text-sm"
-          />
+          <label className="text-xs text-muted-foreground">Parça Seçin</label>
+          <Popover open={partSelectOpen} onOpenChange={setPartSelectOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={partSelectOpen}
+                className="w-full justify-between h-8 text-sm font-normal"
+                disabled={!allPartsLoaded}
+              >
+                {!allPartsLoaded ? (
+                  <span className="text-muted-foreground">Yükleniyor...</span>
+                ) : newPartId ? (
+                  <span className="truncate">
+                    <span className="font-mono text-xs mr-1">{newPartId}</span>
+                    {allParts.find((p) => p.part_id === newPartId)?.part_adi ?? ""}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Parça seçin...</span>
+                )}
+                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Parça ara..." />
+                <CommandList>
+                  <CommandEmpty>Parça bulunamadı.</CommandEmpty>
+                  <CommandGroup>
+                    {allParts.map((part) => (
+                      <CommandItem
+                        key={part.part_id}
+                        value={`${part.part_id} ${part.part_adi}`}
+                        onSelect={() => {
+                          setNewPartId(part.part_id);
+                          setPartSelectOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-3.5 w-3.5",
+                            newPartId === part.part_id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <span className="font-mono text-xs mr-1.5 text-muted-foreground">
+                          {part.part_id}
+                        </span>
+                        <span className="flex-1 truncate text-sm">{part.part_adi}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="w-[90px] space-y-1">
           <label className="text-xs text-muted-foreground">Miktar</label>
