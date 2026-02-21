@@ -2,11 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
-import { SablonDataTable } from "@/app/(dashboard)/admin/palet-sablonlari/components/sablon-data-table";
-import type { PaletSablonRow } from "@/app/(dashboard)/admin/palet-sablonlari/actions";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { SablonDataTable } from "./components/sablon-data-table";
+import type { PaletSablonRow } from "./actions";
 
 interface PageProps {
   searchParams: Promise<{
@@ -69,19 +66,12 @@ export default async function SevkiyatSablonlarPage({ searchParams }: PageProps)
   }
 
   return (
-    <div className="pb-20 md:pb-6 px-4 sm:px-6">
-      <div className="flex items-center gap-3 mb-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/sevkiyat">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Palet Şablonları</h1>
-          <p className="text-sm text-muted-foreground">
-            Ürün-ülke bazlı palet konfigürasyonları
-          </p>
-        </div>
+    <div className="px-4 pb-6 sm:px-6">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold tracking-tight">Palet Şablonları</h1>
+        <p className="text-sm text-muted-foreground">
+          Ürün-ülke bazlı palet konfigürasyonları
+        </p>
       </div>
       <SablonDataTable
         data={(sablonlar as PaletSablonRow[]) ?? []}
