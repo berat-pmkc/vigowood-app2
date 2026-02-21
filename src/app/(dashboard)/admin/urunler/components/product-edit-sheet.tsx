@@ -90,15 +90,15 @@ export function ProductEditSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Ürün Düzenle</SheetTitle>
+        <SheetHeader className="px-6 pt-6">
+          <SheetTitle className="text-lg">Ürün Düzenle</SheetTitle>
           <SheetDescription>
             {product?.sku}
           </SheetDescription>
         </SheetHeader>
 
         {product && (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 space-y-6 pt-4">
             {/* Editable fields */}
             <div className="space-y-4">
               <div className="space-y-2">

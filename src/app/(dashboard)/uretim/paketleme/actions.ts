@@ -37,7 +37,7 @@ export async function getActiveProducts() {
   }
 }
 
-/** Paketleme operatörlerini getir */
+/** Paketleme operatörlerini getir (sadece Paketleme istasyonu çalışanları) */
 export async function getPackOperators() {
   try {
     await requireProductionAccess();
@@ -47,7 +47,7 @@ export async function getPackOperators() {
       .from("users")
       .select("user_id, full_name, role")
       .eq("is_active", true)
-      .in("role", ["Üretim", "Hat"])
+      .in("station", ["Paketleme", "Paketleme Hattı"])
       .order("full_name");
 
     if (error) return { success: false as const, error: error.message };

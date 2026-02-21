@@ -13,22 +13,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { MAKINE_IDS, MAKINE_LABELS } from "@/lib/constants";
 import {
   plakaCreateSchema,
   type PlakaCreateData,
 } from "@/lib/validations";
 import { formatDate } from "@/lib/utils";
 import { updatePlaka, createPlaka } from "../actions";
-import { PlakaPartsPanel } from "./plaka-parts-panel";
 import { toast } from "sonner";
 import type { Database } from "@/lib/supabase/types";
 
@@ -56,8 +47,6 @@ export function PlakaEditSheet({
     register,
     handleSubmit,
     reset,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<PlakaCreateData>({
     resolver: zodResolver(plakaCreateSchema),
@@ -70,18 +59,21 @@ export function PlakaEditSheet({
         plaka_adi: "",
         tipi: null,
         renk: null,
-        makine_id: "BÜYÜK" as PlakaCreateData["makine_id"],
-        std_kesim_suresi_dk: null,
+        kesim_sureleri: {},
         sku: null,
       });
     } else if (plaka) {
+      const ks = (plaka.kesim_sureleri ?? {}) as Record<string, number | null>;
       reset({
         plaka_id: plaka.plaka_id,
         plaka_adi: plaka.plaka_adi || "",
         tipi: plaka.tipi || null,
         renk: plaka.renk || null,
-        makine_id: plaka.makine_id as PlakaCreateData["makine_id"],
-        std_kesim_suresi_dk: plaka.std_kesim_suresi_dk,
+        kesim_sureleri: {
+          "BÜYÜK": ks["BÜYÜK"] ?? null,
+          "KÜÇÜK": ks["KÜÇÜK"] ?? null,
+          "KUTU": ks["KUTU"] ?? null,
+        },
         sku: plaka.sku || null,
       });
     }
@@ -113,13 +105,11 @@ export function PlakaEditSheet({
     });
   };
 
-  const makineValue = watch("makine_id");
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{isCreate ? "Yeni Plaka" : "Plaka Düzenle"}</SheetTitle>
+        <SheetHeader className="px-6 pt-6">
+          <SheetTitle className="text-lg">{isCreate ? "Yeni Plaka" : "Plaka Düzenle"}</SheetTitle>
           <SheetDescription>
             {isCreate
               ? "Yeni plaka oluşturun"
@@ -127,12 +117,11 @@ export function PlakaEditSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 pt-4">
+        <div className="px-6 pb-6 space-y-6 pt-4">
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="space-y-6"
           >
-            {/* Editable fields */}
             <div className="space-y-4">
               {/* Plaka Grup ID — only in create mode */}
               {isCreate && (
@@ -195,76 +184,75 @@ export function PlakaEditSheet({
                 </div>
               </div>
 
+              {/* Kesim Süreleri — 3 makine */}
               <div className="space-y-2">
-                <Label htmlFor="makine_id">Kesim Makinesi</Label>
-                <Select
-                  value={makineValue}
-                  onValueChange={(v) =>
-                    setValue(
-                      "makine_id",
-                      v as PlakaCreateData["makine_id"],
-                      { shouldValidate: true }
-                    )
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Makine seçiniz" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MAKINE_IDS.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {MAKINE_LABELS[m]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.makine_id && (
+                <Label>Kesim Süreleri (dk)</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Büyük</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      {...register("kesim_sureleri.BÜYÜK", {
+                        setValueAs: (v) =>
+                          v === "" || v === null || v === undefined
+                            ? null
+                            : Number(v),
+                      })}
+                      placeholder="—"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Küçük</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      {...register("kesim_sureleri.KÜÇÜK", {
+                        setValueAs: (v) =>
+                          v === "" || v === null || v === undefined
+                            ? null
+                            : Number(v),
+                      })}
+                      placeholder="—"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Kutu</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      {...register("kesim_sureleri.KUTU", {
+                        setValueAs: (v) =>
+                          v === "" || v === null || v === undefined
+                            ? null
+                            : Number(v),
+                      })}
+                      placeholder="—"
+                    />
+                  </div>
+                </div>
+                {errors.kesim_sureleri && (
                   <p className="text-sm text-destructive">
-                    {errors.makine_id.message}
+                    Geçersiz kesim süresi
                   </p>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="std_kesim_suresi_dk">
-                    Kesim Süresi (dk)
-                  </Label>
-                  <Input
-                    id="std_kesim_suresi_dk"
-                    type="number"
-                    min={0}
-                    {...register("std_kesim_suresi_dk", {
-                      setValueAs: (v) =>
-                        v === "" || v === null || v === undefined
-                          ? null
-                          : Number(v),
-                    })}
-                    placeholder="0"
-                  />
-                  {errors.std_kesim_suresi_dk && (
-                    <p className="text-sm text-destructive">
-                      {errors.std_kesim_suresi_dk.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sku">SKU (Ürün)</Label>
-                  <Input
-                    id="sku"
-                    {...register("sku", {
-                      setValueAs: (v) =>
-                        v === "" ? null : v,
-                    })}
-                    placeholder="ör: VW-001"
-                  />
-                  {errors.sku && (
-                    <p className="text-sm text-destructive">
-                      {errors.sku.message}
-                    </p>
-                  )}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="sku">SKU (Ürün)</Label>
+                <Input
+                  id="sku"
+                  {...register("sku", {
+                    setValueAs: (v) =>
+                      v === "" ? null : v,
+                  })}
+                  placeholder="ör: VW-001"
+                />
+                {errors.sku && (
+                  <p className="text-sm text-destructive">
+                    {errors.sku.message}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -292,7 +280,6 @@ export function PlakaEditSheet({
 
             <Separator />
 
-            {/* Actions */}
             <div className="flex gap-2 justify-end">
               <Button
                 type="button"
@@ -310,18 +297,6 @@ export function PlakaEditSheet({
               </Button>
             </div>
           </form>
-
-          {/* PlakaParts — only in edit mode */}
-          {!isCreate && plaka && (
-            <>
-              <Separator />
-              <PlakaPartsPanel
-                plakaId={plaka.plaka_id}
-                sku={plaka.sku}
-                open={open}
-              />
-            </>
-          )}
         </div>
       </SheetContent>
     </Sheet>

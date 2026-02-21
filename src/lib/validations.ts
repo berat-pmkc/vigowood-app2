@@ -64,6 +64,12 @@ export const partCreateSchema = z.object({
 
 export type PartCreateData = z.infer<typeof partCreateSchema>;
 
+export const kesimSureleriSchema = z.object({
+  "BÜYÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
+  "KÜÇÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
+  "KUTU": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
+}).default({});
+
 export const plakaUpdateSchema = z.object({
   plaka_adi: z
     .string()
@@ -71,14 +77,7 @@ export const plakaUpdateSchema = z.object({
     .max(200, "Plaka adı en fazla 200 karakter olabilir"),
   tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
   renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
-  makine_id: z.enum(MAKINE_IDS, {
-    error: "Geçerli bir makine seçiniz",
-  }),
-  std_kesim_suresi_dk: z
-    .number()
-    .int("Tam sayı olmalıdır")
-    .min(0, "Kesim süresi 0 veya üzeri olmalıdır")
-    .nullable(),
+  kesim_sureleri: kesimSureleriSchema,
   sku: z.string().nullable(),
 });
 

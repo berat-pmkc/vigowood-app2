@@ -141,11 +141,11 @@ export function FirmaEditSheet({ firma, isNew, open, onClose }: FirmaEditSheetPr
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{isNew ? "Yeni Firma" : "Firma Düzenle"}</SheetTitle>
+        <SheetHeader className="px-6 pt-6">
+          <SheetTitle className="text-lg">{isNew ? "Yeni Firma" : "Firma Düzenle"}</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 space-y-4 mt-4">
           {/* Tip + Ülke */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

@@ -6,7 +6,7 @@ import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
 import { FiyatlarDataTable } from "./components/fiyatlar-data-table";
 import type { FiyatRow } from "./actions";
 
-export const metadata: Metadata = { title: "Sevkiyat Fiyatlari" };
+export const metadata: Metadata = { title: "Sevkiyat Fiyatları" };
 
 interface PageProps {
   searchParams: Promise<{
@@ -41,6 +41,7 @@ export default async function SevkiyatFiyatlarPage({ searchParams }: PageProps) 
 
   const supabase = await createClient();
 
+  // Fetch fiyatlar
   let query = supabase
     .from("sevkiyat_fiyatlar")
     .select("*", { count: "exact" });
@@ -58,7 +59,21 @@ export default async function SevkiyatFiyatlarPage({ searchParams }: PageProps) 
   query = query.order(sortColumn, { ascending: sortOrder });
   query = query.range(from, to);
 
-  const { data: fiyatlar, count, error } = await query;
+  // Fetch products for combobox
+  const [fiyatlarResult, productsResult] = await Promise.all([
+    query,
+    supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .eq("aktif_mi", true)
+      .order("sku", { ascending: true }),
+  ]);
+
+  const { data: fiyatlar, count, error } = fiyatlarResult;
+  const products = (productsResult.data ?? []).map((p) => ({
+    sku: p.sku,
+    urun_adi: p.urun_adi,
+  }));
 
   if (error) {
     return (
@@ -85,6 +100,7 @@ export default async function SevkiyatFiyatlarPage({ searchParams }: PageProps) 
         countryCode={countryCode}
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
+        products={products}
       />
     </div>
   );

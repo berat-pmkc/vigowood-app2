@@ -114,11 +114,13 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{isNew ? "Yeni Palet Şablonu" : "Şablon Düzenle"}</SheetTitle>
+        <SheetHeader className="px-6 pt-6">
+          <SheetTitle className="text-lg">
+            {isNew ? "Yeni Palet Şablonu" : "Şablon Düzenle"}
+          </SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 mt-4 space-y-4">
           {/* Ülke */}
           <div className="space-y-2">
             <Label>Ülke *</Label>

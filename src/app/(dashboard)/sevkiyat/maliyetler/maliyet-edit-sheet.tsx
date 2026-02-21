@@ -139,8 +139,8 @@ export function MaliyetEditSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
+        <SheetHeader className="px-6 pt-6">
+          <SheetTitle className="text-lg flex items-center gap-2">
             <DollarSign className="w-5 h-5" />
             Maliyet Düzenle
           </SheetTitle>
@@ -154,7 +154,7 @@ export function MaliyetEditSheet({
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-4 pt-4">
+          <div className="px-6 pb-6 space-y-4 pt-4">
             <div className="grid grid-cols-1 gap-3">
               {MALIYET_FIELDS.map((field) => (
                 <div key={field.key} className="space-y-1">

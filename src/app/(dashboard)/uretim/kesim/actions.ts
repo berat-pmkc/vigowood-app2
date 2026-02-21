@@ -45,8 +45,7 @@ export async function getPlakalarForKesim(makineId: string, sku?: string) {
 
     let query = supabase
       .from("plakalar")
-      .select("plakalar_id, plaka_id, plaka_adi, sku, tipi, renk, makine_id, std_kesim_suresi_dk")
-      .eq("makine_id", makineId);
+      .select("plakalar_id, plaka_id, plaka_adi, sku, tipi, renk, kesim_sureleri");
 
     if (sku) {
       query = query.eq("sku", sku);
@@ -55,7 +54,28 @@ export async function getPlakalarForKesim(makineId: string, sku?: string) {
     const { data, error } = await query.order("plaka_adi");
 
     if (error) return { success: false as const, error: error.message };
-    return { success: true as const, data: data ?? [] };
+
+    // Filter client-side: only plakalar that have a kesim süresi for this makine
+    const filtered = (data ?? [])
+      .filter((p) => {
+        const ks = (p.kesim_sureleri ?? {}) as Record<string, number>;
+        return ks[makineId] != null;
+      })
+      .map((p) => {
+        const ks = (p.kesim_sureleri ?? {}) as Record<string, number>;
+        return {
+          plakalar_id: p.plakalar_id,
+          plaka_id: p.plaka_id,
+          plaka_adi: p.plaka_adi,
+          sku: p.sku,
+          tipi: p.tipi,
+          renk: p.renk,
+          makine_id: makineId,
+          std_kesim_suresi_dk: ks[makineId] ?? null,
+        };
+      });
+
+    return { success: true as const, data: filtered };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

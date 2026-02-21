@@ -10,7 +10,7 @@ import {
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { FiyatlarToolbar } from "./fiyatlar-toolbar";
-import { FiyatEditSheet } from "./fiyat-edit-sheet";
+import { FiyatEditSheet, type ProductOption } from "./fiyat-edit-sheet";
 import { getFiyatColumns } from "./fiyat-columns";
 import { deleteFiyat, type FiyatRow } from "../actions";
 import { toast } from "sonner";
@@ -24,6 +24,7 @@ interface FiyatlarDataTableProps {
   countryCode: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
+  products: ProductOption[];
 }
 
 export function FiyatlarDataTable({
@@ -35,6 +36,7 @@ export function FiyatlarDataTable({
   countryCode,
   sortBy,
   sortOrder,
+  products,
 }: FiyatlarDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -166,6 +168,7 @@ export function FiyatlarDataTable({
           setSheetOpen(open);
           if (!open) router.refresh();
         }}
+        products={products}
       />
     </div>
   );

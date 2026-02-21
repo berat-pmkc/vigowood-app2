@@ -7,13 +7,14 @@ import {
   getCoreRowModel,
   type SortingState,
 } from "@tanstack/react-table";
-import { Plus } from "lucide-react";
+import { Plus, List, Puzzle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { PlakalarToolbar } from "./plakalar-toolbar";
 import { PlakaEditSheet } from "./plaka-edit-sheet";
 import { getPlakaColumns } from "./plaka-columns";
+import { PlakaParcalariView } from "./plaka-parcalari-view";
 import type { Database } from "@/lib/supabase/types";
 
 type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
@@ -24,11 +25,12 @@ interface PlakalarDataTableProps {
   pageIndex: number;
   pageSize: number;
   search: string;
-  makine: string;
   sku: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
   skuOptions: string[];
+  initialView: "liste" | "parcalar";
+  initialPlaka: string;
 }
 
 export function PlakalarDataTable({
@@ -37,11 +39,12 @@ export function PlakalarDataTable({
   pageIndex,
   pageSize,
   search,
-  makine,
   sku,
   sortBy,
   sortOrder,
   skuOptions,
+  initialView,
+  initialPlaka,
 }: PlakalarDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,6 +52,7 @@ export function PlakalarDataTable({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("edit");
   const [, startTransition] = useTransition();
+  const [activeView, setActiveView] = useState<"liste" | "parcalar">(initialView);
 
   const buildUrl = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -102,6 +106,14 @@ export function PlakalarDataTable({
     setSheetOpen(true);
   }, []);
 
+  const handleViewChange = useCallback(
+    (view: "liste" | "parcalar") => {
+      setActiveView(view);
+      navigate({ view: view === "liste" ? undefined : view });
+    },
+    [navigate]
+  );
+
   const columns = useMemo(
     () =>
       getPlakaColumns({
@@ -127,21 +139,27 @@ export function PlakalarDataTable({
 
   return (
     <div className="space-y-4">
+      {/* View toggle + action buttons */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex-1">
-          <PlakalarToolbar
-            search={search}
-            makine={makine}
-            sku={sku}
-            skuOptions={skuOptions}
-            onSearchChange={(v) =>
-              navigate({ search: v || undefined, page: "0" })
-            }
-            onMakineChange={(v) =>
-              navigate({ makine: v || undefined, page: "0" })
-            }
-            onSkuChange={(v) => navigate({ sku: v || undefined, page: "0" })}
-          />
+        <div className="flex items-center gap-1 rounded-lg border bg-muted p-1">
+          <Button
+            variant={activeView === "liste" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => handleViewChange("liste")}
+          >
+            <List className="h-4 w-4" />
+            Liste
+          </Button>
+          <Button
+            variant={activeView === "parcalar" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => handleViewChange("parcalar")}
+          >
+            <Puzzle className="h-4 w-4" />
+            Parçalar
+          </Button>
         </div>
         <Button onClick={handleCreate} size="sm" className="shrink-0">
           <Plus className="mr-1 h-4 w-4" />
@@ -149,20 +167,36 @@ export function PlakalarDataTable({
         </Button>
       </div>
 
-      <DataTable
-        table={table}
-        onRowClick={handleEdit}
-        emptyMessage="Plaka bulunamadı."
-      />
+      {activeView === "liste" ? (
+        <>
+          <PlakalarToolbar
+            search={search}
+            sku={sku}
+            skuOptions={skuOptions}
+            onSearchChange={(v) =>
+              navigate({ search: v || undefined, page: "0" })
+            }
+            onSkuChange={(v) => navigate({ sku: v || undefined, page: "0" })}
+          />
 
-      <DataTablePagination
-        table={table}
-        totalCount={totalCount}
-        onPageChange={(page) => navigate({ page: String(page) })}
-        onPageSizeChange={(size) =>
-          navigate({ pageSize: String(size), page: "0" })
-        }
-      />
+          <DataTable
+            table={table}
+            onRowClick={handleEdit}
+            emptyMessage="Plaka bulunamadı."
+          />
+
+          <DataTablePagination
+            table={table}
+            totalCount={totalCount}
+            onPageChange={(page) => navigate({ page: String(page) })}
+            onPageSizeChange={(size) =>
+              navigate({ pageSize: String(size), page: "0" })
+            }
+          />
+        </>
+      ) : (
+        <PlakaParcalariView initialPlaka={initialPlaka} />
+      )}
 
       <PlakaEditSheet
         plaka={editPlaka}

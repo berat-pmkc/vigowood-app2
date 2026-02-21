@@ -104,7 +104,7 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="w-4 h-4" />
@@ -112,10 +112,10 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-2 overflow-hidden">
           {/* Session info */}
-          <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-            <p className="font-medium text-sm truncate">
+          <div className="bg-muted/50 rounded-lg p-3 space-y-1 overflow-hidden">
+            <p className="font-medium text-sm break-words">
               {session.urun_adi ?? session.sku ?? "—"}
             </p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -149,7 +149,7 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
           <div>
             <Label className="text-sm font-medium flex items-center gap-2 mb-2">
               <Users className="w-4 h-4" />
-              Çalışanlar ({selectedWorkers.size} kişi)
+              Kim görev yaptı? ({selectedWorkers.size} kişi)
             </Label>
             {loading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">

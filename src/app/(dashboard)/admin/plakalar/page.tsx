@@ -10,10 +10,11 @@ interface PageProps {
     page?: string;
     pageSize?: string;
     search?: string;
-    makine?: string;
     sku?: string;
     sortBy?: string;
     sortOrder?: string;
+    view?: string;
+    plaka?: string;
   }>;
 }
 
@@ -27,10 +28,11 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
     ? Number(params.pageSize || "25")
     : 25;
   const search = params.search?.trim() || "";
-  const makine = params.makine || "";
   const sku = params.sku || "";
   const sortBy = params.sortBy || "plakalar_id";
   const sortOrder = params.sortOrder === "desc" ? false : true;
+  const view = params.view || "liste";
+  const selectedPlaka = params.plaka || "";
 
   const from = page * pageSize;
   const to = from + pageSize - 1;
@@ -48,11 +50,6 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
     );
   }
 
-  // Machine filter
-  if (makine) {
-    query = query.eq("makine_id", makine);
-  }
-
   // SKU filter
   if (sku) {
     query = query.eq("sku", sku);
@@ -65,8 +62,6 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
     "plaka_adi",
     "tipi",
     "renk",
-    "makine_id",
-    "std_kesim_suresi_dk",
     "sku",
   ];
   const sortColumn = validSortColumns.includes(sortBy as keyof Plaka)
@@ -105,8 +100,7 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
       <div className="mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Plaka Yönetimi</h1>
         <p className="text-sm text-muted-foreground">
-          Plaka listesi, makine filtresi, kesim süresi ve plaka parçaları
-          yönetimi
+          Plaka listesi, kesim süreleri ve plaka parçaları yönetimi
         </p>
       </div>
       <PlakalarDataTable
@@ -115,11 +109,12 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
         pageIndex={page}
         pageSize={pageSize}
         search={search}
-        makine={makine}
         sku={sku}
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
         skuOptions={uniqueSkus}
+        initialView={view as "liste" | "parcalar"}
+        initialPlaka={selectedPlaka}
       />
     </div>
   );

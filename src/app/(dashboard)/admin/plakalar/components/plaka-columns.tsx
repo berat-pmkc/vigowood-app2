@@ -23,12 +23,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
-import { MAKINE_LABELS } from "@/lib/constants";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import { deletePlaka } from "../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import type { Database } from "@/lib/supabase/types";
-import type { MakineId } from "@/lib/constants";
 
 type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
 
@@ -42,6 +41,39 @@ const makineBadgeColors: Record<string, string> = {
   KÜÇÜK: "bg-emerald-100 text-emerald-800 border-emerald-200",
   KUTU: "bg-amber-100 text-amber-800 border-amber-200",
 };
+
+function KesimSureleriCell({ kesimSureleri }: { kesimSureleri: unknown }) {
+  const ks = (kesimSureleri ?? {}) as Record<string, number>;
+  const entries = Object.entries(ks);
+
+  if (entries.length === 0) {
+    return <span className="text-sm text-muted-foreground">—</span>;
+  }
+
+  const labels: Record<string, string> = {
+    BÜYÜK: "B",
+    KÜÇÜK: "K",
+    KUTU: "KU",
+  };
+
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {(["BÜYÜK", "KÜÇÜK", "KUTU"] as const).map((key) => {
+        const val = ks[key];
+        if (val == null) return null;
+        return (
+          <Badge
+            key={key}
+            variant="outline"
+            className={`text-xs px-1.5 py-0 ${makineBadgeColors[key] || ""}`}
+          >
+            {labels[key]}:{val}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
 
 function PlakaActionsCell({
   plaka,
@@ -190,46 +222,13 @@ export function getPlakaColumns({
       size: 100,
     },
     {
-      accessorKey: "makine_id",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Makine"
-          onSort={onSort}
-        />
+      accessorKey: "kesim_sureleri",
+      header: "Kesim Süreleri",
+      cell: ({ row }) => (
+        <KesimSureleriCell kesimSureleri={row.getValue("kesim_sureleri")} />
       ),
-      cell: ({ row }) => {
-        const makineId = row.getValue("makine_id") as string;
-        return (
-          <Badge
-            variant="outline"
-            className={`text-xs whitespace-nowrap ${makineBadgeColors[makineId] || ""}`}
-          >
-            {MAKINE_LABELS[makineId as MakineId] || makineId}
-          </Badge>
-        );
-      },
-      size: 160,
-    },
-    {
-      accessorKey: "std_kesim_suresi_dk",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Kesim Süresi"
-          onSort={onSort}
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => {
-        const sure = row.getValue("std_kesim_suresi_dk") as number | null;
-        return (
-          <div className="text-right font-mono text-sm">
-            {sure != null ? `${sure} dk` : "—"}
-          </div>
-        );
-      },
-      size: 110,
+      size: 180,
+      enableSorting: false,
     },
     {
       accessorKey: "sku",
@@ -238,10 +237,22 @@ export function getPlakaColumns({
       ),
       cell: ({ row }) => {
         const sku = row.getValue("sku") as string | null;
-        return sku ? (
-          <span className="font-mono text-xs">{sku}</span>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
+        if (!sku) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+        const style = getSkuBadgeStyle(sku);
+        return (
+          <Badge
+            variant="outline"
+            className="font-mono text-xs"
+            style={{
+              backgroundColor: style.backgroundColor,
+              color: style.color,
+              borderColor: style.borderColor,
+            }}
+          >
+            {sku}
+          </Badge>
         );
       },
       size: 140,

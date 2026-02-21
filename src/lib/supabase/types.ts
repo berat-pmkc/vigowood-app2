@@ -720,45 +720,38 @@ export type Database = {
       plakalar: {
         Row: {
           created_at: string
-          makine_id: string
+          kesim_sureleri: Json | null
           plaka_adi: string
           plaka_id: string
           plakalar_id: string
           renk: string | null
           sku: string | null
-          std_kesim_suresi_dk: number | null
           tipi: string | null
+          updated_at: string | null
         }
         Insert: {
           created_at?: string
-          makine_id: string
+          kesim_sureleri?: Json | null
           plaka_adi: string
           plaka_id: string
           plakalar_id: string
           renk?: string | null
           sku?: string | null
-          std_kesim_suresi_dk?: number | null
           tipi?: string | null
+          updated_at?: string | null
         }
         Update: {
           created_at?: string
-          makine_id?: string
+          kesim_sureleri?: Json | null
           plaka_adi?: string
           plaka_id?: string
           plakalar_id?: string
           renk?: string | null
           sku?: string | null
-          std_kesim_suresi_dk?: number | null
           tipi?: string | null
+          updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "plakalar_makine_id_fkey"
-            columns: ["makine_id"]
-            isOneToOne: false
-            referencedRelation: "kesim_makinesi"
-            referencedColumns: ["makine_id"]
-          },
           {
             foreignKeyName: "plakalar_sku_fkey"
             columns: ["sku"]
@@ -778,6 +771,7 @@ export type Database = {
           ilk_satis_tarihi: string | null
           kategori: Database["public"]["Enums"]["product_category"] | null
           mamul_stok_kritik: number
+          renk_kodu: string | null
           satilan_gun_sayisi: number
           sku: string
           stok_aktif: number
@@ -794,6 +788,7 @@ export type Database = {
           ilk_satis_tarihi?: string | null
           kategori?: Database["public"]["Enums"]["product_category"] | null
           mamul_stok_kritik?: number
+          renk_kodu?: string | null
           satilan_gun_sayisi?: number
           sku: string
           stok_aktif?: number
@@ -810,6 +805,7 @@ export type Database = {
           ilk_satis_tarihi?: string | null
           kategori?: Database["public"]["Enums"]["product_category"] | null
           mamul_stok_kritik?: number
+          renk_kodu?: string | null
           satilan_gun_sayisi?: number
           sku?: string
           stok_aktif?: number
@@ -1814,8 +1810,7 @@ export const Constants = {
   },
 } as const
 
-// ─── Custom Type Aliases ──────────────────────────────────────
-export type UserRole = Database["public"]["Enums"]["user_role"];
-export type Station = Database["public"]["Enums"]["station"];
-export type ProductCategory = Database["public"]["Enums"]["product_category"];
-export type PartType = Database["public"]["Enums"]["part_type"];
+export type UserRole = Database["public"]["Enums"]["user_role"]
+export type Station = Database["public"]["Enums"]["station"]
+export type ProductCategory = Database["public"]["Enums"]["product_category"]
+export type PartType = Database["public"]["Enums"]["part_type"]

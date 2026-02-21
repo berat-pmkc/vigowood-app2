@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MAKINE_IDS, MAKINE_LABELS } from "@/lib/constants";
 import { exportPlakalar, importPlakalar } from "../actions";
 import { toast } from "sonner";
 import { exportToExcel, type ExcelColumn } from "@/lib/excel-utils";
@@ -23,28 +22,25 @@ const PLAKA_EXPORT_COLUMNS: ExcelColumn[] = [
   { key: "plaka_adi", header: "Plaka Adı", width: 35 },
   { key: "tipi", header: "Tip", width: 15 },
   { key: "renk", header: "Renk", width: 15 },
-  { key: "makine_id", header: "Makine", width: 12 },
-  { key: "std_kesim_suresi_dk", header: "Kesim Süresi (dk)", width: 18 },
+  { key: "buyuk_dk", header: "Büyük (dk)", width: 12 },
+  { key: "kucuk_dk", header: "Küçük (dk)", width: 12 },
+  { key: "kutu_dk", header: "Kutu (dk)", width: 12 },
   { key: "sku", header: "SKU", width: 15 },
 ];
 
 interface PlakalarToolbarProps {
   search: string;
-  makine: string;
   sku: string;
   skuOptions: string[];
   onSearchChange: (value: string) => void;
-  onMakineChange: (value: string) => void;
   onSkuChange: (value: string) => void;
 }
 
 export function PlakalarToolbar({
   search,
-  makine,
   sku,
   skuOptions,
   onSearchChange,
-  onMakineChange,
   onSkuChange,
 }: PlakalarToolbarProps) {
   const [searchInput, setSearchInput] = useState(search);
@@ -85,8 +81,9 @@ export function PlakalarToolbar({
         plaka_adi: r["Plaka Adı"] || r["plaka_adi"] || "",
         tipi: r["Tip"] || r["tipi"] || undefined,
         renk: r["Renk"] || r["renk"] || undefined,
-        makine_id: r["Makine"] || r["makine_id"] || "BÜYÜK",
-        std_kesim_suresi_dk: r["Kesim Süresi (dk)"] || r["std_kesim_suresi_dk"] || undefined,
+        buyuk_dk: r["Büyük (dk)"] || r["buyuk_dk"] || undefined,
+        kucuk_dk: r["Küçük (dk)"] || r["kucuk_dk"] || undefined,
+        kutu_dk: r["Kutu (dk)"] || r["kutu_dk"] || undefined,
         sku: r["SKU"] || r["sku"] || undefined,
       }))
     );
@@ -97,7 +94,7 @@ export function PlakalarToolbar({
     }
   };
 
-  const hasFilters = search || makine || sku;
+  const hasFilters = search || sku;
 
   return (
     <>
@@ -112,24 +109,6 @@ export function PlakalarToolbar({
             className="pl-9"
           />
         </div>
-
-        {/* Machine filter */}
-        <Select
-          value={makine || "__all__"}
-          onValueChange={(v) => onMakineChange(v === "__all__" ? "" : v)}
-        >
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Tüm Makineler" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Tüm Makineler</SelectItem>
-            {MAKINE_IDS.map((m) => (
-              <SelectItem key={m} value={m}>
-                {MAKINE_LABELS[m]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         {/* SKU filter */}
         <Select
@@ -157,7 +136,6 @@ export function PlakalarToolbar({
             onClick={() => {
               setSearchInput("");
               onSearchChange("");
-              onMakineChange("");
               onSkuChange("");
             }}
           >
@@ -192,7 +170,7 @@ export function PlakalarToolbar({
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Plaka İçe Aktar"
-        description="Excel dosyasında Plaka ID, Plaka Grubu, Plaka Adı, Tip, Renk, Makine, Kesim Süresi (dk), SKU kolonları beklenir."
+        description="Excel dosyasında Plaka ID, Plaka Grubu, Plaka Adı, Tip, Renk, Büyük (dk), Küçük (dk), Kutu (dk), SKU kolonları beklenir."
         onConfirm={handleImport}
       />
     </>

@@ -17,14 +17,24 @@ async function requireAdmin() {
   return user;
 }
 
+/** Clean kesim_sureleri: remove null/undefined entries */
+function cleanKesimSureleri(ks: Record<string, number | null | undefined> | undefined): Record<string, number> {
+  const clean: Record<string, number> = {};
+  if (ks) {
+    for (const [key, val] of Object.entries(ks)) {
+      if (val != null) clean[key] = val;
+    }
+  }
+  return clean;
+}
+
 export async function createPlaka(
   formData: {
     plaka_id: string;
     plaka_adi: string;
     tipi: string | null;
     renk: string | null;
-    makine_id: string;
-    std_kesim_suresi_dk: number | null;
+    kesim_sureleri: Record<string, number | null | undefined>;
     sku: string | null;
   }
 ): Promise<ActionResult> {
@@ -62,8 +72,7 @@ export async function createPlaka(
       plaka_adi: parsed.data.plaka_adi,
       tipi: parsed.data.tipi,
       renk: parsed.data.renk,
-      makine_id: parsed.data.makine_id,
-      std_kesim_suresi_dk: parsed.data.std_kesim_suresi_dk,
+      kesim_sureleri: cleanKesimSureleri(parsed.data.kesim_sureleri),
       sku: parsed.data.sku,
     });
 
@@ -82,13 +91,12 @@ export async function createPlaka(
 }
 
 export async function updatePlaka(
-  plakaларId: string,
+  plakalarId: string,
   formData: {
     plaka_adi: string;
     tipi: string | null;
     renk: string | null;
-    makine_id: string;
-    std_kesim_suresi_dk: number | null;
+    kesim_sureleri: Record<string, number | null | undefined>;
     sku: string | null;
   }
 ): Promise<ActionResult> {
@@ -108,11 +116,10 @@ export async function updatePlaka(
         plaka_adi: parsed.data.plaka_adi,
         tipi: parsed.data.tipi,
         renk: parsed.data.renk,
-        makine_id: parsed.data.makine_id,
-        std_kesim_suresi_dk: parsed.data.std_kesim_suresi_dk,
+        kesim_sureleri: cleanKesimSureleri(parsed.data.kesim_sureleri),
         sku: parsed.data.sku,
       })
-      .eq("plakalar_id", plakaларId);
+      .eq("plakalar_id", plakalarId);
 
     if (error) {
       return { success: false, error: error.message };
@@ -352,8 +359,15 @@ export async function deletePlaka(plakalarId: string): Promise<ActionResult> {
   }
 }
 
+/** Export helper: flatten kesim_sureleri into separate columns */
+interface ExportPlaka extends Omit<Plaka, "kesim_sureleri"> {
+  buyuk_dk: number | null;
+  kucuk_dk: number | null;
+  kutu_dk: number | null;
+}
+
 export async function exportPlakalar(): Promise<
-  { success: true; data: Plaka[] } | { success: false; error: string }
+  { success: true; data: ExportPlaka[] } | { success: false; error: string }
 > {
   try {
     await requireAdmin();
@@ -364,7 +378,19 @@ export async function exportPlakalar(): Promise<
       .order("plakalar_id");
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: (data ?? []) as Plaka[] };
+
+    const exportData = ((data ?? []) as Plaka[]).map((p) => {
+      const ks = (p.kesim_sureleri ?? {}) as Record<string, number>;
+      const { kesim_sureleri: _ks, ...rest } = p;
+      return {
+        ...rest,
+        buyuk_dk: ks["BÜYÜK"] ?? null,
+        kucuk_dk: ks["KÜÇÜK"] ?? null,
+        kutu_dk: ks["KUTU"] ?? null,
+      };
+    });
+
+    return { success: true, data: exportData };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
@@ -377,8 +403,9 @@ export async function importPlakalar(
     plaka_adi: string;
     tipi?: string;
     renk?: string;
-    makine_id: string;
-    std_kesim_suresi_dk?: string;
+    buyuk_dk?: string;
+    kucuk_dk?: string;
+    kutu_dk?: string;
     sku?: string;
   }[]
 ): Promise<ActionResult & { count?: number }> {
@@ -390,10 +417,22 @@ export async function importPlakalar(
     for (const row of rows) {
       if (!row.plaka_id || !row.plaka_adi) continue;
 
-      const sureDk = row.std_kesim_suresi_dk ? parseInt(row.std_kesim_suresi_dk, 10) : null;
+      // Build kesim_sureleri from 3 columns
+      const kesimSureleri: Record<string, number> = {};
+      if (row.buyuk_dk) {
+        const v = parseInt(row.buyuk_dk, 10);
+        if (!isNaN(v)) kesimSureleri["BÜYÜK"] = v;
+      }
+      if (row.kucuk_dk) {
+        const v = parseInt(row.kucuk_dk, 10);
+        if (!isNaN(v)) kesimSureleri["KÜÇÜK"] = v;
+      }
+      if (row.kutu_dk) {
+        const v = parseInt(row.kutu_dk, 10);
+        if (!isNaN(v)) kesimSureleri["KUTU"] = v;
+      }
 
       if (row.plakalar_id) {
-        // Upsert by plakalar_id
         const { error } = await supabase
           .from("plakalar")
           .upsert(
@@ -403,8 +442,7 @@ export async function importPlakalar(
               plaka_adi: row.plaka_adi,
               tipi: row.tipi || null,
               renk: row.renk || null,
-              makine_id: row.makine_id || "BÜYÜK",
-              std_kesim_suresi_dk: sureDk,
+              kesim_sureleri: kesimSureleri,
               sku: row.sku || null,
             },
             { onConflict: "plakalar_id" }
@@ -414,7 +452,6 @@ export async function importPlakalar(
           return { success: false, error: `Satır ${row.plakalar_id}: ${error.message}` };
         }
       } else {
-        // Auto-generate plakalar_id for new rows
         const { data: lastPlaka } = await supabase
           .from("plakalar")
           .select("plakalar_id")
@@ -435,8 +472,7 @@ export async function importPlakalar(
           plaka_adi: row.plaka_adi,
           tipi: row.tipi || null,
           renk: row.renk || null,
-          makine_id: row.makine_id || "BÜYÜK",
-          std_kesim_suresi_dk: sureDk,
+          kesim_sureleri: kesimSureleri,
           sku: row.sku || null,
         });
 
@@ -449,6 +485,27 @@ export async function importPlakalar(
 
     revalidatePath("/admin/plakalar");
     return { success: true, count };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Tüm plakaları getir (plaka seçici için — pagination yok) */
+export async function getAllPlakalar(): Promise<
+  | { success: true; data: { plaka_id: string; plaka_adi: string; sku: string | null }[] }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("plakalar")
+      .select("plaka_id, plaka_adi, sku")
+      .order("plaka_id");
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data ?? []) as { plaka_id: string; plaka_adi: string; sku: string | null }[] };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

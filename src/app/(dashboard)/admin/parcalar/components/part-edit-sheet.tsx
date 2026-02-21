@@ -130,14 +130,14 @@ export function PartEditSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{isCreate ? "Yeni Parça" : "Parça Düzenle"}</SheetTitle>
+        <SheetHeader className="px-6 pt-6">
+          <SheetTitle className="text-lg">{isCreate ? "Yeni Parça" : "Parça Düzenle"}</SheetTitle>
           <SheetDescription>
             {isCreate ? "Yeni parça oluşturun" : part?.part_id}
           </SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 space-y-6 pt-4">
           {/* Editable fields */}
           <div className="space-y-4">
             {/* Part ID — only editable in create mode */}

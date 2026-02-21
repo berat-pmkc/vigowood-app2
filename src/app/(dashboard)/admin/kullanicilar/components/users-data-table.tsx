@@ -7,42 +7,47 @@ import {
   getCoreRowModel,
   type SortingState,
 } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
-import { FiyatlarToolbar } from "./fiyatlar-toolbar";
-import { FiyatEditSheet, type ProductOption } from "./fiyat-edit-sheet";
-import { getFiyatColumns } from "./fiyat-columns";
-import { deleteFiyat, type FiyatRow } from "../actions";
-import { toast } from "sonner";
+import { UsersToolbar } from "./users-toolbar";
+import { UserEditSheet } from "./user-edit-sheet";
+import { getUserColumns } from "./user-columns";
+import type { Database } from "@/lib/supabase/types";
 
-interface FiyatlarDataTableProps {
-  data: FiyatRow[];
+type User = Database["public"]["Tables"]["users"]["Row"];
+
+interface UsersDataTableProps {
+  data: User[];
   totalCount: number;
   pageIndex: number;
   pageSize: number;
   search: string;
-  countryCode: string;
+  role: string;
+  station: string;
+  active: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
-  products: ProductOption[];
 }
 
-export function FiyatlarDataTable({
+export function UsersDataTable({
   data,
   totalCount,
   pageIndex,
   pageSize,
   search,
-  countryCode,
+  role,
+  station,
+  active,
   sortBy,
   sortOrder,
-  products,
-}: FiyatlarDataTableProps) {
+}: UsersDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [editFiyat, setEditFiyat] = useState<FiyatRow | null>(null);
+  const [editUser, setEditUser] = useState<User | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [isNew, setIsNew] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"create" | "edit">("edit");
   const [, startTransition] = useTransition();
 
   const buildUrl = useCallback(
@@ -55,7 +60,7 @@ export function FiyatlarDataTable({
           params.set(key, value);
         }
       });
-      return `/admin/fiyatlar?${params.toString()}`;
+      return `/admin/kullanicilar?${params.toString()}`;
     },
     [searchParams]
   );
@@ -85,42 +90,25 @@ export function FiyatlarDataTable({
     [navigate]
   );
 
-  const handleEdit = useCallback((fiyat: FiyatRow) => {
-    setEditFiyat(fiyat);
-    setIsNew(false);
+  const handleEdit = useCallback((user: User) => {
+    setEditUser(user);
+    setSheetMode("edit");
     setSheetOpen(true);
   }, []);
 
-  const handleDelete = useCallback(
-    (fiyat: FiyatRow) => {
-      if (!confirm(`${fiyat.sku} (${fiyat.country_code}) fiyatını silmek istediğinize emin misiniz?`)) return;
-      startTransition(async () => {
-        const result = await deleteFiyat(fiyat.id);
-        if (result.success) {
-          toast.success("Fiyat silindi");
-          router.refresh();
-        } else {
-          toast.error(result.error);
-        }
-      });
-    },
-    [router]
-  );
-
-  const handleAddNew = useCallback(() => {
-    setEditFiyat(null);
-    setIsNew(true);
+  const handleCreate = useCallback(() => {
+    setEditUser(null);
+    setSheetMode("create");
     setSheetOpen(true);
   }, []);
 
   const columns = useMemo(
     () =>
-      getFiyatColumns({
+      getUserColumns({
         onSort: handleSort,
         onEdit: handleEdit,
-        onDelete: handleDelete,
       }),
-    [handleSort, handleEdit, handleDelete]
+    [handleSort, handleEdit]
   );
 
   const table = useReactTable({
@@ -134,21 +122,34 @@ export function FiyatlarDataTable({
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
-    getRowId: (row) => String(row.id),
+    getRowId: (row) => row.user_id,
   });
 
   return (
     <div className="space-y-4">
-      <FiyatlarToolbar
-        search={search}
-        countryCode={countryCode}
-        onAddNew={handleAddNew}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1">
+          <UsersToolbar
+            search={search}
+            role={role}
+            station={station}
+            active={active}
+            onSearchChange={(v) => navigate({ search: v || undefined, page: "0" })}
+            onRoleChange={(v) => navigate({ role: v || undefined, page: "0" })}
+            onStationChange={(v) => navigate({ station: v || undefined, page: "0" })}
+            onActiveChange={(v) => navigate({ active: v || undefined, page: "0" })}
+          />
+        </div>
+        <Button onClick={handleCreate} size="sm" className="shrink-0">
+          <Plus className="mr-1 h-4 w-4" />
+          Yeni Kullanıcı
+        </Button>
+      </div>
 
       <DataTable
         table={table}
         onRowClick={handleEdit}
-        emptyMessage="Fiyat kaydı bulunamadı."
+        emptyMessage="Kullanıcı bulunamadı."
       />
 
       <DataTablePagination
@@ -160,15 +161,12 @@ export function FiyatlarDataTable({
         }
       />
 
-      <FiyatEditSheet
-        fiyat={editFiyat}
-        isNew={isNew}
+      <UserEditSheet
+        user={editUser}
+        mode={sheetMode}
         open={sheetOpen}
-        onOpenChange={(open) => {
-          setSheetOpen(open);
-          if (!open) router.refresh();
-        }}
-        products={products}
+        onOpenChange={setSheetOpen}
+        onSaved={() => router.refresh()}
       />
     </div>
   );

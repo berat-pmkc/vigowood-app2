@@ -77,12 +77,12 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md overflow-hidden">
         <DialogHeader>
           <DialogTitle>Yeni Paketleme Seansı</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-4 pt-2 overflow-hidden">
           <div>
             <label className="text-sm font-medium mb-2 block">Ürün Seçin</label>
             <Popover open={comboOpen} onOpenChange={setComboOpen}>
@@ -120,18 +120,19 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                             setSelectedSku(product.sku);
                             setComboOpen(false);
                           }}
+                          className="overflow-hidden"
                         >
                           <Check
                             className={cn(
-                              "mr-2 h-4 w-4",
+                              "mr-2 h-4 w-4 shrink-0",
                               selectedSku === product.sku ? "opacity-100" : "opacity-0"
                             )}
                           />
-                          <div className="flex flex-col min-w-0">
+                          <div className="flex flex-col min-w-0 overflow-hidden">
                             <span className="truncate text-sm">
                               {product.urun_adi ?? product.sku}
                             </span>
-                            <span className="text-xs text-muted-foreground">{product.sku}</span>
+                            <span className="text-xs text-muted-foreground truncate">{product.sku}</span>
                           </div>
                         </CommandItem>
                       ))}
