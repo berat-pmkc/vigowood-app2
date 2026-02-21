@@ -26,7 +26,15 @@ export async function createClient() {
       },
       global: {
         fetch: (input, init) => {
-          return fetch(input, { ...init, cache: "no-store" });
+          // Unique header per request to prevent React Server Component
+          // fetch deduplication which consumes the response body stream.
+          // See: vercel/next.js#73035, vercel/next.js#69635
+          const headers = new Headers(init?.headers as HeadersInit | undefined);
+          headers.set(
+            "x-supabase-nonce",
+            `${Date.now()}-${Math.random().toString(36).slice(2)}`
+          );
+          return fetch(input, { ...init, headers, cache: "no-store" });
         },
       },
     }
