@@ -27,7 +27,7 @@ export default async function SevkiyatPage({ searchParams }: PageProps) {
   let query = supabase
     .from("sevkiyat")
     .select("*")
-    .or(`durum.neq.teslim_edildi,created_at.gte.${ninetyDaysAgo.toISOString()}`)
+    .or(`durum.in.(bekliyor,hazirlaniyor,yolda),created_at.gte.${ninetyDaysAgo.toISOString()}`)
     .order("created_at", { ascending: false });
 
   if (selectedCountry !== "all") {
@@ -37,7 +37,7 @@ export default async function SevkiyatPage({ searchParams }: PageProps) {
   const { data: allSevkiyat } = await query;
   const sevkiyatlar = (allSevkiyat ?? []) as SevkiyatRow[];
 
-  const counts: Record<string, number> = { bekliyor: 0, hazirlaniyor: 0, yolda: 0, teslim_edildi: 0 };
+  const counts: Record<string, number> = { bekliyor: 0, hazirlaniyor: 0, yolda: 0, teslim_edildi: 0, iptal_edildi: 0 };
   sevkiyatlar.forEach((s) => {
     if (counts[s.durum] !== undefined) counts[s.durum]++;
   });

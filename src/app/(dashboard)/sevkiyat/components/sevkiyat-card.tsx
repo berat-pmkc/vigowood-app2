@@ -40,6 +40,8 @@ export interface SevkiyatRow {
   teslimat_tipi: string | null;
   arac_tipi: string | null;
   tir_plaka: string | null;
+  dorse_plaka: string | null;
+  tasiyici_firma: string | null;
   planlanan_sevk_tarihi: string | null;
   gerceklesen_sevk_tarihi: string | null;
   ihracatci_firma_id: number | null;
@@ -67,6 +69,7 @@ export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
   const durum = sevkiyat.durum as SevkiyatStatus;
   const borderColor = SEVKIYAT_STATUS_BORDER_COLORS[durum] ?? SEVKIYAT_STATUS_BORDER_COLORS.bekliyor;
   const isTeslim = durum === "teslim_edildi";
+  const isIptal = durum === "iptal_edildi";
 
   const handleNavigate = () => {
     router.push(`/sevkiyat/${sevkiyat.sevkiyat_id}`);
@@ -86,7 +89,8 @@ export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
       className={cn(
         "border-l-4 cursor-pointer transition-all hover:shadow-md",
         borderColor,
-        isTeslim && "opacity-60"
+        isTeslim && "opacity-60",
+        isIptal && "opacity-50 bg-red-50/30"
       )}
       onClick={handleNavigate}
     >

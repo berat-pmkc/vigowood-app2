@@ -19,12 +19,14 @@ interface ShipmentPlanningProps {
     kategori: string | null;
     stok_aktif: number;
   }[];
+  showCosts?: boolean;
 }
 
 export function ShipmentPlanning({
   sevkiyat,
   initialItems,
   products,
+  showCosts = false,
 }: ShipmentPlanningProps) {
   const router = useRouter();
   const [items, setItems] = useState<SevkiyatItemRow[]>(initialItems);
@@ -95,10 +97,12 @@ export function ShipmentPlanning({
 
       <ShipmentSummary totals={totals} />
 
-      <ShipmentCosts
-        sevkiyatId={sevkiyat.sevkiyat_id}
-        totalDesi={totals.desi}
-      />
+      {showCosts && (
+        <ShipmentCosts
+          sevkiyatId={sevkiyat.sevkiyat_id}
+          totalDesi={totals.desi}
+        />
+      )}
 
       <ShipmentActions
         sevkiyat={sevkiyat}

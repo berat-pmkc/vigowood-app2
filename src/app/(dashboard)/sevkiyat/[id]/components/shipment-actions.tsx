@@ -3,10 +3,22 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   startPreparation,
   shipSevkiyat,
   deliverSevkiyat,
   cancelSevkiyat,
+  voidSevkiyat,
 } from "../../actions";
 import type { SevkiyatRow } from "../../actions";
 import type { SevkiyatStatus } from "@/lib/constants";
@@ -18,6 +30,7 @@ import {
   FileText,
   ClipboardList,
   Loader2,
+  Ban,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,10 +69,12 @@ export function ShipmentActions({
     window.open(url, "_blank");
   };
 
+  const canVoid = durum === "bekliyor" || durum === "hazirlaniyor" || durum === "yolda";
+
   return (
     <div className="flex flex-col sm:flex-row gap-3">
       {/* PDF Butonları */}
-      {hasItems && (
+      {hasItems && durum !== "iptal_edildi" && (
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -88,7 +103,51 @@ export function ShipmentActions({
       <div className="flex-1" />
 
       {/* Durum Butonları */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
+        {/* İptal Et butonu — bekliyor, hazirlaniyor, yolda */}
+        {canVoid && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                disabled={loading === "void"}
+              >
+                {loading === "void" ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Ban className="w-4 h-4" />
+                )}
+                İptal Et
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sevkiyatı iptal et</AlertDialogTitle>
+                <AlertDialogDescription>
+                  <b>{sevkiyat.sevkiyat_id}</b> sevkiyatı iptal edilecek. Bu işlem geri alınamaz.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() =>
+                    handleAction(
+                      () => voidSevkiyat(sevkiyat.sevkiyat_id),
+                      "void",
+                      "Sevkiyat iptal edildi"
+                    )
+                  }
+                >
+                  İptal Et
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+
         {durum === "bekliyor" && (
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5"
@@ -138,7 +197,7 @@ export function ShipmentActions({
                 handleAction(
                   () => shipSevkiyat(sevkiyat.sevkiyat_id),
                   "ship",
-                  "Sevkiyat gönderildi, stok düşüldü"
+                  "Sevkiyat gönderildi"
                 )
               }
             >
@@ -162,7 +221,7 @@ export function ShipmentActions({
                 handleAction(
                   () => cancelSevkiyat(sevkiyat.sevkiyat_id),
                   "cancel",
-                  "Geri alındı, stok iade edildi"
+                  "Geri alındı"
                 )
               }
             >
@@ -198,6 +257,13 @@ export function ShipmentActions({
           <div className="flex items-center gap-2 text-emerald-600 text-sm">
             <CheckCircle className="w-5 h-5" />
             <span className="font-medium">Teslim Edildi</span>
+          </div>
+        )}
+
+        {durum === "iptal_edildi" && (
+          <div className="flex items-center gap-2 text-red-600 text-sm">
+            <Ban className="w-5 h-5" />
+            <span className="font-medium">İptal Edildi</span>
           </div>
         )}
       </div>

@@ -202,7 +202,9 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
         konteyner_no: data.konteyner_no || null,
         konteyner_tipi: data.konteyner_tipi || null,
         tir_plaka: data.tir_plaka || null,
+        dorse_plaka: data.dorse_plaka || null,
         planlanan_sevk_tarihi: data.planlanan_sevk_tarihi || null,
+        tasiyici_firma: data.tasiyici_firma || null,
         not_text: data.not_text || null,
       },
       items.map((item) => ({
@@ -367,15 +369,35 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
                   </div>
                 </>
               ) : (
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="tir_plaka">Tır Plaka</Label>
-                  <Input
-                    id="tir_plaka"
-                    placeholder="34 ABC 123"
-                    {...register("tir_plaka", { setValueAs: (v: string) => v === "" ? null : v })}
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="tir_plaka">Tır Plaka</Label>
+                    <Input
+                      id="tir_plaka"
+                      placeholder="34 ABC 123"
+                      {...register("tir_plaka", { setValueAs: (v: string) => v === "" ? null : v })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dorse_plaka">Dorse Plaka</Label>
+                    <Input
+                      id="dorse_plaka"
+                      placeholder="34 DEF 456"
+                      {...register("dorse_plaka", { setValueAs: (v: string) => v === "" ? null : v })}
+                    />
+                  </div>
+                </>
               )}
+            </div>
+
+            {/* Taşıyıcı Firma */}
+            <div className="space-y-2">
+              <Label htmlFor="tasiyici_firma">Taşıyıcı Firma</Label>
+              <Input
+                id="tasiyici_firma"
+                placeholder="Nakliye firma adı..."
+                {...register("tasiyici_firma", { setValueAs: (v: string) => v === "" ? null : v })}
+              />
             </div>
 
             {/* Not */}
@@ -598,6 +620,40 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* --- Toplamlar --- */}
+        {items.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            {(() => {
+              const t = items.reduce((acc, item) => ({
+                palet: acc.palet + item.palet_sayisi,
+                koli: acc.koli + (item.palette_koli * item.palet_sayisi),
+                agirlik: acc.agirlik + (item.koli_agirlik * item.palette_koli * item.palet_sayisi),
+                adet: acc.adet + (item.koli_adedi * item.palette_koli * item.palet_sayisi),
+              }), { palet: 0, koli: 0, agirlik: 0, adet: 0 });
+              return (
+                <>
+                  <div className="rounded-lg border bg-blue-50 p-3 text-center">
+                    <p className="text-xs text-blue-600 font-medium">Toplam Palet</p>
+                    <p className="text-lg font-bold text-blue-700">{t.palet}</p>
+                  </div>
+                  <div className="rounded-lg border bg-purple-50 p-3 text-center">
+                    <p className="text-xs text-purple-600 font-medium">Toplam Koli</p>
+                    <p className="text-lg font-bold text-purple-700">{t.koli.toLocaleString("tr-TR")}</p>
+                  </div>
+                  <div className="rounded-lg border bg-amber-50 p-3 text-center">
+                    <p className="text-xs text-amber-600 font-medium">Toplam Ağırlık</p>
+                    <p className="text-lg font-bold text-amber-700">{t.agirlik.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} kg</p>
+                  </div>
+                  <div className="rounded-lg border bg-emerald-50 p-3 text-center">
+                    <p className="text-xs text-emerald-600 font-medium">Toplam Adet</p>
+                    <p className="text-lg font-bold text-emerald-700">{t.adet.toLocaleString("tr-TR")}</p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* --- Submit --- */}
         <div className="flex gap-3">

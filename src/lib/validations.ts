@@ -185,14 +185,16 @@ export const iadeGirisSchema = z.object({
 
 export type IadeGirisData = z.infer<typeof iadeGirisSchema>;
 
-// Sevkiyat oluşturma (v3 — ülke bazlı + araç tipi + tarih)
+// Sevkiyat oluşturma (v4 — ülke bazlı + araç tipi + tarih + dorse + taşıyıcı)
 export const sevkiyatCreateSchema = z.object({
   country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
   arac_tipi: z.enum(["konteyner", "tir"]),
   konteyner_no: z.string().max(50, "Konteyner no en fazla 50 karakter").nullable(),
   konteyner_tipi: z.string().nullable(),
   tir_plaka: z.string().max(20, "Tır plaka en fazla 20 karakter").nullable(),
+  dorse_plaka: z.string().max(30, "Dorse plaka en fazla 30 karakter").nullable().optional(),
   planlanan_sevk_tarihi: z.string().nullable(),
+  tasiyici_firma: z.string().max(100, "Taşıyıcı firma en fazla 100 karakter").nullable().optional(),
   not_text: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
 });
 

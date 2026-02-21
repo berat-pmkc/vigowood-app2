@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SevkiyatCard, type SevkiyatRow } from "./sevkiyat-card";
 import { SEVKIYAT_STATUS, SEVKIYAT_STATUS_LABELS, SEVKIYAT_COUNTRIES } from "@/lib/constants";
 import { useSevkiyatRealtime } from "@/hooks/use-sevkiyat-realtime";
-import { Plus, Truck, LayoutTemplate, Coins } from "lucide-react";
+import { Plus, Truck } from "lucide-react";
 import Link from "next/link";
 
 interface SevkiyatListProps {
@@ -54,18 +54,6 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden md:flex gap-1.5" asChild>
-            <Link href="/sevkiyat/sablonlar">
-              <LayoutTemplate className="w-4 h-4" />
-              <span className="hidden lg:inline">Şablonlar</span>
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="hidden md:flex gap-1.5" asChild>
-            <Link href="/sevkiyat/kurlar">
-              <Coins className="w-4 h-4" />
-              <span className="hidden lg:inline">Kurlar</span>
-            </Link>
-          </Button>
           <Button asChild className="hidden md:flex">
             <Link href="/sevkiyat/yeni">
               <Plus className="w-4 h-4 mr-1" />
@@ -100,7 +88,7 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
 
       {/* Status tabs */}
       <Tabs value={selectedStatus} onValueChange={handleStatusChange}>
-        <TabsList className="w-full grid grid-cols-5">
+        <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="all" className="gap-1 text-xs sm:text-sm">
             Tümü
             <Badge variant="secondary" className="ml-1 text-xs">{totalCount}</Badge>
@@ -113,6 +101,7 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
                 {status === "hazirlaniyor" && "Haz."}
                 {status === "yolda" && "Yolda"}
                 {status === "teslim_edildi" && "Tes."}
+                {status === "iptal_edildi" && "İpt."}
               </span>
               {(counts[status] ?? 0) > 0 && (
                 <Badge variant="secondary" className="ml-1 text-xs">

@@ -1,15 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SevkiyatStatusBadge } from "../../components/sevkiyat-status-badge";
 import {
   KONTEYNER_TYPE_LABELS,
   type KonteynerType,
 } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
+import { updateGerceklesenTarih } from "../../actions";
 import {
   ArrowLeft,
   MapPin,
@@ -18,7 +21,12 @@ import {
   Container,
   User,
   Truck,
+  Building2,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { SevkiyatRow } from "../../actions";
 
 interface ShipmentHeaderProps {
@@ -27,8 +35,31 @@ interface ShipmentHeaderProps {
 
 export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
   const router = useRouter();
+  const [editingDate, setEditingDate] = useState(false);
+  const [dateValue, setDateValue] = useState(sevkiyat.gerceklesen_sevk_tarihi ?? "");
 
   const isTir = sevkiyat.arac_tipi === "tir";
+
+  const handleSaveDate = async () => {
+    if (!dateValue) return;
+    const result = await updateGerceklesenTarih(sevkiyat.sevkiyat_id, dateValue);
+    if (result.success) {
+      toast.success("Tarih güncellendi");
+      setEditingDate(false);
+      router.refresh();
+    } else {
+      toast.error(result.error ?? "Hata oluştu");
+    }
+  };
+
+  // Araç/plaka bilgisi
+  const aracLabel = isTir ? "Tır Plaka" : "Konteyner";
+  const aracValue = isTir
+    ? (sevkiyat.tir_plaka ?? "—")
+    : (sevkiyat.konteyner_no ?? "—");
+
+  // Dorse plaka (sadece tır)
+  const dorsePlaka = isTir ? sevkiyat.dorse_plaka : null;
 
   return (
     <div className="space-y-3">
@@ -94,36 +125,47 @@ export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
             </div>
           </div>
 
-          {sevkiyat.gerceklesen_sevk_tarihi ? (
-            <div className="flex items-start gap-2">
-              <CalendarCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs text-muted-foreground">Gerçekleşen</p>
-                <p className="font-medium text-emerald-700">
-                  {formatDate(sevkiyat.gerceklesen_sevk_tarihi)}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-start gap-2">
-              {isTir ? (
-                <Truck className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+          {/* Gerçekleşen tarih — düzenlenebilir */}
+          <div className="flex items-start gap-2">
+            <CalendarCheck className={`w-4 h-4 mt-0.5 shrink-0 ${sevkiyat.gerceklesen_sevk_tarihi ? "text-emerald-600" : "text-muted-foreground"}`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground">Gerçekleşen</p>
+              {editingDate ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Input
+                    type="date"
+                    className="h-7 text-xs w-[130px]"
+                    value={dateValue}
+                    onChange={(e) => setDateValue(e.target.value)}
+                  />
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSaveDate}>
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingDate(false)}>
+                    <X className="w-3 h-3 text-muted-foreground" />
+                  </Button>
+                </div>
               ) : (
-                <Container className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="flex items-center gap-1">
+                  <p className={`font-medium ${sevkiyat.gerceklesen_sevk_tarihi ? "text-emerald-700" : ""}`}>
+                    {sevkiyat.gerceklesen_sevk_tarihi
+                      ? formatDate(sevkiyat.gerceklesen_sevk_tarihi)
+                      : "—"}
+                  </p>
+                  {sevkiyat.gerceklesen_sevk_tarihi && (
+                    <button
+                      onClick={() => setEditingDate(true)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               )}
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  {isTir ? "Tır Plaka" : "Konteyner"}
-                </p>
-                <p className="font-medium">
-                  {isTir
-                    ? (sevkiyat.tir_plaka ?? "—")
-                    : (sevkiyat.konteyner_no ?? "—")}
-                </p>
-              </div>
             </div>
-          )}
+          </div>
 
+          {/* Araç bilgisi */}
           <div className="flex items-start gap-2">
             {isTir ? (
               <Truck className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -131,28 +173,41 @@ export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
               <Container className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
             )}
             <div>
-              <p className="text-xs text-muted-foreground">
-                {isTir ? "Araç" : "Tip"}
-              </p>
-              <p className="font-medium">
-                {isTir
-                  ? "Tır"
-                  : sevkiyat.konteyner_tipi
-                    ? (KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ??
-                        sevkiyat.konteyner_tipi)
-                    : "—"}
-              </p>
+              <p className="text-xs text-muted-foreground">{aracLabel}</p>
+              <p className="font-medium">{aracValue}</p>
+              {dorsePlaka && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Dorse: <span className="font-medium text-foreground">{dorsePlaka}</span>
+                </p>
+              )}
+              {!isTir && sevkiyat.konteyner_tipi && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ?? sevkiyat.konteyner_tipi}
+                </p>
+              )}
             </div>
           </div>
 
+          {/* Taşıyıcı / Teslimat */}
           <div className="flex items-start gap-2">
-            <Truck className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">Teslimat</p>
-              <p className="font-medium">
-                {sevkiyat.teslimat_tipi ?? "DAP"}
-              </p>
-            </div>
+            {sevkiyat.tasiyici_firma ? (
+              <>
+                <Building2 className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Taşıyıcı</p>
+                  <p className="font-medium truncate">{sevkiyat.tasiyici_firma}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{sevkiyat.teslimat_tipi ?? "DAP"}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Truck className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Teslimat</p>
+                  <p className="font-medium">{sevkiyat.teslimat_tipi ?? "DAP"}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </Card>

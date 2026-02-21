@@ -15,6 +15,10 @@ import {
   Users,
   Settings,
   Bell,
+  LayoutTemplate,
+  DollarSign,
+  Receipt,
+  Coins,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
@@ -45,6 +49,8 @@ const MANAGEMENT_ROLES: UserRole[] = [
 ];
 
 const ALL_INTERNAL: UserRole[] = [...MANAGEMENT_ROLES, "Hat"];
+
+const SEVK_ROLES: UserRole[] = ["Yönetici", "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -86,12 +92,11 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Sevkiyat",
     items: [
-      {
-        title: "Sevkiyat",
-        href: "/sevkiyat",
-        icon: Truck,
-        roles: ["Yönetici", "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"],
-      },
+      { title: "Sevkiyatlar", href: "/sevkiyat", icon: Truck, roles: SEVK_ROLES },
+      { title: "Şablonlar", href: "/sevkiyat/sablonlar", icon: LayoutTemplate, roles: SEVK_ROLES },
+      { title: "Fiyatlar", href: "/sevkiyat/fiyatlar", icon: DollarSign, roles: SEVK_ROLES },
+      { title: "Maliyetler", href: "/sevkiyat/maliyetler", icon: Receipt, roles: ["Yönetici", "Endüstri Mühendisi"] },
+      { title: "Kurlar", href: "/sevkiyat/kurlar", icon: Coins, roles: SEVK_ROLES },
     ],
   },
   {

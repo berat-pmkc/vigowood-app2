@@ -257,7 +257,7 @@ export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
 ];
 
 // Sevkiyat durum sabitleri
-export const SEVKIYAT_STATUS = ["bekliyor", "hazirlaniyor", "yolda", "teslim_edildi"] as const;
+export const SEVKIYAT_STATUS = ["bekliyor", "hazirlaniyor", "yolda", "teslim_edildi", "iptal_edildi"] as const;
 export type SevkiyatStatus = (typeof SEVKIYAT_STATUS)[number];
 
 export const SEVKIYAT_STATUS_LABELS: Record<SevkiyatStatus, string> = {
@@ -265,6 +265,7 @@ export const SEVKIYAT_STATUS_LABELS: Record<SevkiyatStatus, string> = {
   hazirlaniyor: "Hazırlanıyor",
   yolda: "Yolda",
   teslim_edildi: "Teslim Edildi",
+  iptal_edildi: "İptal Edildi",
 };
 
 export const SEVKIYAT_STATUS_COLORS: Record<SevkiyatStatus, { bg: string; text: string; border: string }> = {
@@ -272,6 +273,7 @@ export const SEVKIYAT_STATUS_COLORS: Record<SevkiyatStatus, { bg: string; text: 
   hazirlaniyor: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
   yolda: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
   teslim_edildi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+  iptal_edildi: { bg: "bg-red-50", text: "text-red-700", border: "border-red-300" },
 };
 
 export const SEVKIYAT_STATUS_BORDER_COLORS: Record<SevkiyatStatus, string> = {
@@ -279,6 +281,7 @@ export const SEVKIYAT_STATUS_BORDER_COLORS: Record<SevkiyatStatus, string> = {
   hazirlaniyor: "border-l-blue-500",
   yolda: "border-l-purple-500",
   teslim_edildi: "border-l-emerald-500",
+  iptal_edildi: "border-l-red-500",
 };
 
 // Sevkiyat erişim rolleri
@@ -288,6 +291,12 @@ export const SEVKIYAT_ACCESS_ROLES: UserRole[] = [
   "Sevkiyat Sorumlusu",
   "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
+];
+
+// Sevkiyat maliyet görüntüleme rolleri (sadece admin/mühendis)
+export const SEVKIYAT_COST_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
 ];
 
 // Sevkiyat ülke konfigürasyonları

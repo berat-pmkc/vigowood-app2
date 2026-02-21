@@ -210,6 +210,8 @@ export interface SevkiyatRow {
   teslimat_tipi: string | null;
   arac_tipi: string | null;
   tir_plaka: string | null;
+  dorse_plaka: string | null;
+  tasiyici_firma: string | null;
   planlanan_sevk_tarihi: string | null;
   gerceklesen_sevk_tarihi: string | null;
   ihracatci_firma_id: number | null;
@@ -432,14 +434,16 @@ export async function updateItemGrup(
 
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
-/** Yeni sevkiyat oluştur (v3 — ülke bazlı + araç tipi + tarih) */
+/** Yeni sevkiyat oluştur */
 export async function createSevkiyat(formData: {
   country_code: string;
   arac_tipi?: string;
   konteyner_no: string | null;
   konteyner_tipi: string | null;
   tir_plaka?: string | null;
+  dorse_plaka?: string | null;
   planlanan_sevk_tarihi?: string | null;
+  tasiyici_firma?: string | null;
   not_text: string | null;
 }): Promise<ActionResult & { sevkiyatId?: string }> {
   try {
@@ -495,6 +499,8 @@ export async function createSevkiyat(formData: {
       konteyner_no: aracTipi === "konteyner" ? (parsed.data.konteyner_no || null) : null,
       konteyner_tipi: aracTipi === "konteyner" ? (parsed.data.konteyner_tipi || null) : null,
       tir_plaka: aracTipi === "tir" ? (parsed.data.tir_plaka || null) : null,
+      dorse_plaka: aracTipi === "tir" ? (parsed.data.dorse_plaka || null) : null,
+      tasiyici_firma: parsed.data.tasiyici_firma || null,
       not_text: parsed.data.not_text || null,
       durum: "bekliyor",
       operator_id: operatorId,
@@ -519,7 +525,9 @@ export async function createSevkiyatWithItems(
     konteyner_no: string | null;
     konteyner_tipi: string | null;
     tir_plaka?: string | null;
+    dorse_plaka?: string | null;
     planlanan_sevk_tarihi?: string | null;
+    tasiyici_firma?: string | null;
     not_text: string | null;
   },
   itemsData: {
@@ -586,6 +594,8 @@ export async function createSevkiyatWithItems(
       konteyner_no: aracTipi === "konteyner" ? (parsed.data.konteyner_no || null) : null,
       konteyner_tipi: aracTipi === "konteyner" ? (parsed.data.konteyner_tipi || null) : null,
       tir_plaka: aracTipi === "tir" ? (parsed.data.tir_plaka || null) : null,
+      dorse_plaka: aracTipi === "tir" ? (parsed.data.dorse_plaka || null) : null,
+      tasiyici_firma: parsed.data.tasiyici_firma || null,
       not_text: parsed.data.not_text || null,
       durum: "bekliyor",
       operator_id: operatorId,
@@ -706,7 +716,7 @@ export async function startPreparation(sevkiyatId: string): Promise<ActionResult
   }
 }
 
-/** Sevkiyatı gönder: hazirlaniyor → yolda + STOK DÜŞÜMÜ */
+/** Sevkiyatı gönder: hazirlaniyor → yolda */
 export async function shipSevkiyat(sevkiyatId: string): Promise<ActionResult> {
   try {
     await requireSevkiyatAccess();
@@ -724,19 +734,11 @@ export async function shipSevkiyat(sevkiyatId: string): Promise<ActionResult> {
 
     const { data: items } = await supabase
       .from("sevkiyat_items")
-      .select("item_id, sku, qty")
-      .eq("sevkiyat_id", sevkiyatId);
-
-    const itemRows = (items ?? []) as { item_id: string; sku: string; qty: number }[];
-    if (itemRows.length === 0) return { success: false, error: "Sevkiyatta ürün bulunmuyor" };
-
-    // Idempotency
-    const { data: existingMov } = await supabase
-      .from("stock_movements")
-      .select("id")
-      .eq("source_row_id", sevkiyatId)
-      .eq("source", "Sevkiyat")
+      .select("item_id")
+      .eq("sevkiyat_id", sevkiyatId)
       .limit(1);
+
+    if (!items || items.length === 0) return { success: false, error: "Sevkiyatta ürün bulunmuyor" };
 
     const now = new Date().toISOString();
 
@@ -747,34 +749,7 @@ export async function shipSevkiyat(sevkiyatId: string): Promise<ActionResult> {
 
     if (updateError) return { success: false, error: updateError.message };
 
-    if (!existingMov || existingMov.length === 0) {
-      for (const item of itemRows) {
-        const { error: movError } = await supabase.from("stock_movements").insert({
-          tarih: now,
-          sku: item.sku,
-          qty: -item.qty,
-          source: "Sevkiyat",
-          source_row_id: sevkiyatId,
-          batch_id: sevkiyatId,
-        });
-        if (movError) return { success: false, error: `Stok hareketi hatası: ${movError.message}` };
-
-        const { data: productData } = await supabase
-          .from("products")
-          .select("sku, stok_aktif")
-          .eq("sku", item.sku)
-          .single();
-
-        const product = productData as { sku: string; stok_aktif: number } | null;
-        if (product) {
-          const newStok = Math.max(0, (product.stok_aktif || 0) - item.qty);
-          await supabase.from("products").update({ stok_aktif: newStok }).eq("sku", item.sku);
-        }
-      }
-    }
-
     revalidatePath("/sevkiyat");
-    revalidatePath("/stok/mamul");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -811,7 +786,7 @@ export async function deliverSevkiyat(sevkiyatId: string): Promise<ActionResult>
   }
 }
 
-/** İptal (bir adım geri): yolda→hazirlaniyor ise stok iadesi */
+/** Bir adım geri al */
 export async function cancelSevkiyat(sevkiyatId: string): Promise<ActionResult> {
   try {
     await requireSevkiyatAccess();
@@ -855,37 +830,67 @@ export async function cancelSevkiyat(sevkiyatId: string): Promise<ActionResult> 
 
     if (error) return { success: false, error: error.message };
 
-    // yolda → hazirlaniyor: stok iadesi — eski hareketleri sil + ürün stoğunu geri yükle
-    if (row.durum === "yolda" && newDurum === "hazirlaniyor") {
-      const { data: movs } = await supabase
-        .from("stock_movements")
-        .select("id, sku, qty")
-        .eq("source_row_id", sevkiyatId)
-        .eq("source", "Sevkiyat");
+    revalidatePath("/sevkiyat");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
 
-      const movements = (movs ?? []) as { id: string; sku: string; qty: number }[];
+/** Sevkiyatı iptal et (terminal state) */
+export async function voidSevkiyat(sevkiyatId: string): Promise<ActionResult> {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
 
-      for (const mov of movements) {
-        // Ürün stoğunu geri yükle
-        const { data: productData } = await supabase
-          .from("products")
-          .select("sku, stok_aktif")
-          .eq("sku", mov.sku)
-          .single();
+    const { data } = await supabase
+      .from("sevkiyat")
+      .select("durum")
+      .eq("sevkiyat_id", sevkiyatId)
+      .single();
 
-        const product = productData as { sku: string; stok_aktif: number } | null;
-        if (product) {
-          const newStok = (product.stok_aktif || 0) + Math.abs(mov.qty);
-          await supabase.from("products").update({ stok_aktif: newStok }).eq("sku", mov.sku);
-        }
+    const row = data as { durum: string } | null;
+    if (!row) return { success: false, error: "Sevkiyat bulunamadı" };
 
-        // Orijinal stok hareketini sil (re-ship'te yeni hareket oluşturulacak)
-        await supabase.from("stock_movements").delete().eq("id", mov.id);
-      }
+    if (row.durum === "teslim_edildi" || row.durum === "iptal_edildi") {
+      return { success: false, error: "Bu durumdaki sevkiyat iptal edilemez" };
     }
 
+    const { error } = await supabase
+      .from("sevkiyat")
+      .update({ durum: "iptal_edildi" })
+      .eq("sevkiyat_id", sevkiyatId);
+
+    if (error) return { success: false, error: error.message };
+
     revalidatePath("/sevkiyat");
-    revalidatePath("/stok/mamul");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Gerçekleşen sevk tarihini güncelle */
+export async function updateGerceklesenTarih(
+  sevkiyatId: string,
+  tarih: string
+): Promise<ActionResult> {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    if (!tarih || !/^\d{4}-\d{2}-\d{2}$/.test(tarih)) {
+      return { success: false, error: "Geçersiz tarih formatı" };
+    }
+
+    const { error } = await supabase
+      .from("sevkiyat")
+      .update({ gerceklesen_sevk_tarihi: tarih })
+      .eq("sevkiyat_id", sevkiyatId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/sevkiyat");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
