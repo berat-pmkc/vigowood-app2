@@ -122,8 +122,8 @@ export async function getFiyatlarForCountry(countryCode: string) {
   }
 }
 
-/** Palet şablonu getir (ülke + sku) */
-export async function getPaletSablon(countryCode: string, sku: string) {
+/** Palet şablonlarını getir (SKU bazlı, tüm palet boyutları) */
+export async function getPaletSablonlar(sku: string) {
   try {
     await requireSevkiyatAccess();
     const supabase = await createClient();
@@ -131,11 +131,10 @@ export async function getPaletSablon(countryCode: string, sku: string) {
     const { data, error } = await supabase
       .from("sevkiyat_palet_sablon")
       .select("*")
-      .eq("country_code", countryCode)
       .eq("sku", sku)
-      .single();
+      .order("palet_boyut");
 
-    if (error || !data) return { success: true as const, data: null };
+    if (error || !data || data.length === 0) return { success: true as const, data: [] };
     return {
       success: true as const,
       data: data as {
@@ -147,7 +146,7 @@ export async function getPaletSablon(countryCode: string, sku: string) {
         koli_adedi: number;
         palette_koli: number;
         koli_agirlik: number;
-      },
+      }[],
     };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };

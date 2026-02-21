@@ -17,9 +17,7 @@ async function requireAdmin() {
 
 export interface PaletSablonRow {
   id: number;
-  country_code: string;
   sku: string;
-  urun_adi: string | null;
   palet_boyut: string;
   palet_yukseklik: number;
   en: number;
@@ -33,9 +31,7 @@ export interface PaletSablonRow {
 }
 
 export async function createPaletSablon(formData: {
-  country_code: string;
   sku: string;
-  urun_adi: string | null;
   palet_boyut: string;
   palet_yukseklik: number;
   en: number;
@@ -56,9 +52,7 @@ export async function createPaletSablon(formData: {
 
     const supabase = await createClient();
     const { error } = await supabase.from("sevkiyat_palet_sablon").insert({
-      country_code: parsed.data.country_code,
       sku: parsed.data.sku,
-      urun_adi: parsed.data.urun_adi || null,
       palet_boyut: parsed.data.palet_boyut,
       palet_yukseklik: parsed.data.palet_yukseklik,
       en: parsed.data.en,
@@ -81,9 +75,7 @@ export async function createPaletSablon(formData: {
 export async function updatePaletSablon(
   id: number,
   formData: {
-    country_code: string;
     sku: string;
-    urun_adi: string | null;
     palet_boyut: string;
     palet_yukseklik: number;
     en: number;
@@ -107,9 +99,7 @@ export async function updatePaletSablon(
     const { error } = await supabase
       .from("sevkiyat_palet_sablon")
       .update({
-        country_code: parsed.data.country_code,
         sku: parsed.data.sku,
-        urun_adi: parsed.data.urun_adi || null,
         palet_boyut: parsed.data.palet_boyut,
         palet_yukseklik: parsed.data.palet_yukseklik,
         en: parsed.data.en,

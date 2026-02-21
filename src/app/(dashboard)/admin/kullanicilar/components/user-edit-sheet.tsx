@@ -30,12 +30,10 @@ import {
 import { formatDate } from "@/lib/utils";
 import { createUser, updateUser, getNextUserId } from "../actions";
 import { toast } from "sonner";
-import type { Database } from "@/lib/supabase/types";
-
-type User = Database["public"]["Tables"]["users"]["Row"];
+import type { UserWithLastSignIn } from "../page";
 
 interface UserEditSheetProps {
-  user: User | null;
+  user: UserWithLastSignIn | null;
   mode: "create" | "edit";
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +49,7 @@ export function UserEditSheet({
 }: UserEditSheetProps) {
   const [isPending, startTransition] = useTransition();
   const [isActive, setIsActive] = useState(true);
+  const [password, setPassword] = useState("");
   const isCreate = mode === "create";
 
   const {
@@ -78,6 +77,7 @@ export function UserEditSheet({
           role: "Üretim" as UserCreateData["role"],
           station: "Kesim" as UserCreateData["station"],
         });
+        setPassword("");
       });
     } else if (user) {
       reset({
@@ -88,6 +88,7 @@ export function UserEditSheet({
         station: user.station as UserCreateData["station"],
       });
       setIsActive(user.is_active);
+      setPassword(user.password_plain || "");
     }
   }, [user, isCreate, reset, open]);
 
@@ -100,6 +101,7 @@ export function UserEditSheet({
           email: data.email,
           role: data.role,
           station: data.station,
+          password_plain: password || null,
         });
         if (result.success) {
           toast.success("Kullanıcı oluşturuldu");
@@ -116,6 +118,7 @@ export function UserEditSheet({
           role: data.role,
           station: data.station,
           is_active: isActive,
+          password_plain: password || null,
         });
         if (result.success) {
           toast.success("Kullanıcı güncellendi");
@@ -194,6 +197,20 @@ export function UserEditSheet({
                   {errors.email.message}
                 </p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Şifre</Label>
+              <Input
+                id="password"
+                type="text"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="ör: Hasan2026."
+              />
+              <p className="text-xs text-muted-foreground">
+                E-posta olan kullanıcılar için giriş şifresi de güncellenir
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -291,6 +308,20 @@ export function UserEditSheet({
                   <div>
                     <span className="text-muted-foreground">Son Güncelleme</span>
                     <p>{formatDate(user.updated_at)}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Son Giriş</span>
+                    <p>
+                      {user.last_sign_in_at
+                        ? new Date(user.last_sign_in_at).toLocaleString("tr-TR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "—"}
+                    </p>
                   </div>
                 </div>
               </div>

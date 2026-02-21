@@ -38,7 +38,7 @@ import {
   ARAC_TIPLERI,
   type SevkiyatCountryCode,
 } from "@/lib/constants";
-import { createSevkiyatWithItems, getPaletSablon } from "../actions";
+import { createSevkiyatWithItems, getPaletSablonlar } from "../actions";
 import {
   ArrowLeft,
   Truck,

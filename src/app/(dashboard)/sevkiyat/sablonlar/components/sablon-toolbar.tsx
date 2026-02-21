@@ -11,16 +11,16 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Search, X, Plus } from "lucide-react";
-import { SEVKIYAT_COUNTRIES } from "@/lib/constants";
+import { PALET_BOYUTLARI } from "@/lib/constants";
 import { useCallback, useState } from "react";
 
 interface SablonToolbarProps {
   search: string;
-  countryCode: string;
+  paletBoyut: string;
   onAddNew: () => void;
 }
 
-export function SablonToolbar({ search, countryCode, onAddNew }: SablonToolbarProps) {
+export function SablonToolbar({ search, paletBoyut, onAddNew }: SablonToolbarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState(search);
@@ -55,7 +55,7 @@ export function SablonToolbar({ search, countryCode, onAddNew }: SablonToolbarPr
         <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="SKU veya ürün adı ara..."
+            placeholder="SKU ara..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-8 pr-8 h-9"
@@ -71,18 +71,19 @@ export function SablonToolbar({ search, countryCode, onAddNew }: SablonToolbarPr
           )}
         </form>
 
+        {/* Palet Boyutu filter */}
         <Select
-          value={countryCode || "all"}
-          onValueChange={(v) => updateParams("country_code", v === "all" ? "" : v)}
+          value={paletBoyut || "all"}
+          onValueChange={(v) => updateParams("palet_boyut", v === "all" ? "" : v)}
         >
           <SelectTrigger className="w-[140px] h-9">
-            <SelectValue placeholder="Ülke" />
+            <SelectValue placeholder="Palet Boyutu" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Tüm Ülkeler</SelectItem>
-            {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
-              <SelectItem key={c.code} value={c.code}>
-                {c.code} - {c.name}
+            <SelectItem value="all">Tüm Boyutlar</SelectItem>
+            {PALET_BOYUTLARI.map((b) => (
+              <SelectItem key={b} value={b}>
+                {b} cm
               </SelectItem>
             ))}
           </SelectContent>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { UsersDataTable } from "./components/users-data-table";
 import type { Database, UserRole, Station } from "@/lib/supabase/types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
+export type UserWithLastSignIn = User & { last_sign_in_at: string | null };
 
 interface PageProps {
   searchParams: Promise<{
@@ -24,9 +26,9 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const page = Math.max(0, Number(params.page || "0"));
-  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
-    ? Number(params.pageSize || "25")
-    : 25;
+  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "100"))
+    ? Number(params.pageSize || "100")
+    : 100;
   const search = params.search?.trim() || "";
   const role = params.role || "";
   const station = params.station || "";
@@ -97,6 +99,20 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
     );
   }
 
+  // Fetch last_sign_in_at from auth.users via DB function
+  const adminClient = createAdminClient();
+  const { data: signInData } = await adminClient.rpc("get_all_users_last_sign_in");
+  const signInMap = new Map<string, string | null>();
+  for (const row of signInData ?? []) {
+    signInMap.set(row.auth_id, row.last_sign_in_at);
+  }
+
+  // Merge last_sign_in_at into users
+  const usersWithSignIn: UserWithLastSignIn[] = ((users as User[]) ?? []).map((u) => ({
+    ...u,
+    last_sign_in_at: u.auth_id ? signInMap.get(u.auth_id) ?? null : null,
+  }));
+
   return (
     <div className="px-4 pb-6 sm:px-6">
       <div className="mb-4">
@@ -106,7 +122,7 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
         </p>
       </div>
       <UsersDataTable
-        data={(users as User[]) ?? []}
+        data={usersWithSignIn}
         totalCount={count ?? 0}
         pageIndex={page}
         pageSize={pageSize}

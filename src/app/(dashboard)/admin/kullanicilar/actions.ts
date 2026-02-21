@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { userCreateSchema, userUpdateSchema } from "@/lib/validations";
 import type { Database } from "@/lib/supabase/types";
 
@@ -43,6 +44,7 @@ export async function createUser(
     email: string | null;
     role: string;
     station: string;
+    password_plain?: string | null;
   }
 ): Promise<ActionResult> {
   try {
@@ -87,6 +89,7 @@ export async function createUser(
       role: parsed.data.role,
       station: parsed.data.station,
       is_active: true,
+      password_plain: formData.password_plain || null,
     });
 
     if (error) {
@@ -111,6 +114,7 @@ export async function updateUser(
     role: string;
     station: string;
     is_active: boolean;
+    password_plain?: string | null;
   }
 ): Promise<ActionResult> {
   try {
@@ -151,11 +155,34 @@ export async function updateUser(
         role: parsed.data.role,
         station: parsed.data.station,
         is_active: parsed.data.is_active,
+        password_plain: formData.password_plain ?? null,
       })
       .eq("user_id", userId);
 
     if (error) {
       return { success: false, error: error.message };
+    }
+
+    // If password changed and user has an auth account, update Supabase Auth password
+    if (formData.password_plain) {
+      const { data: userData } = await supabase
+        .from("users")
+        .select("auth_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (userData?.auth_id) {
+        const adminClient = createAdminClient();
+        const { error: authErr } = await adminClient.auth.admin.updateUserById(
+          userData.auth_id,
+          { password: formData.password_plain }
+        );
+
+        if (authErr) {
+          // DB updated but auth failed — warn but don't fail
+          return { success: false, error: `Bilgiler güncellendi fakat giriş şifresi güncellenemedi: ${authErr.message}` };
+        }
+      }
     }
 
     revalidatePath("/admin/kullanicilar");

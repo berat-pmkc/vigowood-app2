@@ -9,7 +9,7 @@ export default async function AyarlarPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Ayarlar</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Uygulama geneli ayarlar ve kritik stok hesaplama
+          Uygulama geneli ayarlar
         </p>
       </div>
 

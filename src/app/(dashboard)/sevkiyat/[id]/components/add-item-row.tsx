@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { addSevkiyatItem, getPaletSablon } from "../../actions";
+import { addSevkiyatItem, getPaletSablonlar } from "../../actions";
 import { Plus, ChevronsUpDown, Check, AlertTriangle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -80,9 +80,9 @@ export function AddItemRow({
     setSkuOpen(false);
     setSablonLoading(true);
 
-    const result = await getPaletSablon(countryCode, sku);
-    if (result.success && result.data) {
-      const s = result.data;
+    const result = await getPaletSablonlar(sku);
+    if (result.success && result.data && result.data.length > 0) {
+      const s = result.data[0];
       setPaletBoyut(s.palet_boyut);
       setPaletYukseklik(s.palet_yukseklik);
       setEn(s.en);

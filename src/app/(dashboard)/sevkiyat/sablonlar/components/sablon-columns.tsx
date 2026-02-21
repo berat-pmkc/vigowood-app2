@@ -2,7 +2,6 @@
 
 import { type ColumnDef } from "@tanstack/react-table";
 import { MoreHorizontal } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
-import { SEVKIYAT_COUNTRIES, type SevkiyatCountryCode } from "@/lib/constants";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import type { PaletSablonRow } from "../actions";
 
 interface ColumnOptions {
@@ -27,41 +26,27 @@ export function getSablonColumns({
 }: ColumnOptions): ColumnDef<PaletSablonRow>[] {
   return [
     {
-      accessorKey: "country_code",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ülke" onSort={onSort} />
-      ),
-      cell: ({ row }) => {
-        const code = row.getValue("country_code") as string;
-        const country = SEVKIYAT_COUNTRIES[code as SevkiyatCountryCode];
-        return (
-          <Badge variant="outline" className="text-xs font-mono">
-            {country?.code ?? code}
-          </Badge>
-        );
-      },
-      size: 80,
-    },
-    {
       accessorKey: "sku",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
       ),
-      cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.getValue("sku")}</span>
-      ),
+      cell: ({ row }) => {
+        const sku = row.getValue("sku") as string;
+        const style = getSkuBadgeStyle(sku);
+        return (
+          <span
+            className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium font-mono border"
+            style={{
+              backgroundColor: style.backgroundColor,
+              color: style.color,
+              borderColor: style.borderColor,
+            }}
+          >
+            {sku}
+          </span>
+        );
+      },
       size: 130,
-    },
-    {
-      accessorKey: "urun_adi",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ürün" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="max-w-[160px] truncate block sm:max-w-none">
-          {(row.getValue("urun_adi") as string) || "\u2014"}
-        </span>
-      ),
     },
     {
       accessorKey: "palet_boyut",

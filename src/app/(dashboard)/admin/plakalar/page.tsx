@@ -24,9 +24,9 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const page = Math.max(0, Number(params.page || "0"));
-  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
-    ? Number(params.pageSize || "25")
-    : 25;
+  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "100"))
+    ? Number(params.pageSize || "100")
+    : 100;
   const search = params.search?.trim() || "";
   const sku = params.sku || "";
   const sortBy = params.sortBy || "plakalar_id";

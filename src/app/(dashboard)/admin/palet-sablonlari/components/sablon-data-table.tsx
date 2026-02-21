@@ -21,7 +21,7 @@ interface SablonDataTableProps {
   pageIndex: number;
   pageSize: number;
   search: string;
-  countryCode: string;
+  paletBoyut: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -32,7 +32,7 @@ export function SablonDataTable({
   pageIndex,
   pageSize,
   search,
-  countryCode,
+  paletBoyut,
   sortBy,
   sortOrder,
 }: SablonDataTableProps) {
@@ -91,7 +91,7 @@ export function SablonDataTable({
 
   const handleDelete = useCallback(
     (sablon: PaletSablonRow) => {
-      if (!confirm(`${sablon.sku} (${sablon.country_code}) şablonunu silmek istediğinize emin misiniz?`)) return;
+      if (!confirm(`${sablon.sku} (${sablon.palet_boyut}) şablonunu silmek istediğinize emin misiniz?`)) return;
       startTransition(async () => {
         const result = await deletePaletSablon(sablon.id);
         if (result.success) {
@@ -139,7 +139,7 @@ export function SablonDataTable({
     <div className="space-y-4">
       <SablonToolbar
         search={search}
-        countryCode={countryCode}
+        paletBoyut={paletBoyut}
         onAddNew={handleAddNew}
       />
 

@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { paletSablonSchema, type PaletSablonData } from "@/lib/validations";
-import { SEVKIYAT_COUNTRIES, PALET_BOYUTLARI } from "@/lib/constants";
+import { PALET_BOYUTLARI } from "@/lib/constants";
 import { createPaletSablon, updatePaletSablon, type PaletSablonRow } from "../actions";
 import { toast } from "sonner";
 
@@ -45,16 +45,13 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
     resolver: zodResolver(paletSablonSchema),
   });
 
-  const countryCode = watch("country_code");
   const paletBoyut = watch("palet_boyut");
 
   useEffect(() => {
     if (open) {
       if (sablon && !isNew) {
         reset({
-          country_code: sablon.country_code as PaletSablonData["country_code"],
           sku: sablon.sku,
-          urun_adi: sablon.urun_adi,
           palet_boyut: sablon.palet_boyut,
           palet_yukseklik: sablon.palet_yukseklik,
           en: sablon.en,
@@ -66,9 +63,7 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
         });
       } else {
         reset({
-          country_code: "DE",
           sku: "",
-          urun_adi: null,
           palet_boyut: "80x120",
           palet_yukseklik: 125,
           en: 0,
@@ -85,9 +80,7 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
   const onSubmit = async (data: PaletSablonData) => {
     setLoading(true);
     const formData = {
-      country_code: data.country_code,
       sku: data.sku,
-      urun_adi: data.urun_adi || null,
       palet_boyut: data.palet_boyut,
       palet_yukseklik: data.palet_yukseklik,
       en: data.en,
@@ -121,29 +114,6 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
         </SheetHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 mt-4 space-y-4">
-          {/* Ülke */}
-          <div className="space-y-2">
-            <Label>Ülke *</Label>
-            <Select
-              value={countryCode ?? "DE"}
-              onValueChange={(v) => setValue("country_code", v as PaletSablonData["country_code"])}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Ülke seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.code} - {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.country_code && (
-              <p className="text-sm text-destructive">{errors.country_code.message}</p>
-            )}
-          </div>
-
           {/* SKU */}
           <div className="space-y-2">
             <Label htmlFor="sku">SKU *</Label>
@@ -151,16 +121,6 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
             {errors.sku && (
               <p className="text-sm text-destructive">{errors.sku.message}</p>
             )}
-          </div>
-
-          {/* Ürün Adı */}
-          <div className="space-y-2">
-            <Label htmlFor="urun_adi">Ürün Adı</Label>
-            <Input
-              id="urun_adi"
-              placeholder="Ürün adı"
-              {...register("urun_adi", { setValueAs: (v: string) => v === "" ? null : v })}
-            />
           </div>
 
           {/* Palet Boyut + Yükseklik */}

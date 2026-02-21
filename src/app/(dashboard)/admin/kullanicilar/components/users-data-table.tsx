@@ -14,12 +14,10 @@ import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { UsersToolbar } from "./users-toolbar";
 import { UserEditSheet } from "./user-edit-sheet";
 import { getUserColumns } from "./user-columns";
-import type { Database } from "@/lib/supabase/types";
-
-type User = Database["public"]["Tables"]["users"]["Row"];
+import type { UserWithLastSignIn } from "../page";
 
 interface UsersDataTableProps {
-  data: User[];
+  data: UserWithLastSignIn[];
   totalCount: number;
   pageIndex: number;
   pageSize: number;
@@ -45,7 +43,7 @@ export function UsersDataTable({
 }: UsersDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editUser, setEditUser] = useState<UserWithLastSignIn | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit">("edit");
   const [, startTransition] = useTransition();
@@ -90,7 +88,7 @@ export function UsersDataTable({
     [navigate]
   );
 
-  const handleEdit = useCallback((user: User) => {
+  const handleEdit = useCallback((user: UserWithLastSignIn) => {
     setEditUser(user);
     setSheetMode("edit");
     setSheetOpen(true);

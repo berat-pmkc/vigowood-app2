@@ -1551,6 +1551,7 @@ export type Database = {
           email: string | null
           full_name: string
           is_active: boolean
+          password_plain: string | null
           role: Database["public"]["Enums"]["user_role"]
           station: Database["public"]["Enums"]["station"]
           updated_at: string
@@ -1562,6 +1563,7 @@ export type Database = {
           email?: string | null
           full_name: string
           is_active?: boolean
+          password_plain?: string | null
           role: Database["public"]["Enums"]["user_role"]
           station: Database["public"]["Enums"]["station"]
           updated_at?: string
@@ -1573,6 +1575,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           is_active?: boolean
+          password_plain?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           station?: Database["public"]["Enums"]["station"]
           updated_at?: string
@@ -1627,6 +1630,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_all_users_last_sign_in: {
+        Args: never
+        Returns: {
+          auth_id: string
+          last_sign_in_at: string
+        }[]
+      }
+      get_user_last_sign_in: { Args: { p_auth_id: string }; Returns: string }
       has_personel_access: { Args: never; Returns: boolean }
       has_production_access: { Args: never; Returns: boolean }
       has_sales_access: { Args: never; Returns: boolean }

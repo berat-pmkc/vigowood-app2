@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal, Trash2, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,13 +27,12 @@ import { formatDate } from "@/lib/utils";
 import { deleteUser } from "../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import type { Database, UserRole } from "@/lib/supabase/types";
-
-type User = Database["public"]["Tables"]["users"]["Row"];
+import type { UserRole } from "@/lib/supabase/types";
+import type { UserWithLastSignIn } from "../page";
 
 interface ColumnOptions {
   onSort: (columnId: string, desc: boolean) => void;
-  onEdit: (user: User) => void;
+  onEdit: (user: UserWithLastSignIn) => void;
 }
 
 const roleBadgeColors: Record<UserRole, string> = {
@@ -49,12 +48,39 @@ const roleBadgeColors: Record<UserRole, string> = {
   "Mimar": "bg-pink-100 text-pink-800 border-pink-200",
 };
 
+function PasswordCell({ password }: { password: string | null }) {
+  const [visible, setVisible] = useState(false);
+  if (!password) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex items-center gap-1">
+      <span className="font-mono text-xs">
+        {visible ? password : "••••••••"}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6"
+        onClick={(e) => {
+          e.stopPropagation();
+          setVisible(!visible);
+        }}
+      >
+        {visible ? (
+          <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </Button>
+    </div>
+  );
+}
+
 function UserActionsCell({
   user,
   onEdit,
 }: {
-  user: User;
-  onEdit: (user: User) => void;
+  user: UserWithLastSignIn;
+  onEdit: (user: UserWithLastSignIn) => void;
 }) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -129,17 +155,17 @@ function UserActionsCell({
 export function getUserColumns({
   onSort,
   onEdit,
-}: ColumnOptions): ColumnDef<User>[] {
+}: ColumnOptions): ColumnDef<UserWithLastSignIn>[] {
   return [
     {
       accessorKey: "user_id",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Kullanıcı ID" onSort={onSort} />
+        <DataTableColumnHeader column={column} title="ID" onSort={onSort} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-sm">{row.getValue("user_id")}</span>
       ),
-      size: 120,
+      size: 90,
     },
     {
       accessorKey: "full_name",
@@ -163,6 +189,15 @@ export function getUserColumns({
         </span>
       ),
       meta: { className: "hidden md:table-cell" },
+    },
+    {
+      accessorKey: "password_plain",
+      header: "Şifre",
+      cell: ({ row }) => (
+        <PasswordCell password={row.getValue("password_plain")} />
+      ),
+      meta: { className: "hidden lg:table-cell" },
+      size: 140,
     },
     {
       accessorKey: "role",
@@ -211,17 +246,29 @@ export function getUserColumns({
       size: 80,
     },
     {
-      accessorKey: "created_at",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Kayıt Tarihi" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">
-          {formatDate(row.getValue("created_at"))}
-        </span>
-      ),
-      meta: { className: "hidden lg:table-cell" },
-      size: 120,
+      accessorKey: "last_sign_in_at",
+      header: "Son Giriş",
+      cell: ({ row }) => {
+        const lastSignIn = row.getValue("last_sign_in_at") as string | null;
+        if (!lastSignIn) return <span className="text-muted-foreground text-xs">—</span>;
+        try {
+          return (
+            <span className="text-muted-foreground text-xs whitespace-nowrap">
+              {new Date(lastSignIn).toLocaleString("tr-TR", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          );
+        } catch {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+      },
+      meta: { className: "hidden xl:table-cell" },
+      size: 140,
     },
     {
       id: "actions",

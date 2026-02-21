@@ -8,7 +8,7 @@ interface PageProps {
     page?: string;
     pageSize?: string;
     search?: string;
-    country_code?: string;
+    palet_boyut?: string;
     sortBy?: string;
     sortOrder?: string;
   }>;
@@ -20,11 +20,11 @@ export default async function PaletSablonlariPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const page = Math.max(0, Number(params.page || "0"));
-  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
-    ? Number(params.pageSize || "25")
-    : 25;
+  const pageSize = [25, 50, 100].includes(Number(params.pageSize || "100"))
+    ? Number(params.pageSize || "100")
+    : 100;
   const search = params.search?.trim() || "";
-  const countryCode = params.country_code || "";
+  const paletBoyut = params.palet_boyut || "";
   const sortBy = params.sortBy || "sku";
   const sortOrder = params.sortOrder === "desc" ? false : true;
 
@@ -38,14 +38,14 @@ export default async function PaletSablonlariPage({ searchParams }: PageProps) {
     .select("*", { count: "exact" });
 
   if (search) {
-    query = query.or(`sku.ilike.%${search}%,urun_adi.ilike.%${search}%`);
+    query = query.ilike("sku", `%${search}%`);
   }
 
-  if (countryCode) {
-    query = query.eq("country_code", countryCode);
+  if (paletBoyut) {
+    query = query.eq("palet_boyut", paletBoyut);
   }
 
-  const validSortColumns = ["sku", "urun_adi", "country_code", "palet_boyut", "koli_adedi", "palette_koli", "koli_agirlik"];
+  const validSortColumns = ["sku", "palet_boyut", "koli_adedi", "palette_koli", "koli_agirlik"];
   const sortColumn = validSortColumns.includes(sortBy) ? sortBy : "sku";
   query = query.order(sortColumn, { ascending: sortOrder });
   query = query.range(from, to);
@@ -65,7 +65,7 @@ export default async function PaletSablonlariPage({ searchParams }: PageProps) {
       <div className="mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Palet Şablonları</h1>
         <p className="text-sm text-muted-foreground">
-          Ürün-ülke bazlı palet konfigürasyonları (sevkiyat planlamasında otomatik doldurma)
+          Palet boyutuna göre ürün konfigürasyonları (sevkiyat planlamasında otomatik doldurma)
         </p>
       </div>
       <SablonDataTable
@@ -74,7 +74,7 @@ export default async function PaletSablonlariPage({ searchParams }: PageProps) {
         pageIndex={page}
         pageSize={pageSize}
         search={search}
-        countryCode={countryCode}
+        paletBoyut={paletBoyut}
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
       />

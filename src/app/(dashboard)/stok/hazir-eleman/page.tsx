@@ -42,9 +42,9 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
 
   // ---------- STOK TABLE PARAMS ----------
   const stokPage = Math.max(0, Number(params.page || "0"));
-  const stokPageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
-    ? Number(params.pageSize || "25")
-    : 25;
+  const stokPageSize = [25, 50, 100].includes(Number(params.pageSize || "100"))
+    ? Number(params.pageSize || "100")
+    : 100;
   const stokSearch = params.search?.trim() || "";
   const stokPartType = params.partType || "";
   const stokSortBy = params.sortBy || "part_id";
@@ -52,9 +52,9 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
 
   // ---------- MOVEMENTS TABLE PARAMS ----------
   const mPage = Math.max(0, Number(params.mPage || "0"));
-  const mPageSize = [25, 50, 100].includes(Number(params.mPageSize || "25"))
-    ? Number(params.mPageSize || "25")
-    : 25;
+  const mPageSize = [25, 50, 100].includes(Number(params.mPageSize || "100"))
+    ? Number(params.mPageSize || "100")
+    : 100;
   const mSearch = params.mSearch?.trim() || "";
   const mSortBy = params.mSortBy || "tarih";
   const mSortOrder = params.mSortOrder === "asc" ? "asc" as const : "desc" as const;
