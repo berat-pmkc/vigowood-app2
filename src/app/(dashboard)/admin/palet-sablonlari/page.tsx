@@ -14,6 +14,8 @@ interface PageProps {
   }>;
 }
 
+export const metadata: Metadata = { title: "Palet Sablonlari" };
+
 export default async function PaletSablonlariPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
