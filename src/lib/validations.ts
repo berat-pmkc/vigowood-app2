@@ -68,7 +68,7 @@ export const kesimSureleriSchema = z.object({
   "BÜYÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
   "KÜÇÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
   "KUTU": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
-}).default({});
+});
 
 export const plakaUpdateSchema = z.object({
   plaka_adi: z

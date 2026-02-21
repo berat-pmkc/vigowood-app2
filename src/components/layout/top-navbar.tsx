@@ -14,6 +14,15 @@ type TopNavbarProps = {
   userId?: string;
 };
 
+function getTodayString() {
+  return new Date().toLocaleDateString("tr-TR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function TopNavbar({ displayName, displayRole, userId }: TopNavbarProps) {
   const unreadCount = useUnreadCount(userId ?? null);
 
@@ -26,7 +35,7 @@ export function TopNavbar({ displayName, displayRole, userId }: TopNavbarProps) 
         {/* Breadcrumb area — can be extended later */}
         <div />
 
-        {/* Right side — user info + notifications */}
+        {/* Right side — user info + notifications + date */}
         <div className="flex items-center gap-3">
           <RealtimeIndicator />
 
@@ -47,6 +56,12 @@ export function TopNavbar({ displayName, displayRole, userId }: TopNavbarProps) 
             <p className="text-sm font-medium leading-tight">{displayName}</p>
             <p className="text-xs text-muted-foreground">{displayRole}</p>
           </div>
+
+          <Separator orientation="vertical" className="hidden h-4 sm:block" />
+
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            {getTodayString()}
+          </p>
         </div>
       </div>
     </header>

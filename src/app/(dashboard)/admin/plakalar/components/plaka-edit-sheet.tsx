@@ -49,7 +49,7 @@ export function PlakaEditSheet({
     reset,
     formState: { errors },
   } = useForm<PlakaCreateData>({
-    resolver: zodResolver(plakaCreateSchema),
+    resolver: zodResolver(plakaCreateSchema) as never,
   });
 
   useEffect(() => {

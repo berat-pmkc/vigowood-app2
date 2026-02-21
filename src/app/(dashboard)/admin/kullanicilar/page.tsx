@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { UsersDataTable } from "./components/users-data-table";
-import type { Database } from "@/lib/supabase/types";
+import type { Database, UserRole, Station } from "@/lib/supabase/types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 
@@ -52,12 +52,12 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
 
   // Role filter
   if (role) {
-    query = query.eq("role", role);
+    query = query.eq("role", role as UserRole);
   }
 
   // Station filter
   if (station) {
-    query = query.eq("station", station);
+    query = query.eq("station", station as Station);
   }
 
   // Active filter

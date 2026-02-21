@@ -10,19 +10,14 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
   Scissors,
   Package,
   Layers,
-  Component,
   Box,
   Settings,
   ArrowRight,
-  Clock,
-  CheckCircle2,
   AlertTriangle,
   TrendingUp,
   Activity,
@@ -31,10 +26,44 @@ import {
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
 import { DashboardRealtimeWrapper } from "./components/dashboard-realtime-wrapper";
+import { PeriodFilter } from "./components/period-filter";
 
 export const metadata: Metadata = { title: "Ana Sayfa" };
 
-export default async function DashboardPage() {
+type PeriodType = "today" | "week" | "month" | "last_month";
+
+function getPeriodDates(period: PeriodType): { start: string; end: string } {
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+  switch (period) {
+    case "today":
+      return { start: todayStr, end: todayStr };
+    case "week": {
+      const startOfWeek = new Date(now);
+      const day = now.getDay();
+      startOfWeek.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+      return { start: startOfWeek.toISOString().split("T")[0], end: todayStr };
+    }
+    case "month": {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start: startOfMonth.toISOString().split("T")[0], end: todayStr };
+    }
+    case "last_month": {
+      const firstLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      return {
+        start: firstLastMonth.toISOString().split("T")[0],
+        end: lastLastMonth.toISOString().split("T")[0],
+      };
+    }
+  }
+}
+
+interface PageProps {
+  searchParams: Promise<{ period?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: PageProps) {
   const profile = await getCurrentUser();
   if (!profile) redirect("/login");
 
@@ -47,30 +76,63 @@ export default async function DashboardPage() {
   const displayName = operatorName || profile.full_name || "";
   const userRole = profile.role as UserRole;
 
+  const params = await searchParams;
+  const period = (["today", "week", "month", "last_month"].includes(params.period ?? "")
+    ? params.period
+    : "today") as PeriodType;
+  const { start, end } = getPeriodDates(period);
+
   const today = new Date().toISOString().split("T")[0];
+
+  // Build period-filtered queries for production KPIs
+  function cutBatchPeriodQuery() {
+    let q = supabase
+      .from("cut_batches")
+      .select("cut_id", { count: "exact", head: true });
+    q = q.gte("tarih", start).lte("tarih", end);
+    return q;
+  }
+
+  function montajPeriodQuery() {
+    let q = supabase
+      .from("montaj_batches")
+      .select("montaj_id", { count: "exact", head: true });
+    q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
+    return q;
+  }
+
+  function packPeriodQuery() {
+    let q = supabase
+      .from("pack_events")
+      .select("session_id", { count: "exact", head: true });
+    q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
+    return q;
+  }
+
+  function kutuPeriodQuery() {
+    let q = supabase
+      .from("kutu_uretim")
+      .select("session_id", { count: "exact", head: true });
+    q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
+    return q;
+  }
 
   // Fetch dashboard data in parallel
   const [
-    activeProductsRes,
-    totalPartsRes,
-    todayCutsRes,
+    kesimRes,
+    montajRes,
+    paketlemeRes,
+    kutuRes,
     pendingCutsRes,
     cuttingCutsRes,
     completedTodayRes,
     recentCutsRes,
     criticalPartsRes,
   ] = await Promise.all([
-    supabase
-      .from("products")
-      .select("sku", { count: "exact", head: true })
-      .eq("aktif_mi", true),
-    supabase
-      .from("all_parts")
-      .select("part_id", { count: "exact", head: true }),
-    supabase
-      .from("cut_batches")
-      .select("cut_id", { count: "exact", head: true })
-      .eq("tarih", today),
+    cutBatchPeriodQuery(),
+    montajPeriodQuery(),
+    packPeriodQuery(),
+    kutuPeriodQuery(),
     supabase
       .from("cut_batches")
       .select("cut_id", { count: "exact", head: true })
@@ -99,9 +161,10 @@ export default async function DashboardPage() {
       .limit(5),
   ]);
 
-  const activeProducts = activeProductsRes.count ?? 0;
-  const totalParts = totalPartsRes.count ?? 0;
-  const todayCuts = todayCutsRes.count ?? 0;
+  const kesimCount = kesimRes.count ?? 0;
+  const montajCount = montajRes.count ?? 0;
+  const paketlemeCount = paketlemeRes.count ?? 0;
+  const kutuCount = kutuRes.count ?? 0;
   const pendingCuts = pendingCutsRes.count ?? 0;
   const cuttingCuts = cuttingCutsRes.count ?? 0;
   const completedToday = completedTodayRes.count ?? 0;
@@ -127,70 +190,43 @@ export default async function DashboardPage() {
     hazir_eleman_kritik_stok: number;
   }>;
 
-  const now = new Date();
-  const greeting = now.getHours() < 12 ? "Gunaydin" : now.getHours() < 18 ? "Iyi gunler" : "Iyi aksamlar";
-  const todayStr = now.toLocaleDateString("tr-TR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
-  const isProduction = ["Üretim", "Hat"].includes(userRole);
   const isAdmin = ["Yönetici", "Endüstri Mühendisi"].includes(userRole);
 
   return (
     <DashboardRealtimeWrapper>
     <div className="space-y-6">
-      {/* Welcome Banner */}
-      <div className="rounded-xl bg-gradient-to-r from-vw-deep to-vw-dark p-6 text-white">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold sm:text-2xl">
-              Hos geldiniz, {displayName}
-            </h1>
-            <p className="mt-1 text-sm text-white/70">{todayStr}</p>
-          </div>
-          <Badge
-            variant="secondary"
-            className="mt-2 w-fit bg-white/15 text-white hover:bg-white/20 sm:mt-0"
-          >
-            {userRole}
-          </Badge>
-        </div>
-      </div>
+      {/* Period Filter */}
+      <PeriodFilter activePeriod={period} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <KpiCard
-          title="Aktif Urunler"
-          value={activeProducts}
+          title="Kesim"
+          value={kesimCount}
+          icon={<Scissors className="size-5 text-amber-600" />}
+          href="/uretim/kesim"
+          color="warning"
+        />
+        <KpiCard
+          title="Montaj"
+          value={montajCount}
+          icon={<Wrench className="size-5 text-emerald-600" />}
+          href="/uretim/montaj"
+          color="success"
+        />
+        <KpiCard
+          title="Paketleme"
+          value={paketlemeCount}
           icon={<Package className="size-5 text-vw-info" />}
-          href="/admin/urunler"
+          href="/uretim/paketleme"
           color="blue"
         />
         <KpiCard
-          title="Toplam Parca"
-          value={totalParts}
-          icon={<Component className="size-5 text-vw-primary" />}
-          href="/admin/parcalar"
+          title="Kutu-Koli"
+          value={kutuCount}
+          icon={<Box className="size-5 text-vw-primary" />}
+          href="/uretim/kutu-koli"
           color="primary"
-        />
-        <KpiCard
-          title="Bekleyen Kesim"
-          value={pendingCuts}
-          icon={<Clock className="size-5 text-vw-warning" />}
-          href="/uretim/kesim"
-          color="warning"
-          highlight={pendingCuts > 0}
-        />
-        <KpiCard
-          title="Bugunku Kesim"
-          value={todayCuts}
-          subtitle={`${completedToday} tamamlandi`}
-          icon={<Scissors className="size-5 text-vw-success" />}
-          href="/uretim/kesim"
-          color="success"
         />
       </div>
 
@@ -380,8 +416,6 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <SummaryRow label="Aktif Urunler" value={activeProducts} />
-                <SummaryRow label="Toplam Parca" value={totalParts} />
                 <SummaryRow
                   label="Bekleyen Kesim"
                   value={pendingCuts}
@@ -391,6 +425,10 @@ export default async function DashboardPage() {
                   label="Devam Eden"
                   value={cuttingCuts}
                   active={cuttingCuts > 0}
+                />
+                <SummaryRow
+                  label="Bugun Tamamlanan"
+                  value={completedToday}
                 />
               </div>
             </CardContent>
@@ -407,27 +445,19 @@ export default async function DashboardPage() {
 function KpiCard({
   title,
   value,
-  subtitle,
   icon,
   href,
   color,
-  highlight,
 }: {
   title: string;
   value: number;
-  subtitle?: string;
   icon: React.ReactNode;
   href: string;
   color: "blue" | "primary" | "warning" | "success";
-  highlight?: boolean;
 }) {
   return (
     <Link href={href}>
-      <Card
-        className={`transition-shadow hover:shadow-md ${
-          highlight ? "border-vw-warning/50 bg-amber-50/30" : ""
-        }`}
-      >
+      <Card className="transition-shadow hover:shadow-md">
         <CardContent className="flex items-center gap-3 pt-0">
           <div className="rounded-lg bg-muted p-2.5">{icon}</div>
           <div className="min-w-0">
@@ -435,9 +465,6 @@ function KpiCard({
             <p className="text-xl font-bold tracking-tight">
               {formatNumber(value)}
             </p>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground">{subtitle}</p>
-            )}
           </div>
         </CardContent>
       </Card>
