@@ -36,7 +36,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   // ---------- STOK TABLE PARAMS ----------
   const stokPage = Math.max(0, Number(params.page || "0"));
   const stokPageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
-    ? Number(params.pageSize)
+    ? Number(params.pageSize || "25")
     : 25;
   const stokSearch = params.search?.trim() || "";
   const stokKategori = params.kategori || "";
@@ -46,7 +46,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   // ---------- MOVEMENTS TABLE PARAMS ----------
   const mPage = Math.max(0, Number(params.mPage || "0"));
   const mPageSize = [25, 50, 100].includes(Number(params.mPageSize || "25"))
-    ? Number(params.mPageSize)
+    ? Number(params.mPageSize || "25")
     : 25;
   const mSearch = params.mSearch?.trim() || "";
   const mSource = params.mSource || "";

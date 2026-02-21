@@ -20,7 +20,7 @@ export default async function ParcalarPage({ searchParams }: PageProps) {
 
   const page = Math.max(0, Number(params.page || "0"));
   const pageSize = [25, 50, 100].includes(Number(params.pageSize || "25"))
-    ? Number(params.pageSize)
+    ? Number(params.pageSize || "25")
     : 25;
   const search = params.search?.trim() || "";
   const tip = params.tip || "";
