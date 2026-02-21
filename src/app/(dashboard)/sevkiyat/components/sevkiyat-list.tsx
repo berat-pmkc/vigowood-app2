@@ -50,7 +50,7 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
             Sevkiyat
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Sevkiyat listesi ve konteyner y&ouml;netimi
+            Sevkiyat listesi ve konteyner yönetimi
           </p>
         </div>
         <div className="flex items-center gap-2">

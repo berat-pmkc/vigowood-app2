@@ -855,27 +855,18 @@ export async function cancelSevkiyat(sevkiyatId: string): Promise<ActionResult> 
 
     if (error) return { success: false, error: error.message };
 
-    // yolda → hazirlaniyor: stok iadesi
+    // yolda → hazirlaniyor: stok iadesi — eski hareketleri sil + ürün stoğunu geri yükle
     if (row.durum === "yolda" && newDurum === "hazirlaniyor") {
       const { data: movs } = await supabase
         .from("stock_movements")
-        .select("sku, qty")
+        .select("id, sku, qty")
         .eq("source_row_id", sevkiyatId)
         .eq("source", "Sevkiyat");
 
-      const movements = (movs ?? []) as { sku: string; qty: number }[];
-      const now = new Date().toISOString();
+      const movements = (movs ?? []) as { id: string; sku: string; qty: number }[];
 
       for (const mov of movements) {
-        await supabase.from("stock_movements").insert({
-          tarih: now,
-          sku: mov.sku,
-          qty: Math.abs(mov.qty),
-          source: "Sevkiyat \u0130ptal",
-          source_row_id: `${sevkiyatId}-iptal`,
-          batch_id: sevkiyatId,
-        });
-
+        // Ürün stoğunu geri yükle
         const { data: productData } = await supabase
           .from("products")
           .select("sku, stok_aktif")
@@ -887,6 +878,9 @@ export async function cancelSevkiyat(sevkiyatId: string): Promise<ActionResult> 
           const newStok = (product.stok_aktif || 0) + Math.abs(mov.qty);
           await supabase.from("products").update({ stok_aktif: newStok }).eq("sku", mov.sku);
         }
+
+        // Orijinal stok hareketini sil (re-ship'te yeni hareket oluşturulacak)
+        await supabase.from("stock_movements").delete().eq("id", mov.id);
       }
     }
 
@@ -1186,13 +1180,25 @@ export async function upsertSevkiyatMaliyet(
     await requireSevkiyatAccess();
     const supabase = await createClient();
 
+    // Sadece izin verilen maliyet alanlarını geçir (arbitrary data injection engelle)
+    const allowedKeys = [
+      "navlun", "navlun_currency", "ic_nakliye", "ic_nakliye_currency",
+      "ara_depo", "ara_depo_currency", "amazon_pickup", "amazon_pickup_currency",
+      "ydg", "ydg_currency", "tr_gumruk", "tr_gumruk_currency",
+      "diger", "diger_currency", "not_text",
+    ];
+    const safeData: Record<string, unknown> = {};
+    for (const key of allowedKeys) {
+      if (key in formData) safeData[key] = formData[key];
+    }
+
     const { data: existing } = await supabase
       .from("sevkiyat_maliyetler")
       .select("id")
       .eq("sevkiyat_id", sevkiyatId)
-      .single();
+      .maybeSingle();
 
-    const payload = { sevkiyat_id: sevkiyatId, ...formData };
+    const payload = { sevkiyat_id: sevkiyatId, ...safeData };
 
     if (existing) {
       const { error } = await supabase
@@ -1240,7 +1246,7 @@ export async function getLatestKur() {
       .select("*")
       .order("tarih", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!data) return { success: true as const, data: null };
     return { success: true as const, data: data as DovizKuruRow };

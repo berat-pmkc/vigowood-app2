@@ -133,7 +133,7 @@ export function SevkiyatCard({ sevkiyat }: SevkiyatCardProps) {
             </span>
           )}
           {(sevkiyat.total_agirlik ?? 0) > 0 && (
-            <span className="flex items-center gap-0.5 hidden sm:flex">
+            <span className="items-center gap-0.5 hidden sm:flex">
               <Weight className="w-3 h-3" />
               <span className="font-semibold tabular-nums text-foreground">
                 {Math.round(sevkiyat.total_agirlik! / 1000)}t

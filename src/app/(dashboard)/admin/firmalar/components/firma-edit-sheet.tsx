@@ -49,6 +49,7 @@ export function FirmaEditSheet({ firma, isNew, open, onClose }: FirmaEditSheetPr
     formState: { errors },
   } = useForm<SevkiyatFirmaData>({
     resolver: zodResolver(sevkiyatFirmaSchema),
+    defaultValues: { aktif: true, varsayilan: false },
   });
 
   useEffect(() => {

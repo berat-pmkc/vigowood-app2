@@ -59,7 +59,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         .select("*")
         .in("id", firmaIds);
 
-      const firmaMap = new Map((firmaData as SevkiyatFirmaRow[] ?? []).map(f => [f.id, f]));
+      const firmaMap = new Map(((firmaData ?? []) as SevkiyatFirmaRow[]).map(f => [f.id, f]));
 
       // İhracatçı firma
       const ihracatci = sev.ihracatci_firma_id ? firmaMap.get(sev.ihracatci_firma_id) : null;
@@ -115,7 +115,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         .eq("firma_tipi", "contact")
         .eq("varsayilan", true)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (contactData) {
         const c = contactData as SevkiyatFirmaRow;

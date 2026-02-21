@@ -51,14 +51,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
     let plSignatory: PLSignatoryConfig | undefined;
     let plContact: PLContactConfig | undefined;
 
-    const firmaIds = [sev.ihracatci_firma_id, sev.alici_firma_id].filter(Boolean) as number[];
-    // Also fetch signatory + contact by type
+    // Fetch all active firms (includes ihracatci, alici, imzalayan, contact)
     const { data: allFirma } = await supabase
       .from("sevkiyat_firmalar")
       .select("*")
       .eq("aktif", true);
 
-    const firmaRows = (allFirma as SevkiyatFirmaRow[] ?? []);
+    const firmaRows = ((allFirma ?? []) as SevkiyatFirmaRow[]);
     const firmaById = new Map(firmaRows.map(f => [f.id, f]));
 
     // İhracatçı

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface FirmalarClientProps {
 }
 
 export function FirmalarClient({ firmalar }: FirmalarClientProps) {
+  const router = useRouter();
   const [editItem, setEditItem] = useState<SevkiyatFirmaRow | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [search, setSearch] = useState("");
@@ -38,8 +40,12 @@ export function FirmalarClient({ firmalar }: FirmalarClientProps) {
   const handleDelete = async (id: number, name: string) => {
     if (!confirm(`"${name}" silinecek. Emin misiniz?`)) return;
     const result = await deleteFirma(id);
-    if (result.success) toast.success("Silindi");
-    else toast.error(result.error);
+    if (result.success) {
+      toast.success("Silindi");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
   };
 
   return (

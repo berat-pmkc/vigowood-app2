@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ShipmentHeader } from "./shipment-header";
 import { ShipmentTable } from "./shipment-table";
@@ -67,9 +67,9 @@ export function ShipmentPlanning({
   }, [router]);
 
   // Sync items when server re-renders
-  if (JSON.stringify(initialItems) !== JSON.stringify(items) && initialItems.length !== items.length) {
+  useEffect(() => {
     setItems(initialItems);
-  }
+  }, [initialItems]);
 
   return (
     <div className="space-y-4 pb-24 md:pb-6">

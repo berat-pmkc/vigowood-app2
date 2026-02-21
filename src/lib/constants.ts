@@ -141,7 +141,7 @@ export type CleanStatus = (typeof CLEAN_STATUS)[number];
 export const CLEAN_STATUS_LABELS: Record<CleanStatus, string> = {
   bekliyor: "Bekliyor",
   temizleniyor: "Temizleniyor",
-  tamamlandi: "Tamamlandi",
+  tamamlandi: "Tamamlandı",
 };
 
 export const CLEAN_STATUS_COLORS: Record<CleanStatus, { bg: string; text: string; border: string }> = {
