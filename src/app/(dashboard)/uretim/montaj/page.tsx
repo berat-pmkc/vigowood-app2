@@ -19,7 +19,7 @@ export default async function MontajPage() {
   // Devam eden seanslar
   const { data: activeData } = await supabase
     .from("montaj_sessions")
-    .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name")
+    .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name, workers")
     .eq("durum", "montajda")
     .order("start_time", { ascending: true });
 
@@ -54,6 +54,7 @@ export default async function MontajPage() {
   const activeSessions: ActiveMontajSession[] = (activeData ?? []).map((s) => ({
     ...s,
     urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
+    workers: s.workers as Array<{ id: string; name: string }> | null,
   }));
 
   return (

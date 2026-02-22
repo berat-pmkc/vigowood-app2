@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Wrench, X } from "lucide-react";
+import { Clock, Wrench, X, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
 
 export interface ActiveMontajSession {
   session_id: string;
@@ -18,6 +19,7 @@ export interface ActiveMontajSession {
   start_time: string | null;
   durum: string;
   operator_name: string | null;
+  workers?: Array<{ id: string; name: string }> | null;
 }
 
 interface SessionCardProps {
@@ -52,15 +54,19 @@ function LiveTimer({ startTime }: { startTime: string }) {
 
 export function SessionCard({ session, onClose, onCancel }: SessionCardProps) {
   const [cancelLoading, setCancelLoading] = useState(false);
+  const skuStyle = getSkuBadgeStyle(session.sku);
 
   return (
-    <Card className={cn("border-l-[3px] border-l-blue-500 relative")}>
+    <Card className={cn("border-l-[3px] relative")} style={{ borderLeftColor: skuStyle.borderColor }}>
       <div className="px-3 py-2">
-        {/* Header: Product + cancel */}
+        {/* Header: SKU + cancel */}
         <div className="flex items-center justify-between gap-1 mb-1">
-          <p className="font-medium text-foreground truncate text-xs leading-tight">
-            {session.urun_adi ?? session.sku ?? "—"}
-          </p>
+          <span
+            className="font-bold text-xs px-1.5 py-0.5 rounded truncate"
+            style={{ backgroundColor: skuStyle.backgroundColor, color: skuStyle.color }}
+          >
+            {session.sku}
+          </span>
           <button
             onClick={() => {
               setCancelLoading(true);
@@ -85,6 +91,14 @@ export function SessionCard({ session, onClose, onCancel }: SessionCardProps) {
             </Badge>
           )}
         </div>
+
+        {/* Workers */}
+        {session.workers && session.workers.length > 0 && (
+          <div className="flex items-center gap-1 mb-1.5 text-[10px] text-muted-foreground truncate">
+            <Users className="w-3 h-3 shrink-0" />
+            {session.workers.map((w) => w.name).join(", ")}
+          </div>
+        )}
 
         {/* Timer + Close */}
         <div className="flex items-center justify-between">

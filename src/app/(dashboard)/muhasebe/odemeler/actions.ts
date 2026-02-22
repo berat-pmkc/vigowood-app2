@@ -44,6 +44,7 @@ export async function createOdeme(
         tarih: parsed.data.tarih,
         turu: parsed.data.turu,
         odeme_durum: parsed.data.odeme_durum,
+        kredi_grubu: parsed.data.kredi_grubu || null,
       })
       .select("id")
       .single();
@@ -83,6 +84,7 @@ export async function updateOdeme(
         tarih: parsed.data.tarih,
         turu: parsed.data.turu,
         odeme_durum: parsed.data.odeme_durum,
+        kredi_grubu: parsed.data.kredi_grubu || null,
       })
       .eq("id", id);
 
@@ -121,6 +123,28 @@ export async function toggleOdemeDurum(
       success: false,
       error: err instanceof Error ? err.message : "Bilinmeyen hata",
     };
+  }
+}
+
+/** Distinct kredi gruplarını getir (combobox için) */
+export async function getDistinctKrediGruplari(): Promise<string[]> {
+  try {
+    await requireFinanceAccess();
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("odemeler")
+      .select("kredi_grubu")
+      .eq("turu", "KREDİ")
+      .not("kredi_grubu", "is", null)
+      .order("kredi_grubu");
+
+    if (!data) return [];
+
+    const unique = [...new Set(data.map((r) => r.kredi_grubu).filter(Boolean))] as string[];
+    return unique;
+  } catch {
+    return [];
   }
 }
 

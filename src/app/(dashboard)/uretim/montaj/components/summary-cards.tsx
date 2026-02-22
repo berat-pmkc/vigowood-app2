@@ -7,7 +7,7 @@ import { Wrench, Users, Clock, TrendingUp, Loader2 } from "lucide-react";
 import { getMontajAnalytics } from "../actions";
 import { cn } from "@/lib/utils";
 
-type Period = "today" | "week" | "month";
+type Period = "today" | "week" | "month" | "lastMonth";
 
 interface AnalyticsData {
   totalQty: number;
@@ -21,6 +21,7 @@ const PERIOD_LABELS: Record<Period, string> = {
   today: "Bugün",
   week: "Hafta",
   month: "Ay",
+  lastMonth: "Geçen Ay",
 };
 
 export function SummaryCards() {

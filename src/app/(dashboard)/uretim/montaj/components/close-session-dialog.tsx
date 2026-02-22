@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Users, Package, Clock } from "lucide-react";
 import { closeMontajSession, getMontajOperators } from "../actions";
 import { toast } from "sonner";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import type { ActiveMontajSession } from "./session-card";
 
 interface Operator {
@@ -113,20 +114,27 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
 
         <div className="space-y-4 pt-2 overflow-hidden">
           {/* Session info */}
+          {(() => {
+            const skuStyle = session.sku ? getSkuBadgeStyle(session.sku) : null;
+            return (
           <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 overflow-hidden">
-            <p className="font-medium text-sm break-words">
-              {session.urun_adi ?? session.sku ?? "—"}
-            </p>
+            {skuStyle && (
+              <span
+                className="font-bold text-sm px-2 py-0.5 rounded inline-block"
+                style={{ backgroundColor: skuStyle.backgroundColor, color: skuStyle.color }}
+              >
+                {session.sku}
+              </span>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
-              {session.sku && (
-                <span className="text-xs text-muted-foreground">{session.sku}</span>
-              )}
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
                 Adım {session.seq_no}: {session.step_name || "—"}
               </Badge>
               {session.start_time && <ElapsedBadge startTime={session.start_time} />}
             </div>
           </div>
+            );
+          })()}
 
           {/* Qty input */}
           <div>

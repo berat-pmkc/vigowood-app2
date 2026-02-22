@@ -27,7 +27,7 @@ import { formatDate } from "@/lib/utils";
 import { deleteUser } from "../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import type { UserRole } from "@/lib/supabase/types";
+type UserRole = "Yönetici" | "Endüstri Mühendisi" | "E-Ticaret Müdürü" | "Dış Ticaret Müdürü" | "Üretim" | "Hat" | "Muhasebe" | "Sevkiyat Sorumlusu" | "Pazaryeri Sorumlusu" | "Mimar";
 import type { UserWithLastSignIn } from "../page";
 
 interface ColumnOptions {

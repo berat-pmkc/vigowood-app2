@@ -23,6 +23,7 @@ import type { CompletedMontajSession } from "../components/completed-sessions-sh
 import { getCompletedSessions } from "../actions";
 import { formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import {
   ArrowLeft,
   Check,
@@ -261,6 +262,7 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
         <div className="space-y-2">
           {sessions.map((s) => {
             const workers = s.workers as Array<{ id: string; name: string }> | null;
+            const skuStyle = s.sku ? getSkuBadgeStyle(s.sku) : null;
             return (
               <div
                 key={s.session_id}
@@ -269,11 +271,15 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
                 {/* Header row */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-sm truncate">
-                      {s.urun_adi ?? s.sku ?? "—"}
-                    </span>
-                    {s.sku && s.urun_adi && (
-                      <span className="text-xs text-muted-foreground shrink-0">{s.sku}</span>
+                    {skuStyle ? (
+                      <span
+                        className="font-bold text-xs px-2 py-0.5 rounded truncate"
+                        style={{ backgroundColor: skuStyle.backgroundColor, color: skuStyle.color }}
+                      >
+                        {s.sku}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-sm truncate">—</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">

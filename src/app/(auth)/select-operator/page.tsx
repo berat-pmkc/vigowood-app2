@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { APP_NAME } from "@/lib/constants";
-import type { Station } from "@/lib/supabase/types";
+type Station = "Kesim" | "Temizlik" | "Montaj" | "Paketleme" | "Kutu";
 import {
   Card,
   CardContent,

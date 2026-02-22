@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown } from "lucide-react";
+import { Plus, FileDown, Pencil } from "lucide-react";
 import { NakitKpiCards } from "./nakit-kpi-cards";
 import { DonemSelector } from "./donem-selector";
 import { GenelBakisTable } from "./genel-bakis-table";
@@ -148,15 +148,23 @@ export function NakitAkisClient({
         <div className="flex items-center gap-2">
           <DonemSelector donemler={donemler} selectedDonemId={selectedDonemId} />
           {hasData && selectedDonemId && (
-            <Button size="sm" variant="outline" asChild>
-              <a
-                href={`/api/muhasebe/nakit-akis/${selectedDonemId}`}
-                download
-              >
-                <FileDown className="mr-1.5 h-4 w-4" />
-                <span className="hidden sm:inline">PDF</span>
-              </a>
-            </Button>
+            <>
+              <Button size="sm" variant="outline" asChild>
+                <Link href={`/muhasebe/nakit-akis/${selectedDonemId}/duzenle`}>
+                  <Pencil className="mr-1.5 h-4 w-4" />
+                  <span className="hidden sm:inline">Düzenle</span>
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <a
+                  href={`/api/muhasebe/nakit-akis/${selectedDonemId}`}
+                  download
+                >
+                  <FileDown className="mr-1.5 h-4 w-4" />
+                  <span className="hidden sm:inline">PDF</span>
+                </a>
+              </Button>
+            </>
           )}
           <Button size="sm" asChild>
             <Link href="/muhasebe/nakit-akis/yeni">

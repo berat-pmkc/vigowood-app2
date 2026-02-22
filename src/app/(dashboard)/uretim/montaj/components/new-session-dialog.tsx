@@ -22,17 +22,24 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronsUpDown, Check, Loader2, Search, ArrowRight, ArrowLeft } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronsUpDown, Check, Loader2, Search, ArrowRight, ArrowLeft, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getActiveProductsWithSteps,
   getTopMontajProducts,
   getStepsForProduct,
-  getStepBomWithStock,
+  getMontajOperators,
   createMontajSession,
 } from "../actions";
-import { MaterialCheckPanel, type BomItemWithStock } from "./material-check-panel";
 import { toast } from "sonner";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
+
+interface Operator {
+  user_id: string;
+  full_name: string;
+  role: string;
+}
 
 interface Product {
   sku: string;
@@ -75,10 +82,13 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
   const [steps, setSteps] = useState<StepInfo[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
   const [selectedStepId, setSelectedStepId] = useState("");
-  const [bomItems, setBomItems] = useState<BomItemWithStock[]>([]);
-  const [bomLoading, setBomLoading] = useState(false);
+  // Cache: SKU → steps (prefetch)
+  const [stepsCache, setStepsCache] = useState<Map<string, StepInfo[]>>(new Map());
+  // Workers
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
 
-  // Ürünleri ve popüler ürünleri yükle
+  // Ürünleri, popüler ürünleri ve operatörleri yükle
   useEffect(() => {
     if (open) {
       if (topProducts.length === 0) {
@@ -95,41 +105,41 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
           setLoading(false);
         });
       }
+      if (operators.length === 0) {
+        getMontajOperators().then((result) => {
+          if (result.success) setOperators(result.data);
+        });
+      }
     }
     if (!open) {
       setSelectedSku("");
       setSelectedStepId("");
       setActiveStep(1);
       setSteps([]);
-      setBomItems([]);
+      setSelectedWorkers(new Set());
     }
-  }, [open, products.length, topProducts.length]);
+  }, [open, products.length, topProducts.length, operators.length]);
 
-  // Adımları yükle (SKU seçildiğinde)
+  // Adımları yükle — SKU seçilir seçilmez prefetch (Step 2'ye geçmeden)
   useEffect(() => {
-    if (selectedSku && activeStep === 2) {
+    if (selectedSku) {
+      // Cache'de varsa hemen yükle
+      const cached = stepsCache.get(selectedSku);
+      if (cached) {
+        setSteps(cached);
+        return;
+      }
       setStepsLoading(true);
       setSelectedStepId("");
-      setBomItems([]);
       getStepsForProduct(selectedSku).then((result) => {
-        if (result.success) setSteps(result.data);
+        if (result.success) {
+          setSteps(result.data);
+          setStepsCache((prev) => new Map(prev).set(selectedSku, result.data));
+        }
         setStepsLoading(false);
       });
     }
-  }, [selectedSku, activeStep]);
-
-  // BOM yükle (step seçildiğinde)
-  useEffect(() => {
-    if (selectedStepId) {
-      setBomLoading(true);
-      getStepBomWithStock(selectedStepId).then((result) => {
-        if (result.success) setBomItems(result.data);
-        setBomLoading(false);
-      });
-    } else {
-      setBomItems([]);
-    }
-  }, [selectedStepId]);
+  }, [selectedSku, stepsCache]);
 
   const selectedProduct =
     products.find((p) => p.sku === selectedSku) ??
@@ -143,13 +153,31 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
     setActiveStep(2);
   };
 
+  const toggleWorker = (id: string) => {
+    setSelectedWorkers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleSubmit = async () => {
     if (!selectedSku || !selectedStepId) {
       toast.error("Ürün ve adım seçimi gereklidir");
       return;
     }
+    if (selectedWorkers.size === 0) {
+      toast.error("En az 1 çalışan seçiniz");
+      return;
+    }
+    const workers = Array.from(selectedWorkers).map((id) => {
+      const op = operators.find((o) => o.user_id === id);
+      return { id, name: op?.full_name ?? id };
+    });
+
     setSubmitting(true);
-    const result = await createMontajSession(selectedSku, selectedStepId);
+    const result = await createMontajSession(selectedSku, selectedStepId, workers);
     if (result.success) {
       toast.success("Montaj seansı başlatıldı");
       onOpenChange(false);
@@ -275,13 +303,18 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
             </div>
           </div>
         ) : (
-          /* ─── Adım 2: Adım Seçimi + BOM ─── */
+          /* ─── Adım 2: Adım Seçimi ─── */
           <div className="space-y-4 pt-2 overflow-y-auto flex-1">
             {/* Seçilen ürün */}
-            <div className="bg-muted/50 rounded-lg p-3">
-              <p className="font-medium text-sm">{selectedProduct?.urun_adi ?? selectedSku}</p>
-              <p className="text-xs text-muted-foreground">{selectedSku}</p>
-            </div>
+            {(() => {
+              const skuStyle = getSkuBadgeStyle(selectedSku);
+              return (
+                <div className="rounded-lg p-3 flex items-center gap-3" style={{ backgroundColor: skuStyle.backgroundColor }}>
+                  <span className="font-bold text-sm" style={{ color: skuStyle.color }}>{selectedSku}</span>
+                  <span className="text-xs text-muted-foreground truncate">{selectedProduct?.urun_adi ?? ""}</span>
+                </div>
+              );
+            })()}
 
             {/* Adım listesi */}
             {stepsLoading ? (
@@ -290,7 +323,7 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                 Adımlar yükleniyor...
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
                 {steps.map((step) => (
                   <button
                     key={step.step_id}
@@ -312,18 +345,11 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                           {step.step_name || step.step_id}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {step.bom_count > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {step.bom_count} malzeme
-                          </Badge>
-                        )}
-                        {step.is_final_step && (
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
-                            Son
-                          </Badge>
-                        )}
-                      </div>
+                      {step.is_final_step && (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                          Son
+                        </Badge>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -335,18 +361,30 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
               </div>
             )}
 
-            {/* BOM / Malzeme durumu */}
+            {/* Çalışan seçimi */}
             {selectedStepId && (
               <div>
-                <p className="text-sm font-medium mb-2">Malzeme Durumu</p>
-                {bomLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Yükleniyor...
-                  </div>
-                ) : (
-                  <MaterialCheckPanel items={bomItems} />
-                )}
+                <p className="text-sm font-medium flex items-center gap-2 mb-2">
+                  <Users className="w-4 h-4" />
+                  Çalışanlar ({selectedWorkers.size} kişi)
+                </p>
+                <div className="max-h-32 overflow-y-auto border rounded-lg p-2 space-y-0.5">
+                  {operators.map((op) => (
+                    <label
+                      key={op.user_id}
+                      className="flex items-center gap-3 p-1.5 rounded-md hover:bg-muted/50 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedWorkers.has(op.user_id)}
+                        onCheckedChange={() => toggleWorker(op.user_id)}
+                      />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm truncate">{op.full_name}</span>
+                        <span className="text-[10px] text-muted-foreground">{op.user_id}</span>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -356,7 +394,6 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                 onClick={() => {
                   setActiveStep(1);
                   setSelectedStepId("");
-                  setBomItems([]);
                 }}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -364,7 +401,7 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={!selectedStepId || submitting}
+                disabled={!selectedStepId || selectedWorkers.size === 0 || submitting}
                 className="bg-vw-primary hover:bg-vw-deep text-white"
               >
                 {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

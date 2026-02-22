@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UsersDataTable } from "./components/users-data-table";
-import type { Database, UserRole, Station } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 export type UserWithLastSignIn = User & { last_sign_in_at: string | null };
@@ -54,12 +54,12 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
 
   // Role filter
   if (role) {
-    query = query.eq("role", role as UserRole);
+    query = query.eq("role", role as any);
   }
 
   // Station filter
   if (station) {
-    query = query.eq("station", station as Station);
+    query = query.eq("station", station as any);
   }
 
   // Active filter

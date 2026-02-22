@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { MontajSessionStatusBadge } from "./montaj-session-status-badge";
 import { EditSessionDialog } from "./edit-session-dialog";
 import { formatDuration } from "@/lib/utils";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import { CheckCircle, Users, Pencil } from "lucide-react";
 
 export interface CompletedMontajSession {
@@ -65,6 +66,7 @@ export function CompletedSessionsSheet({ sessions, open, onOpenChange }: Complet
               <div className="space-y-2">
                 {sessions.map((s) => {
                   const workers = s.workers as Array<{ id: string; name: string }> | null;
+                  const skuStyle = s.sku ? getSkuBadgeStyle(s.sku) : null;
                   return (
                     <div
                       key={s.session_id}
@@ -72,9 +74,16 @@ export function CompletedSessionsSheet({ sessions, open, onOpenChange }: Complet
                     >
                       {/* Header row */}
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm truncate max-w-[200px]">
-                          {s.urun_adi ?? s.sku ?? "—"}
-                        </span>
+                        {skuStyle ? (
+                          <span
+                            className="font-bold text-xs px-2 py-0.5 rounded truncate max-w-[200px]"
+                            style={{ backgroundColor: skuStyle.backgroundColor, color: skuStyle.color }}
+                          >
+                            {s.sku}
+                          </span>
+                        ) : (
+                          <span className="font-medium text-sm truncate max-w-[200px]">—</span>
+                        )}
                         <div className="flex items-center gap-1">
                           <MontajSessionStatusBadge durum={s.durum} />
                           <Button
@@ -129,20 +138,17 @@ export function CompletedSessionsSheet({ sessions, open, onOpenChange }: Complet
                         </div>
                       )}
 
-                      {/* SKU + date */}
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        {s.sku && <span>{s.sku}</span>}
-                        {s.end_time && (
-                          <span>
-                            {new Date(s.end_time).toLocaleDateString("tr-TR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        )}
-                      </div>
+                      {/* Date */}
+                      {s.end_time && (
+                        <div className="text-xs text-muted-foreground text-right">
+                          {new Date(s.end_time).toLocaleDateString("tr-TR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

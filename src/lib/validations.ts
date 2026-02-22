@@ -652,6 +652,7 @@ export const odemeCreateSchema = z.object({
   odeme_durum: z.enum(ODEME_DURUMLARI, {
     error: "Geçerli bir durum seçiniz",
   }),
+  kredi_grubu: z.string().max(200, "Kredi grubu en fazla 200 karakter olabilir").nullable().optional(),
 });
 
 export type OdemeCreateData = z.infer<typeof odemeCreateSchema>;

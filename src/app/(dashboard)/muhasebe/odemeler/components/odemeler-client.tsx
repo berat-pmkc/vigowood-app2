@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown } from "lucide-react";
+import { Plus, FileDown, CalendarDays } from "lucide-react";
 import { OdemelerKpiCards } from "./odemeler-kpi-cards";
 import { OdemelerDataTable } from "./odemeler-data-table";
 import { OdemelerToolbar } from "./odemeler-toolbar";
 import { OdemeFormSheet } from "./odeme-form-sheet";
 import { OdemelerCalendarView } from "./odemeler-calendar-view";
 import { OdemelerSummaryTab } from "./odemeler-summary-tab";
+import { KrediSection } from "./kredi-section";
 import type { Odeme } from "@/lib/supabase/types";
 
 interface SummaryItem {
@@ -77,6 +78,17 @@ export function OdemelerClient({
   const [editingRecord, setEditingRecord] = useState<Odeme | null>(null);
   const [prefillDate, setPrefillDate] = useState<string | null>(null);
 
+  // Madde 13: Takvimden gelen tarih aralığı
+  const [calendarDateRange, setCalendarDateRange] = useState<{ start: Date; end: Date }>(() => {
+    const start = new Date(calYear, calMonth, 1);
+    const end = new Date(calYear, calMonth + 1, 0);
+    return { start, end };
+  });
+
+  const handleCalendarRangeChange = useCallback((range: { start: Date; end: Date }) => {
+    setCalendarDateRange(range);
+  }, []);
+
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams();
     if (tab !== "takvim") {
@@ -111,6 +123,44 @@ export function OdemelerClient({
     setPrefillDate(null);
   };
 
+  // Kredi ödemeleri (Madde 9)
+  const krediOdemeler = useMemo(
+    () =>
+      allOdemeler
+        .filter((o) => o.turu === "KREDİ")
+        .map((o) => ({
+          tutar: Number(o.tutar),
+          cinsi: o.cinsi,
+          odeme_durum: o.odeme_durum,
+          kredi_grubu: null as string | null, // Hafif sorgudan gelmiyor, full data'dan bakarız
+        })),
+    [allOdemeler]
+  );
+
+  // calendarData'dan kredi bilgisi (tam veri)
+  const allKrediWithGrup = useMemo(() => {
+    // allOdemeler kredi_grubu içermiyor, calendarData'da var
+    // Tüm veriyi KPI'dan süzmek yerine calendar + list data'dan çıkaralım
+    // Aslında odemeler tablosundan tüm kredi kayıtları lazım
+    // Ama zaten allOdemeler light sorgu — kredi grubu eklemek için page.tsx değişmeli
+    // Şimdilik calendarData'daki ve listData'daki kayıtlardan çıkaralım
+    return [...calendarData, ...listData]
+      .filter((o) => o.turu === "KREDİ")
+      .reduce((acc, o) => {
+        // Dedup by id
+        if (!acc.find((x) => x.id === o.id)) {
+          acc.push(o);
+        }
+        return acc;
+      }, [] as Odeme[])
+      .map((o) => ({
+        tutar: Number(o.tutar),
+        cinsi: o.cinsi,
+        odeme_durum: o.odeme_durum,
+        kredi_grubu: o.kredi_grubu,
+      }));
+  }, [calendarData, listData]);
+
   return (
     <div className="space-y-4 pb-20 md:pb-6">
       <div className="flex items-center justify-between">
@@ -121,6 +171,15 @@ export function OdemelerClient({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <a
+              href={`/api/muhasebe/odemeler/takvim-pdf?year=${calYear}&month=${calMonth}`}
+              download
+            >
+              <CalendarDays className="mr-1.5 h-4 w-4" />
+              <span className="hidden sm:inline">Takvim PDF</span>
+            </a>
+          </Button>
           <Button size="sm" variant="outline" asChild>
             <a
               href={`/api/muhasebe/odemeler/pdf${turu || durum || cinsi ? `?${new URLSearchParams(Object.entries({ turu, durum, cinsi }).filter(([, v]) => v)).toString()}` : ""}`}
@@ -137,7 +196,16 @@ export function OdemelerClient({
         </div>
       </div>
 
-      <OdemelerKpiCards allOdemeler={allOdemeler} />
+      {/* Madde 13: KPI'lar takvimden gelen date range'e göre */}
+      <OdemelerKpiCards
+        allOdemeler={allOdemeler}
+        dateRange={calendarDateRange}
+      />
+
+      {/* Madde 9: Kredi bölümü */}
+      {allKrediWithGrup.length > 0 && (
+        <KrediSection odemeler={allKrediWithGrup} />
+      )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
@@ -153,6 +221,7 @@ export function OdemelerClient({
             calMonth={calMonth}
             onEdit={handleEdit}
             onNewWithDate={handleNewRecordWithDate}
+            onRangeChange={handleCalendarRangeChange}
           />
         </TabsContent>
 

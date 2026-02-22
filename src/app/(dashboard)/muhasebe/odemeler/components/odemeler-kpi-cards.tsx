@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Banknote, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { formatCurrency, getWeekRange, getMonthRange } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 interface OdemeKpiRow {
   id: string;
@@ -16,53 +15,27 @@ interface OdemeKpiRow {
   odeme_durum: string | null;
 }
 
-type TimeFilter = "bu-hafta" | "gecen-hafta" | "bu-ay" | "gelecek-ay";
-
-const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
-  { key: "bu-hafta", label: "Bu Hafta" },
-  { key: "gecen-hafta", label: "Geçen Hafta" },
-  { key: "bu-ay", label: "Bu Ay" },
-  { key: "gelecek-ay", label: "Gelecek Ay" },
-];
-
-function getFilterRange(filter: TimeFilter): { start: Date; end: Date } {
-  const now = new Date();
-  switch (filter) {
-    case "bu-hafta":
-      return getWeekRange(now);
-    case "gecen-hafta": {
-      const prev = new Date(now);
-      prev.setDate(prev.getDate() - 7);
-      return getWeekRange(prev);
-    }
-    case "bu-ay":
-      return getMonthRange(now.getFullYear(), now.getMonth());
-    case "gelecek-ay": {
-      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      return getMonthRange(next.getFullYear(), next.getMonth());
-    }
-  }
-}
-
 function toDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function OdemelerKpiCards({ allOdemeler }: { allOdemeler: OdemeKpiRow[] }) {
-  const router = useRouter();
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("bu-ay");
+interface OdemelerKpiCardsProps {
+  allOdemeler: OdemeKpiRow[];
+  dateRange: { start: Date; end: Date };
+}
 
-  const range = useMemo(() => getFilterRange(timeFilter), [timeFilter]);
+export function OdemelerKpiCards({ allOdemeler, dateRange }: OdemelerKpiCardsProps) {
+  const router = useRouter();
 
   const filtered = useMemo(() => {
-    const startStr = toDateStr(range.start);
-    const endStr = toDateStr(range.end);
+    const startStr = toDateStr(dateRange.start);
+    const endStr = toDateStr(dateRange.end);
     return allOdemeler.filter((o) => {
       if (!o.tarih) return false;
       const d = o.tarih.substring(0, 10);
       return d >= startStr && d <= endStr;
     });
-  }, [allOdemeler, range]);
+  }, [allOdemeler, dateRange]);
 
   const bekleyenTl = useMemo(
     () => filtered.filter((o) => o.odeme_durum === "BEKLİYOR" && o.cinsi === "TL")
@@ -89,8 +62,8 @@ export function OdemelerKpiCards({ allOdemeler }: { allOdemeler: OdemeKpiRow[] }
   const handleCardClick = (filters: Record<string, string>) => {
     const params = new URLSearchParams();
     params.set("tab", "liste");
-    const startStr = toDateStr(range.start);
-    const endStr = toDateStr(range.end);
+    const startStr = toDateStr(dateRange.start);
+    const endStr = toDateStr(dateRange.end);
     params.set("dateFrom", startStr);
     params.set("dateTo", endStr);
     for (const [k, v] of Object.entries(filters)) {
@@ -98,6 +71,15 @@ export function OdemelerKpiCards({ allOdemeler }: { allOdemeler: OdemeKpiRow[] }
     }
     router.push(`/muhasebe/odemeler?${params.toString()}`);
   };
+
+  // Tarih aralığı açıklaması
+  const rangeLabel = useMemo(() => {
+    const s = dateRange.start;
+    const e = dateRange.end;
+    const startLabel = s.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+    const endLabel = e.toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
+    return `${startLabel} - ${endLabel}`;
+  }, [dateRange]);
 
   const cards = [
     {
@@ -139,21 +121,11 @@ export function OdemelerKpiCards({ allOdemeler }: { allOdemeler: OdemeKpiRow[] }
   ];
 
   return (
-    <div className="space-y-3">
-      {/* Time filter buttons */}
-      <div className="flex flex-wrap gap-1.5">
-        {TIME_FILTERS.map((f) => (
-          <Button
-            key={f.key}
-            size="sm"
-            variant={timeFilter === f.key ? "default" : "outline"}
-            className="h-7 text-xs"
-            onClick={() => setTimeFilter(f.key)}
-          >
-            {f.label}
-          </Button>
-        ))}
-      </div>
+    <div className="space-y-2">
+      {/* Tarih aralığı göstergesi */}
+      <p className="text-xs text-muted-foreground">
+        Gösterilen dönem: <span className="font-medium text-foreground">{rangeLabel}</span>
+      </p>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

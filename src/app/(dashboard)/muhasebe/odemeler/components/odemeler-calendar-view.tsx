@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getDaysInMonthGrid } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { ChevronLeft, ChevronRight, Plus, CalendarIcon } from "lucide-react";
+import { getDaysInMonthGrid, formatCurrency, getWeekRange } from "@/lib/utils";
+import { ODEME_DURUM_COLORS, type OdemeDurumuConst } from "@/lib/constants";
+import { OdemeTuruBadge } from "./odeme-turu-badge";
 import { CalendarDayCell } from "./calendar-day-cell";
-import { CalendarDayDetail } from "./calendar-day-detail";
 import type { Odeme } from "@/lib/supabase/types";
 
 const GUN_ISIMLERI = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
@@ -15,12 +23,15 @@ const AY_ISIMLERI = [
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ];
 
+type ViewMode = "ay" | "hafta";
+
 interface OdemelerCalendarViewProps {
   calendarData: Odeme[];
   calYear: number;
   calMonth: number; // 0-indexed
   onEdit: (record: Odeme) => void;
   onNewWithDate: (dateStr: string) => void;
+  onRangeChange?: (range: { start: Date; end: Date }) => void;
 }
 
 export function OdemelerCalendarView({
@@ -29,10 +40,13 @@ export function OdemelerCalendarView({
   calMonth,
   onEdit,
   onNewWithDate,
+  onRangeChange,
 }: OdemelerCalendarViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("ay");
 
   const today = useMemo(() => {
     const d = new Date();
@@ -43,6 +57,18 @@ export function OdemelerCalendarView({
     () => getDaysInMonthGrid(calYear, calMonth),
     [calYear, calMonth]
   );
+
+  // Hafta görünümü: bugün'ün haftası
+  const weekDays = useMemo(() => {
+    const { start } = getWeekRange(today);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }, [today]);
+
+  const displayDays = viewMode === "hafta" ? weekDays : gridDays;
 
   // Group odemeler by date string
   const odemelerByDate = useMemo(() => {
@@ -71,6 +97,7 @@ export function OdemelerCalendarView({
     params.set("tab", "takvim");
     router.push(`/muhasebe/odemeler?${params.toString()}`);
     setSelectedDate(null);
+    setDialogOpen(false);
   };
 
   const selectedOdemeler = useMemo(() => {
@@ -78,16 +105,62 @@ export function OdemelerCalendarView({
     return odemelerByDate.get(dateToKey(selectedDate)) || [];
   }, [selectedDate, odemelerByDate]);
 
+  const handleDaySelect = (date: Date) => {
+    setSelectedDate(date);
+    const dayOdemeler = odemelerByDate.get(dateToKey(date)) || [];
+    if (dayOdemeler.length > 0) {
+      setDialogOpen(true);
+    }
+  };
+
+  // Madde 13: Takvim aralığını parent'a bildir
+  useEffect(() => {
+    if (!onRangeChange) return;
+
+    if (viewMode === "ay") {
+      onRangeChange({
+        start: new Date(calYear, calMonth, 1),
+        end: new Date(calYear, calMonth + 1, 0),
+      });
+    } else {
+      const { start, end } = getWeekRange(today);
+      onRangeChange({ start, end });
+    }
+  }, [viewMode, calYear, calMonth, onRangeChange, today]);
+
   return (
     <div className="space-y-4">
-      {/* Month Navigation */}
+      {/* Month Navigation + View Toggle */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h3 className="text-base font-semibold">
-          {AY_ISIMLERI[calMonth]} {calYear}
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-semibold">
+            {AY_ISIMLERI[calMonth]} {calYear}
+          </h3>
+          {/* View mode toggle */}
+          <div className="flex rounded-md border border-border">
+            <button
+              type="button"
+              className={`px-2.5 py-1 text-xs font-medium transition-colors rounded-l-md ${
+                viewMode === "ay" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+              }`}
+              onClick={() => setViewMode("ay")}
+            >
+              Ay
+            </button>
+            <button
+              type="button"
+              className={`px-2.5 py-1 text-xs font-medium transition-colors rounded-r-md ${
+                viewMode === "hafta" ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+              }`}
+              onClick={() => setViewMode("hafta")}
+            >
+              Hafta
+            </button>
+          </div>
+        </div>
         <Button variant="ghost" size="icon" onClick={() => navigateMonth(1)}>
           <ChevronRight className="h-5 w-5" />
         </Button>
@@ -105,7 +178,7 @@ export function OdemelerCalendarView({
         ))}
 
         {/* Calendar Grid */}
-        {gridDays.map((day, i) => {
+        {displayDays.map((day, i) => {
           const key = dateToKey(day);
           const dayOdemeler = odemelerByDate.get(key) || [];
           const isCurrentMonth = day.getMonth() === calMonth;
@@ -118,7 +191,7 @@ export function OdemelerCalendarView({
             <CalendarDayCell
               key={i}
               date={day}
-              isCurrentMonth={isCurrentMonth}
+              isCurrentMonth={viewMode === "hafta" || isCurrentMonth}
               isToday={isToday}
               isSelected={isSelected}
               odemeler={dayOdemeler.map((o) => ({
@@ -128,21 +201,87 @@ export function OdemelerCalendarView({
                 cinsi: o.cinsi,
                 odeme_durum: o.odeme_durum,
               }))}
-              onSelect={setSelectedDate}
+              onSelect={handleDaySelect}
             />
           );
         })}
       </div>
 
-      {/* Day Detail Panel */}
-      {selectedDate && (
-        <CalendarDayDetail
-          selectedDate={selectedDate}
-          odemeler={selectedOdemeler}
-          onEdit={onEdit}
-          onNewWithDate={onNewWithDate}
-        />
-      )}
+      {/* Madde 10: Dialog popup yerine inline detail */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              {selectedDate?.toLocaleDateString("tr-TR", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                weekday: "long",
+              })}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {selectedOdemeler.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                Bu tarihte ödeme bulunmuyor.
+              </p>
+            ) : (
+              selectedOdemeler.map((o) => {
+                const durumColors = ODEME_DURUM_COLORS[o.odeme_durum as OdemeDurumuConst];
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      onEdit(o);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg border border-border/50 p-3 text-left transition-colors hover:bg-accent/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{o.tanimi}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <OdemeTuruBadge turu={o.turu} />
+                        {durumColors && (
+                          <Badge
+                            variant="outline"
+                            className={`${durumColors.bg} ${durumColors.text} border-0 text-[10px]`}
+                          >
+                            {o.odeme_durum === "TAMAMLANDI" ? "Tamamlandı" : "Bekliyor"}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums">
+                      {formatCurrency(
+                        Number(o.tutar),
+                        (o.cinsi as "TL" | "USD" | "EUR") || "TL"
+                      )}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {selectedDate && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setDialogOpen(false);
+                onNewWithDate(dateToKey(selectedDate));
+              }}
+            >
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              Ödeme Ekle
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

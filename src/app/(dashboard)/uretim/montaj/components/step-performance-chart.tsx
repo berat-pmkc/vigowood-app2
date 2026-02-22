@@ -169,7 +169,7 @@ export function StepPerformanceChart({ products }: StepPerformanceChartProps) {
             </ResponsiveContainer>
           </div>
           <p className="text-xs text-muted-foreground text-center mt-2">
-            Toplam tahmini montaj süresi: <span className="font-semibold">{Math.round(totalMinutes * 100) / 100} dk/birim</span>
+            Toplam tahmini üretim süresi (montaj + paketleme): <span className="font-semibold">{Math.round(totalMinutes * 100) / 100} dk/birim</span>
           </p>
         </>
       )}

@@ -57,6 +57,7 @@ export async function getStepsForProduct(sku: string) {
       .from("assembly_steps")
       .select("step_id, sku, step_name, seq_no, is_final_step")
       .eq("sku", sku)
+      .neq("step_name", "PAKETLEME")
       .order("seq_no", { ascending: true });
 
     if (error) return { success: false as const, error: error.message };
@@ -218,26 +219,36 @@ export async function getMontajOperators() {
 }
 
 /** KPI analiz verisi */
-export async function getMontajAnalytics(period: "today" | "week" | "month") {
+export async function getMontajAnalytics(period: "today" | "week" | "month" | "lastMonth") {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
     const now = new Date();
     let since: Date;
+    let until: Date | null = null;
     if (period === "today") {
       since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     } else if (period === "week") {
       since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    } else if (period === "lastMonth") {
+      since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      until = new Date(now.getFullYear(), now.getMonth(), 1);
     } else {
       since = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("montaj_sessions")
       .select("session_id, qty, start_time, end_time, worker_count, workers, birim_montaj_dk")
       .eq("durum", "tamamlandi")
       .gte("end_time", since.toISOString());
+
+    if (until) {
+      query = query.lt("end_time", until.toISOString());
+    }
+
+    const { data, error } = await query;
 
     if (error) return { success: false as const, error: error.message };
 
@@ -500,6 +511,25 @@ export async function getStepPerformance(sku: string) {
       }))
       .sort((a, b) => a.seq_no - b.seq_no);
 
+    // Paketleme birim süresini pack_events'ten ekle
+    const { data: packData } = await supabase
+      .from("pack_events")
+      .select("birim_paketleme_dk")
+      .eq("sku", sku)
+      .eq("status", "Closed")
+      .not("birim_paketleme_dk", "is", null);
+
+    if (packData && packData.length > 0) {
+      const avgPaket = packData.reduce((sum, p) => sum + (Number(p.birim_paketleme_dk) || 0), 0) / packData.length;
+      const maxSeq = result.length > 0 ? Math.max(...result.map(r => r.seq_no)) : 0;
+      result.push({
+        step_name: "PAKETLEME",
+        seq_no: maxSeq + 1,
+        avgBirimDk: Math.round(avgPaket * 100) / 100,
+        sessionCount: packData.length,
+      });
+    }
+
     return { success: true as const, data: result };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -599,7 +629,8 @@ export async function getCompletedSessions(params: {
 /** Yeni montaj seansı oluştur */
 export async function createMontajSession(
   sku: string,
-  stepId: string
+  stepId: string,
+  workers?: Array<{ id: string; name: string }>
 ): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -644,6 +675,11 @@ export async function createMontajSession(
       sessionId = `${sessionId}-${String(now.getMilliseconds()).padStart(3, "0")}`;
     }
 
+    // Workers: seans açılışında seçilenler veya sadece aktif operatör
+    const sessionWorkers = workers && workers.length > 0
+      ? workers
+      : [{ id: operatorId, name: operatorName }];
+
     // INSERT
     const { error } = await supabase.from("montaj_sessions").insert({
       session_id: sessionId,
@@ -658,8 +694,8 @@ export async function createMontajSession(
       operator_name: operatorName,
       start_time: now.toISOString(),
       qty: 0,
-      worker_count: 1,
-      workers: JSON.stringify([]),
+      worker_count: sessionWorkers.length,
+      workers: JSON.stringify(sessionWorkers),
     });
 
     if (error) return { success: false, error: error.message };
