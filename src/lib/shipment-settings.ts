@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   SEVKIYAT_COUNTRIES,
   PALET_BOYUTLARI,
@@ -125,9 +126,15 @@ const SEVKIYAT_SETTINGS_KEYS = [
   "sevkiyat_kur_ayarlari",
 ] as const;
 
-export async function getShipmentSettings(): Promise<ShipmentSettings> {
+/**
+ * Get shipment settings — cached with unstable_cache (1 hour).
+ * Uses admin client (service_role) since unstable_cache runs outside request context.
+ * Invalidate by calling revalidateTag("shipment-settings") in server actions.
+ */
+export const getShipmentSettings: () => Promise<ShipmentSettings> = unstable_cache(
+  async (): Promise<ShipmentSettings> => {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data } = await supabase
       .from("app_settings")
       .select("key, value")
@@ -217,4 +224,7 @@ export async function getShipmentSettings(): Promise<ShipmentSettings> {
       kurAyarlari: FALLBACK_KUR_AYARLARI,
     };
   }
-}
+  },
+  ["shipment-settings"],
+  { revalidate: 3600, tags: ["shipment-settings"] }
+);

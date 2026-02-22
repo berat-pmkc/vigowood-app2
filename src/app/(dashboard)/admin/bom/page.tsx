@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedActiveProducts, getCachedAllParts } from "@/lib/cached-queries";
 import { BomPageClient } from "./components/bom-page-client";
 
 interface PageProps {
@@ -14,16 +15,13 @@ export default async function BomPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const selectedSku = params.sku || "";
 
-  const supabase = await createClient();
+  // Cached reference data (2 min cache, invalidated on product/part changes)
+  const [products, allParts] = await Promise.all([
+    getCachedActiveProducts(),
+    getCachedAllParts(),
+  ]);
 
-  // Fetch active products for selector
-  const { data: products } = await supabase
-    .from("products")
-    .select("sku, urun_adi, kategori")
-    .eq("aktif_mi", true)
-    .order("sku");
-
-  // Fetch assembly steps + BOM count if SKU selected
+  // Fetch assembly steps + BOM count if SKU selected (not cached — changes frequently)
   let steps: {
     step_id: string;
     sku: string | null;
@@ -35,6 +33,7 @@ export default async function BomPage({ searchParams }: PageProps) {
   }[] = [];
 
   if (selectedSku) {
+    const supabase = await createClient();
     const { data: stepsData } = await supabase
       .from("assembly_steps")
       .select("step_id, sku, step_name, seq_no, is_final_step, created_at")
@@ -61,12 +60,6 @@ export default async function BomPage({ searchParams }: PageProps) {
       }));
     }
   }
-
-  // Fetch all parts for BOM item combobox
-  const { data: allParts } = await supabase
-    .from("all_parts")
-    .select("part_id, part_adi, part_type")
-    .order("part_id");
 
   return (
     <div className="px-4 pb-6 sm:px-6">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedPartsPage } from "@/lib/cached-queries";
 import { PartsDataTable } from "./components/parts-data-table";
-import type { Database, PartType } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 
 type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
 
@@ -33,23 +33,6 @@ export default async function ParcalarPage({ searchParams }: PageProps) {
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("all_parts")
-    .select("*", { count: "exact" });
-
-  // Search filter
-  if (search) {
-    query = query.or(`part_id.ilike.%${search}%,part_adi.ilike.%${search}%`);
-  }
-
-  // Part type filter
-  if (tip) {
-    query = query.eq("part_type", tip as PartType);
-  }
-
-  // Sorting
   const validSortColumns: (keyof AllPart)[] = [
     "part_id",
     "part_adi",
@@ -61,22 +44,15 @@ export default async function ParcalarPage({ searchParams }: PageProps) {
   const sortColumn = validSortColumns.includes(sortBy as keyof AllPart)
     ? sortBy
     : "part_id";
-  query = query.order(sortColumn, { ascending: sortOrder });
 
-  // Pagination
-  query = query.range(from, to);
-
-  const { data: parts, count, error } = await query;
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <p className="text-destructive">
-          Veri yüklenirken hata oluştu: {error.message}
-        </p>
-      </div>
-    );
-  }
+  const { data: parts, count } = await getCachedPartsPage({
+    search,
+    tip,
+    sortColumn,
+    sortOrder,
+    from,
+    to,
+  });
 
   return (
     <div className="px-4 pb-6 sm:px-6">

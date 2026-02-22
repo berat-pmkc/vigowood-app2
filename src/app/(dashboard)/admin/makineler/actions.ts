@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { makineCreateSchema, makineUpdateSchema } from "@/lib/validations";
@@ -55,6 +55,7 @@ export async function createMakine(formData: {
     }
 
     revalidatePath("/admin/makineler");
+    revalidateTag("machines", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -93,6 +94,7 @@ export async function updateMakine(
     }
 
     revalidatePath("/admin/makineler");
+    revalidateTag("machines", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -131,6 +133,7 @@ export async function deleteMakine(makineId: string): Promise<ActionResult> {
     }
 
     revalidatePath("/admin/makineler");
+    revalidateTag("machines", "default");
     return { success: true };
   } catch (e) {
     return {

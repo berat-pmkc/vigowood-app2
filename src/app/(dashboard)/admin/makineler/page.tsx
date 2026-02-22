@@ -1,27 +1,11 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedMachines } from "@/lib/cached-queries";
 import { MakinelerTable } from "./components/makineler-table";
 
 export const metadata: Metadata = { title: "Makine Yönetimi" };
 
 export default async function MakinelerPage() {
-  const supabase = await createClient();
-
-  const { data: makineler, error } = await supabase
-    .from("kesim_makinesi")
-    .select("*")
-    .order("bolum")
-    .order("makine_id");
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <p className="text-destructive">
-          Veri yüklenirken hata oluştu: {error.message}
-        </p>
-      </div>
-    );
-  }
+  const makineler = await getCachedMachines();
 
   return (
     <div className="px-4 pb-6 sm:px-6">

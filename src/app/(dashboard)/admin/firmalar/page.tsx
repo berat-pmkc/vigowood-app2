@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
 import { ADMIN_ROLES } from "@/lib/auth";
 import { getShipmentSettings } from "@/lib/shipment-settings";
+import { getCachedFirmalar } from "@/lib/cached-queries";
 import { FirmalarClient } from "./components/firmalar-client";
 import type { SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
 
@@ -15,22 +15,14 @@ export default async function FirmalarPage() {
     redirect("/");
   }
 
-  const supabase = await createClient();
-
-  const [{ data }, settings] = await Promise.all([
-    supabase
-      .from("sevkiyat_firmalar")
-      .select("*")
-      .order("firma_tipi")
-      .order("profil_adi"),
+  const [firmalar, settings] = await Promise.all([
+    getCachedFirmalar(),
     getShipmentSettings(),
   ]);
 
-  const firmalar = (data ?? []) as SevkiyatFirmaRow[];
-
   return (
     <FirmalarClient
-      firmalar={firmalar}
+      firmalar={(firmalar ?? []) as SevkiyatFirmaRow[]}
       firmaTipleri={settings.firmaTipleri}
       ulkeler={settings.ulkeler}
     />

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { productUpdateSchema, productCreateSchema } from "@/lib/validations";
@@ -66,6 +66,7 @@ export async function createProduct(
     }
 
     revalidatePath("/admin/urunler");
+    revalidateTag("products", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -103,6 +104,7 @@ export async function updateProduct(
     }
 
     revalidatePath("/admin/urunler");
+    revalidateTag("products", "default");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -131,6 +133,7 @@ export async function bulkToggleActive(
     }
 
     revalidatePath("/admin/urunler");
+    revalidateTag("products", "default");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -184,6 +187,7 @@ export async function importProducts(
     }
 
     revalidatePath("/admin/urunler");
+    revalidateTag("products", "default");
     return { success: true, count };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { partUpdateSchema, partCreateSchema } from "@/lib/validations";
@@ -62,6 +62,7 @@ export async function createPart(
     }
 
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -99,6 +100,7 @@ export async function updatePart(
     }
 
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -151,6 +153,7 @@ export async function deletePart(partId: string): Promise<ActionResult> {
     }
 
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -208,6 +211,7 @@ export async function importParts(
     }
 
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true, count };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

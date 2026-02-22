@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sevkiyatFirmaSchema } from "@/lib/validations";
@@ -30,6 +30,7 @@ export async function createFirma(formData: Record<string, unknown>): Promise<Ac
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/admin/firmalar");
+    revalidateTag("firmalar", "default");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -55,6 +56,7 @@ export async function updateFirma(id: number, formData: Record<string, unknown>)
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/admin/firmalar");
+    revalidateTag("firmalar", "default");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -74,6 +76,7 @@ export async function deleteFirma(id: number): Promise<ActionResult> {
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/admin/firmalar");
+    revalidateTag("firmalar", "default");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

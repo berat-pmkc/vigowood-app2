@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
@@ -33,6 +33,7 @@ function revalidateSevkiyat() {
   revalidatePath("/sevkiyat/maliyetler");
   revalidatePath("/sevkiyat/kurlar");
   revalidatePath("/sevkiyat/sablonlar");
+  revalidateTag("shipment-settings", "default");
 }
 
 // ─── 1. Ülkeler ─────────────────────────────────────────────────

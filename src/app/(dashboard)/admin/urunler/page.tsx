@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedProductsPage } from "@/lib/cached-queries";
 import { ProductsDataTable } from "./components/products-data-table";
 import type { Database, ProductCategory } from "@/lib/supabase/types";
 
@@ -43,21 +43,15 @@ export default async function UrunlerPage({ searchParams }: PageProps) {
     ? sortBy
     : "gunluk_satis";
 
-  const supabase = await createClient();
-  const q = supabase.from("products").select("*", { count: "exact" });
-  if (search) q.or(`sku.ilike.%${search}%,urun_adi.ilike.%${search}%`);
-  if (kategori) q.eq("kategori", kategori as ProductCategory);
-  if (aktif === "true") q.eq("aktif_mi", true);
-  else if (aktif === "false") q.eq("aktif_mi", false);
-  const { data: products, count, error } = await q.order(sortColumn, { ascending: sortOrder }).range(from, to);
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <p className="text-destructive">Veri yüklenirken hata oluştu: {error.message}</p>
-      </div>
-    );
-  }
+  const { data: products, count } = await getCachedProductsPage({
+    search,
+    kategori,
+    aktif,
+    sortColumn,
+    sortOrder,
+    from,
+    to,
+  });
 
   return (
     <div className="px-4 pb-6 sm:px-6">

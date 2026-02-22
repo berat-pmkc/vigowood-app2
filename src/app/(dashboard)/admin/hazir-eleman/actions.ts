@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
@@ -127,6 +127,7 @@ export async function createHazirEleman(formData: {
 
     revalidatePath("/admin/hazir-eleman");
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -188,6 +189,7 @@ export async function updateHazirEleman(
 
     revalidatePath("/admin/hazir-eleman");
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true };
   } catch (e) {
     return {
@@ -241,6 +243,7 @@ export async function deleteHazirEleman(partId: string): Promise<ActionResult> {
 
     revalidatePath("/admin/hazir-eleman");
     revalidatePath("/admin/parcalar");
+    revalidateTag("parts", "default");
     return { success: true };
   } catch (e) {
     return {
