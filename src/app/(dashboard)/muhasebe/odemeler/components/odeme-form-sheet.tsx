@@ -35,12 +35,14 @@ interface OdemeFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingRecord: Odeme | null;
+  prefillDate?: string | null;
 }
 
 export function OdemeFormSheet({
   open,
   onOpenChange,
   editingRecord,
+  prefillDate,
 }: OdemeFormSheetProps) {
   const [isPending, startTransition] = useTransition();
   const isEdit = !!editingRecord;
@@ -85,13 +87,13 @@ export function OdemeFormSheet({
           tanimi: "",
           tutar: 0,
           cinsi: "TL",
-          tarih: todayStr,
+          tarih: prefillDate || todayStr,
           turu: "GENEL",
           odeme_durum: "BEKLİYOR",
         });
       }
     }
-  }, [open, editingRecord, reset, todayStr]);
+  }, [open, editingRecord, reset, todayStr, prefillDate]);
 
   const onSubmit = (data: OdemeCreateData) => {
     startTransition(async () => {

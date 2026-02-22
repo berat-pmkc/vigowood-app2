@@ -597,8 +597,10 @@ export type Database = {
           part_adi: string | null
           part_id: string | null
           part_type: string | null
+          plaka_id: string | null
           qty: number
           session_id: string
+          sku: string | null
           start_time: string | null
           tarih: string | null
         }
@@ -613,8 +615,10 @@ export type Database = {
           part_adi?: string | null
           part_id?: string | null
           part_type?: string | null
+          plaka_id?: string | null
           qty?: number
           session_id: string
+          sku?: string | null
           start_time?: string | null
           tarih?: string | null
         }
@@ -629,8 +633,10 @@ export type Database = {
           part_adi?: string | null
           part_id?: string | null
           part_type?: string | null
+          plaka_id?: string | null
           qty?: number
           session_id?: string
+          sku?: string | null
           start_time?: string | null
           tarih?: string | null
         }
@@ -1241,6 +1247,7 @@ export type Database = {
           kesim_sureleri: Json | null
           plaka_adi: string
           plaka_id: string
+          plaka_kategori: string
           plakalar_id: string
           renk: string | null
           sku: string | null
@@ -1252,6 +1259,7 @@ export type Database = {
           kesim_sureleri?: Json | null
           plaka_adi: string
           plaka_id: string
+          plaka_kategori?: string
           plakalar_id: string
           renk?: string | null
           sku?: string | null
@@ -1263,6 +1271,7 @@ export type Database = {
           kesim_sureleri?: Json | null
           plaka_adi?: string
           plaka_id?: string
+          plaka_kategori?: string
           plakalar_id?: string
           renk?: string | null
           sku?: string | null
@@ -2450,37 +2459,9 @@ export const Constants = {
   },
 } as const
 
-// ─── Custom Type Aliases ──────────────────────────────────
-export type Product = Database["public"]["Tables"]["products"]["Row"];
-export type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
-export type User = Database["public"]["Tables"]["users"]["Row"];
-export type CutBatch = Database["public"]["Tables"]["cut_batches"]["Row"];
-export type CutLine = Database["public"]["Tables"]["cut_lines"]["Row"];
-export type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
-export type PlakaPart = Database["public"]["Tables"]["plaka_parts"]["Row"];
-export type AssemblyStep = Database["public"]["Tables"]["assembly_steps"]["Row"];
-export type StepBom = Database["public"]["Tables"]["step_bom"]["Row"];
-export type StockMovement = Database["public"]["Tables"]["stock_movements"]["Row"];
-export type YariMamulStok = Database["public"]["Tables"]["yari_mamul_stok"]["Row"];
-export type HazirElemanAkis = Database["public"]["Tables"]["hazir_eleman_akis"]["Row"];
-export type IadeGiris = Database["public"]["Tables"]["iade_giris"]["Row"];
-export type PackEvent = Database["public"]["Tables"]["pack_events"]["Row"];
-export type KesimMakinesi = Database["public"]["Tables"]["kesim_makinesi"]["Row"];
-export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+// ─── Custom Type Aliases ───────────────────────────────────────
+export type UserRole = Database["public"]["Enums"]["user_role"];
+export type Station = Database["public"]["Enums"]["user_station"];
+export type ProductCategory = Database["public"]["Enums"]["product_category"];
 export type Odeme = Database["public"]["Tables"]["odemeler"]["Row"];
 export type NakitDonem = Database["public"]["Tables"]["nakit_donemler"]["Row"];
-export type NakitGiris = Database["public"]["Tables"]["nakit_girisler"]["Row"];
-export type NakitCikis = Database["public"]["Tables"]["nakit_cikislar"]["Row"];
-export type NakitGirisTakip = Database["public"]["Tables"]["nakit_giris_takip"]["Row"];
-
-// ─── Enum Type Aliases ────────────────────────────────────
-export type UserRole = Database["public"]["Enums"]["user_role"];
-export type Station = Database["public"]["Enums"]["station"];
-export type ProductCategory = Database["public"]["Enums"]["product_category"];
-export type PartType = Database["public"]["Enums"]["part_type"];
-export type OdemeTuru = Database["public"]["Enums"]["odeme_turu"];
-export type OdemeDurumu = Database["public"]["Enums"]["odeme_durumu"];
-export type MaliyetGrubu = Database["public"]["Enums"]["maliyet_grubu"];
-export type FaaliyetTuru = Database["public"]["Enums"]["faaliyet_turu"];
-export type KalemTuru = Database["public"]["Enums"]["kalem_turu"];
-export type ParaBirimi = Database["public"]["Enums"]["para_birimi"];

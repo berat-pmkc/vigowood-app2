@@ -9,6 +9,7 @@ interface UyariData {
   toplamVarlik: number;
   organikGelir: number;
   prevOrganikGelir?: number;
+  kisaVadeliBorc?: number;
 }
 
 export function UyariKartlari({ data }: { data: UyariData }) {
@@ -24,14 +25,14 @@ export function UyariKartlari({ data }: { data: UyariData }) {
     });
   }
 
-  // Kritik borç/varlık oranı (>80%)
-  if (data.toplamVarlik > 0) {
-    const oran = (data.toplamBorc / data.toplamVarlik) * 100;
+  // Kısa vadeli likidite uyarısı (90 gün bekleyen ödemeler vs nakit TL)
+  if (data.kisaVadeliBorc != null && data.kisaVadeliBorc > 0 && data.nakitTl > 0) {
+    const oran = (data.kisaVadeliBorc / data.nakitTl) * 100;
     if (oran > 80) {
       alerts.push({
         icon: AlertTriangle,
-        title: "Kritik Borç/Varlık Oranı",
-        desc: `Oran: %${oran.toFixed(1)} (Eşik: %80)`,
+        title: "Kısa Vadeli Likidite Uyarısı",
+        desc: `90 gün içindeki yükümlülükler nakit rezervinin %${oran.toFixed(0)}'ine ulaştı (${formatCurrency(data.kisaVadeliBorc, "TL")} / ${formatCurrency(data.nakitTl, "TL")})`,
         color: "border-amber-300 bg-amber-50 text-amber-800",
       });
     }

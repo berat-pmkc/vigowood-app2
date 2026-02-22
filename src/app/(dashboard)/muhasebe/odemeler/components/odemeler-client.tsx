@@ -9,15 +9,9 @@ import { OdemelerKpiCards } from "./odemeler-kpi-cards";
 import { OdemelerDataTable } from "./odemeler-data-table";
 import { OdemelerToolbar } from "./odemeler-toolbar";
 import { OdemeFormSheet } from "./odeme-form-sheet";
-import { OdemelerTrendChart } from "./odemeler-trend-chart";
+import { OdemelerCalendarView } from "./odemeler-calendar-view";
+import { OdemelerSummaryTab } from "./odemeler-summary-tab";
 import type { Odeme } from "@/lib/supabase/types";
-
-interface KpiData {
-  bekleyenTl: number;
-  bekleyenUsd: number;
-  yaklasan7Gun: number;
-  buAyOdenen: number;
-}
 
 interface TrendItem {
   month: string;
@@ -26,10 +20,27 @@ interface TrendItem {
   bekleyen: number;
 }
 
+interface SummaryItem {
+  tarih: string | null;
+  tutar: number;
+  odeme_durum: string | null;
+  cinsi: string | null;
+  turu: string | null;
+}
+
+interface OdemeKpiRow {
+  id: string;
+  tutar: number;
+  cinsi: string | null;
+  tarih: string | null;
+  turu: string | null;
+  odeme_durum: string | null;
+}
+
 interface OdemelerClientProps {
   activeTab: string;
-  kpiData: KpiData;
   trendData: TrendItem[];
+  summaryData: SummaryItem[];
   listData: Odeme[];
   totalCount: number;
   pageIndex: number;
@@ -42,12 +53,16 @@ interface OdemelerClientProps {
   dateTo: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
+  calendarData: Odeme[];
+  calYear: number;
+  calMonth: number;
+  allOdemeler: OdemeKpiRow[];
 }
 
 export function OdemelerClient({
   activeTab,
-  kpiData,
   trendData,
+  summaryData,
   listData,
   totalCount,
   pageIndex,
@@ -60,15 +75,20 @@ export function OdemelerClient({
   dateTo,
   sortBy,
   sortOrder,
+  calendarData,
+  calYear,
+  calMonth,
+  allOdemeler,
 }: OdemelerClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<Odeme | null>(null);
+  const [prefillDate, setPrefillDate] = useState<string | null>(null);
 
   const handleTabChange = (tab: string) => {
     const params = new URLSearchParams();
-    if (tab !== "liste") {
+    if (tab !== "takvim") {
       params.set("tab", tab);
     }
     startTransition(() => {
@@ -78,17 +98,26 @@ export function OdemelerClient({
 
   const handleNewRecord = () => {
     setEditingRecord(null);
+    setPrefillDate(null);
+    setSheetOpen(true);
+  };
+
+  const handleNewRecordWithDate = (dateStr: string) => {
+    setEditingRecord(null);
+    setPrefillDate(dateStr);
     setSheetOpen(true);
   };
 
   const handleEdit = (record: Odeme) => {
     setEditingRecord(record);
+    setPrefillDate(null);
     setSheetOpen(true);
   };
 
   const handleSheetClose = () => {
     setSheetOpen(false);
     setEditingRecord(null);
+    setPrefillDate(null);
   };
 
   return (
@@ -117,13 +146,24 @@ export function OdemelerClient({
         </div>
       </div>
 
-      <OdemelerKpiCards data={kpiData} />
+      <OdemelerKpiCards allOdemeler={allOdemeler} />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
+          <TabsTrigger value="takvim">Takvim</TabsTrigger>
           <TabsTrigger value="liste">Liste</TabsTrigger>
           <TabsTrigger value="ozet">Özet</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="takvim" className="mt-4">
+          <OdemelerCalendarView
+            calendarData={calendarData}
+            calYear={calYear}
+            calMonth={calMonth}
+            onEdit={handleEdit}
+            onNewWithDate={handleNewRecordWithDate}
+          />
+        </TabsContent>
 
         <TabsContent value="liste" className="mt-4 space-y-4">
           <OdemelerToolbar
@@ -146,7 +186,7 @@ export function OdemelerClient({
         </TabsContent>
 
         <TabsContent value="ozet" className="mt-4 space-y-4">
-          <OdemelerTrendChart data={trendData} />
+          <OdemelerSummaryTab data={summaryData} />
         </TabsContent>
       </Tabs>
 
@@ -154,6 +194,7 @@ export function OdemelerClient({
         open={sheetOpen}
         onOpenChange={handleSheetClose}
         editingRecord={editingRecord}
+        prefillDate={prefillDate}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useReactTable,
@@ -20,6 +20,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Pencil, Trash2, CheckCircle2, Clock } from "lucide-react";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { ODEME_DURUM_COLORS, type OdemeDurumuConst } from "@/lib/constants";
@@ -38,6 +48,15 @@ interface OdemelerDataTableProps {
   onEdit: (record: Odeme) => void;
 }
 
+interface DurumConfirmState {
+  id: string;
+  tanimi: string;
+  tutar: number;
+  cinsi: string;
+  currentDurum: string;
+  newDurum: string;
+}
+
 function DurumBadge({ durum }: { durum: string | null }) {
   if (!durum) return <span className="text-muted-foreground">—</span>;
   const colors = ODEME_DURUM_COLORS[durum as OdemeDurumuConst];
@@ -52,7 +71,7 @@ function DurumBadge({ durum }: { durum: string | null }) {
 function getColumns(
   onSort: (id: string, desc: boolean) => void,
   onEdit: (record: Odeme) => void,
-  onToggleDurum: (id: string, currentDurum: string | null) => void,
+  onToggleDurum: (record: Odeme) => void,
   onDelete: (id: string) => void
 ): ColumnDef<Odeme>[] {
   return [
@@ -117,7 +136,7 @@ function getColumns(
       cell: ({ row }) => (
         <button
           className="cursor-pointer"
-          onClick={() => onToggleDurum(row.original.id, row.original.odeme_durum)}
+          onClick={() => onToggleDurum(row.original)}
         >
           <DurumBadge durum={row.original.odeme_durum} />
         </button>
@@ -140,7 +159,7 @@ function getColumns(
               Düzenle
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => onToggleDurum(row.original.id, row.original.odeme_durum)}
+              onClick={() => onToggleDurum(row.original)}
             >
               {row.original.odeme_durum === "TAMAMLANDI" ? (
                 <>
@@ -183,6 +202,7 @@ export function OdemelerDataTable({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
+  const [durumConfirm, setDurumConfirm] = useState<DurumConfirmState | null>(null);
 
   const buildUrl = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -219,15 +239,34 @@ export function OdemelerDataTable({
     [navigate]
   );
 
-  const handleToggleDurum = useCallback(async (id: string, currentDurum: string | null) => {
+  const handleRequestToggleDurum = useCallback((record: Odeme) => {
+    const currentDurum = record.odeme_durum || "BEKLİYOR";
     const newDurum = currentDurum === "TAMAMLANDI" ? "BEKLİYOR" : "TAMAMLANDI";
-    const result = await toggleOdemeDurum(id, newDurum as "TAMAMLANDI" | "BEKLİYOR");
+    setDurumConfirm({
+      id: record.id,
+      tanimi: record.tanimi,
+      tutar: Number(record.tutar),
+      cinsi: record.cinsi || "TL",
+      currentDurum,
+      newDurum,
+    });
+  }, []);
+
+  const handleConfirmToggle = useCallback(async () => {
+    if (!durumConfirm) return;
+    const result = await toggleOdemeDurum(
+      durumConfirm.id,
+      durumConfirm.newDurum as "TAMAMLANDI" | "BEKLİYOR"
+    );
     if (result.success) {
-      toast.success(`Durum güncellendi: ${newDurum === "TAMAMLANDI" ? "Tamamlandı" : "Bekliyor"}`);
+      toast.success(
+        `Durum güncellendi: ${durumConfirm.newDurum === "TAMAMLANDI" ? "Tamamlandı" : "Bekliyor"}`
+      );
     } else {
       toast.error(result.error);
     }
-  }, []);
+    setDurumConfirm(null);
+  }, [durumConfirm]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Bu ödeme kaydını silmek istediğinize emin misiniz?")) return;
@@ -245,8 +284,8 @@ export function OdemelerDataTable({
   );
 
   const columns = useMemo(
-    () => getColumns(handleSort, onEdit, handleToggleDurum, handleDelete),
-    [handleSort, onEdit, handleToggleDurum, handleDelete]
+    () => getColumns(handleSort, onEdit, handleRequestToggleDurum, handleDelete),
+    [handleSort, onEdit, handleRequestToggleDurum, handleDelete]
   );
 
   const table = useReactTable({
@@ -274,6 +313,43 @@ export function OdemelerDataTable({
           navigate({ pageSize: String(size), page: "0" })
         }
       />
+
+      <AlertDialog
+        open={!!durumConfirm}
+        onOpenChange={(open) => { if (!open) setDurumConfirm(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ödeme Durumunu Değiştir</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  <span className="font-medium text-foreground">
+                    {durumConfirm?.tanimi}
+                  </span>
+                </p>
+                <p>
+                  Tutar: {durumConfirm && formatCurrency(
+                    durumConfirm.tutar,
+                    durumConfirm.cinsi as "TL" | "USD" | "EUR"
+                  )}
+                </p>
+                <p>
+                  <DurumBadge durum={durumConfirm?.currentDurum ?? null} />
+                  {" → "}
+                  <DurumBadge durum={durumConfirm?.newDurum ?? null} />
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmToggle}>
+              Onayla
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -109,6 +109,18 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
     .select("*")
     .order("tarih", { ascending: false });
 
+  // Kısa vadeli borç (90 gün içindeki bekleyen ödemeler)
+  const today90 = new Date();
+  today90.setDate(today90.getDate() + 90);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const today90Str = today90.toISOString().split("T")[0];
+  const kisaVadeliQuery = supabase
+    .from("odemeler")
+    .select("tutar")
+    .eq("odeme_durum", "BEKLİYOR")
+    .eq("cinsi", "TL")
+    .lte("tarih", today90Str);
+
   const [
     donemResult,
     girisResult,
@@ -117,6 +129,7 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
     prevDonemResult,
     trendResult,
     girisTakipResult,
+    kisaVadeliResult,
   ] = await Promise.all([
     donemQuery,
     girisQuery,
@@ -125,6 +138,7 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
     prevDonemQuery,
     trendQuery,
     girisTakipQuery,
+    kisaVadeliQuery,
   ]);
 
   const donem = donemResult.data as NakitDonem | null;
@@ -245,6 +259,12 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
     odeme_durum: r.odeme_durum as string | null,
   }));
 
+  // Kısa vadeli borç
+  const kisaVadeliBorc = (kisaVadeliResult.data ?? []).reduce(
+    (sum, r) => sum + Number(r.tutar),
+    0
+  );
+
   // Previous organik gelir (for alerts)
   const prevOrganikGelir = prevGiris
     ? n(prevGiris.vigowood_com) + n(prevGiris.trendyol) + n(prevGiris.hepsiburada) +
@@ -267,6 +287,7 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
         trendData={trendData}
         girisTakipData={girisTakipData}
         prevOrganikGelir={prevOrganikGelir}
+        kisaVadeliBorc={kisaVadeliBorc}
       />
     </div>
   );

@@ -25,7 +25,6 @@ const PLAKA_EXPORT_COLUMNS: ExcelColumn[] = [
   { key: "mak1_dk", header: "MAK-1 (dk)", width: 12 },
   { key: "mak2_dk", header: "MAK-2 (dk)", width: 12 },
   { key: "mak3_dk", header: "MAK-3 (dk)", width: 12 },
-  { key: "kutu_dk", header: "Kutu (dk)", width: 12 },
   { key: "sku", header: "SKU", width: 15 },
 ];
 
@@ -85,7 +84,6 @@ export function PlakalarToolbar({
         mak1_dk: r["MAK-1 (dk)"] || r["mak1_dk"] || undefined,
         mak2_dk: r["MAK-2 (dk)"] || r["mak2_dk"] || undefined,
         mak3_dk: r["MAK-3 (dk)"] || r["mak3_dk"] || undefined,
-        kutu_dk: r["Kutu (dk)"] || r["kutu_dk"] || undefined,
         sku: r["SKU"] || r["sku"] || undefined,
       }))
     );
@@ -172,7 +170,7 @@ export function PlakalarToolbar({
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Plaka İçe Aktar"
-        description="Excel dosyasında Plaka ID, Plaka Grubu, Plaka Adı, Tip, Renk, Büyük (dk), Küçük (dk), Kutu (dk), SKU kolonları beklenir."
+        description="Excel dosyasında Plaka ID, Plaka Grubu, Plaka Adı, Tip, Renk, MAK-1 (dk), MAK-2 (dk), MAK-3 (dk), SKU kolonları beklenir."
         onConfirm={handleImport}
       />
     </>

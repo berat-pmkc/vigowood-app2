@@ -105,6 +105,7 @@ interface NakitAkisClientProps {
   trendData: TrendItem[];
   girisTakipData: GirisTakipRow[];
   prevOrganikGelir?: number;
+  kisaVadeliBorc?: number;
 }
 
 export function NakitAkisClient({
@@ -121,6 +122,7 @@ export function NakitAkisClient({
   trendData,
   girisTakipData,
   prevOrganikGelir,
+  kisaVadeliBorc,
 }: NakitAkisClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -182,6 +184,7 @@ export function NakitAkisClient({
               toplamVarlik: kpiData.toplamVarlik,
               organikGelir: gelirYapisi.organikGelir,
               prevOrganikGelir,
+              kisaVadeliBorc,
             }}
           />
 

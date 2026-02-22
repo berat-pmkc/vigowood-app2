@@ -350,6 +350,7 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] 18A: Ülke bazlı ID (DE21/UK29), lojistik kolonlar, sevkiyat_fiyatlar, Admin Fiyatlar, seed
 - [x] 18C: Palet şablon sistemi, Admin Şablonlar sayfası
 - [x] 18D: Planlama sayfası (/sevkiyat/[id]), Proforma PDF, Paket Listesi PDF
+- [x] 18G: Sevkiyat Ayarları — hardcoded sabitler DB'ye taşındı, admin ayarlar sayfası (/sevkiyat/ayarlar)
 
 ### KATMAN 19: Satış ✅
 - [x] Satış dashboard + Excel upload + stok düşümü

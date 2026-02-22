@@ -11,23 +11,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { KutuStatusBadge } from "./kutu-status-badge";
-import { startKutu, completeKutu, cancelKutu } from "../actions";
+import { completeKutu, cancelKutu } from "../actions";
 import { PART_TYPE_LABELS, type KutuStatus, type PartType } from "@/lib/constants";
 import { formatDate, formatTime, formatDuration } from "@/lib/utils";
 import {
-  Play,
   CheckCircle,
   XCircle,
-  Clock,
   User,
   Box,
   TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { KutuSessionRow } from "./kutu-card";
+import type { KutuSessionEnriched } from "../page";
 
 interface KutuDetailSheetProps {
-  session: KutuSessionRow;
+  session: KutuSessionEnriched;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -36,14 +34,6 @@ export function KutuDetailSheet({ session, open, onOpenChange }: KutuDetailSheet
   const [actionLoading, setActionLoading] = useState(false);
 
   const durum = session.durum as KutuStatus;
-
-  const handleStart = async () => {
-    setActionLoading(true);
-    const result = await startKutu(session.session_id);
-    if (!result.success) toast.error(result.error);
-    else { toast.success("Kutu üretimi başlatıldı"); onOpenChange(false); }
-    setActionLoading(false);
-  };
 
   const handleComplete = async () => {
     setActionLoading(true);
@@ -76,7 +66,6 @@ export function KutuDetailSheet({ session, open, onOpenChange }: KutuDetailSheet
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
-          {/* Seans bilgileri */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-muted-foreground">Parça</p>
@@ -87,11 +76,19 @@ export function KutuDetailSheet({ session, open, onOpenChange }: KutuDetailSheet
               <p className="font-semibold text-lg">{session.qty}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Tip</p>
-              <div className="flex items-center gap-1">
-                {partTypeLabel && <Badge variant="outline" className="text-xs">{partTypeLabel}</Badge>}
-              </div>
+              <p className="text-muted-foreground">Ürün (SKU)</p>
+              <p className="font-medium">{session.urun_adi ?? session.sku ?? "—"}</p>
             </div>
+            <div>
+              <p className="text-muted-foreground">Şablon</p>
+              <p className="font-medium">{session.plaka_adi ?? session.plaka_id ?? "—"}</p>
+            </div>
+            {partTypeLabel && (
+              <div>
+                <p className="text-muted-foreground">Tip</p>
+                <Badge variant="outline" className="text-xs">{partTypeLabel}</Badge>
+              </div>
+            )}
             <div>
               <p className="text-muted-foreground">Operatör</p>
               <div className="flex items-center gap-1">
@@ -126,7 +123,6 @@ export function KutuDetailSheet({ session, open, onOpenChange }: KutuDetailSheet
 
           <Separator />
 
-          {/* Stok hareketi bilgisi */}
           {durum === "tamamlandi" && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -142,12 +138,12 @@ export function KutuDetailSheet({ session, open, onOpenChange }: KutuDetailSheet
           )}
 
           {durum === "uretimde" && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Box className="w-4 h-4 text-blue-600" />
-                <span className="font-medium text-blue-700 text-sm">Üretim Devam Ediyor</span>
+                <Box className="w-4 h-4 text-amber-600" />
+                <span className="font-medium text-amber-700 text-sm">Üretim Devam Ediyor</span>
               </div>
-              <p className="text-sm text-blue-600">
+              <p className="text-sm text-amber-600">
                 Tamamlandığında <span className="font-bold">{session.qty}</span> adet parça stoğa eklenecek.
               </p>
             </div>
@@ -155,19 +151,7 @@ export function KutuDetailSheet({ session, open, onOpenChange }: KutuDetailSheet
 
           <Separator />
 
-          {/* Aksiyon butonları */}
           <div className="flex gap-2 pb-4">
-            {durum === "bekliyor" && (
-              <Button
-                className="flex-1 h-14 text-base bg-vw-success hover:bg-vw-success/90 text-white"
-                onClick={handleStart}
-                disabled={actionLoading}
-              >
-                <Play className="w-5 h-5 mr-2" />
-                Üretime Başlat
-              </Button>
-            )}
-
             {durum === "uretimde" && (
               <>
                 <Button

@@ -74,6 +74,7 @@ export async function createPlaka(
       renk: parsed.data.renk,
       kesim_sureleri: cleanKesimSureleri(parsed.data.kesim_sureleri),
       sku: parsed.data.sku,
+      plaka_kategori: "MDF",
     });
 
     if (error) {
@@ -359,12 +360,11 @@ export async function deletePlaka(plakalarId: string): Promise<ActionResult> {
   }
 }
 
-/** Export helper: flatten kesim_sureleri into separate columns */
+/** Export helper: flatten kesim_sureleri into separate columns (MDF only) */
 interface ExportPlaka extends Omit<Plaka, "kesim_sureleri"> {
   mak1_dk: number | null;
   mak2_dk: number | null;
   mak3_dk: number | null;
-  kutu_dk: number | null;
 }
 
 export async function exportPlakalar(): Promise<
@@ -376,6 +376,7 @@ export async function exportPlakalar(): Promise<
     const { data, error } = await supabase
       .from("plakalar")
       .select("*")
+      .eq("plaka_kategori", "MDF")
       .order("plakalar_id");
 
     if (error) return { success: false, error: error.message };
@@ -388,7 +389,6 @@ export async function exportPlakalar(): Promise<
         mak1_dk: ks["MAK-1"] ?? null,
         mak2_dk: ks["MAK-2"] ?? null,
         mak3_dk: ks["MAK-3"] ?? null,
-        kutu_dk: ks["KUTU"] ?? null,
       };
     });
 
@@ -408,7 +408,6 @@ export async function importPlakalar(
     mak1_dk?: string;
     mak2_dk?: string;
     mak3_dk?: string;
-    kutu_dk?: string;
     sku?: string;
   }[]
 ): Promise<ActionResult & { count?: number }> {
@@ -420,7 +419,7 @@ export async function importPlakalar(
     for (const row of rows) {
       if (!row.plaka_id || !row.plaka_adi) continue;
 
-      // Build kesim_sureleri from 4 columns
+      // Build kesim_sureleri from 3 MDF columns
       const kesimSureleri: Record<string, number> = {};
       if (row.mak1_dk) {
         const v = parseInt(row.mak1_dk, 10);
@@ -433,10 +432,6 @@ export async function importPlakalar(
       if (row.mak3_dk) {
         const v = parseInt(row.mak3_dk, 10);
         if (!isNaN(v)) kesimSureleri["MAK-3"] = v;
-      }
-      if (row.kutu_dk) {
-        const v = parseInt(row.kutu_dk, 10);
-        if (!isNaN(v)) kesimSureleri["KUTU"] = v;
       }
 
       if (row.plakalar_id) {
@@ -451,6 +446,7 @@ export async function importPlakalar(
               renk: row.renk || null,
               kesim_sureleri: kesimSureleri,
               sku: row.sku || null,
+              plaka_kategori: "MDF",
             },
             { onConflict: "plakalar_id" }
           );
@@ -481,6 +477,7 @@ export async function importPlakalar(
           renk: row.renk || null,
           kesim_sureleri: kesimSureleri,
           sku: row.sku || null,
+          plaka_kategori: "MDF",
         });
 
         if (error) {

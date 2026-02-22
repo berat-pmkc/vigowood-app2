@@ -24,65 +24,36 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
-import { deletePlaka } from "../actions";
+import { deleteKartonSablon } from "../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import type { Database } from "@/lib/supabase/types";
 
-type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
+export interface KartonSablonRow {
+  plakalar_id: string;
+  plaka_id: string;
+  plaka_adi: string;
+  tipi: string | null;
+  renk: string | null;
+  kesim_sureleri: unknown;
+  sku: string | null;
+  created_at: string;
+  updated_at: string | null;
+  plaka_kategori: string;
+  output_part_id: string | null;
+  output_part_adi: string | null;
+}
 
 interface ColumnOptions {
   onSort: (columnId: string, desc: boolean) => void;
-  onEdit: (plaka: Plaka) => void;
+  onEdit: (row: KartonSablonRow) => void;
 }
 
-const makineBadgeColors: Record<string, string> = {
-  "MAK-1": "bg-emerald-100 text-emerald-800 border-emerald-200",
-  "MAK-2": "bg-blue-100 text-blue-800 border-blue-200",
-  "MAK-3": "bg-purple-100 text-purple-800 border-purple-200",
-};
-
-function KesimSureleriCell({ kesimSureleri }: { kesimSureleri: unknown }) {
-  const ks = (kesimSureleri ?? {}) as Record<string, number>;
-
-  const labels: Record<string, string> = {
-    "MAK-1": "M1",
-    "MAK-2": "M2",
-    "MAK-3": "M3",
-  };
-
-  const mdfKeys = ["MAK-1", "MAK-2", "MAK-3"] as const;
-  const hasMdf = mdfKeys.some((k) => ks[k] != null);
-
-  if (!hasMdf) {
-    return <span className="text-sm text-muted-foreground">—</span>;
-  }
-
-  return (
-    <div className="flex gap-1.5 flex-wrap">
-      {mdfKeys.map((key) => {
-        const val = ks[key];
-        if (val == null) return null;
-        return (
-          <Badge
-            key={key}
-            variant="outline"
-            className={`text-xs px-1.5 py-0 ${makineBadgeColors[key] || ""}`}
-          >
-            {labels[key]}:{val}
-          </Badge>
-        );
-      })}
-    </div>
-  );
-}
-
-function PlakaActionsCell({
-  plaka,
+function KartonActionsCell({
+  row,
   onEdit,
 }: {
-  plaka: Plaka;
-  onEdit: (plaka: Plaka) => void;
+  row: KartonSablonRow;
+  onEdit: (row: KartonSablonRow) => void;
 }) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -90,9 +61,9 @@ function PlakaActionsCell({
 
   const handleDelete = () => {
     startTransition(async () => {
-      const result = await deletePlaka(plaka.plakalar_id);
+      const result = await deleteKartonSablon(row.plakalar_id);
       if (result.success) {
-        toast.success("Plaka silindi");
+        toast.success("Şablon silindi");
         setDeleteOpen(false);
         router.refresh();
       } else {
@@ -114,7 +85,7 @@ function PlakaActionsCell({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onEdit(plaka)}>
+          <DropdownMenuItem onClick={() => onEdit(row)}>
             Düzenle
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -134,11 +105,10 @@ function PlakaActionsCell({
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Plakayı Sil</AlertDialogTitle>
+            <AlertDialogTitle>Şablonu Sil</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{plaka.plakalar_id}</strong> — {plaka.plaka_adi || "İsimsiz"}{" "}
-              plakasını silmek istediğinize emin misiniz? Plaka parçaları da
-              silinecektir. Bu işlem geri alınamaz.
+              <strong>{row.plakalar_id}</strong> — {row.plaka_adi || "İsimsiz"}{" "}
+              şablonunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -157,35 +127,27 @@ function PlakaActionsCell({
   );
 }
 
-export function getPlakaColumns({
+export function getKartonSablonColumns({
   onSort,
   onEdit,
-}: ColumnOptions): ColumnDef<Plaka>[] {
+}: ColumnOptions): ColumnDef<KartonSablonRow>[] {
   return [
     {
       accessorKey: "plakalar_id",
       header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Plaka ID"
-          onSort={onSort}
-        />
+        <DataTableColumnHeader column={column} title="ID" onSort={onSort} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-sm">
           {row.getValue("plakalar_id")}
         </span>
       ),
-      size: 120,
+      size: 100,
     },
     {
       accessorKey: "plaka_adi",
       header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Plaka Adı"
-          onSort={onSort}
-        />
+        <DataTableColumnHeader column={column} title="Şablon Adı" onSort={onSort} />
       ),
       cell: ({ row }) => (
         <span className="max-w-[180px] truncate block sm:max-w-none">
@@ -194,16 +156,40 @@ export function getPlakaColumns({
       ),
     },
     {
+      accessorKey: "sku",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
+      ),
+      cell: ({ row }) => {
+        const sku = row.getValue("sku") as string | null;
+        if (!sku) return <span className="text-sm text-muted-foreground">—</span>;
+        const style = getSkuBadgeStyle(sku);
+        return (
+          <Badge
+            variant="outline"
+            className="font-mono text-xs"
+            style={{
+              backgroundColor: style.backgroundColor,
+              color: style.color,
+              borderColor: style.borderColor,
+            }}
+          >
+            {sku}
+          </Badge>
+        );
+      },
+      size: 140,
+    },
+    {
       accessorKey: "tipi",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Tip" onSort={onSort} />
       ),
-      cell: ({ row }) => {
-        const tipi = row.getValue("tipi") as string | null;
-        return (
-          <span className="text-sm whitespace-nowrap">{tipi || "—"}</span>
-        );
-      },
+      cell: ({ row }) => (
+        <span className="text-sm whitespace-nowrap">
+          {(row.getValue("tipi") as string | null) || "—"}
+        </span>
+      ),
       size: 100,
     },
     {
@@ -225,48 +211,40 @@ export function getPlakaColumns({
       size: 100,
     },
     {
-      accessorKey: "kesim_sureleri",
-      header: "Kesim Süreleri",
-      cell: ({ row }) => (
-        <KesimSureleriCell kesimSureleri={row.getValue("kesim_sureleri")} />
-      ),
-      size: 180,
-      enableSorting: false,
+      id: "kutu_sure",
+      header: "KUTU (dk)",
+      cell: ({ row }) => {
+        const ks = (row.original.kesim_sureleri ?? {}) as Record<string, number>;
+        const val = ks["KUTU"];
+        return val != null ? (
+          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-200">
+            {val} dk
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        );
+      },
+      size: 90,
+    },
+    {
+      id: "output_part",
+      header: "Çıkan Parça",
+      cell: ({ row }) => {
+        const name = row.original.output_part_adi;
+        return name ? (
+          <span className="text-sm truncate block max-w-[150px]">{name}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        );
+      },
+      size: 150,
       meta: { className: "hidden lg:table-cell" },
     },
     {
-      accessorKey: "sku",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
-      ),
-      cell: ({ row }) => {
-        const sku = row.getValue("sku") as string | null;
-        if (!sku) {
-          return <span className="text-sm text-muted-foreground">—</span>;
-        }
-        const style = getSkuBadgeStyle(sku);
-        return (
-          <Badge
-            variant="outline"
-            className="font-mono text-xs"
-            style={{
-              backgroundColor: style.backgroundColor,
-              color: style.color,
-              borderColor: style.borderColor,
-            }}
-          >
-            {sku}
-          </Badge>
-        );
-      },
-      size: 140,
-    },
-    {
       id: "actions",
-      cell: ({ row }) => {
-        const plaka = row.original;
-        return <PlakaActionsCell plaka={plaka} onEdit={onEdit} />;
-      },
+      cell: ({ row }) => (
+        <KartonActionsCell row={row.original} onEdit={onEdit} />
+      ),
       size: 50,
     },
   ];

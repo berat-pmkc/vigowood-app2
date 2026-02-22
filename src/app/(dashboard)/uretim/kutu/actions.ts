@@ -18,20 +18,139 @@ async function requireProductionAccess() {
 
 // ─── READ ACTIONS ───────────────────────────────────────────────
 
-/** Aktif KUTU ve KARTON parçaları getir */
-export async function getActiveKutuParts() {
+/** Bir SKU'ya ait karton şablonları getir (plaka_parts + all_parts join) */
+export async function getKartonSablonlarForSku(sku: string) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    const { data: parts, error } = await supabase
-      .from("all_parts")
-      .select("part_id, part_adi, part_type, hazir_eleman_aktif_stok, hazir_eleman_kritik_stok")
-      .in("part_type", ["KUTU", "KARTON"])
-      .order("part_adi");
+    const { data: sablonlar, error } = await supabase
+      .from("plakalar")
+      .select("plakalar_id, plaka_id, plaka_adi, tipi, renk, kesim_sureleri")
+      .eq("plaka_kategori", "KARTON")
+      .eq("sku", sku)
+      .order("plaka_adi");
 
     if (error) return { success: false as const, error: error.message };
-    return { success: true as const, data: parts ?? [] };
+
+    // Get plaka_parts for each
+    const plakaIds = (sablonlar ?? []).map((s) => s.plaka_id);
+    let partInfoMap = new Map<string, { part_id: string; part_adi: string; stok: number; kritik: number }>();
+
+    if (plakaIds.length > 0) {
+      const { data: pparts } = await supabase
+        .from("plaka_parts")
+        .select("plaka_id, part_id")
+        .in("plaka_id", plakaIds);
+
+      if (pparts && pparts.length > 0) {
+        const partIds = [...new Set(pparts.map((p) => p.part_id))];
+        const { data: parts } = await supabase
+          .from("all_parts")
+          .select("part_id, part_adi, hazir_eleman_aktif_stok, hazir_eleman_kritik_stok")
+          .in("part_id", partIds);
+
+        const partsMap = new Map(
+          (parts ?? []).map((p) => [
+            p.part_id,
+            {
+              part_adi: p.part_adi,
+              stok: p.hazir_eleman_aktif_stok ?? 0,
+              kritik: p.hazir_eleman_kritik_stok ?? 0,
+            },
+          ])
+        );
+
+        partInfoMap = new Map(
+          pparts.map((pp) => {
+            const info = partsMap.get(pp.part_id);
+            return [
+              pp.plaka_id,
+              {
+                part_id: pp.part_id,
+                part_adi: info?.part_adi ?? pp.part_id,
+                stok: info?.stok ?? 0,
+                kritik: info?.kritik ?? 0,
+              },
+            ];
+          })
+        );
+      }
+    }
+
+    const result = (sablonlar ?? []).map((s) => {
+      const ks = (s.kesim_sureleri ?? {}) as Record<string, number>;
+      const partInfo = partInfoMap.get(s.plaka_id);
+      return {
+        plaka_id: s.plaka_id,
+        plaka_adi: s.plaka_adi,
+        tipi: s.tipi,
+        renk: s.renk,
+        kutu_sure_dk: ks["KUTU"] ?? null,
+        part_id: partInfo?.part_id ?? null,
+        part_adi: partInfo?.part_adi ?? null,
+        part_stok: partInfo?.stok ?? 0,
+        part_kritik: partInfo?.kritik ?? 0,
+      };
+    });
+
+    return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Son 3 ayda en çok kesilen SKU'lar */
+export async function getTopKutuSkus(limit = 10) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const { data, error } = await supabase
+      .from("kutu_uretim")
+      .select("sku")
+      .not("sku", "is", null)
+      .gte("created_at", threeMonthsAgo.toISOString())
+      .eq("durum", "tamamlandi");
+
+    if (error) return { success: false as const, error: error.message };
+
+    // Group by SKU, count
+    const skuCounts = new Map<string, number>();
+    for (const row of data ?? []) {
+      if (!row.sku) continue;
+      skuCounts.set(row.sku, (skuCounts.get(row.sku) ?? 0) + 1);
+    }
+
+    const sorted = [...skuCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([sku]) => sku);
+
+    return { success: true as const, data: sorted };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Kutu istasyonu operatörleri */
+export async function getKutuOperators() {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("user_id, full_name, station")
+      .in("station", ["Kutu", "Kutu Hattı", "Kutu-Koli"])
+      .eq("is_active", true)
+      .order("full_name");
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data ?? [] };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
@@ -39,11 +158,15 @@ export async function getActiveKutuParts() {
 
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
-/** Yeni kutu üretim seansı oluştur */
+/** Yeni kutu üretim seansı oluştur — auto-start "uretimde" */
 export async function createKutuSession(formData: {
+  plaka_id: string;
+  sku: string;
   part_id: string;
   qty: number;
   not_text: string | null;
+  operator_id?: string;
+  operator_name?: string;
 }): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -56,10 +179,10 @@ export async function createKutuSession(formData: {
 
     const supabase = await createClient();
 
-    // Operatör bilgisi
+    // Operatör bilgisi — form'dan gelen veya auth'tan
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
-    const operatorName = authUser?.user_metadata?.selected_operator_name ?? user.full_name;
+    const operatorId = formData.operator_id ?? authUser?.user_metadata?.selected_operator_id ?? user.user_id;
+    const operatorName = formData.operator_name ?? authUser?.user_metadata?.selected_operator_name ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
     // Parça bilgisi
@@ -72,14 +195,13 @@ export async function createKutuSession(formData: {
     const part = partData as { part_adi: string; part_type: string } | null;
     if (!part) return { success: false, error: "Parça bulunamadı" };
 
-    // Generate session_id: KUT-YYYYMMDD-HHMMSS format
+    // Generate session_id: KUT-YYYYMMDD-HHMMSS
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
     const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     let sessionId = `KUT-${datePart}-${timePart}`;
 
-    // Check uniqueness
     const { data: existing } = await supabase
       .from("kutu_uretim")
       .select("session_id")
@@ -90,7 +212,7 @@ export async function createKutuSession(formData: {
       sessionId = `${sessionId}-${pad(now.getMilliseconds())}`;
     }
 
-    // INSERT
+    // INSERT — auto-start as "uretimde"
     const { error } = await supabase.from("kutu_uretim").insert({
       session_id: sessionId,
       email: email,
@@ -100,43 +222,13 @@ export async function createKutuSession(formData: {
       part_type: part.part_type,
       qty: parsed.data.qty,
       not_text: parsed.data.not_text,
-      durum: "bekliyor",
+      durum: "uretimde",
       operator_id: operatorId,
       operator_name: operatorName,
+      start_time: now.toISOString(),
+      plaka_id: parsed.data.plaka_id,
+      sku: parsed.data.sku,
     });
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/uretim/kutu");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Kutu üretimi başlat: bekliyor → uretimde */
-export async function startKutu(sessionId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    const { data } = await supabase
-      .from("kutu_uretim")
-      .select("durum")
-      .eq("session_id", sessionId)
-      .single();
-
-    const session = data as { durum: string } | null;
-    if (!session) return { success: false, error: "Seans bulunamadı" };
-    if (session.durum !== "bekliyor") return { success: false, error: "Bu seans zaten başlatılmış" };
-
-    const { error } = await supabase
-      .from("kutu_uretim")
-      .update({
-        durum: "uretimde",
-        start_time: new Date().toISOString(),
-      })
-      .eq("session_id", sessionId);
 
     if (error) return { success: false, error: error.message };
 
@@ -153,7 +245,6 @@ export async function completeKutu(sessionId: string): Promise<ActionResult> {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    // Seans bilgileri
     const { data } = await supabase
       .from("kutu_uretim")
       .select("session_id, durum, part_id, qty")
@@ -169,7 +260,6 @@ export async function completeKutu(sessionId: string): Promise<ActionResult> {
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
     if (session.durum === "tamamlandi") {
-      // Idempotent: zaten tamamlandıysa skip
       revalidatePath("/uretim/kutu");
       return { success: true };
     }
@@ -177,7 +267,6 @@ export async function completeKutu(sessionId: string): Promise<ActionResult> {
 
     const now = new Date().toISOString();
 
-    // Update durum
     const { error: updateError } = await supabase
       .from("kutu_uretim")
       .update({
@@ -188,9 +277,8 @@ export async function completeKutu(sessionId: string): Promise<ActionResult> {
 
     if (updateError) return { success: false, error: updateError.message };
 
-    // Parça stok güncelleme: hazir_eleman_aktif_stok += qty
+    // Parça stok güncelleme
     if (session.part_id) {
-      // Mevcut stoku oku
       const { data: partData } = await supabase
         .from("all_parts")
         .select("hazir_eleman_aktif_stok")

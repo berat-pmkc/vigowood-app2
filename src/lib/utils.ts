@@ -90,6 +90,54 @@ export function formatCurrencyCompact(
   return `${sign}${formatted} ₺`;
 }
 
+const AY_ISIMLERI = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+];
+
+/** Format "2026-2-D1" → "Şubat 2026 — 1. Dönem" */
+export function formatDonemKodu(kod: string): string {
+  const match = kod.match(/^(\d{4})-(\d{1,2})-D(\d)$/);
+  if (!match) return kod;
+  const [, yil, ay, donem] = match;
+  const ayIdx = Number(ay) - 1;
+  if (ayIdx < 0 || ayIdx > 11) return kod;
+  return `${AY_ISIMLERI[ayIdx]} ${yil} — ${donem}. Dönem`;
+}
+
+/** Get 42 dates for a calendar grid (6 weeks × 7 days), starting Monday */
+export function getDaysInMonthGrid(year: number, month: number): Date[] {
+  const firstDay = new Date(year, month, 1);
+  // getDay: 0=Sun...6=Sat. Convert to Mon=0...Sun=6
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const gridStart = new Date(year, month, 1 - startOffset);
+  const days: Date[] = [];
+  for (let i = 0; i < 42; i++) {
+    days.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
+  }
+  return days;
+}
+
+/** Get week range (Monday–Sunday) for a given date */
+export function getWeekRange(date: Date): { start: Date; end: Date } {
+  const d = new Date(date);
+  const day = (d.getDay() + 6) % 7; // Mon=0
+  const start = new Date(d);
+  start.setDate(d.getDate() - day);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+/** Get month range for a given year/month (0-indexed) */
+export function getMonthRange(year: number, month: number): { start: Date; end: Date } {
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+}
+
 /** Relative time: "5 dk önce", "2 saat önce", "3 gün önce" */
 export function formatDistanceToNow(iso: string | null): string {
   if (!iso) return "";

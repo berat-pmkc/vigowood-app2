@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { formatDonemKodu } from "@/lib/utils";
 
 interface TrendItem {
   donemKodu: string;
@@ -33,7 +34,16 @@ export function NakitTrendChart({ data }: { data: TrendItem[] }) {
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-              <XAxis dataKey="donemKodu" tick={{ fontSize: 10 }} />
+              <XAxis
+                dataKey="donemKodu"
+                tick={{ fontSize: 10 }}
+                tickFormatter={(v: string) => {
+                  const m = v.match(/^(\d{4})-(\d{1,2})-D(\d)$/);
+                  if (!m) return v;
+                  const months = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+                  return `${months[Number(m[2])-1]} D${m[3]}`;
+                }}
+              />
               <YAxis
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) =>

@@ -16,6 +16,7 @@ interface PageProps {
     dateTo?: string;
     sortBy?: string;
     sortOrder?: string;
+    calMonth?: string;
   }>;
 }
 
@@ -25,7 +26,10 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
-  const activeTab = params.tab === "ozet" ? "ozet" : "liste";
+  const validTabs = ["takvim", "liste", "ozet"] as const;
+  const activeTab = validTabs.includes(params.tab as typeof validTabs[number])
+    ? (params.tab as string)
+    : "takvim";
 
   // ---------- TABLE PARAMS ----------
   const page = Math.max(0, Number(params.page || "0"));
@@ -41,14 +45,22 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
   const sortBy = params.sortBy || "tarih";
   const sortOrder = params.sortOrder === "asc" ? ("asc" as const) : ("desc" as const);
 
+  // ---------- CALENDAR PARAMS ----------
+  const now = new Date();
+  let calYear = now.getFullYear();
+  let calMonth = now.getMonth(); // 0-indexed
+  if (params.calMonth) {
+    const [y, m] = params.calMonth.split("-").map(Number);
+    if (y && m >= 1 && m <= 12) {
+      calYear = y;
+      calMonth = m - 1;
+    }
+  }
+  const calMonthStart = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-01`;
+  const calMonthEnd = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(new Date(calYear, calMonth + 1, 0).getDate()).padStart(2, "0")}`;
+
   // ---------- DATES ----------
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-  const sevenDaysLater = new Date(today);
-  sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
-  const sevenDaysLaterStr = sevenDaysLater.toISOString().split("T")[0];
-
-  const thisMonthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
 
   // ---------- 1. Ödeme listesi (paginated + filtered + sorted) ----------
   let listQuery = supabase
@@ -80,80 +92,47 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
     .order(sortColumn, { ascending: sortOrder === "asc" })
     .range(page * pageSize, page * pageSize + pageSize - 1);
 
-  // ---------- 2. Bekleyen TL toplamı ----------
-  const bekleyenTlQuery = supabase
+  // ---------- 2. Calendar data (tüm ay, pagination yok) ----------
+  const calendarQuery = supabase
     .from("odemeler")
-    .select("tutar")
-    .eq("odeme_durum", "BEKLİYOR")
-    .eq("cinsi", "TL");
+    .select("*")
+    .gte("tarih", calMonthStart)
+    .lte("tarih", calMonthEnd)
+    .order("tarih");
 
-  // ---------- 3. Bekleyen USD toplamı ----------
-  const bekleyenUsdQuery = supabase
+  // ---------- 3. All odemeler (KPI hesaplama için, hafif kolonlar) ----------
+  const allOdemelerQuery = supabase
     .from("odemeler")
-    .select("tutar")
-    .eq("odeme_durum", "BEKLİYOR")
-    .eq("cinsi", "USD");
+    .select("id, tutar, cinsi, tarih, turu, odeme_durum");
 
-  // ---------- 4. Yaklaşan 7 gün ----------
-  const yaklasanQuery = supabase
-    .from("odemeler")
-    .select("id", { count: "exact", head: true })
-    .eq("odeme_durum", "BEKLİYOR")
-    .gte("tarih", todayStr)
-    .lte("tarih", sevenDaysLaterStr);
-
-  // ---------- 5. Bu ay tamamlanan ----------
-  const buAyQuery = supabase
-    .from("odemeler")
-    .select("id", { count: "exact", head: true })
-    .eq("odeme_durum", "TAMAMLANDI")
-    .gte("tarih", thisMonthStart)
-    .lte("tarih", todayStr);
-
-  // ---------- 6. Trend (son 6 ay) ----------
-  const sixMonthsAgo = new Date(today);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const sixMonthsAgoStr = sixMonthsAgo.toISOString().split("T")[0];
+  // ---------- 4. Trend (son 12 ay) ----------
+  const twelveMonthsAgo = new Date(today);
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
 
   const trendQuery = supabase
     .from("odemeler")
-    .select("tarih, tutar, odeme_durum, cinsi")
-    .gte("tarih", sixMonthsAgoStr)
+    .select("tarih, tutar, odeme_durum, cinsi, turu")
+    .gte("tarih", twelveMonthsAgoStr)
     .order("tarih");
 
   // Execute all in parallel
   const [
     listResult,
-    bekleyenTlResult,
-    bekleyenUsdResult,
-    yaklasanResult,
-    buAyResult,
+    calendarResult,
+    allOdemelerResult,
     trendResult,
   ] = await Promise.all([
     listQuery,
-    bekleyenTlQuery,
-    bekleyenUsdQuery,
-    yaklasanQuery,
-    buAyQuery,
+    calendarQuery,
+    allOdemelerQuery,
     trendQuery,
   ]);
-
-  // ---------- PROCESS KPI ----------
-  const bekleyenTl = (bekleyenTlResult.data ?? []).reduce(
-    (sum, r) => sum + Number(r.tutar),
-    0
-  );
-  const bekleyenUsd = (bekleyenUsdResult.data ?? []).reduce(
-    (sum, r) => sum + Number(r.tutar),
-    0
-  );
-  const yaklasan7Gun = yaklasanResult.count ?? 0;
-  const buAyOdenen = buAyResult.count ?? 0;
 
   // ---------- PROCESS TREND ----------
   const trendMap = new Map<string, { tamamlanan: number; bekleyen: number }>();
 
-  for (let i = 5; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const d = new Date(today);
     d.setMonth(d.getMonth() - i);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -161,7 +140,7 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
   }
 
   (trendResult.data ?? []).forEach(
-    (r: { tarih: string | null; tutar: number; odeme_durum: string | null; cinsi: string | null }) => {
+    (r: { tarih: string | null; tutar: number; odeme_durum: string | null; cinsi: string | null; turu: string | null }) => {
       if (!r.tarih || r.cinsi !== "TL") return;
       const monthKey = r.tarih.substring(0, 7);
       const existing = trendMap.get(monthKey);
@@ -186,6 +165,17 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
       };
     });
 
+  // ---------- PROCESS SUMMARY (with turu) ----------
+  const summaryData = (trendResult.data ?? []).map(
+    (r: { tarih: string | null; tutar: number; odeme_durum: string | null; cinsi: string | null; turu: string | null }) => ({
+      tarih: r.tarih,
+      tutar: Number(r.tutar) || 0,
+      odeme_durum: r.odeme_durum,
+      cinsi: r.cinsi,
+      turu: r.turu,
+    })
+  );
+
   // ---------- ERROR HANDLING ----------
   if (listResult.error) {
     return (
@@ -201,8 +191,8 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
     <div className="px-4 sm:px-6">
       <OdemelerClient
         activeTab={activeTab}
-        kpiData={{ bekleyenTl, bekleyenUsd, yaklasan7Gun, buAyOdenen }}
         trendData={trendData}
+        summaryData={summaryData}
         listData={(listResult.data ?? []) as Odeme[]}
         totalCount={listResult.count ?? 0}
         pageIndex={page}
@@ -215,6 +205,17 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
         dateTo={dateTo}
         sortBy={sortColumn}
         sortOrder={sortOrder}
+        calendarData={(calendarResult.data ?? []) as Odeme[]}
+        calYear={calYear}
+        calMonth={calMonth}
+        allOdemeler={(allOdemelerResult.data ?? []) as {
+          id: string;
+          tutar: number;
+          cinsi: string | null;
+          tarih: string | null;
+          turu: string | null;
+          odeme_durum: string | null;
+        }[]}
       />
     </div>
   );

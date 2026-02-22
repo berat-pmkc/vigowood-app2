@@ -4,75 +4,38 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { KesimStatusBadge } from "./kesim-status-badge";
-import { KesimDetailSheet } from "./kesim-detail-sheet";
-import { completeCut, cancelCut } from "../actions";
-import {
-  MAKINE_LABELS,
-  type MakineId,
-} from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { KutuStatusBadge } from "./kutu-status-badge";
+import { KutuDetailSheet } from "./kutu-detail-sheet";
 import { LiveTimer } from "@/components/shared/live-timer";
+import { completeKutu, cancelKutu } from "../actions";
+import { cn } from "@/lib/utils";
 import { CheckCircle, User, Timer, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import type { KutuSessionEnriched } from "../page";
 
-export interface CutBatchRow {
-  cut_id: string;
-  tarih: string;
-  sku: string | null;
-  plaka_id: string | null;
-  makine_id: string | null;
-  adet: number;
-  operator_id: string | null;
-  plk_notu: string | null;
-  durum: string;
-  baslama_zamani: string | null;
-  bitis_zamani: string | null;
-  created_at: string;
-  // Enriched fields
-  plaka_adi?: string;
-  urun_adi?: string;
-  operator_adi?: string;
+interface ActiveKutuCardProps {
+  session: KutuSessionEnriched;
 }
 
-interface ActiveCutCardProps {
-  batch: CutBatchRow;
-}
-
-const MAKINE_BADGE_COLORS: Record<string, string> = {
-  "MAK-1": "bg-emerald-100 text-emerald-800 border-emerald-200",
-  "MAK-2": "bg-blue-100 text-blue-800 border-blue-200",
-  "MAK-3": "bg-purple-100 text-purple-800 border-purple-200",
-  KUTU: "bg-amber-100 text-amber-800 border-amber-200",
-};
-
-export function ActiveCutCard({ batch }: ActiveCutCardProps) {
+export function ActiveKutuCard({ session }: ActiveKutuCardProps) {
   const [loading, setLoading] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-
-  const makineLabel = batch.makine_id
-    ? MAKINE_LABELS[batch.makine_id as MakineId] ?? batch.makine_id
-    : "—";
-
-  const makineBadge = batch.makine_id
-    ? MAKINE_BADGE_COLORS[batch.makine_id] ?? "bg-gray-100 text-gray-800"
-    : "";
 
   const handleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
-    const result = await completeCut(batch.cut_id);
+    const result = await completeKutu(session.session_id);
     if (!result.success) toast.error(result.error);
-    else toast.success("Kesim tamamlandı, stok güncellendi");
+    else toast.success("Kutu üretimi tamamlandı, stok güncellendi");
     setLoading(false);
   };
 
   const handleCancel = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
-    const result = await cancelCut(batch.cut_id);
+    const result = await cancelKutu(session.session_id);
     if (!result.success) toast.error(result.error);
-    else toast.success("Kesim iptal edildi");
+    else toast.success("Kutu üretimi iptal edildi");
     setLoading(false);
   };
 
@@ -80,34 +43,30 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
     <>
       <Card
         className={cn(
-          "border-l-4 border-l-blue-500 cursor-pointer transition-all hover:shadow-md",
-          "bg-blue-50/30"
+          "border-l-4 border-l-amber-500 cursor-pointer transition-all hover:shadow-md",
+          "bg-amber-50/30"
         )}
         onClick={() => setSheetOpen(true)}
       >
         <div className="p-4">
-          {/* Header — ID + Makine + Status */}
+          {/* Header — ID + Status */}
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-mono text-xs">
-                {batch.cut_id}
+                {session.session_id}
               </Badge>
-              {batch.makine_id && (
-                <Badge variant="outline" className={cn("text-xs", makineBadge)}>
-                  {makineLabel}
-                </Badge>
-              )}
             </div>
-            <KesimStatusBadge durum={batch.durum} />
+            <KutuStatusBadge durum={session.durum} />
           </div>
 
-          {/* Ürün + Plaka */}
+          {/* Parça + Ürün */}
           <div className="mb-2">
             <p className="font-medium text-foreground truncate text-sm">
-              {batch.urun_adi ?? batch.sku ?? "—"}
+              {session.part_adi ?? session.part_id ?? "—"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {batch.plaka_adi ?? batch.plaka_id ?? "—"}
+              {session.urun_adi ?? session.sku ?? "—"}
+              {session.plaka_adi && ` · ${session.plaka_adi}`}
             </p>
           </div>
 
@@ -115,24 +74,24 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-3xl font-bold text-foreground tabular-nums">
-                {batch.adet}
+                {session.qty}
               </span>
               <span className="text-sm text-muted-foreground">adet</span>
             </div>
 
-            {batch.baslama_zamani && (
+            {session.start_time && (
               <div className="flex items-center gap-1.5">
-                <Timer className="w-4 h-4 text-blue-600" />
-                <LiveTimer startTime={batch.baslama_zamani} />
+                <Timer className="w-4 h-4 text-amber-600" />
+                <LiveTimer startTime={session.start_time} className="text-lg font-bold tabular-nums text-amber-700" />
               </div>
             )}
           </div>
 
           {/* Operatör */}
-          {batch.operator_adi && (
+          {session.operator_name && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
               <User className="w-3 h-3" />
-              <span>{batch.operator_adi}</span>
+              <span>{session.operator_name}</span>
             </div>
           )}
 
@@ -158,8 +117,8 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
         </div>
       </Card>
 
-      <KesimDetailSheet
-        batch={batch}
+      <KutuDetailSheet
+        session={session}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />

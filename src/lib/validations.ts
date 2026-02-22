@@ -241,8 +241,10 @@ export const packSessionCloseSchema = z.object({
 
 export type PackSessionCloseData = z.infer<typeof packSessionCloseSchema>;
 
-// Kutu-Koli seans oluşturma
+// Kutu-Koli seans oluşturma (v2 — plaka_id ve sku eklendi)
 export const kutuSessionCreateSchema = z.object({
+  plaka_id: z.string().min(1, "Karton şablon seçimi gereklidir"),
+  sku: z.string().min(1, "Ürün seçimi gereklidir"),
   part_id: z.string().min(1, "Parça seçimi gereklidir"),
   qty: z
     .number()
@@ -253,6 +255,47 @@ export const kutuSessionCreateSchema = z.object({
 });
 
 export type KutuSessionCreateData = z.infer<typeof kutuSessionCreateSchema>;
+
+// Karton Şablon oluşturma (Admin)
+export const kartonSablonCreateSchema = z.object({
+  plaka_id: z
+    .string()
+    .min(1, "Şablon ID gereklidir")
+    .max(30, "Şablon ID en fazla 30 karakter olabilir"),
+  plaka_adi: z
+    .string()
+    .min(1, "Şablon adı gereklidir")
+    .max(200, "Şablon adı en fazla 200 karakter olabilir"),
+  tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
+  renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
+  sku: z.string().min(1, "SKU (ürün) seçimi gereklidir"),
+  kutu_sure_dk: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(0, "Süre 0 veya üzeri olmalıdır")
+    .nullable(),
+  output_part_id: z.string().min(1, "Çıkan parça seçimi gereklidir"),
+});
+
+export type KartonSablonCreateData = z.infer<typeof kartonSablonCreateSchema>;
+
+export const kartonSablonUpdateSchema = z.object({
+  plaka_adi: z
+    .string()
+    .min(1, "Şablon adı gereklidir")
+    .max(200, "Şablon adı en fazla 200 karakter olabilir"),
+  tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
+  renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
+  sku: z.string().min(1, "SKU (ürün) seçimi gereklidir"),
+  kutu_sure_dk: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(0, "Süre 0 veya üzeri olmalıdır")
+    .nullable(),
+  output_part_id: z.string().min(1, "Çıkan parça seçimi gereklidir"),
+});
+
+export type KartonSablonUpdateData = z.infer<typeof kartonSablonUpdateSchema>;
 
 // Hazır Eleman stok girişi
 export const hazirElemanGirisSchema = z.object({

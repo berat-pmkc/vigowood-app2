@@ -185,10 +185,10 @@ export function PlakaEditSheet({
                 </div>
               </div>
 
-              {/* Kesim Süreleri — 4 makine */}
+              {/* Kesim Süreleri — 3 MDF makine (KUTU karton şablonlarında) */}
               <div className="space-y-2">
                 <Label>Kesim Süreleri (dk)</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">MAK-1 (300W)</label>
                     <Input
@@ -223,20 +223,6 @@ export function PlakaEditSheet({
                       type="number"
                       min={0}
                       {...register("kesim_sureleri.MAK-3", {
-                        setValueAs: (v) =>
-                          v === "" || v === null || v === undefined
-                            ? null
-                            : Number(v),
-                      })}
-                      placeholder="—"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Kutu</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      {...register("kesim_sureleri.KUTU", {
                         setValueAs: (v) =>
                           v === "" || v === null || v === undefined
                             ? null

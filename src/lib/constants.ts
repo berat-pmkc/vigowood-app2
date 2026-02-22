@@ -86,6 +86,10 @@ export const PART_TYPE_LABELS: Record<PartType, string> = {
   KARTON: "Karton",
 };
 
+// Plaka kategorileri
+export const PLAKA_KATEGORILERI = ["MDF", "KARTON"] as const;
+export type PlakaKategori = (typeof PLAKA_KATEGORILERI)[number];
+
 // Product categories (matches product_category enum in DB)
 export const PRODUCT_CATEGORIES = [
   "AT EVİ",

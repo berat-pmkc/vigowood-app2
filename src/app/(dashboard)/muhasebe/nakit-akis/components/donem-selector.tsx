@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatDonemKodu } from "@/lib/utils";
 
 interface DonemOption {
   id: string;
@@ -50,7 +51,7 @@ export function DonemSelector({ donemler, selectedDonemId }: DonemSelectorProps)
       <SelectContent>
         {donemler.map((d) => (
           <SelectItem key={d.id} value={d.id}>
-            {d.donem_kodu}
+            {formatDonemKodu(d.donem_kodu)}
           </SelectItem>
         ))}
       </SelectContent>
