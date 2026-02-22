@@ -19,6 +19,8 @@ export type Database = {
           created_at: string
           hazir_eleman_aktif_stok: number
           hazir_eleman_kritik_stok: number
+          mdf_tipi: string | null
+          mdf_renk: string | null
           part_adi: string
           part_id: string
           part_type: Database["public"]["Enums"]["part_type"]
@@ -29,6 +31,8 @@ export type Database = {
           created_at?: string
           hazir_eleman_aktif_stok?: number
           hazir_eleman_kritik_stok?: number
+          mdf_tipi?: string | null
+          mdf_renk?: string | null
           part_adi: string
           part_id: string
           part_type: Database["public"]["Enums"]["part_type"]
@@ -39,6 +43,8 @@ export type Database = {
           created_at?: string
           hazir_eleman_aktif_stok?: number
           hazir_eleman_kritik_stok?: number
+          mdf_tipi?: string | null
+          mdf_renk?: string | null
           part_adi?: string
           part_id?: string
           part_type?: Database["public"]["Enums"]["part_type"]

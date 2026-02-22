@@ -8,6 +8,8 @@ import {
   type SortingState,
   type RowSelectionState,
 } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { ProductsToolbar } from "./products-toolbar";
@@ -47,6 +49,7 @@ export function ProductsDataTable({
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<"create" | "edit">("edit");
   const [, startTransition] = useTransition();
 
   // Build URL with new params
@@ -93,6 +96,13 @@ export function ProductsDataTable({
 
   const handleEdit = useCallback((product: Product) => {
     setEditProduct(product);
+    setSheetMode("edit");
+    setSheetOpen(true);
+  }, []);
+
+  const handleCreate = useCallback(() => {
+    setEditProduct(null);
+    setSheetMode("create");
     setSheetOpen(true);
   }, []);
 
@@ -145,16 +155,24 @@ export function ProductsDataTable({
 
   return (
     <div className="space-y-4">
-      <ProductsToolbar
-        table={table}
-        search={search}
-        kategori={kategori}
-        aktif={aktif}
-        onSearchChange={(v) => navigate({ search: v || undefined, page: "0" })}
-        onKategoriChange={(v) => navigate({ kategori: v || undefined, page: "0" })}
-        onAktifChange={(v) => navigate({ aktif: v || undefined, page: "0" })}
-        onBulkActionDone={() => router.refresh()}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1">
+          <ProductsToolbar
+            table={table}
+            search={search}
+            kategori={kategori}
+            aktif={aktif}
+            onSearchChange={(v) => navigate({ search: v || undefined, page: "0" })}
+            onKategoriChange={(v) => navigate({ kategori: v || undefined, page: "0" })}
+            onAktifChange={(v) => navigate({ aktif: v || undefined, page: "0" })}
+            onBulkActionDone={() => router.refresh()}
+          />
+        </div>
+        <Button onClick={handleCreate} size="sm" className="shrink-0">
+          <Plus className="mr-1 h-4 w-4" />
+          Yeni Ürün
+        </Button>
+      </div>
 
       <DataTable
         table={table}
@@ -173,6 +191,7 @@ export function ProductsDataTable({
 
       <ProductEditSheet
         product={editProduct}
+        mode={sheetMode}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         onSaved={() => router.refresh()}

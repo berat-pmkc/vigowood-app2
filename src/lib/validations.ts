@@ -27,6 +27,24 @@ export const productUpdateSchema = z.object({
 
 export type ProductUpdateData = z.infer<typeof productUpdateSchema>;
 
+export const productCreateSchema = z.object({
+  sku: z
+    .string()
+    .min(1, "SKU gereklidir")
+    .max(50, "SKU en fazla 50 karakter olabilir")
+    .regex(/^[A-Za-z0-9\-_]+$/, "Geçersiz SKU formatı (harf, rakam, tire, alt çizgi)"),
+  urun_adi: z
+    .string()
+    .min(1, "Ürün adı gereklidir")
+    .max(200, "Ürün adı en fazla 200 karakter olabilir"),
+  kategori: z.enum(PRODUCT_CATEGORIES, {
+    error: "Geçerli bir kategori seçiniz",
+  }),
+  aktif_mi: z.boolean(),
+});
+
+export type ProductCreateData = z.infer<typeof productCreateSchema>;
+
 export const partUpdateSchema = z.object({
   part_adi: z
     .string()

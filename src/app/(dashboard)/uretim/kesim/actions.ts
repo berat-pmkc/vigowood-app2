@@ -263,11 +263,11 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
     // Batch bilgilerini al
     const { data } = await supabase
       .from("cut_batches")
-      .select("cut_id, durum, sku, operator_id")
+      .select("cut_id, durum, sku, operator_id, plaka_id, adet")
       .eq("cut_id", cutId)
       .single();
 
-    const batch = data as { cut_id: string; durum: string; sku: string | null; operator_id: string | null } | null;
+    const batch = data as { cut_id: string; durum: string; sku: string | null; operator_id: string | null; plaka_id: string | null; adet: number } | null;
     if (!batch) return { success: false, error: "Kesim bulunamadı" };
     if (batch.durum !== "kesiliyor") return { success: false, error: "Bu kesim henüz başlatılmamış veya zaten tamamlanmış" };
 
@@ -351,7 +351,61 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
       }
     }
 
+    // MDF stok düşümü: plaka tipi+renk ile eşleşen MDF hazır elemanın stoğunu düş
+    if (batch.plaka_id) {
+      const { data: plaka } = await supabase
+        .from("plakalar")
+        .select("tipi, renk")
+        .eq("plaka_id", batch.plaka_id)
+        .limit(1)
+        .single();
+
+      if (plaka?.tipi && plaka?.renk) {
+        const { data: mdfPart } = await supabase
+          .from("all_parts")
+          .select("part_id, part_adi, hazir_eleman_aktif_stok")
+          .eq("mdf_tipi", plaka.tipi)
+          .eq("mdf_renk", plaka.renk)
+          .limit(1)
+          .single();
+
+        if (mdfPart) {
+          // Stok düş
+          const newStok = mdfPart.hazir_eleman_aktif_stok - batch.adet;
+          await supabase
+            .from("all_parts")
+            .update({ hazir_eleman_aktif_stok: newStok })
+            .eq("part_id", mdfPart.part_id);
+
+          // Hareket kaydı (hazir_eleman_akis)
+          const hakisNow = new Date();
+          const hakisId = `HA-${hakisNow.getFullYear()}${String(hakisNow.getMonth() + 1).padStart(2, "0")}${String(hakisNow.getDate()).padStart(2, "0")}-${String(hakisNow.getHours()).padStart(2, "0")}${String(hakisNow.getMinutes()).padStart(2, "0")}${String(hakisNow.getSeconds()).padStart(2, "0")}`;
+
+          // Unique check — aynı saniyede birden fazla işlem olursa suffix ekle
+          const { data: hakisExisting } = await supabase
+            .from("hazir_eleman_akis")
+            .select("hakis_id")
+            .eq("hakis_id", hakisId)
+            .limit(1);
+
+          const finalHakisId = hakisExisting && hakisExisting.length > 0
+            ? `${hakisId}-${cutId}`
+            : hakisId;
+
+          await supabase.from("hazir_eleman_akis").insert({
+            hakis_id: finalHakisId,
+            tarih: now,
+            part_id: mdfPart.part_id,
+            qty: -batch.adet,
+            operator: batch.operator_id,
+            not_text: `Kesim MDF Düşüm — ${cutId}`,
+          });
+        }
+      }
+    }
+
     revalidatePath("/uretim/kesim");
+    revalidatePath("/stok/hazir-eleman");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

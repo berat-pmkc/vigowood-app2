@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { productUpdateSchema } from "@/lib/validations";
+import { productUpdateSchema, productCreateSchema } from "@/lib/validations";
 import type { ProductCategory, Database } from "@/lib/supabase/types";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -15,6 +15,64 @@ async function requireAdmin() {
     throw new Error("Yetkisiz erişim");
   }
   return user;
+}
+
+export async function createProduct(
+  formData: {
+    sku: string;
+    urun_adi: string;
+    kategori: string;
+    aktif_mi: boolean;
+  }
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const parsed = productCreateSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
+      return { success: false, error: firstError };
+    }
+
+    const supabase = await createClient();
+
+    // Check if SKU already exists
+    const { data: existing } = await supabase
+      .from("products")
+      .select("sku")
+      .eq("sku", parsed.data.sku)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      return { success: false, error: "Bu SKU zaten kullanılıyor" };
+    }
+
+    const { error } = await supabase.from("products").insert({
+      sku: parsed.data.sku,
+      urun_adi: parsed.data.urun_adi,
+      kategori: parsed.data.kategori as ProductCategory,
+      aktif_mi: parsed.data.aktif_mi,
+      stok_aktif: 0,
+      gunluk_satis: 0,
+      aylik_uretim: 0,
+      gecen_ay_uretim: 0,
+      satilan_gun_sayisi: 0,
+      toplam_satis: 0,
+      mamul_stok_kritik: 0,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/admin/urunler");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Bir hata oluştu",
+    };
+  }
 }
 
 export async function updateProduct(
