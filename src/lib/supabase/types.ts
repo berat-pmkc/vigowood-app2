@@ -19,8 +19,8 @@ export type Database = {
           created_at: string
           hazir_eleman_aktif_stok: number
           hazir_eleman_kritik_stok: number
-          mdf_tipi: string | null
           mdf_renk: string | null
+          mdf_tipi: string | null
           part_adi: string
           part_id: string
           part_type: Database["public"]["Enums"]["part_type"]
@@ -31,8 +31,8 @@ export type Database = {
           created_at?: string
           hazir_eleman_aktif_stok?: number
           hazir_eleman_kritik_stok?: number
-          mdf_tipi?: string | null
           mdf_renk?: string | null
+          mdf_tipi?: string | null
           part_adi: string
           part_id: string
           part_type: Database["public"]["Enums"]["part_type"]
@@ -43,8 +43,8 @@ export type Database = {
           created_at?: string
           hazir_eleman_aktif_stok?: number
           hazir_eleman_kritik_stok?: number
-          mdf_tipi?: string | null
           mdf_renk?: string | null
+          mdf_tipi?: string | null
           part_adi?: string
           part_id?: string
           part_type?: Database["public"]["Enums"]["part_type"]
@@ -340,6 +340,45 @@ export type Database = {
         }
         Relationships: []
       }
+      faaliyet_donemler: {
+        Row: {
+          ay_no: number
+          ceyrek: string
+          created_at: string | null
+          donem_kodu: string
+          donem_label: string | null
+          id: string
+          kur_tl_usd: number | null
+          updated_at: string | null
+          yari_yil: string
+          yil: number
+        }
+        Insert: {
+          ay_no: number
+          ceyrek: string
+          created_at?: string | null
+          donem_kodu: string
+          donem_label?: string | null
+          id?: string
+          kur_tl_usd?: number | null
+          updated_at?: string | null
+          yari_yil: string
+          yil: number
+        }
+        Update: {
+          ay_no?: number
+          ceyrek?: string
+          created_at?: string | null
+          donem_kodu?: string
+          donem_label?: string | null
+          id?: string
+          kur_tl_usd?: number | null
+          updated_at?: string | null
+          yari_yil?: string
+          yil?: number
+        }
+        Relationships: []
+      }
       hazir_eleman_akis: {
         Row: {
           created_at: string
@@ -460,6 +499,62 @@ export type Database = {
         }
         Relationships: []
       }
+      karlilik_data: {
+        Row: {
+          aciklama: string | null
+          aktarim_tarihi: string | null
+          created_at: string | null
+          donem_id: string
+          id: string
+          kalem: string
+          kalem_turu: Database["public"]["Enums"]["kalem_turu"]
+          marka: string
+          ortalama_kur: number | null
+          sira: number
+          tl: number | null
+          updated_at: string | null
+          usd: number | null
+        }
+        Insert: {
+          aciklama?: string | null
+          aktarim_tarihi?: string | null
+          created_at?: string | null
+          donem_id: string
+          id?: string
+          kalem: string
+          kalem_turu: Database["public"]["Enums"]["kalem_turu"]
+          marka: string
+          ortalama_kur?: number | null
+          sira?: number
+          tl?: number | null
+          updated_at?: string | null
+          usd?: number | null
+        }
+        Update: {
+          aciklama?: string | null
+          aktarim_tarihi?: string | null
+          created_at?: string | null
+          donem_id?: string
+          id?: string
+          kalem?: string
+          kalem_turu?: Database["public"]["Enums"]["kalem_turu"]
+          marka?: string
+          ortalama_kur?: number | null
+          sira?: number
+          tl?: number | null
+          updated_at?: string | null
+          usd?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "karlilik_data_donem_id_fkey"
+            columns: ["donem_id"]
+            isOneToOne: false
+            referencedRelation: "faaliyet_donemler"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kesim_makinesi: {
         Row: {
           aciklama: string | null
@@ -541,6 +636,68 @@ export type Database = {
         }
         Relationships: []
       }
+      maliyet_giris: {
+        Row: {
+          aktarim_tarihi: string | null
+          cari_adi: string | null
+          created_at: string | null
+          donem_id: string
+          id: string
+          kategori: string
+          kaynak: string | null
+          maliyet_grubu: Database["public"]["Enums"]["maliyet_grubu"] | null
+          marka: string
+          ortalama_kur: number | null
+          tl_maliyet: number | null
+          tur: Database["public"]["Enums"]["faaliyet_turu"]
+          updated_at: string | null
+          usd_maliyet: number | null
+          vigo_wood_orani: number | null
+        }
+        Insert: {
+          aktarim_tarihi?: string | null
+          cari_adi?: string | null
+          created_at?: string | null
+          donem_id: string
+          id?: string
+          kategori: string
+          kaynak?: string | null
+          maliyet_grubu?: Database["public"]["Enums"]["maliyet_grubu"] | null
+          marka: string
+          ortalama_kur?: number | null
+          tl_maliyet?: number | null
+          tur?: Database["public"]["Enums"]["faaliyet_turu"]
+          updated_at?: string | null
+          usd_maliyet?: number | null
+          vigo_wood_orani?: number | null
+        }
+        Update: {
+          aktarim_tarihi?: string | null
+          cari_adi?: string | null
+          created_at?: string | null
+          donem_id?: string
+          id?: string
+          kategori?: string
+          kaynak?: string | null
+          maliyet_grubu?: Database["public"]["Enums"]["maliyet_grubu"] | null
+          marka?: string
+          ortalama_kur?: number | null
+          tl_maliyet?: number | null
+          tur?: Database["public"]["Enums"]["faaliyet_turu"]
+          updated_at?: string | null
+          usd_maliyet?: number | null
+          vigo_wood_orani?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maliyet_giris_donem_id_fkey"
+            columns: ["donem_id"]
+            isOneToOne: false
+            referencedRelation: "faaliyet_donemler"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       montaj_batches: {
         Row: {
           adet: number
@@ -588,6 +745,292 @@ export type Database = {
           total_steps?: number | null
         }
         Relationships: []
+      }
+      nakit_cikislar: {
+        Row: {
+          akaryakit: number | null
+          arac_bakim: number | null
+          created_at: string | null
+          demirbas: number | null
+          diger_giderler: number | null
+          diger_usd: number | null
+          donem_id: string
+          doviz_bozdurma_usd: number | null
+          elektrik: number | null
+          faaliyet_disi_harcamalar: number | null
+          gumruk_usd: number | null
+          hammadde: number | null
+          hukuk: number | null
+          id: string
+          kredi_karti: number | null
+          kredi_odemesi: number | null
+          maas: number | null
+          makine_bakim: number | null
+          masraf_komisyon: number | null
+          muhasebe: number | null
+          mutfak: number | null
+          nakliye: number | null
+          navlun_usd: number | null
+          pazaryeri: number | null
+          sgk: number | null
+          su: number | null
+          telekom: number | null
+          toplam_tl: number | null
+          toplam_yurtdisi_usd: number | null
+          updated_at: string | null
+          vergi: number | null
+        }
+        Insert: {
+          akaryakit?: number | null
+          arac_bakim?: number | null
+          created_at?: string | null
+          demirbas?: number | null
+          diger_giderler?: number | null
+          diger_usd?: number | null
+          donem_id: string
+          doviz_bozdurma_usd?: number | null
+          elektrik?: number | null
+          faaliyet_disi_harcamalar?: number | null
+          gumruk_usd?: number | null
+          hammadde?: number | null
+          hukuk?: number | null
+          id?: string
+          kredi_karti?: number | null
+          kredi_odemesi?: number | null
+          maas?: number | null
+          makine_bakim?: number | null
+          masraf_komisyon?: number | null
+          muhasebe?: number | null
+          mutfak?: number | null
+          nakliye?: number | null
+          navlun_usd?: number | null
+          pazaryeri?: number | null
+          sgk?: number | null
+          su?: number | null
+          telekom?: number | null
+          toplam_tl?: number | null
+          toplam_yurtdisi_usd?: number | null
+          updated_at?: string | null
+          vergi?: number | null
+        }
+        Update: {
+          akaryakit?: number | null
+          arac_bakim?: number | null
+          created_at?: string | null
+          demirbas?: number | null
+          diger_giderler?: number | null
+          diger_usd?: number | null
+          donem_id?: string
+          doviz_bozdurma_usd?: number | null
+          elektrik?: number | null
+          faaliyet_disi_harcamalar?: number | null
+          gumruk_usd?: number | null
+          hammadde?: number | null
+          hukuk?: number | null
+          id?: string
+          kredi_karti?: number | null
+          kredi_odemesi?: number | null
+          maas?: number | null
+          makine_bakim?: number | null
+          masraf_komisyon?: number | null
+          muhasebe?: number | null
+          mutfak?: number | null
+          nakliye?: number | null
+          navlun_usd?: number | null
+          pazaryeri?: number | null
+          sgk?: number | null
+          su?: number | null
+          telekom?: number | null
+          toplam_tl?: number | null
+          toplam_yurtdisi_usd?: number | null
+          updated_at?: string | null
+          vergi?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nakit_cikislar_donem_id_fkey"
+            columns: ["donem_id"]
+            isOneToOne: true
+            referencedRelation: "nakit_donemler"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nakit_donemler: {
+        Row: {
+          baslangic_tarihi: string
+          bitis_tarihi: string
+          created_at: string | null
+          donem_kodu: string
+          gayrinakit_islem: number | null
+          id: string
+          kur_bilgisi: number | null
+          nakit_cikis_tl: number | null
+          nakit_cikis_usd: number | null
+          nakit_giris_tl: number | null
+          nakit_giris_usd: number | null
+          toplam_finansal_borc: number | null
+          toplam_kk_borc: number | null
+          toplam_piyasa_borcu: number | null
+          toplam_varlik_tl: number | null
+          updated_at: string | null
+          varlik_acilis_tl: number | null
+          varlik_acilis_usd: number | null
+          varlik_tl: number | null
+          varlik_usd: number | null
+          yatirim_tl: number | null
+        }
+        Insert: {
+          baslangic_tarihi: string
+          bitis_tarihi: string
+          created_at?: string | null
+          donem_kodu: string
+          gayrinakit_islem?: number | null
+          id?: string
+          kur_bilgisi?: number | null
+          nakit_cikis_tl?: number | null
+          nakit_cikis_usd?: number | null
+          nakit_giris_tl?: number | null
+          nakit_giris_usd?: number | null
+          toplam_finansal_borc?: number | null
+          toplam_kk_borc?: number | null
+          toplam_piyasa_borcu?: number | null
+          toplam_varlik_tl?: number | null
+          updated_at?: string | null
+          varlik_acilis_tl?: number | null
+          varlik_acilis_usd?: number | null
+          varlik_tl?: number | null
+          varlik_usd?: number | null
+          yatirim_tl?: number | null
+        }
+        Update: {
+          baslangic_tarihi?: string
+          bitis_tarihi?: string
+          created_at?: string | null
+          donem_kodu?: string
+          gayrinakit_islem?: number | null
+          id?: string
+          kur_bilgisi?: number | null
+          nakit_cikis_tl?: number | null
+          nakit_cikis_usd?: number | null
+          nakit_giris_tl?: number | null
+          nakit_giris_usd?: number | null
+          toplam_finansal_borc?: number | null
+          toplam_kk_borc?: number | null
+          toplam_piyasa_borcu?: number | null
+          toplam_varlik_tl?: number | null
+          updated_at?: string | null
+          varlik_acilis_tl?: number | null
+          varlik_acilis_usd?: number | null
+          varlik_tl?: number | null
+          varlik_usd?: number | null
+          yatirim_tl?: number | null
+        }
+        Relationships: []
+      }
+      nakit_giris_takip: {
+        Row: {
+          cinsi: Database["public"]["Enums"]["para_birimi"] | null
+          created_at: string | null
+          id: string
+          marka: string | null
+          odeme_durum: Database["public"]["Enums"]["odeme_durumu"] | null
+          tanimi: string
+          tarih: string | null
+          turu: string | null
+          tutar: number
+          updated_at: string | null
+        }
+        Insert: {
+          cinsi?: Database["public"]["Enums"]["para_birimi"] | null
+          created_at?: string | null
+          id?: string
+          marka?: string | null
+          odeme_durum?: Database["public"]["Enums"]["odeme_durumu"] | null
+          tanimi: string
+          tarih?: string | null
+          turu?: string | null
+          tutar?: number
+          updated_at?: string | null
+        }
+        Update: {
+          cinsi?: Database["public"]["Enums"]["para_birimi"] | null
+          created_at?: string | null
+          id?: string
+          marka?: string | null
+          odeme_durum?: Database["public"]["Enums"]["odeme_durumu"] | null
+          tanimi?: string
+          tarih?: string | null
+          turu?: string | null
+          tutar?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      nakit_girisler: {
+        Row: {
+          amazon: number | null
+          amazon_yurtdisi: number | null
+          created_at: string | null
+          diger_pazaryeri: number | null
+          diger_yurtdisi: number | null
+          donem_id: string
+          doviz_satisi: number | null
+          has_mob: number | null
+          hepsiburada: number | null
+          id: string
+          nakit_kredi: number | null
+          toplam_tl: number | null
+          toplam_yurtdisi: number | null
+          trendyol: number | null
+          updated_at: string | null
+          vigowood_com: number | null
+        }
+        Insert: {
+          amazon?: number | null
+          amazon_yurtdisi?: number | null
+          created_at?: string | null
+          diger_pazaryeri?: number | null
+          diger_yurtdisi?: number | null
+          donem_id: string
+          doviz_satisi?: number | null
+          has_mob?: number | null
+          hepsiburada?: number | null
+          id?: string
+          nakit_kredi?: number | null
+          toplam_tl?: number | null
+          toplam_yurtdisi?: number | null
+          trendyol?: number | null
+          updated_at?: string | null
+          vigowood_com?: number | null
+        }
+        Update: {
+          amazon?: number | null
+          amazon_yurtdisi?: number | null
+          created_at?: string | null
+          diger_pazaryeri?: number | null
+          diger_yurtdisi?: number | null
+          donem_id?: string
+          doviz_satisi?: number | null
+          has_mob?: number | null
+          hepsiburada?: number | null
+          id?: string
+          nakit_kredi?: number | null
+          toplam_tl?: number | null
+          toplam_yurtdisi?: number | null
+          trendyol?: number | null
+          updated_at?: string | null
+          vigowood_com?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nakit_girisler_donem_id_fkey"
+            columns: ["donem_id"]
+            isOneToOne: true
+            referencedRelation: "nakit_donemler"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_reads: {
         Row: {
@@ -651,6 +1094,42 @@ export type Database = {
           target_user?: string | null
           title?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      odemeler: {
+        Row: {
+          cinsi: Database["public"]["Enums"]["para_birimi"] | null
+          created_at: string | null
+          id: string
+          odeme_durum: Database["public"]["Enums"]["odeme_durumu"] | null
+          tanimi: string
+          tarih: string | null
+          turu: Database["public"]["Enums"]["odeme_turu"] | null
+          tutar: number
+          updated_at: string | null
+        }
+        Insert: {
+          cinsi?: Database["public"]["Enums"]["para_birimi"] | null
+          created_at?: string | null
+          id?: string
+          odeme_durum?: Database["public"]["Enums"]["odeme_durumu"] | null
+          tanimi: string
+          tarih?: string | null
+          turu?: Database["public"]["Enums"]["odeme_turu"] | null
+          tutar?: number
+          updated_at?: string | null
+        }
+        Update: {
+          cinsi?: Database["public"]["Enums"]["para_birimi"] | null
+          created_at?: string | null
+          id?: string
+          odeme_durum?: Database["public"]["Enums"]["odeme_durumu"] | null
+          tanimi?: string
+          tarih?: string | null
+          turu?: Database["public"]["Enums"]["odeme_turu"] | null
+          tutar?: number
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -853,6 +1332,68 @@ export type Database = {
           urun_adi?: string | null
         }
         Relationships: []
+      }
+      satis_giris: {
+        Row: {
+          aktarim_tarihi: string | null
+          created_at: string | null
+          donem_id: string
+          hesaplanan_tl: number | null
+          hesaplanan_usd: number | null
+          id: string
+          kanal: string
+          marka: string
+          ortalama_kur: number | null
+          pazaryeri: string
+          tl_satislar: number | null
+          tur: Database["public"]["Enums"]["faaliyet_turu"]
+          ulke: string | null
+          updated_at: string | null
+          usd_satislar: number | null
+        }
+        Insert: {
+          aktarim_tarihi?: string | null
+          created_at?: string | null
+          donem_id: string
+          hesaplanan_tl?: number | null
+          hesaplanan_usd?: number | null
+          id?: string
+          kanal: string
+          marka: string
+          ortalama_kur?: number | null
+          pazaryeri: string
+          tl_satislar?: number | null
+          tur?: Database["public"]["Enums"]["faaliyet_turu"]
+          ulke?: string | null
+          updated_at?: string | null
+          usd_satislar?: number | null
+        }
+        Update: {
+          aktarim_tarihi?: string | null
+          created_at?: string | null
+          donem_id?: string
+          hesaplanan_tl?: number | null
+          hesaplanan_usd?: number | null
+          id?: string
+          kanal?: string
+          marka?: string
+          ortalama_kur?: number | null
+          pazaryeri?: string
+          tl_satislar?: number | null
+          tur?: Database["public"]["Enums"]["faaliyet_turu"]
+          ulke?: string | null
+          updated_at?: string | null
+          usd_satislar?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "satis_giris_donem_id_fkey"
+            columns: ["donem_id"]
+            isOneToOne: false
+            referencedRelation: "faaliyet_donemler"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       satis_raporlari: {
         Row: {
@@ -1645,9 +2186,36 @@ export type Database = {
       has_stock_access: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_admin_or_engineer: { Args: never; Returns: boolean }
+      is_admin_or_finance: { Args: never; Returns: boolean }
       next_sevkiyat_item_id: { Args: never; Returns: string }
     }
     Enums: {
+      faaliyet_turu: "FAALIYET" | "FAALIYET_DISI"
+      kalem_turu:
+        | "GELIR"
+        | "GIDER"
+        | "TOPLAM"
+        | "KAR"
+        | "MARJ"
+        | "FD_GELIR"
+        | "FD_GIDER"
+      maliyet_grubu: "VIGO_WOOD" | "HAS_MOB" | "ORTAK"
+      odeme_durumu: "TAMAMLANDI" | "BEKLİYOR"
+      odeme_turu:
+        | "PİYASA"
+        | "KREDİ"
+        | "KREDİ KARTI"
+        | "MAAŞ"
+        | "FAİZ"
+        | "SGK"
+        | "VERGİ"
+        | "HAMMADDE"
+        | "PERSONEL"
+        | "ELEKTRİK"
+        | "BANKA"
+        | "GENEL"
+        | "DİĞER"
+      para_birimi: "TL" | "USD" | "EUR"
       part_type: "HAZIR" | "KUTU" | "KARTON" | "YARIMAMUL"
       product_category:
         | "AT EVİ"
@@ -1811,6 +2379,34 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      faaliyet_turu: ["FAALIYET", "FAALIYET_DISI"],
+      kalem_turu: [
+        "GELIR",
+        "GIDER",
+        "TOPLAM",
+        "KAR",
+        "MARJ",
+        "FD_GELIR",
+        "FD_GIDER",
+      ],
+      maliyet_grubu: ["VIGO_WOOD", "HAS_MOB", "ORTAK"],
+      odeme_durumu: ["TAMAMLANDI", "BEKLİYOR"],
+      odeme_turu: [
+        "PİYASA",
+        "KREDİ",
+        "KREDİ KARTI",
+        "MAAŞ",
+        "FAİZ",
+        "SGK",
+        "VERGİ",
+        "HAMMADDE",
+        "PERSONEL",
+        "ELEKTRİK",
+        "BANKA",
+        "GENEL",
+        "DİĞER",
+      ],
+      para_birimi: ["TL", "USD", "EUR"],
       part_type: ["HAZIR", "KUTU", "KARTON", "YARIMAMUL"],
       product_category: [
         "AT EVİ",
@@ -1852,10 +2448,29 @@ export const Constants = {
       ],
     },
   },
-} as const;
+} as const
 
-// ─── Custom Type Aliases ────────────────────────────────────
-export type PartType = Database["public"]["Enums"]["part_type"];
-export type ProductCategory = Database["public"]["Enums"]["product_category"];
+// ─── Custom Type Aliases ───────────────────────────────────────
 export type UserRole = Database["public"]["Enums"]["user_role"];
 export type Station = Database["public"]["Enums"]["station"];
+export type ProductCategory = Database["public"]["Enums"]["product_category"];
+export type PartType = Database["public"]["Enums"]["part_type"];
+
+// ─── Custom Type Aliases — Muhasebe & Finans ──────────────────
+export type NakitDonem = Database["public"]["Tables"]["nakit_donemler"]["Row"];
+export type NakitGiris = Database["public"]["Tables"]["nakit_girisler"]["Row"];
+export type NakitCikis = Database["public"]["Tables"]["nakit_cikislar"]["Row"];
+export type Odeme = Database["public"]["Tables"]["odemeler"]["Row"];
+export type NakitGirisTakip = Database["public"]["Tables"]["nakit_giris_takip"]["Row"];
+export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
+export type SatisGiris = Database["public"]["Tables"]["satis_giris"]["Row"];
+export type MaliyetGiris = Database["public"]["Tables"]["maliyet_giris"]["Row"];
+export type KarlilikData = Database["public"]["Tables"]["karlilik_data"]["Row"];
+
+// Enum types
+export type OdemeTuru = Database["public"]["Enums"]["odeme_turu"];
+export type OdemeDurumu = Database["public"]["Enums"]["odeme_durumu"];
+export type ParaBirimi = Database["public"]["Enums"]["para_birimi"];
+export type MaliyetGrubu = Database["public"]["Enums"]["maliyet_grubu"];
+export type FaaliyetTuru = Database["public"]["Enums"]["faaliyet_turu"];
+export type KalemTuru = Database["public"]["Enums"]["kalem_turu"];

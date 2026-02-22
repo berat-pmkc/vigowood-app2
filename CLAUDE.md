@@ -384,7 +384,19 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 ### KATMAN 23: Realtime & Polish ✅
 - [x] Supabase Realtime + performans + UX iyileştirmeleri
 
+### KATMAN 25: DB Migration — Muhasebe ve Finans Tabloları ✅
+- [x] is_admin_or_finance() RLS fonksiyonu
+- [x] 6 enum: odeme_turu, odeme_durumu, para_birimi, maliyet_grubu, faaliyet_turu, kalem_turu
+- [x] Alt Sistem A: nakit_donemler, nakit_girisler, nakit_cikislar, odemeler, nakit_giris_takip
+- [x] Alt Sistem B: faaliyet_donemler, satis_giris, maliyet_giris, karlilik_data
+- [x] RLS policy'leri (SELECT/INSERT/UPDATE: is_admin_or_finance, DELETE: is_admin)
+- [x] Realtime: odemeler + nakit_donemler
+- [x] Seed: HASMOB xlsx + FALİYET xlsx → 9 tablo (3+3+3+293+7+1+20+48+80 satır)
+- [x] Supabase types regenerated + custom aliases
+- [x] Navigation: Muhasebe grubu (Nakit Akış, Ödemeler, Faaliyet Hesapları, Kârlılık)
+- [x] Constants: FINANCE_ROLES, ODEME_TURLERI, ODEME_TURU_COLORS, MALIYET_KATEGORILERI
+
 ### KATMAN 24+: İleri Özellikler
 - [ ] Amazon SP-API, Trendyol/Hepsiburada API
 - [ ] WhatsApp bildirimler
-- [ ] PPC dashboard, Finans modülü, AI tahmin
+- [ ] PPC dashboard, AI tahmin

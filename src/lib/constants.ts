@@ -479,6 +479,96 @@ export const PAZARYERI_OPTIONS = [
   "Etsy",
 ] as const;
 
+// ─── Muhasebe & Finans Sabitleri ────────────────────────────
+
+/** Muhasebe erişim rolleri (Yönetici + Muhasebe + E-Ticaret Müdürü) */
+export const FINANCE_ROLES: UserRole[] = [
+  "Yönetici",
+  "Muhasebe",
+  "E-Ticaret Müdürü",
+];
+
+/** Ödeme türleri */
+export const ODEME_TURLERI = [
+  "PİYASA", "KREDİ", "KREDİ KARTI", "MAAŞ", "FAİZ",
+  "SGK", "VERGİ", "HAMMADDE", "PERSONEL", "ELEKTRİK",
+  "BANKA", "GENEL", "DİĞER",
+] as const;
+
+export type OdemeTuruConst = (typeof ODEME_TURLERI)[number];
+
+export const ODEME_TURU_LABELS: Record<OdemeTuruConst, string> = {
+  PİYASA: "Piyasa",
+  KREDİ: "Kredi",
+  "KREDİ KARTI": "Kredi Kartı",
+  MAAŞ: "Maaş",
+  FAİZ: "Faiz",
+  SGK: "SGK",
+  VERGİ: "Vergi",
+  HAMMADDE: "Hammadde",
+  PERSONEL: "Personel",
+  ELEKTRİK: "Elektrik",
+  BANKA: "Banka",
+  GENEL: "Genel",
+  DİĞER: "Diğer",
+};
+
+/** Ödeme kategori renkleri (CLAUDE.md'den) */
+export const ODEME_TURU_COLORS: Record<OdemeTuruConst, { bg: string; text: string }> = {
+  PİYASA: { bg: "#e8eaf6", text: "#283593" },
+  KREDİ: { bg: "#fce4ec", text: "#b71c1c" },
+  "KREDİ KARTI": { bg: "#fff3e0", text: "#e65100" },
+  MAAŞ: { bg: "#e0f2f1", text: "#00695c" },
+  FAİZ: { bg: "#fbe9e7", text: "#d84315" },
+  SGK: { bg: "#f3e5f5", text: "#7b1fa2" },
+  VERGİ: { bg: "#ffebee", text: "#c62828" },
+  HAMMADDE: { bg: "#e1f5fe", text: "#0277bd" },
+  PERSONEL: { bg: "#e8f5e9", text: "#2e7d32" },
+  ELEKTRİK: { bg: "#fff9c4", text: "#f57f17" },
+  BANKA: { bg: "#efebe9", text: "#4e342e" },
+  GENEL: { bg: "#eceff1", text: "#546e7a" },
+  DİĞER: { bg: "#f5f5f5", text: "#616161" },
+};
+
+/** Ödeme durumları */
+export const ODEME_DURUMLARI = ["TAMAMLANDI", "BEKLİYOR"] as const;
+export type OdemeDurumuConst = (typeof ODEME_DURUMLARI)[number];
+
+export const ODEME_DURUM_COLORS: Record<OdemeDurumuConst, { bg: string; text: string }> = {
+  TAMAMLANDI: { bg: "bg-emerald-100", text: "text-emerald-800" },
+  BEKLİYOR: { bg: "bg-amber-100", text: "text-amber-800" },
+};
+
+/** Para birimleri */
+export const PARA_BIRIMLERI = ["TL", "USD", "EUR"] as const;
+
+/** Maliyet kategorileri (12 adet) */
+export const MALIYET_KATEGORILERI = [
+  "Personel & SGK Giderleri",
+  "Üretim & Hammadde Giderleri",
+  "Operasyon & Bakım Giderleri",
+  "Enerji Giderleri",
+  "Satış Giderleri",
+  "Pazarlama Giderleri",
+  "Vergi Giderleri",
+  "Nakliye Giderleri",
+  "Genel Yönetim Giderleri",
+  "Faiz ve Komisyon Giderleri",
+  "Faaliyet Dışı Giderler",
+  "Yatırım Giderleri",
+] as const;
+
+/** Nakit giriş kanalları (TL) */
+export const NAKIT_GIRIS_KANALLARI_TL = [
+  "vigowood.com", "Trendyol", "Hepsiburada", "Amazon",
+  "Diğer Pazaryeri", "HAS-MOB", "Döviz Satışı", "Nakit Kredi",
+] as const;
+
+/** Nakit giriş kanalları (USD) */
+export const NAKIT_GIRIS_KANALLARI_USD = [
+  "Amazon Y.Dışı", "Diğer Y.Dışı",
+] as const;
+
 // ─── Personel & Yoklama Sabitleri ────────────────────────────
 
 /** Yoklama departmanları */

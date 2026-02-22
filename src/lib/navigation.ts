@@ -23,6 +23,9 @@ import {
   FileText,
   Target,
   Megaphone,
+  Landmark,
+  CreditCard,
+  PieChart,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
@@ -55,6 +58,8 @@ const MANAGEMENT_ROLES: UserRole[] = [
 const ALL_INTERNAL: UserRole[] = [...MANAGEMENT_ROLES, "Hat"];
 
 const SEVK_ROLES: UserRole[] = ["Yönetici", "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"];
+
+const FINANCE_ROLES: UserRole[] = ["Yönetici", "Muhasebe", "E-Ticaret Müdürü"];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -105,6 +110,15 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Fiyatlar", href: "/sevkiyat/fiyatlar", icon: DollarSign, roles: SEVK_ROLES },
       { title: "Maliyetler", href: "/sevkiyat/maliyetler", icon: Receipt, roles: ["Yönetici", "Endüstri Mühendisi"] },
       { title: "Kurlar", href: "/sevkiyat/kurlar", icon: Coins, roles: SEVK_ROLES },
+    ],
+  },
+  {
+    label: "Muhasebe",
+    items: [
+      { title: "Nakit Akış", href: "/muhasebe/nakit-akis", icon: Landmark, roles: FINANCE_ROLES },
+      { title: "Ödemeler", href: "/muhasebe/odemeler", icon: CreditCard, roles: FINANCE_ROLES },
+      { title: "Faaliyet Hesapları", href: "/muhasebe/faaliyet", icon: Receipt, roles: FINANCE_ROLES },
+      { title: "Kârlılık", href: "/muhasebe/faaliyet/karlilik", icon: PieChart, roles: FINANCE_ROLES },
     ],
   },
   {
