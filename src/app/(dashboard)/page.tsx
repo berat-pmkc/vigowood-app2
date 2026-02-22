@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUserWithAuth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { formatDate, formatNumber } from "@/lib/utils";
 import {
@@ -64,18 +64,15 @@ interface PageProps {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  // getCurrentUserWithAuth() is React cache()'d — deduped with layout call
+  const result = await getCurrentUserWithAuth();
+  if (!result) redirect("/login");
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const operatorName = user?.user_metadata?.selected_operator_name;
-  const displayName = operatorName || profile.full_name || "";
+  const { profile, auth } = result;
+  const displayName = auth.operatorName || profile.full_name || "";
   const userRole = profile.role as UserRole;
 
+  const supabase = await createClient();
   const params = await searchParams;
   const period = (["today", "week", "month", "last_month"].includes(params.period ?? "")
     ? params.period

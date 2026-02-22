@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUserWithAuth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BildirimlerClient } from "./components/bildirimler-client";
 
 export const metadata: Metadata = { title: "Bildirimler" };
 
 export default async function BildirimlerPage() {
-  const profile = await getCurrentUser();
-  if (!profile) redirect("/login");
+  const result = await getCurrentUserWithAuth();
+  if (!result) redirect("/login");
 
+  const { profile, auth } = result;
   const supabase = await createClient();
 
-  // Station hesap desteği
-  const { data: { user: authUser } } = await supabase.auth.getUser();
-  const operatorId = authUser?.user_metadata?.selected_operator_id as string | undefined;
-  const effectiveUserId = operatorId || profile.user_id;
+  const effectiveUserId = auth.operatorId || profile.user_id;
   const isAdmin = profile.role === "Yönetici";
 
   // Tüm bildirimler (en yeni önce)

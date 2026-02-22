@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
     optimizePackageImports: [
       "recharts",
       "lucide-react",
+      "@tanstack/react-table",
+      "@dnd-kit/core",
+      "@dnd-kit/sortable",
+      "@dnd-kit/utilities",
     ],
   },
   images: {

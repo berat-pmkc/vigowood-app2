@@ -3,16 +3,24 @@
  */
 import "server-only";
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Database, UserRole, Station } from "@/lib/supabase/types";
 
 export type UserProfile = Database["public"]["Tables"]["users"]["Row"];
 
+/** Auth metadata from Supabase auth (operator selection etc.) */
+export type AuthMeta = {
+  operatorId: string | undefined;
+  operatorName: string | undefined;
+};
+
 /**
  * Get the current authenticated user + their profile from public.users
- * Returns null if not authenticated
+ * Wrapped with React cache() — deduplicates within the same request.
+ * Layout + page calling this will only hit DB once per request.
  */
-export async function getCurrentUser(): Promise<UserProfile | null> {
+export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   const supabase = await createClient();
 
   const {
@@ -51,7 +59,35 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
   }
 
   return null;
-}
+});
+
+/**
+ * Get current user profile + auth metadata (operator info).
+ * Reuses getCurrentUser() (cache()'d) so the users table query
+ * is deduplicated if both layout and page call these functions.
+ * Only adds one extra getUser() call for operator metadata.
+ */
+export const getCurrentUserWithAuth = cache(async (): Promise<{
+  profile: UserProfile;
+  auth: AuthMeta;
+} | null> => {
+  const profile = await getCurrentUser(); // deduplicated via cache()
+  if (!profile) return null;
+
+  // Extra getUser() for operator metadata (JWT-based, fast)
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  return {
+    profile,
+    auth: {
+      operatorId: authUser?.user_metadata?.selected_operator_id as string | undefined,
+      operatorName: authUser?.user_metadata?.selected_operator_name as string | undefined,
+    },
+  };
+});
 
 /**
  * Get operators for a given station (used in operator selection page)
