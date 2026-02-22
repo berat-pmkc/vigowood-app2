@@ -145,7 +145,7 @@ export async function getKutuOperators() {
     const { data, error } = await supabase
       .from("users")
       .select("user_id, full_name, station")
-      .in("station", ["Kutu", "Kutu Hattı", "Kutu-Koli"])
+      .in("station", ["Kutu", "Kutu Hattı"])
       .eq("is_active", true)
       .order("full_name");
 

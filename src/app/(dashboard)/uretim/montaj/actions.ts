@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { montajBatchCreateSchema } from "@/lib/validations";
+import { montajSessionCloseSchema } from "@/lib/validations";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -24,7 +24,6 @@ export async function getActiveProductsWithSteps() {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    // Aktif ürünleri çek
     const { data: products, error: pErr } = await supabase
       .from("products")
       .select("sku, urun_adi, kategori")
@@ -34,7 +33,6 @@ export async function getActiveProductsWithSteps() {
     if (pErr) return { success: false as const, error: pErr.message };
     if (!products || products.length === 0) return { success: true as const, data: [] };
 
-    // assembly_steps olan sku'ları bul
     const skus = products.map((p) => p.sku);
     const { data: steps } = await supabase
       .from("assembly_steps")
@@ -42,7 +40,6 @@ export async function getActiveProductsWithSteps() {
       .in("sku", skus);
 
     const skusWithSteps = new Set((steps ?? []).map((s) => s.sku));
-
     const filtered = products.filter((p) => skusWithSteps.has(p.sku));
     return { success: true as const, data: filtered };
   } catch (e) {
@@ -50,34 +47,59 @@ export async function getActiveProductsWithSteps() {
   }
 }
 
-/** Bir ürünün montaj verilerini getir (adımlar + BOM + stok) */
-export async function getProductAssemblyData(sku: string, adet: number = 1) {
+/** Bir ürünün montaj adımlarını getir (seq_no sıralı, bom_count ile) */
+export async function getStepsForProduct(sku: string) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    // 1. Assembly steps
-    const { data: steps, error: stepsErr } = await supabase
+    const { data: steps, error } = await supabase
       .from("assembly_steps")
       .select("step_id, sku, step_name, seq_no, is_final_step")
       .eq("sku", sku)
       .order("seq_no", { ascending: true });
 
-    if (stepsErr) return { success: false as const, error: stepsErr.message };
-    if (!steps || steps.length === 0) {
-      return { success: true as const, data: { steps: [], bomItems: [], stockMap: {} } };
-    }
+    if (error) return { success: false as const, error: error.message };
+    if (!steps || steps.length === 0) return { success: true as const, data: [] };
 
-    // 2. Step BOM items
+    // BOM count per step
     const stepIds = steps.map((s) => s.step_id);
     const { data: bomData } = await supabase
       .from("step_bom")
-      .select("step_bom_id, step_id, part_id, qty_per, kodu")
+      .select("step_id")
       .in("step_id", stepIds);
 
-    const bomItems = bomData ?? [];
+    const bomCountMap = new Map<string, number>();
+    for (const b of bomData ?? []) {
+      bomCountMap.set(b.step_id, (bomCountMap.get(b.step_id) || 0) + 1);
+    }
 
-    // 3. Part bilgileri (ASM olmayan)
+    const result = steps.map((s) => ({
+      ...s,
+      bom_count: bomCountMap.get(s.step_id) || 0,
+    }));
+
+    return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Tek bir adımın BOM'u + stok durumu */
+export async function getStepBomWithStock(stepId: string, qty: number = 1) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data: bomItems, error } = await supabase
+      .from("step_bom")
+      .select("step_bom_id, step_id, part_id, qty_per, kodu")
+      .eq("step_id", stepId);
+
+    if (error) return { success: false as const, error: error.message };
+    if (!bomItems || bomItems.length === 0) return { success: true as const, data: [] };
+
+    // Part bilgileri
     const regularPartIds = [...new Set(bomItems.filter((b) => !b.part_id.startsWith("ASM-")).map((b) => b.part_id))];
     const asmPartIds = [...new Set(bomItems.filter((b) => b.part_id.startsWith("ASM-")).map((b) => b.part_id))];
 
@@ -94,7 +116,6 @@ export async function getProductAssemblyData(sku: string, adet: number = 1) {
       }
     }
 
-    // ASM referans isimleri
     if (asmPartIds.length > 0) {
       const { data: asmSteps } = await supabase
         .from("assembly_steps")
@@ -106,19 +127,15 @@ export async function getProductAssemblyData(sku: string, adet: number = 1) {
       }
     }
 
-    // 4. Stok bilgileri — YARIMAMUL parçalar için yari_mamul_stok SUM
-    const yarimamulIds = regularPartIds.filter((id) => {
-      const info = partInfoMap.get(id);
-      return info?.type === "YARIMAMUL";
-    });
+    // Stok bilgileri
+    const yarimamulIds = regularPartIds.filter((id) => partInfoMap.get(id)?.type === "YARIMAMUL");
     const hazirIds = regularPartIds.filter((id) => {
-      const info = partInfoMap.get(id);
-      return info?.type && info.type !== "YARIMAMUL";
+      const t = partInfoMap.get(id)?.type;
+      return t && t !== "YARIMAMUL";
     });
 
     const stockMap: Record<string, number> = {};
 
-    // YARIMAMUL stok: SUM(qty) where direction='IN' - SUM(qty) where direction='OUT'
     if (yarimamulIds.length > 0) {
       const { data: ymsIn } = await supabase
         .from("yari_mamul_stok")
@@ -146,7 +163,6 @@ export async function getProductAssemblyData(sku: string, adet: number = 1) {
       }
     }
 
-    // HAZIR/KUTU/KARTON stok: all_parts.hazir_eleman_aktif_stok
     if (hazirIds.length > 0) {
       const { data: hazirParts } = await supabase
         .from("all_parts")
@@ -158,8 +174,7 @@ export async function getProductAssemblyData(sku: string, adet: number = 1) {
       }
     }
 
-    // Enriched BOM items
-    const enrichedBom = bomItems.map((b) => {
+    const enriched = bomItems.map((b) => {
       const info = partInfoMap.get(b.part_id);
       const isAsm = b.part_id.startsWith("ASM-");
       return {
@@ -170,21 +185,94 @@ export async function getProductAssemblyData(sku: string, adet: number = 1) {
         part_type: info?.type || null,
         is_asm_reference: isAsm,
         qty_per: b.qty_per,
-        qty_needed: b.qty_per * adet,
+        qty_needed: b.qty_per * qty,
         stock_available: isAsm ? null : (stockMap[b.part_id] ?? 0),
-        is_sufficient: isAsm ? true : (stockMap[b.part_id] ?? 0) >= b.qty_per * adet,
+        is_sufficient: isAsm ? true : (stockMap[b.part_id] ?? 0) >= b.qty_per * qty,
       };
     });
+
+    return { success: true as const, data: enriched };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Montaj istasyonu operatörlerini getir */
+export async function getMontajOperators() {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("user_id, full_name, role")
+      .eq("is_active", true)
+      .in("station", ["Montaj", "Montaj Hattı"])
+      .order("full_name");
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data ?? [] };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** KPI analiz verisi */
+export async function getMontajAnalytics(period: "today" | "week" | "month") {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const now = new Date();
+    let since: Date;
+    if (period === "today") {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (period === "week") {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    } else {
+      since = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    }
+
+    const { data, error } = await supabase
+      .from("montaj_sessions")
+      .select("session_id, qty, start_time, end_time, worker_count, workers, birim_montaj_dk")
+      .eq("durum", "tamamlandi")
+      .gte("end_time", since.toISOString());
+
+    if (error) return { success: false as const, error: error.message };
+
+    const sessions = data ?? [];
+    const totalQty = sessions.reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
+
+    const workerIds = new Set<string>();
+    sessions.forEach((s) => {
+      const workers = s.workers as Array<{ id: string; name: string }> | null;
+      if (workers && Array.isArray(workers)) {
+        workers.forEach((w) => workerIds.add(w.id));
+      }
+    });
+
+    let totalMinutes = 0;
+    sessions.forEach((s) => {
+      if (s.start_time && s.end_time) {
+        const diff = new Date(s.end_time).getTime() - new Date(s.start_time).getTime();
+        totalMinutes += diff / 60000;
+      }
+    });
+
+    const withBirim = sessions.filter((s) => s.birim_montaj_dk && Number(s.birim_montaj_dk) > 0);
+    const avgBirimDk = withBirim.length > 0
+      ? withBirim.reduce((sum, s) => sum + Number(s.birim_montaj_dk), 0) / withBirim.length
+      : 0;
 
     return {
       success: true as const,
       data: {
-        steps: steps.map((s) => ({
-          ...s,
-          bom_count: bomItems.filter((b) => b.step_id === s.step_id).length,
-        })),
-        bomItems: enrichedBom,
-        stockMap,
+        totalQty,
+        uniqueWorkers: workerIds.size,
+        totalMinutes: Math.round(totalMinutes),
+        sessionCount: sessions.length,
+        avgBirimDk: Math.round(avgBirimDk * 100) / 100,
       },
     };
   } catch (e) {
@@ -192,24 +280,236 @@ export async function getProductAssemblyData(sku: string, adet: number = 1) {
   }
 }
 
+/** Günlük trend verisi (ürün bazlı) */
+export async function getStepTrend(sku: string, days: number = 30) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const { data, error } = await supabase
+      .from("montaj_sessions")
+      .select("session_id, end_time, qty, birim_montaj_dk, worker_count, step_name")
+      .eq("durum", "tamamlandi")
+      .eq("sku", sku)
+      .gte("end_time", since.toISOString())
+      .order("end_time", { ascending: true });
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data ?? [] };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Son 3 ayda en çok montajlanan ürünleri getir (quick-select) */
+export async function getTopMontajProducts(limit: number = 10) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const since = new Date();
+    since.setMonth(since.getMonth() - 3);
+
+    const { data, error } = await supabase
+      .from("montaj_sessions")
+      .select("sku, qty")
+      .eq("durum", "tamamlandi")
+      .gte("end_time", since.toISOString());
+
+    if (error) return { success: false as const, error: error.message };
+
+    const skuMap = new Map<string, { totalQty: number; sessionCount: number }>();
+    for (const row of data ?? []) {
+      if (!row.sku) continue;
+      const existing = skuMap.get(row.sku);
+      if (existing) {
+        existing.totalQty += Number(row.qty) || 0;
+        existing.sessionCount += 1;
+      } else {
+        skuMap.set(row.sku, { totalQty: Number(row.qty) || 0, sessionCount: 1 });
+      }
+    }
+
+    const sorted = Array.from(skuMap.entries())
+      .sort((a, b) => b[1].totalQty - a[1].totalQty)
+      .slice(0, limit);
+
+    const skus = sorted.map(([sku]) => sku);
+    if (skus.length === 0) return { success: true as const, data: [] };
+
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skus);
+
+    const productMap = new Map<string, string>();
+    for (const p of products ?? []) {
+      productMap.set(p.sku, p.urun_adi ?? p.sku);
+    }
+
+    const result = sorted.map(([sku, stats]) => ({
+      sku,
+      urun_adi: productMap.get(sku) ?? sku,
+      totalQty: stats.totalQty,
+      sessionCount: stats.sessionCount,
+    }));
+
+    return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Paketlemeye hazır stok — son adım tamamlanan - paketlenen = bekleyen */
+export async function getPackageReadyStock() {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    // Son adım tamamlanan seanslar (is_final_step=true, durum=tamamlandi)
+    const { data: finalSessions } = await supabase
+      .from("montaj_sessions")
+      .select("sku, qty")
+      .eq("is_final_step", true)
+      .eq("durum", "tamamlandi");
+
+    // Paketlenen toplam (pack_events, tamamlandi)
+    const { data: packEvents } = await supabase
+      .from("pack_events")
+      .select("sku, qty")
+      .eq("durum", "tamamlandi");
+
+    // SKU bazlı toplam
+    const montajMap = new Map<string, number>();
+    for (const r of finalSessions ?? []) {
+      if (!r.sku) continue;
+      montajMap.set(r.sku, (montajMap.get(r.sku) || 0) + (Number(r.qty) || 0));
+    }
+
+    const paketMap = new Map<string, number>();
+    for (const r of packEvents ?? []) {
+      if (!r.sku) continue;
+      paketMap.set(r.sku, (paketMap.get(r.sku) || 0) + (Number(r.qty) || 0));
+    }
+
+    // Sadece bekleyen > 0 olanları al
+    const skusWithPending: string[] = [];
+    const results: Array<{ sku: string; montajTotal: number; paketTotal: number; bekleyen: number }> = [];
+
+    for (const [sku, montajTotal] of montajMap) {
+      const paketTotal = paketMap.get(sku) || 0;
+      const bekleyen = montajTotal - paketTotal;
+      if (bekleyen > 0) {
+        skusWithPending.push(sku);
+        results.push({ sku, montajTotal, paketTotal, bekleyen });
+      }
+    }
+
+    if (skusWithPending.length === 0) return { success: true as const, data: [] };
+
+    // Ürün isimleri
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skusWithPending);
+
+    const productMap = new Map<string, string>();
+    for (const p of products ?? []) {
+      productMap.set(p.sku, p.urun_adi ?? p.sku);
+    }
+
+    const enriched = results
+      .map((r) => ({ ...r, urun_adi: productMap.get(r.sku) ?? r.sku }))
+      .sort((a, b) => b.bekleyen - a.bekleyen);
+
+    return { success: true as const, data: enriched };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Adım bazlı ortalama birim süre (performans grafiği için) */
+export async function getStepPerformance(sku: string) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("montaj_sessions")
+      .select("step_id, step_name, seq_no, birim_montaj_dk")
+      .eq("sku", sku)
+      .eq("durum", "tamamlandi")
+      .not("birim_montaj_dk", "is", null);
+
+    if (error) return { success: false as const, error: error.message };
+
+    // Step bazlı ortalama hesapla
+    const stepMap = new Map<string, {
+      step_name: string;
+      seq_no: number;
+      total: number;
+      count: number;
+    }>();
+
+    for (const r of data ?? []) {
+      const existing = stepMap.get(r.step_id);
+      const val = Number(r.birim_montaj_dk) || 0;
+      if (existing) {
+        existing.total += val;
+        existing.count += 1;
+      } else {
+        stepMap.set(r.step_id, {
+          step_name: r.step_name || r.step_id,
+          seq_no: r.seq_no || 0,
+          total: val,
+          count: 1,
+        });
+      }
+    }
+
+    const result = Array.from(stepMap.values())
+      .map((s) => ({
+        step_name: s.step_name,
+        seq_no: s.seq_no,
+        avgBirimDk: Math.round((s.total / s.count) * 100) / 100,
+        sessionCount: s.count,
+      }))
+      .sort((a, b) => a.seq_no - b.seq_no);
+
+    return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
-/** Yeni montaj batch oluştur */
-export async function createMontajBatch(formData: {
-  sku: string;
-  adet: number;
-  notes: string | null;
-}): Promise<ActionResult> {
+/** Yeni montaj seansı oluştur */
+export async function createMontajSession(
+  sku: string,
+  stepId: string
+): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
 
-    const parsed = montajBatchCreateSchema.safeParse(formData);
-    if (!parsed.success) {
-      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
-      return { success: false, error: firstError };
+    if (!sku || !stepId) {
+      return { success: false, error: "Ürün ve adım seçimi gereklidir" };
     }
 
     const supabase = await createClient();
+
+    // Adım bilgisi
+    const { data: step } = await supabase
+      .from("assembly_steps")
+      .select("step_id, step_name, seq_no, is_final_step, sku")
+      .eq("step_id", stepId)
+      .single();
+
+    if (!step) return { success: false, error: "Montaj adımı bulunamadı" };
+    if (step.sku !== sku) return { success: false, error: "Adım bu ürüne ait değil" };
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -217,44 +517,40 @@ export async function createMontajBatch(formData: {
     const operatorName = authUser?.user_metadata?.selected_operator_name ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
-    // Assembly steps sayısı
-    const { data: steps } = await supabase
-      .from("assembly_steps")
-      .select("step_id")
-      .eq("sku", parsed.data.sku);
+    // Generate session_id: MNT-YYYYMMDD-HHMMSS
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const datePart = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+    const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    let sessionId = `MNT-${datePart}-${timePart}`;
 
-    const totalSteps = steps?.length ?? 0;
-    if (totalSteps === 0) {
-      return { success: false, error: "Bu ürünün montaj adımı bulunamadı" };
-    }
-
-    // Generate MON-XXXX ID
-    const { data: lastBatch } = await supabase
-      .from("montaj_batches")
-      .select("montaj_id")
-      .like("montaj_id", "MON-%")
-      .order("montaj_id", { ascending: false })
+    // Check uniqueness
+    const { data: existing } = await supabase
+      .from("montaj_sessions")
+      .select("session_id")
+      .eq("session_id", sessionId)
       .limit(1);
 
-    let nextNum = 1;
-    if (lastBatch && lastBatch.length > 0) {
-      const match = lastBatch[0].montaj_id.match(/MON-(\d+)/);
-      if (match) nextNum = parseInt(match[1], 10) + 1;
+    if (existing && existing.length > 0) {
+      sessionId = `${sessionId}-${String(now.getMilliseconds()).padStart(3, "0")}`;
     }
-    const montajId = `MON-${String(nextNum).padStart(4, "0")}`;
 
     // INSERT
-    const { error } = await supabase.from("montaj_batches").insert({
-      montaj_id: montajId,
-      sku: parsed.data.sku,
-      adet: parsed.data.adet,
-      durum: "bekliyor",
-      current_step_no: 0,
-      total_steps: totalSteps,
+    const { error } = await supabase.from("montaj_sessions").insert({
+      session_id: sessionId,
+      sku,
+      step_id: stepId,
+      step_name: step.step_name,
+      seq_no: step.seq_no,
+      is_final_step: step.is_final_step ?? false,
+      durum: "montajda",
+      email,
       operator_id: operatorId,
       operator_name: operatorName,
-      email: email,
-      notes: parsed.data.notes,
+      start_time: now.toISOString(),
+      qty: 0,
+      worker_count: 1,
+      workers: JSON.stringify([]),
     });
 
     if (error) return { success: false, error: error.message };
@@ -266,191 +562,191 @@ export async function createMontajBatch(formData: {
   }
 }
 
-/** Montajı başlat: bekliyor → montajda */
-export async function startMontaj(montajId: string): Promise<ActionResult> {
+/** Seans kapat: montajda → tamamlandi + stok düşümü */
+export async function closeMontajSession(
+  sessionId: string,
+  formData: { qty: number; workers: { id: string; name: string }[] }
+): Promise<ActionResult> {
   try {
     await requireProductionAccess();
-    const supabase = await createClient();
 
-    const { data } = await supabase
-      .from("montaj_batches")
-      .select("durum")
-      .eq("montaj_id", montajId)
-      .single();
-
-    const batch = data as { durum: string } | null;
-    if (!batch) return { success: false, error: "Montaj bulunamadı" };
-    if (batch.durum !== "bekliyor") return { success: false, error: "Bu montaj zaten başlatılmış" };
-
-    const { error } = await supabase
-      .from("montaj_batches")
-      .update({
-        durum: "montajda",
-        current_step_no: 1,
-        baslama_zamani: new Date().toISOString(),
-      })
-      .eq("montaj_id", montajId);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/uretim/montaj");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Adım ilerlet: current_step_no++ */
-export async function advanceStep(montajId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    const { data } = await supabase
-      .from("montaj_batches")
-      .select("durum, current_step_no, total_steps")
-      .eq("montaj_id", montajId)
-      .single();
-
-    const batch = data as { durum: string; current_step_no: number; total_steps: number } | null;
-    if (!batch) return { success: false, error: "Montaj bulunamadı" };
-    if (batch.durum !== "montajda") return { success: false, error: "Montaj aktif değil" };
-    if (batch.current_step_no >= batch.total_steps) {
-      return { success: false, error: "Son adıma ulaşıldı. Montajı tamamlayın." };
+    const parsed = montajSessionCloseSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
+      return { success: false, error: firstError };
     }
 
-    const { error } = await supabase
-      .from("montaj_batches")
-      .update({ current_step_no: batch.current_step_no + 1 })
-      .eq("montaj_id", montajId);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/uretim/montaj");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Montajı tamamla: montajda → tamamlandi + yari_mamul_stok OUT */
-export async function completeMontaj(montajId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
     const supabase = await createClient();
 
-    // Batch bilgileri
+    // Seans bilgileri
     const { data } = await supabase
-      .from("montaj_batches")
-      .select("montaj_id, durum, sku, adet, operator_id")
-      .eq("montaj_id", montajId)
+      .from("montaj_sessions")
+      .select("session_id, durum, sku, step_id, start_time, operator_id")
+      .eq("session_id", sessionId)
       .single();
 
-    const batch = data as {
-      montaj_id: string;
+    const session = data as {
+      session_id: string;
       durum: string;
       sku: string;
-      adet: number;
+      step_id: string;
+      start_time: string | null;
       operator_id: string | null;
     } | null;
 
-    if (!batch) return { success: false, error: "Montaj bulunamadı" };
-    if (batch.durum !== "montajda") return { success: false, error: "Montaj aktif değil" };
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "montajda") return { success: false, error: "Seans aktif değil" };
 
-    const now = new Date().toISOString();
+    const now = new Date();
+    const endTime = now.toISOString();
+    const { qty, workers } = parsed.data;
 
-    // Update durum
+    // Birim montaj süresi hesapla
+    let birimDk: number | null = null;
+    if (session.start_time && qty > 0 && workers.length > 0) {
+      const diffMs = now.getTime() - new Date(session.start_time).getTime();
+      const totalMinutes = diffMs / 60000;
+      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+    }
+
+    // Update montaj_sessions
     const { error: updateError } = await supabase
-      .from("montaj_batches")
-      .update({ durum: "tamamlandi", bitis_zamani: now })
-      .eq("montaj_id", montajId);
+      .from("montaj_sessions")
+      .update({
+        durum: "tamamlandi",
+        end_time: endTime,
+        qty,
+        worker_count: workers.length,
+        workers,
+        birim_montaj_dk: birimDk,
+      })
+      .eq("session_id", sessionId);
 
     if (updateError) return { success: false, error: updateError.message };
 
-    // Idempotency: mevcut kayıt kontrolü
-    const { data: existing } = await supabase
-      .from("yari_mamul_stok")
-      .select("source_id")
-      .eq("source_id", montajId)
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      // Zaten kayıt var
-      revalidatePath("/uretim/montaj");
-      return { success: true };
+    // ─── Stok Düşümü ───
+    const stockResult = await deductStockForSession(supabase, session.step_id, sessionId, session.sku, qty, session.operator_id);
+    if (!stockResult.success) {
+      return { success: false, error: stockResult.error };
     }
 
-    // Assembly steps + BOM al
-    const { data: steps } = await supabase
-      .from("assembly_steps")
-      .select("step_id")
-      .eq("sku", batch.sku);
+    revalidatePath("/uretim/montaj");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
 
-    const stepIds = (steps ?? []).map((s) => s.step_id);
+/** Aktif seansı iptal et (sil) */
+export async function cancelMontajSession(sessionId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
 
-    if (stepIds.length > 0) {
-      const { data: bomItems } = await supabase
-        .from("step_bom")
-        .select("step_bom_id, step_id, part_id, qty_per")
-        .in("step_id", stepIds);
+    const { data } = await supabase
+      .from("montaj_sessions")
+      .select("durum")
+      .eq("session_id", sessionId)
+      .single();
 
-      // Sadece YARIMAMUL parçaları için stok düş (ASM referanslar atla)
-      const regularPartIds = [
-        ...new Set((bomItems ?? []).filter((b) => !b.part_id.startsWith("ASM-")).map((b) => b.part_id)),
-      ];
+    const session = data as { durum: string } | null;
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "montajda") {
+      return { success: false, error: "Sadece devam eden seans iptal edilebilir" };
+    }
 
-      // Part type bilgisi al
-      let yarimamulParts = new Set<string>();
-      if (regularPartIds.length > 0) {
-        const { data: parts } = await supabase
-          .from("all_parts")
-          .select("part_id, part_adi, part_type")
-          .in("part_id", regularPartIds);
+    const { error } = await supabase
+      .from("montaj_sessions")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("durum", "montajda");
 
-        const partMap = new Map((parts ?? []).map((p) => [p.part_id, p]));
-        yarimamulParts = new Set(
-          (parts ?? []).filter((p) => p.part_type === "YARIMAMUL").map((p) => p.part_id)
-        );
+    if (error) return { success: false, error: error.message };
 
-        // Generate YMS IDs
-        const { data: lastYms } = await supabase
-          .from("yari_mamul_stok")
-          .select("yms_id")
-          .like("yms_id", "YMS-%")
-          .order("yms_id", { ascending: false })
-          .limit(1);
+    revalidatePath("/uretim/montaj");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
 
-        let ymsNum = 1;
-        if (lastYms && lastYms.length > 0) {
-          const match = lastYms[0].yms_id.match(/YMS-(\d+)/);
-          if (match) ymsNum = parseInt(match[1], 10) + 1;
-        }
+/** Tamamlanan seansı düzenle (qty, workers) + stok güncelle */
+export async function updateCompletedMontajSession(
+  sessionId: string,
+  formData: { qty: number; workers: { id: string; name: string }[] }
+): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
 
-        // YARIMAMUL parçalar için OUT kayıtları
-        const ymsInserts = (bomItems ?? [])
-          .filter((b) => yarimamulParts.has(b.part_id))
-          .map((b) => {
-            const ymsId = `YMS-${String(ymsNum).padStart(6, "0")}`;
-            ymsNum++;
-            const partInfo = partMap.get(b.part_id);
-            return {
-              yms_id: ymsId,
-              tarih: now,
-              part_id: b.part_id,
-              part_adi: partInfo?.part_adi ?? null,
-              sku: batch.sku,
-              qty: b.qty_per * batch.adet,
-              direction: "OUT",
-              source: "Montaj",
-              source_id: montajId,
-              operator: batch.operator_id,
-            };
-          });
+    const parsed = montajSessionCloseSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
+      return { success: false, error: firstError };
+    }
 
-        if (ymsInserts.length > 0) {
-          const { error: ymsError } = await supabase.from("yari_mamul_stok").insert(ymsInserts);
-          if (ymsError) return { success: false, error: ymsError.message };
-        }
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("montaj_sessions")
+      .select("session_id, durum, sku, step_id, start_time, end_time, qty, operator_id")
+      .eq("session_id", sessionId)
+      .single();
+
+    const session = data as {
+      session_id: string;
+      durum: string;
+      sku: string;
+      step_id: string;
+      start_time: string | null;
+      end_time: string | null;
+      qty: number;
+      operator_id: string | null;
+    } | null;
+
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "tamamlandi") {
+      return { success: false, error: "Sadece tamamlanan seanslar düzenlenebilir" };
+    }
+
+    const { qty, workers } = parsed.data;
+    const oldQty = Number(session.qty) || 0;
+
+    // Birim montaj süresi yeniden hesapla
+    let birimDk: number | null = null;
+    if (session.start_time && session.end_time && qty > 0 && workers.length > 0) {
+      const diffMs = new Date(session.end_time).getTime() - new Date(session.start_time).getTime();
+      const totalMinutes = diffMs / 60000;
+      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+    }
+
+    // Update montaj_sessions
+    const { error: updateError } = await supabase
+      .from("montaj_sessions")
+      .update({
+        qty,
+        worker_count: workers.length,
+        workers,
+        birim_montaj_dk: birimDk,
+      })
+      .eq("session_id", sessionId);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    // Stok güncelle (eğer qty değiştiyse)
+    if (qty !== oldQty) {
+      // Eski OUT kayıtlarını sil
+      await supabase
+        .from("yari_mamul_stok")
+        .delete()
+        .eq("source_id", sessionId);
+
+      // Hazır eleman stokunu eski değeri geri ekle
+      await reverseHazirStockForSession(supabase, session.step_id, oldQty);
+
+      // Yeni değerle stok düş
+      const stockResult = await deductStockForSession(supabase, session.step_id, sessionId, session.sku, qty, session.operator_id);
+      if (!stockResult.success) {
+        return { success: false, error: stockResult.error };
       }
     }
 
@@ -461,36 +757,154 @@ export async function completeMontaj(montajId: string): Promise<ActionResult> {
   }
 }
 
-/** Montajı iptal et: montajda → bekliyor */
-export async function cancelMontaj(montajId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
+// ─── STOK HELPER FONKSİYONLARI ─────────────────────────────────
 
-    const { data } = await supabase
-      .from("montaj_batches")
-      .select("durum")
-      .eq("montaj_id", montajId)
-      .single();
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-    const batch = data as { durum: string } | null;
-    if (!batch) return { success: false, error: "Montaj bulunamadı" };
-    if (batch.durum !== "montajda") return { success: false, error: "Sadece montajda durumundaki kayıt iptal edilebilir" };
+async function deductStockForSession(
+  supabase: SupabaseClient,
+  stepId: string,
+  sessionId: string,
+  sku: string,
+  qty: number,
+  operatorId: string | null
+): Promise<{ success: true } | { success: false; error: string }> {
+  // Idempotency: mevcut kayıt kontrolü
+  const { data: existingYms } = await supabase
+    .from("yari_mamul_stok")
+    .select("source_id")
+    .eq("source_id", sessionId)
+    .limit(1);
 
-    const { error } = await supabase
-      .from("montaj_batches")
-      .update({
-        durum: "bekliyor",
-        current_step_no: 0,
-        baslama_zamani: null,
-      })
-      .eq("montaj_id", montajId);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/uretim/montaj");
+  if (existingYms && existingYms.length > 0) {
     return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+
+  // BOM al
+  const { data: bomItems } = await supabase
+    .from("step_bom")
+    .select("step_bom_id, step_id, part_id, qty_per")
+    .eq("step_id", stepId);
+
+  if (!bomItems || bomItems.length === 0) return { success: true };
+
+  // Part bilgileri
+  const regularPartIds = [...new Set(bomItems.filter((b) => !b.part_id.startsWith("ASM-")).map((b) => b.part_id))];
+  if (regularPartIds.length === 0) return { success: true };
+
+  const { data: parts } = await supabase
+    .from("all_parts")
+    .select("part_id, part_adi, part_type")
+    .in("part_id", regularPartIds);
+
+  const partMap = new Map((parts ?? []).map((p) => [p.part_id, p]));
+  const yarimamulParts = new Set(
+    (parts ?? []).filter((p) => p.part_type === "YARIMAMUL").map((p) => p.part_id)
+  );
+  const hazirParts = (parts ?? []).filter((p) => p.part_type && p.part_type !== "YARIMAMUL");
+
+  // YARIMAMUL → yari_mamul_stok INSERT direction='OUT'
+  if (yarimamulParts.size > 0) {
+    const { data: lastYms } = await supabase
+      .from("yari_mamul_stok")
+      .select("yms_id")
+      .like("yms_id", "YMS-%")
+      .order("yms_id", { ascending: false })
+      .limit(1);
+
+    let ymsNum = 1;
+    if (lastYms && lastYms.length > 0) {
+      const match = lastYms[0].yms_id.match(/YMS-(\d+)/);
+      if (match) ymsNum = parseInt(match[1], 10) + 1;
+    }
+
+    const now = new Date().toISOString();
+    const ymsInserts = bomItems
+      .filter((b) => yarimamulParts.has(b.part_id))
+      .map((b) => {
+        const ymsId = `YMS-${String(ymsNum).padStart(6, "0")}`;
+        ymsNum++;
+        const partInfo = partMap.get(b.part_id);
+        return {
+          yms_id: ymsId,
+          tarih: now,
+          part_id: b.part_id,
+          part_adi: partInfo?.part_adi ?? null,
+          sku,
+          qty: b.qty_per * qty,
+          direction: "OUT",
+          source: "Montaj",
+          source_id: sessionId,
+          operator: operatorId,
+        };
+      });
+
+    if (ymsInserts.length > 0) {
+      const { error: ymsError } = await supabase.from("yari_mamul_stok").insert(ymsInserts);
+      if (ymsError) return { success: false, error: ymsError.message };
+    }
+  }
+
+  // HAZIR/KUTU/KARTON → all_parts hazir_eleman_aktif_stok -= qty
+  for (const part of hazirParts) {
+    const bomForPart = bomItems.filter((b) => b.part_id === part.part_id);
+    const totalQtyPer = bomForPart.reduce((sum, b) => sum + b.qty_per, 0);
+    const deductAmount = totalQtyPer * qty;
+
+    if (deductAmount > 0) {
+      // Read current stock, then update
+      const { data: currentPart } = await supabase
+        .from("all_parts")
+        .select("hazir_eleman_aktif_stok")
+        .eq("part_id", part.part_id)
+        .single();
+
+      if (currentPart) {
+        const newStock = (currentPart.hazir_eleman_aktif_stok || 0) - deductAmount;
+        await supabase
+          .from("all_parts")
+          .update({ hazir_eleman_aktif_stok: newStock })
+          .eq("part_id", part.part_id);
+      }
+    }
+  }
+
+  return { success: true };
+}
+
+async function reverseHazirStockForSession(
+  supabase: SupabaseClient,
+  stepId: string,
+  oldQty: number
+): Promise<void> {
+  const { data: bomItems } = await supabase
+    .from("step_bom")
+    .select("part_id, qty_per")
+    .eq("step_id", stepId);
+
+  if (!bomItems || bomItems.length === 0) return;
+
+  const regularPartIds = [...new Set(bomItems.filter((b) => !b.part_id.startsWith("ASM-")).map((b) => b.part_id))];
+  if (regularPartIds.length === 0) return;
+
+  const { data: parts } = await supabase
+    .from("all_parts")
+    .select("part_id, part_type, hazir_eleman_aktif_stok")
+    .in("part_id", regularPartIds);
+
+  const hazirParts = (parts ?? []).filter((p) => p.part_type && p.part_type !== "YARIMAMUL");
+
+  for (const part of hazirParts) {
+    const bomForPart = bomItems.filter((b) => b.part_id === part.part_id);
+    const totalQtyPer = bomForPart.reduce((sum, b) => sum + b.qty_per, 0);
+    const restoreAmount = totalQtyPer * oldQty;
+
+    if (restoreAmount > 0) {
+      const newStock = (part.hazir_eleman_aktif_stok || 0) + restoreAmount;
+      await supabase
+        .from("all_parts")
+        .update({ hazir_eleman_aktif_stok: newStock })
+        .eq("part_id", part.part_id);
+    }
   }
 }

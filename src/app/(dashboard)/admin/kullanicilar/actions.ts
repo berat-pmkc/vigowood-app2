@@ -210,7 +210,8 @@ export async function deleteUser(userId: string): Promise<ActionResult> {
     const refChecks = [
       { table: "cut_batches" as const, column: "operator", label: "kesim" },
       { table: "clean" as const, column: "operator", label: "temizlik" },
-      { table: "montaj_batches" as const, column: "operator", label: "montaj" },
+      { table: "montaj_batches" as const, column: "operator", label: "montaj (eski)" },
+      { table: "montaj_sessions" as const, column: "operator_id", label: "montaj" },
       { table: "pack_events" as const, column: "operator", label: "paketleme" },
       { table: "kutu_uretim" as const, column: "operator", label: "kutu üretim" },
       { table: "attendance" as const, column: "employee", label: "yoklama" },

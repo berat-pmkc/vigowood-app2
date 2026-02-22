@@ -2,11 +2,11 @@
 
 import { useRealtimeSubscription } from "./use-realtime-subscription";
 
-export function useMontajRealtime() {
+export function useMontajSessionRealtime() {
   return useRealtimeSubscription({
-    channelName: "montaj-realtime",
+    channelName: "montaj-session-realtime",
     subscriptions: [
-      { event: "*", table: "montaj_batches" },
+      { event: "*", table: "montaj_sessions" },
     ],
     debounceMs: 1000,
   });

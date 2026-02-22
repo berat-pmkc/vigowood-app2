@@ -95,8 +95,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   function montajPeriodQuery() {
     let q = supabase
-      .from("montaj_batches")
-      .select("montaj_id", { count: "exact", head: true });
+      .from("montaj_sessions")
+      .select("session_id", { count: "exact", head: true })
+      .eq("durum", "tamamlandi");
     q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
     return q;
   }

@@ -208,6 +208,26 @@ export const montajBatchCreateSchema = z.object({
 
 export type MontajBatchCreateData = z.infer<typeof montajBatchCreateSchema>;
 
+// Montaj Seans kapatma (yeni seans bazlı sistem)
+export const montajSessionCloseSchema = z.object({
+  qty: z
+    .number()
+    .int("Tam sayı olmalıdır")
+    .min(1, "En az 1 adet olmalıdır")
+    .max(9999, "En fazla 9999 adet olabilir"),
+  workers: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+      })
+    )
+    .min(1, "En az 1 çalışan seçilmelidir")
+    .max(10, "En fazla 10 çalışan seçilebilir"),
+});
+
+export type MontajSessionCloseData = z.infer<typeof montajSessionCloseSchema>;
+
 // Paketleme seans oluşturma
 export const packSessionCreateSchema = z.object({
   sku: z.string().min(1, "Ürün seçimi gereklidir"),

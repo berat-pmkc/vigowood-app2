@@ -3,51 +3,42 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
-import { MontajList } from "./components/montaj-list";
-import type { MontajBatchRow } from "./components/montaj-card";
+import { MontajDashboard } from "./components/montaj-dashboard";
+import type { ActiveMontajSession } from "./components/session-card";
+import type { CompletedMontajSession } from "./components/completed-sessions-sheet";
 
 export const metadata: Metadata = { title: "Montaj" };
 
-interface PageProps {
-  searchParams: Promise<{ durum?: string }>;
-}
-
-export default async function MontajPage({ searchParams }: PageProps) {
+export default async function MontajPage() {
   const user = await getCurrentUser();
   if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
     redirect("/");
   }
 
-  const params = await searchParams;
-  const selectedStatus = params.durum || "all";
-
   const supabase = await createClient();
 
-  // Son 30 gün veya aktif olanlar
+  // Devam eden seanslar
+  const { data: activeData } = await supabase
+    .from("montaj_sessions")
+    .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name")
+    .eq("durum", "montajda")
+    .order("start_time", { ascending: true });
+
+  // Son 30 gün tamamlanan seanslar
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const { data: allBatches } = await supabase
-    .from("montaj_batches")
-    .select("montaj_id, sku, adet, durum, current_step_no, total_steps, operator_id, operator_name, email, baslama_zamani, bitis_zamani, notes, created_at")
-    .or(`durum.neq.tamamlandi,created_at.gte.${thirtyDaysAgo.toISOString()}`)
-    .order("created_at", { ascending: false });
+  const { data: completedData } = await supabase
+    .from("montaj_sessions")
+    .select("session_id, sku, step_name, seq_no, is_final_step, qty, start_time, end_time, durum, worker_count, workers, birim_montaj_dk")
+    .eq("durum", "tamamlandi")
+    .gte("end_time", thirtyDaysAgo.toISOString())
+    .order("end_time", { ascending: false })
+    .limit(50);
 
-  const batches = (allBatches ?? []) as MontajBatchRow[];
-
-  // Durum sayaçları
-  const counts: Record<string, number> = { bekliyor: 0, montajda: 0, tamamlandi: 0 };
-  batches.forEach((b) => {
-    if (counts[b.durum] !== undefined) counts[b.durum]++;
-  });
-
-  // Durum filtrele
-  const filtered = selectedStatus === "all"
-    ? batches
-    : batches.filter((b) => b.durum === selectedStatus);
-
-  // Enrich: ürün adları
-  const skus = [...new Set(filtered.map((b) => b.sku).filter(Boolean))];
+  // Ürün adlarını çek
+  const allSessions = [...(activeData ?? []), ...(completedData ?? [])];
+  const skus = [...new Set(allSessions.map((s) => s.sku).filter(Boolean) as string[])];
 
   let productMap = new Map<string, string>();
   if (skus.length > 0) {
@@ -61,17 +52,38 @@ export default async function MontajPage({ searchParams }: PageProps) {
     );
   }
 
-  const enriched: MontajBatchRow[] = filtered.map((b) => ({
-    ...b,
-    urun_adi: productMap.get(b.sku) ?? undefined,
+  // Aktif ürünler (chart seçicileri için)
+  const { data: activeProducts } = await supabase
+    .from("products")
+    .select("sku, urun_adi")
+    .eq("aktif_mi", true)
+    .order("urun_adi");
+
+  const productOptions = (activeProducts ?? []).map((p) => ({
+    sku: p.sku,
+    urun_adi: p.urun_adi ?? p.sku,
+  }));
+
+  // Enrich sessions
+  const activeSessions: ActiveMontajSession[] = (activeData ?? []).map((s) => ({
+    ...s,
+    urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
+  }));
+
+  const completedSessions: CompletedMontajSession[] = (completedData ?? []).map((s) => ({
+    ...s,
+    workers: s.workers as Array<{ id: string; name: string }> | null,
+    birim_montaj_dk: s.birim_montaj_dk ? Number(s.birim_montaj_dk) : null,
+    qty: Number(s.qty) || 0,
+    urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
   }));
 
   return (
     <div className="pb-20 md:pb-6">
-      <MontajList
-        batches={enriched}
-        counts={counts}
-        selectedStatus={selectedStatus}
+      <MontajDashboard
+        activeSessions={activeSessions}
+        completedSessions={completedSessions}
+        productOptions={productOptions}
       />
     </div>
   );

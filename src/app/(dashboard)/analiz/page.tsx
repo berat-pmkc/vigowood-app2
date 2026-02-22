@@ -171,11 +171,11 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       return q;
     })(),
 
-    // 8 — montaj period
+    // 8 — montaj period (montaj_sessions)
     (() => {
       let q = supabase
-        .from("montaj_batches")
-        .select("montaj_id, adet, baslama_zamani, bitis_zamani")
+        .from("montaj_sessions")
+        .select("session_id, qty, start_time, end_time")
         .eq("durum", "tamamlandi");
       if (start) q = q.gte("created_at", start);
       if (end) q = q.lte("created_at", `${end}T23:59:59`);
@@ -217,10 +217,10 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       .eq("durum", "tamamlandi")
       .gte("tarih", thirtyDaysAgoStr),
 
-    // 14 — montaj last 30 days
+    // 14 — montaj last 30 days (montaj_sessions)
     supabase
-      .from("montaj_batches")
-      .select("created_at, adet")
+      .from("montaj_sessions")
+      .select("created_at, qty")
       .eq("durum", "tamamlandi")
       .gte("created_at", thirtyDaysAgoStr),
   ]);
@@ -348,10 +348,10 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     end_time: string | null;
   }[];
   const montajPeriod = (montajPeriodResult.data || []) as {
-    montaj_id: string;
-    adet: number;
-    baslama_zamani: string | null;
-    bitis_zamani: string | null;
+    session_id: string;
+    qty: number;
+    start_time: string | null;
+    end_time: string | null;
   }[];
   const packPeriodQty = packLast30Rows
     .filter((r) => {
@@ -397,16 +397,16 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     if (existing) existing.temizlik += 1;
   }
 
-  // Montaj
+  // Montaj (montaj_sessions)
   const montajLast30 = (montajLast30Result.data || []) as {
     created_at: string | null;
-    adet: number;
+    qty: number;
   }[];
   for (const r of montajLast30) {
     if (!r.created_at) continue;
     const day = r.created_at.split("T")[0];
     const existing = prodDailyMap.get(day);
-    if (existing) existing.montaj += Number(r.adet) || 0;
+    if (existing) existing.montaj += Number(r.qty) || 0;
   }
 
   // Paketleme
@@ -463,8 +463,8 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       istasyon: "Montaj",
       ortSureDk: avgMinutes(
         montajPeriod.map((r) => ({
-          start: r.baslama_zamani,
-          end: r.bitis_zamani,
+          start: r.start_time,
+          end: r.end_time,
         })),
       ),
     },
