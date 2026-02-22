@@ -13,13 +13,6 @@ import { OdemelerCalendarView } from "./odemeler-calendar-view";
 import { OdemelerSummaryTab } from "./odemeler-summary-tab";
 import type { Odeme } from "@/lib/supabase/types";
 
-interface TrendItem {
-  month: string;
-  label: string;
-  tamamlanan: number;
-  bekleyen: number;
-}
-
 interface SummaryItem {
   tarih: string | null;
   tutar: number;
@@ -39,7 +32,6 @@ interface OdemeKpiRow {
 
 interface OdemelerClientProps {
   activeTab: string;
-  trendData: TrendItem[];
   summaryData: SummaryItem[];
   listData: Odeme[];
   totalCount: number;
@@ -61,7 +53,6 @@ interface OdemelerClientProps {
 
 export function OdemelerClient({
   activeTab,
-  trendData,
   summaryData,
   listData,
   totalCount,

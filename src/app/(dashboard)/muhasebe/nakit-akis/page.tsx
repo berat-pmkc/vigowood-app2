@@ -61,8 +61,6 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
   }
 
   // ---------- 2. Seçili dönem verileri ----------
-  const selectedDonemKodu = donemler.find((d) => d.id === selectedDonemId)?.donem_kodu;
-
   // Önceki dönem ID'sini bul
   const selectedIdx = donemler.findIndex((d) => d.id === selectedDonemId);
   const prevDonemId = selectedIdx >= 0 && selectedIdx < donemler.length - 1
@@ -112,7 +110,6 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
   // Kısa vadeli borç (90 gün içindeki bekleyen ödemeler)
   const today90 = new Date();
   today90.setDate(today90.getDate() + 90);
-  const todayStr = new Date().toISOString().split("T")[0];
   const today90Str = today90.toISOString().split("T")[0];
   const kisaVadeliQuery = supabase
     .from("odemeler")
@@ -126,7 +123,7 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
     girisResult,
     cikisResult,
     prevGirisResult,
-    prevDonemResult,
+    _prevDonemResult,
     trendResult,
     girisTakipResult,
     kisaVadeliResult,
@@ -145,7 +142,6 @@ export default async function NakitAkisPage({ searchParams }: PageProps) {
   const giris = girisResult.data as Record<string, unknown> | null;
   const cikis = cikisResult.data as Record<string, unknown> | null;
   const prevGiris = prevGirisResult.data as Record<string, unknown> | null;
-  const prevDonem = prevDonemResult.data as NakitDonem | null;
 
   if (!donem) {
     return (

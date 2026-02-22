@@ -129,42 +129,6 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
     trendQuery,
   ]);
 
-  // ---------- PROCESS TREND ----------
-  const trendMap = new Map<string, { tamamlanan: number; bekleyen: number }>();
-
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(today);
-    d.setMonth(d.getMonth() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    trendMap.set(key, { tamamlanan: 0, bekleyen: 0 });
-  }
-
-  (trendResult.data ?? []).forEach(
-    (r: { tarih: string | null; tutar: number; odeme_durum: string | null; cinsi: string | null; turu: string | null }) => {
-      if (!r.tarih || r.cinsi !== "TL") return;
-      const monthKey = r.tarih.substring(0, 7);
-      const existing = trendMap.get(monthKey);
-      if (!existing) return;
-      const amount = Number(r.tutar) || 0;
-      if (r.odeme_durum === "TAMAMLANDI") {
-        existing.tamamlanan += amount;
-      } else {
-        existing.bekleyen += amount;
-      }
-    }
-  );
-
-  const trendData = Array.from(trendMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, v]) => {
-      const d = new Date(month + "-01");
-      return {
-        month,
-        label: d.toLocaleDateString("tr-TR", { month: "short" }),
-        ...v,
-      };
-    });
-
   // ---------- PROCESS SUMMARY (with turu) ----------
   const summaryData = (trendResult.data ?? []).map(
     (r: { tarih: string | null; tutar: number; odeme_durum: string | null; cinsi: string | null; turu: string | null }) => ({
@@ -191,7 +155,6 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
     <div className="px-4 sm:px-6">
       <OdemelerClient
         activeTab={activeTab}
-        trendData={trendData}
         summaryData={summaryData}
         listData={(listResult.data ?? []) as Odeme[]}
         totalCount={listResult.count ?? 0}

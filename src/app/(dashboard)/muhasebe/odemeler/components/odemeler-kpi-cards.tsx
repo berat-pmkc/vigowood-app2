@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Banknote, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Banknote, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatCurrency, getWeekRange, getMonthRange } from "@/lib/utils";
 
 interface OdemeKpiRow {

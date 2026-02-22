@@ -12,7 +12,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { formatDonemKodu } from "@/lib/utils";
 
 interface TrendItem {
   donemKodu: string;
