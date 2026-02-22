@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, Wrench, X, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
+import { parseWorkers } from "../utils";
 
 export interface ActiveMontajSession {
   session_id: string;
@@ -19,7 +20,7 @@ export interface ActiveMontajSession {
   start_time: string | null;
   durum: string;
   operator_name: string | null;
-  workers?: Array<{ id: string; name: string }> | null;
+  workers?: Array<{ id: string; name: string }> | string | null;
 }
 
 interface SessionCardProps {
@@ -93,12 +94,15 @@ export function SessionCard({ session, onClose, onCancel }: SessionCardProps) {
         </div>
 
         {/* Workers */}
-        {session.workers && session.workers.length > 0 && (
-          <div className="flex items-center gap-1 mb-1.5 text-[10px] text-muted-foreground truncate">
-            <Users className="w-3 h-3 shrink-0" />
-            {session.workers.map((w) => w.name).join(", ")}
-          </div>
-        )}
+        {(() => {
+          const workers = parseWorkers(session.workers);
+          return workers && workers.length > 0 ? (
+            <div className="flex items-center gap-1 mb-1.5 text-[10px] text-muted-foreground truncate">
+              <Users className="w-3 h-3 shrink-0" />
+              {workers.map((w) => w.name).join(", ")}
+            </div>
+          ) : null;
+        })()}
 
         {/* Timer + Close */}
         <div className="flex items-center justify-between">

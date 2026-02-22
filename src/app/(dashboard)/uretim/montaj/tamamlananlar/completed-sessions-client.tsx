@@ -24,6 +24,7 @@ import { getCompletedSessions } from "../actions";
 import { formatDuration } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
+import { parseWorkers } from "../utils";
 import {
   ArrowLeft,
   Check,
@@ -261,7 +262,7 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
       ) : (
         <div className="space-y-2">
           {sessions.map((s) => {
-            const workers = s.workers as Array<{ id: string; name: string }> | null;
+            const workers = parseWorkers(s.workers);
             const skuStyle = s.sku ? getSkuBadgeStyle(s.sku) : null;
             return (
               <div

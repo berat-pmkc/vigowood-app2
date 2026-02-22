@@ -14,6 +14,7 @@ import { EditSessionDialog } from "./edit-session-dialog";
 import { formatDuration } from "@/lib/utils";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import { CheckCircle, Users, Pencil } from "lucide-react";
+import { parseWorkers } from "../utils";
 
 export interface CompletedMontajSession {
   session_id: string;
@@ -65,7 +66,7 @@ export function CompletedSessionsSheet({ sessions, open, onOpenChange }: Complet
             ) : (
               <div className="space-y-2">
                 {sessions.map((s) => {
-                  const workers = s.workers as Array<{ id: string; name: string }> | null;
+                  const workers = parseWorkers(s.workers);
                   const skuStyle = s.sku ? getSkuBadgeStyle(s.sku) : null;
                   return (
                     <div

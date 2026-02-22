@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { montajSessionCloseSchema } from "@/lib/validations";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { parseWorkers } from "./utils";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -257,8 +258,8 @@ export async function getMontajAnalytics(period: "today" | "week" | "month" | "l
 
     const workerIds = new Set<string>();
     sessions.forEach((s) => {
-      const workers = s.workers as Array<{ id: string; name: string }> | null;
-      if (workers && Array.isArray(workers)) {
+      const workers = parseWorkers(s.workers);
+      if (workers) {
         workers.forEach((w) => workerIds.add(w.id));
       }
     });

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { MontajDashboard } from "./components/montaj-dashboard";
 import type { ActiveMontajSession } from "./components/session-card";
+import { parseWorkers } from "./utils";
 
 export const metadata: Metadata = { title: "Montaj" };
 
@@ -54,7 +55,7 @@ export default async function MontajPage() {
   const activeSessions: ActiveMontajSession[] = (activeData ?? []).map((s) => ({
     ...s,
     urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
-    workers: s.workers as Array<{ id: string; name: string }> | null,
+    workers: parseWorkers(s.workers),
   }));
 
   return (
