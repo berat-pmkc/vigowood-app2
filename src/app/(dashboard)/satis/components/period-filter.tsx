@@ -9,8 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SALES_CHANNELS, SALES_CHANNEL_LABELS } from "@/lib/constants";
 import type { PeriodType } from "../actions";
+import type { SalesChannel } from "@/lib/sales-settings";
 
 const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
   { value: "today", label: "Bugün" },
@@ -22,11 +22,13 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
 interface PeriodFilterProps {
   currentPeriod: PeriodType;
   currentKanal: string;
+  channels: SalesChannel[];
 }
 
 export function PeriodFilter({
   currentPeriod,
   currentKanal,
+  channels,
 }: PeriodFilterProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,9 +67,9 @@ export function PeriodFilter({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="tumu">Tüm Kanallar</SelectItem>
-          {SALES_CHANNELS.map((ch) => (
-            <SelectItem key={ch} value={ch}>
-              {SALES_CHANNEL_LABELS[ch] || ch}
+          {channels.map((ch) => (
+            <SelectItem key={ch.id} value={ch.id}>
+              {ch.label}
             </SelectItem>
           ))}
         </SelectContent>

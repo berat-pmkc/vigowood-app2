@@ -209,7 +209,7 @@ export function BomPageClient({
             </div>
           }
         >
-          <AssemblyFlowDiagram sku={selectedSku} />
+          <AssemblyFlowDiagram sku={selectedSku} onRefresh={handleRefresh} />
         </Suspense>
       )}
 

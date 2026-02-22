@@ -94,6 +94,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Raporlar", href: "/satis/raporlar", icon: FileText, roles: MANAGEMENT_ROLES },
       { title: "Pazarlama", href: "/satis/pazarlama", icon: Target, roles: MANAGEMENT_ROLES },
       { title: "Kampanyalar", href: "/satis/kampanyalar", icon: Megaphone, roles: MANAGEMENT_ROLES },
+      { title: "Ayarlar", href: "/satis/ayarlar", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
     ],
   },
   {

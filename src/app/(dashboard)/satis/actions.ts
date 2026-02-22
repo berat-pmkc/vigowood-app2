@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { SATIS_ACCESS_ROLES, isExportChannel, isServiceSku } from "@/lib/constants";
+import { SATIS_ACCESS_ROLES } from "@/lib/constants";
+import { getSalesSettings, isExportChannelFromSettings, isServiceSkuFromSettings } from "@/lib/sales-settings";
 import * as XLSX from "xlsx";
 
 type ActionResult = { success: true; data?: unknown } | { success: false; error: string };
@@ -84,7 +85,7 @@ function findHeaderRow(sheet: XLSX.WorkSheet): number {
   return 0;
 }
 
-function parseExcelRows(buffer: Buffer): ParsedRow[] {
+function parseExcelRows(buffer: Buffer, hizmetSkulari: string[]): ParsedRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
@@ -148,7 +149,7 @@ function parseExcelRows(buffer: Buffer): ParsedRow[] {
       toplam_tutar: parseNumber(toplamTutarVal),
       kdv_orani: kdvOrani,
       doviz: dovizVal ? String(dovizVal).trim() : "TL",
-      is_hizmet: isServiceSku(sku),
+      is_hizmet: isServiceSkuFromSettings(sku, hizmetSkulari),
     });
   }
 
@@ -213,12 +214,14 @@ export async function uploadSalesExcel(
     const raporTarihiStr = formData.get("rapor_tarihi") as string | null;
     const forceOverwrite = formData.get("force_overwrite") === "true";
 
+    const settings = await getSalesSettings();
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     let rows: ParsedRow[];
     try {
-      rows = parseExcelRows(buffer);
+      rows = parseExcelRows(buffer, settings.hizmetSkulari);
     } catch (e) {
       return {
         success: false,
@@ -284,12 +287,12 @@ export async function uploadSalesExcel(
     const toplamTutar = rows.reduce((s, r) => s + r.toplam_tutar, 0);
     const trTutar = rows
       .filter(
-        (r) => !r.satis_kanali || !isExportChannel(r.satis_kanali),
+        (r) => !r.satis_kanali || !isExportChannelFromSettings(r.satis_kanali, settings.kanallari),
       )
       .reduce((s, r) => s + r.toplam_tutar, 0);
     const ihracatTutar = rows
       .filter(
-        (r) => r.satis_kanali && isExportChannel(r.satis_kanali),
+        (r) => r.satis_kanali && isExportChannelFromSettings(r.satis_kanali, settings.kanallari),
       )
       .reduce((s, r) => s + r.toplam_tutar, 0);
 

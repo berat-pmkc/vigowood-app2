@@ -381,7 +381,9 @@ export const FIRMA_TIPI_LABELS: Record<FirmaTipi, string> = {
 };
 
 // ─── Satış Sabitleri ──────────────────────────────────────────
+// @deprecated DB'den okunuyor (app_settings), fallback olarak kalıyor
 
+/** @deprecated DB'den okunuyor (app_settings.satis_kanallari). Fallback olarak kalıyor. */
 export const SALES_CHANNELS = [
   "TRENDYOL",
   "VIGOWOOD",
@@ -403,6 +405,7 @@ export const SALES_CHANNELS = [
 
 export type SalesChannel = (typeof SALES_CHANNELS)[number];
 
+/** @deprecated DB'den okunuyor (app_settings.satis_kanallari). Fallback olarak kalıyor. */
 export const SALES_CHANNEL_LABELS: Record<string, string> = {
   TRENDYOL: "Trendyol",
   VIGOWOOD: "VigoWood",
@@ -422,10 +425,10 @@ export const SALES_CHANNEL_LABELS: Record<string, string> = {
   FUAR: "Fuar",
 };
 
-/** İhracat kanalları (HAS- prefix) */
+/** @deprecated DB'den okunuyor (app_settings.satis_kanallari ihracat flag). Fallback olarak kalıyor. */
 export const EXPORT_CHANNELS = ["HAS-DE", "HAS-UK", "HAS-ABD"] as const;
 
-/** Hizmet SKU'ları — stoktan düşülmez */
+/** @deprecated DB'den okunuyor (app_settings.hizmet_skulari). Fallback olarak kalıyor. */
 export const SERVICE_SKUS = [
   "KARGO",
   "HIZMET",
@@ -439,12 +442,12 @@ export const SERVICE_SKUS = [
   "AMBALAJ",
 ] as const;
 
-/** İhracat kanalı mı? */
+/** @deprecated DB'den okunuyor. isExportChannelFromSettings kullanın. Fallback olarak kalıyor. */
 export function isExportChannel(channel: string): boolean {
   return channel.startsWith("HAS-");
 }
 
-/** Hizmet SKU'su mu? (stoktan düşülmez) */
+/** @deprecated DB'den okunuyor. isServiceSkuFromSettings kullanın. Fallback olarak kalıyor. */
 export function isServiceSku(sku: string): boolean {
   if (!sku) return false;
   const upper = sku.toUpperCase().trim();
@@ -463,7 +466,7 @@ export const SATIS_ACCESS_ROLES: UserRole[] = [
   "Sevkiyat Sorumlusu",
 ];
 
-/** Pazaryeri seçenekleri (TR Pazarlama) */
+/** @deprecated DB'den okunuyor (app_settings.pazaryeri_secenekleri). Fallback olarak kalıyor. */
 export const PAZARYERI_OPTIONS = [
   "vigowood.com",
   "Trendyol",

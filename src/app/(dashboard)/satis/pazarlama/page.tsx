@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getSalesSettings } from "@/lib/sales-settings";
 import { PazarlamaClient } from "./components/pazarlama-client";
 
 export const metadata: Metadata = { title: "Pazarlama" };
 
 export default async function PazarlamaPage() {
-  const supabase = await createClient();
+  const [supabase, settings] = await Promise.all([
+    createClient(),
+    getSalesSettings(),
+  ]);
+
   const { data, error } = await supabase
     .from("tr_pazarlama")
     .select("*")
@@ -39,7 +44,11 @@ export default async function PazarlamaPage() {
 
   return (
     <div className="px-4 sm:px-6">
-      <PazarlamaClient rows={rows} />
+      <PazarlamaClient
+        rows={rows}
+        pazaryeriSecenekleri={settings.pazaryeriSecenekleri}
+        basariEsikleri={settings.basariEsikleri}
+      />
     </div>
   );
 }

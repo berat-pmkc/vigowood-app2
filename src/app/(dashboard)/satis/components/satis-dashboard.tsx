@@ -6,6 +6,7 @@ import { SatisChart, type DailySalesData } from "./satis-chart";
 import { SatisTable, type SkuSalesRow } from "./satis-table";
 import { ExcelUpload } from "./excel-upload";
 import type { PeriodType } from "../actions";
+import type { SalesChannel } from "@/lib/sales-settings";
 
 interface SatisDashboardProps {
   period: PeriodType;
@@ -16,6 +17,7 @@ interface SatisDashboardProps {
   ihracatRows: SkuSalesRow[];
   trToplam: number;
   ihracatToplam: number;
+  channels: SalesChannel[];
 }
 
 export function SatisDashboard({
@@ -27,6 +29,7 @@ export function SatisDashboard({
   ihracatRows,
   trToplam,
   ihracatToplam,
+  channels,
 }: SatisDashboardProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -44,7 +47,7 @@ export function SatisDashboard({
       </div>
 
       {/* Period Filter */}
-      <PeriodFilter currentPeriod={period} currentKanal={kanal} />
+      <PeriodFilter currentPeriod={period} currentKanal={kanal} channels={channels} />
 
       {/* KPI Cards */}
       <SatisKpiCards data={kpiData} />

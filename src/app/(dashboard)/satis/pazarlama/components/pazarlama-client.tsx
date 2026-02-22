@@ -18,7 +18,7 @@ import { formatNumber } from "@/lib/utils";
 import { toast } from "sonner";
 import { deletePazarlama } from "../actions";
 import { PazarlamaEditSheet } from "./pazarlama-edit-sheet";
-import { PAZARYERI_OPTIONS } from "@/lib/constants";
+import type { BasariEsikleri } from "@/lib/sales-settings";
 
 const AY_LABELS: Record<number, string> = {
   1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan",
@@ -43,7 +43,13 @@ export interface PazarlamaRow {
   not_text: string | null;
 }
 
-export function PazarlamaClient({ rows }: { rows: PazarlamaRow[] }) {
+interface PazarlamaClientProps {
+  rows: PazarlamaRow[];
+  pazaryeriSecenekleri: string[];
+  basariEsikleri: BasariEsikleri;
+}
+
+export function PazarlamaClient({ rows, pazaryeriSecenekleri, basariEsikleri }: PazarlamaClientProps) {
   const [editRow, setEditRow] = useState<PazarlamaRow | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -95,7 +101,7 @@ export function PazarlamaClient({ rows }: { rows: PazarlamaRow[] }) {
           <SelectTrigger className="h-8 w-[160px] text-xs"><SelectValue placeholder="Pazaryeri" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="tumu">Tüm Pazaryerleri</SelectItem>
-            {PAZARYERI_OPTIONS.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
+            {pazaryeriSecenekleri.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
           </SelectContent>
         </Select>
       </div>
@@ -130,7 +136,7 @@ export function PazarlamaClient({ rows }: { rows: PazarlamaRow[] }) {
                     <TableCell>{r.pazaryeri}</TableCell>
                     <TableCell className="text-right">₺{formatNumber(Math.round(r.hedef_ciro))}</TableCell>
                     <TableCell className="text-right">
-                      <span className={achieveRate >= 100 ? "text-vw-success font-medium" : achieveRate >= 70 ? "text-vw-warning" : "text-vw-error"}>
+                      <span className={achieveRate >= basariEsikleri.success ? "text-vw-success font-medium" : achieveRate >= basariEsikleri.warning ? "text-vw-warning" : "text-vw-error"}>
                         ₺{formatNumber(Math.round(r.gercek_ciro))}
                       </span>
                     </TableCell>
@@ -170,7 +176,7 @@ export function PazarlamaClient({ rows }: { rows: PazarlamaRow[] }) {
         </div>
       )}
 
-      <PazarlamaEditSheet open={isNew || !!editRow} onClose={() => { setEditRow(null); setIsNew(false); }} row={editRow} />
+      <PazarlamaEditSheet open={isNew || !!editRow} onClose={() => { setEditRow(null); setIsNew(false); }} row={editRow} pazaryeriSecenekleri={pazaryeriSecenekleri} />
     </div>
   );
 }

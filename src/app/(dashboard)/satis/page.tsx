@@ -4,7 +4,7 @@ import { SatisDashboard } from "./components/satis-dashboard";
 import type { SatisKpiData } from "./components/kpi-cards";
 import type { DailySalesData } from "./components/satis-chart";
 import type { SkuSalesRow } from "./components/satis-table";
-import { isExportChannel } from "@/lib/constants";
+import { getSalesSettings, isExportChannelFromSettings } from "@/lib/sales-settings";
 import type { PeriodType } from "./actions";
 
 function getPeriodDates(period: PeriodType): { start: string | null; end: string | null } {
@@ -35,7 +35,8 @@ export const metadata: Metadata = { title: "Satis" };
 
 export default async function SatisPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const period = (params.period || "month") as PeriodType;
+  const settings = await getSalesSettings();
+  const period = (params.period || settings.varsayilanDonem) as PeriodType;
   const kanal = params.kanal || "all";
 
   const supabase = await createClient();
@@ -83,7 +84,7 @@ export default async function SatisPage({ searchParams }: PageProps) {
 
   for (const r of satirlar) {
     if (!r.sku || r.is_hizmet) continue;
-    const isExport = r.satis_kanali ? isExportChannel(r.satis_kanali) : false;
+    const isExport = r.satis_kanali ? isExportChannelFromSettings(r.satis_kanali, settings.kanallari) : false;
     const map = isExport ? ihracatMap : trMap;
     const existing = map.get(r.sku) || { adet: 0, tutar: 0 };
     existing.adet += r.miktar || 0;
@@ -126,6 +127,7 @@ export default async function SatisPage({ searchParams }: PageProps) {
         ihracatRows={ihracatRows}
         trToplam={trToplam}
         ihracatToplam={ihracatToplam}
+        channels={settings.kanallari}
       />
     </div>
   );

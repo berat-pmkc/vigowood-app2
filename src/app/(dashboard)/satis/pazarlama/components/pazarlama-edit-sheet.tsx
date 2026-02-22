@@ -24,7 +24,6 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { trPazarlamaSchema, type TrPazarlamaData } from "@/lib/validations";
-import { PAZARYERI_OPTIONS } from "@/lib/constants";
 import { createPazarlama, updatePazarlama } from "../actions";
 import type { PazarlamaRow } from "./pazarlama-client";
 
@@ -32,6 +31,7 @@ interface PazarlamaEditSheetProps {
   open: boolean;
   onClose: () => void;
   row: PazarlamaRow | null;
+  pazaryeriSecenekleri: string[];
 }
 
 const AY_OPTIONS = [
@@ -49,7 +49,7 @@ const AY_OPTIONS = [
   { value: 12, label: "Aralık" },
 ];
 
-export function PazarlamaEditSheet({ open, onClose, row }: PazarlamaEditSheetProps) {
+export function PazarlamaEditSheet({ open, onClose, row, pazaryeriSecenekleri }: PazarlamaEditSheetProps) {
   const [loading, setLoading] = useState(false);
   const isEdit = !!row;
 
@@ -176,7 +176,7 @@ export function PazarlamaEditSheet({ open, onClose, row }: PazarlamaEditSheetPro
             >
               <SelectTrigger><SelectValue placeholder="Pazaryeri seçin" /></SelectTrigger>
               <SelectContent>
-                {PAZARYERI_OPTIONS.map((p) => (
+                {pazaryeriSecenekleri.map((p) => (
                   <SelectItem key={p} value={p}>{p}</SelectItem>
                 ))}
               </SelectContent>
