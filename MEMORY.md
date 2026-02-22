@@ -6,7 +6,7 @@ Her katman tamamlandığında güncellenir. Proje boyunca alınan kararlar, öğ
 
 ## AKTİF KATMAN
 
-**Katman 16: Stok — Yarı Mamül** — Sırada
+**Katman 25: DB Migration — Muhasebe ve Finans Tabloları** — Sırada
 
 ---
 
