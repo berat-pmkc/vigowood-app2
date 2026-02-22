@@ -397,7 +397,31 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Navigation: Muhasebe grubu (Nakit Akış, Ödemeler, Faaliyet Hesapları, Kârlılık)
 - [x] Constants: FINANCE_ROLES, ODEME_TURLERI, ODEME_TURU_COLORS, MALIYET_KATEGORILERI
 
-### KATMAN 24+: İleri Özellikler
+### KATMAN 26: Muhasebe — Nakit Akış Yönetimi ✅
+- [x] Nakit Akış Dashboard (KPI, dönem seçici, genel bakış, gelir yapısı, gider dağılımı, borç yapısı)
+- [x] Dönem oluşturma formu (15 günlük D1/D2)
+- [x] Nakit giriş/çıkış girişi (13 kanal TL + USD, 27 kategori gider)
+- [x] Ödemeler sayfası (TanStack Table, 13 tür, renk badge, takvim görünümü)
+- [x] Nakit Giriş Takip (beklenen alacaklar)
+- [x] Trend grafikleri (Recharts)
+
+### KATMAN 27: Muhasebe — Faaliyet Hesapları (Gelir Tablosu) ✅
+- [x] Faaliyet Hesapları ana sayfası (/muhasebe/faaliyet) — 3 tab (Özet|Satış|Maliyet)
+- [x] Dönem seçici (aylık) + yeni dönem oluşturma dialog
+- [x] Özet tab: KPI kartları (Gelir, Gider, FAVÖK, Net Kâr) + veri durumu badge'leri
+- [x] Satış Girişi tab: Dinamik satır tablosu, pazaryeri DB'den + serbest giriş, auto-calc hesaplanan TL/USD
+- [x] Maliyet Girişi tab: 12 Collapsible kategori, VW direkt + HM direkt + ORTAK paylaşımlı, dağıtım audit trail
+- [x] P&L hesaplama motoru (computeKarlilik): ~80 satır/dönem, 3 marka (GENEL/VW/HM)
+- [x] Kârlılık sayfası (/muhasebe/faaliyet/karlilik) — 4 tab (GENEL|VW|HM|Karşılaştırma)
+- [x] Gelir tablosu P&L: kalem_turu stilizasyonu, önceki dönem karşılaştırma (% fark)
+- [x] Marka karşılaştırma: VW vs HM yan yana (Gelir, Gider, FAVÖK, Marj, Net Kâr)
+- [x] 3 Recharts grafik: PieChart (gelir dağılımı), LineChart (FAVÖK+Net Kâr trend), BarChart (gider dağılımı)
+- [x] Dönem tipleri: Aylık, Çeyrek (Q1-Q4), Yarıyıl (H1-H2), Yıllık — SUM aggregation
+- [x] Constants: FAALIYET_MARKALAR, FAALIYET_KANALLARI, AY_LABELS, MALIYET_KATEGORI_TURLERI
+- [x] Validations: satisGirisBatchSchema, maliyetGirisBatchSchema
+- [x] Type aliases: FaaliyetDonem, SatisGiris, MaliyetGiris, KarlilikData
+
+### KATMAN 28+: İleri Özellikler
 - [ ] Amazon SP-API, Trendyol/Hepsiburada API
 - [ ] WhatsApp bildirimler
 - [ ] PPC dashboard, AI tahmin
