@@ -100,7 +100,7 @@ export async function getKartonSablonlarForSku(sku: string) {
   }
 }
 
-/** Son 3 ayda en çok kesilen SKU'lar */
+/** Son 3 ayda en çok üretilen SKU'lar (ürün adıyla birlikte) */
 export async function getTopKutuSkus(limit = 10) {
   try {
     await requireProductionAccess();
@@ -125,12 +125,28 @@ export async function getTopKutuSkus(limit = 10) {
       skuCounts.set(row.sku, (skuCounts.get(row.sku) ?? 0) + 1);
     }
 
-    const sorted = [...skuCounts.entries()]
+    const topSkus = [...skuCounts.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
-      .map(([sku]) => sku);
+      .map(([sku, count]) => ({ sku, count }));
 
-    return { success: true as const, data: sorted };
+    // Fetch product names
+    const skuList = topSkus.map((s) => s.sku);
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skuList.length > 0 ? skuList : ["__none__"]);
+
+    const productMap = new Map(
+      (products ?? []).map((p) => [p.sku, p.urun_adi])
+    );
+
+    const result = topSkus.map((s) => ({
+      ...s,
+      urun_adi: productMap.get(s.sku) ?? s.sku,
+    }));
+
+    return { success: true as const, data: result };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

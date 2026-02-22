@@ -88,7 +88,7 @@ export function SummaryCards() {
               <span className="text-xs text-muted-foreground">Çalışan Kişi</span>
             </div>
             <p className="text-2xl font-bold tabular-nums">{data.uniqueWorkers}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">benzersiz operatör</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Benzersiz Operatör</p>
           </Card>
 
           <Card className="p-4">
@@ -97,7 +97,7 @@ export function SummaryCards() {
               <span className="text-xs text-muted-foreground">Toplam Süre</span>
             </div>
             <p className="text-2xl font-bold tabular-nums">{formatMinutes(data.totalMinutes)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">seans süresi</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Seans Süresi</p>
           </Card>
 
           <Card className="p-4">
@@ -108,7 +108,7 @@ export function SummaryCards() {
             <p className="text-2xl font-bold tabular-nums">
               {data.avgBirimDk > 0 ? `${data.avgBirimDk} dk` : "—"}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">dk / (adet x kişi)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">dk / (Adet x Kişi)</p>
           </Card>
         </div>
       ) : null}

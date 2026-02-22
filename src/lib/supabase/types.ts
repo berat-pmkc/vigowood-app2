@@ -2548,6 +2548,10 @@ export type NakitGiris = Database["public"]["Tables"]["nakit_girisler"]["Row"];
 export type NakitCikis = Database["public"]["Tables"]["nakit_cikislar"]["Row"];
 export type NakitGirisTakip = Database["public"]["Tables"]["nakit_giris_takip"]["Row"];
 export type MontajSession = Database["public"]["Tables"]["montaj_sessions"]["Row"];
+export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
+export type SatisGiris = Database["public"]["Tables"]["satis_giris"]["Row"];
+export type MaliyetGiris = Database["public"]["Tables"]["maliyet_giris"]["Row"];
+export type KarlilikData = Database["public"]["Tables"]["karlilik_data"]["Row"];
 
 // ─── Enum Type Aliases ────────────────────────────────────
 export type UserRole = Database["public"]["Enums"]["user_role"];

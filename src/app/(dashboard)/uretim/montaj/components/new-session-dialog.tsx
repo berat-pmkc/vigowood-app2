@@ -241,14 +241,14 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : topProducts.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {topProducts.map((product) => (
                   <button
                     key={product.sku}
                     type="button"
                     onClick={() => setSelectedSku(product.sku)}
                     className={cn(
-                      "rounded-lg border px-3 py-2.5 text-sm font-medium text-center transition-colors truncate",
+                      "rounded-lg border px-2 py-2 text-xs font-medium text-center transition-colors truncate",
                       selectedSku === product.sku
                         ? "border-vw-primary bg-vw-primary/10 text-vw-deep ring-1 ring-vw-primary/30"
                         : "border-border text-foreground hover:border-vw-side hover:bg-muted/50"

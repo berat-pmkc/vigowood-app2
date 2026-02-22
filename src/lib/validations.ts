@@ -677,3 +677,49 @@ export const nakitGirisTakipSchema = z.object({
 });
 
 export type NakitGirisTakipData = z.infer<typeof nakitGirisTakipSchema>;
+
+// ─── Faaliyet Hesapları ─────────────────────────────────────
+
+/** Satış giriş satırı */
+export const satisGirisRowSchema = z.object({
+  marka: z.string().min(1, "Marka seçiniz"),
+  kanal: z.string().min(1, "Kanal seçiniz"),
+  tur: z.enum(["FAALIYET", "FAALIYET_DISI"] as const, {
+    error: "Geçerli bir tür seçiniz",
+  }),
+  pazaryeri: z.string().min(1, "Pazaryeri giriniz"),
+  ulke: z.string().nullable().optional(),
+  tl_satislar: z.number().min(0, "Tutar 0 veya üzeri olmalıdır"),
+  usd_satislar: z.number().min(0, "Tutar 0 veya üzeri olmalıdır"),
+});
+
+/** Satış giriş toplu form */
+export const satisGirisBatchSchema = z.object({
+  donem_yil: z.number().min(2020).max(2100),
+  donem_ay: z.number().min(1).max(12),
+  kur_tl_usd: z.number().min(0, "Kur 0 veya üzeri olmalıdır"),
+  satirlar: z.array(satisGirisRowSchema).min(1, "En az bir satış satırı gereklidir"),
+});
+
+export type SatisGirisBatchData = z.infer<typeof satisGirisBatchSchema>;
+
+/** Maliyet giriş satırı */
+export const maliyetGirisRowSchema = z.object({
+  kategori: z.string().min(1, "Kategori seçiniz"),
+  maliyet_grubu: z.enum(["VIGO_WOOD", "HAS_MOB", "ORTAK"] as const, {
+    error: "Geçerli bir maliyet grubu seçiniz",
+  }),
+  cari_adi: z.string().nullable().optional(),
+  tl_maliyet: z.number().min(0, "Tutar 0 veya üzeri olmalıdır"),
+  vigo_wood_orani: z.number().min(0).max(100).nullable().optional(),
+});
+
+/** Maliyet giriş toplu form */
+export const maliyetGirisBatchSchema = z.object({
+  donem_yil: z.number().min(2020).max(2100),
+  donem_ay: z.number().min(1).max(12),
+  kur_tl_usd: z.number().min(0, "Kur 0 veya üzeri olmalıdır"),
+  satirlar: z.array(maliyetGirisRowSchema).min(1, "En az bir maliyet satırı gereklidir"),
+});
+
+export type MaliyetGirisBatchData = z.infer<typeof maliyetGirisBatchSchema>;

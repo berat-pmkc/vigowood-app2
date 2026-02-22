@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Wrench, ClipboardList } from "lucide-react";
+import { Plus, Wrench, ClipboardList, Package } from "lucide-react";
+import Link from "next/link";
 import { ActiveSessions } from "./active-sessions";
 import { NewSessionDialog } from "./new-session-dialog";
 import { CloseSessionDialog } from "./close-session-dialog";
 import { SummaryCards } from "./summary-cards";
 import { StepPerformanceChart } from "./step-performance-chart";
 import { ProductTrendChart } from "./product-trend-chart";
-import { PackageReadyWidget } from "./package-ready-widget";
-import { CompletedSessionsSheet, type CompletedMontajSession } from "./completed-sessions-sheet";
+import { PackageReadyDialog } from "./package-ready-widget";
 import type { ActiveMontajSession } from "./session-card";
 import { cancelMontajSession } from "../actions";
 import { toast } from "sonner";
@@ -24,18 +24,16 @@ interface ProductOption {
 
 interface MontajDashboardProps {
   activeSessions: ActiveMontajSession[];
-  completedSessions: CompletedMontajSession[];
   productOptions: ProductOption[];
 }
 
 export function MontajDashboard({
   activeSessions,
-  completedSessions,
   productOptions,
 }: MontajDashboardProps) {
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
-  const [completedSheetOpen, setCompletedSheetOpen] = useState(false);
+  const [packageReadyOpen, setPackageReadyOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<ActiveMontajSession | null>(null);
 
   // Realtime subscription
@@ -71,18 +69,20 @@ export function MontajDashboard({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={() => setCompletedSheetOpen(true)}
+            onClick={() => setPackageReadyOpen(true)}
             className="h-10"
           >
-            <ClipboardList className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Tamamlananlar</span>
-            <span className="sm:hidden">Geçmiş</span>
-            {completedSessions.length > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold px-1.5">
-                {completedSessions.length}
-              </span>
-            )}
+            <Package className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Hazır Stok</span>
+            <span className="sm:hidden">Stok</span>
           </Button>
+          <Link href="/uretim/montaj/tamamlananlar">
+            <Button variant="outline" className="h-10">
+              <ClipboardList className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Tamamlananlar</span>
+              <span className="sm:hidden">Geçmiş</span>
+            </Button>
+          </Link>
           <Button
             onClick={() => setNewDialogOpen(true)}
             className="bg-vw-primary hover:bg-vw-deep text-white h-10"
@@ -113,13 +113,6 @@ export function MontajDashboard({
 
       <Separator />
 
-      {/* Package Ready Widget */}
-      <section>
-        <PackageReadyWidget />
-      </section>
-
-      <Separator />
-
       {/* Summary Cards */}
       <section>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -143,10 +136,9 @@ export function MontajDashboard({
         open={closeDialogOpen}
         onOpenChange={setCloseDialogOpen}
       />
-      <CompletedSessionsSheet
-        sessions={completedSessions}
-        open={completedSheetOpen}
-        onOpenChange={setCompletedSheetOpen}
+      <PackageReadyDialog
+        open={packageReadyOpen}
+        onOpenChange={setPackageReadyOpen}
       />
 
       {/* Mobile FAB */}

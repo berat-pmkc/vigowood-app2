@@ -31,7 +31,7 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-1 border-b px-4 sm:px-6">
+    <nav className="flex flex-wrap gap-x-1 gap-y-0 border-b px-4 sm:px-6">
       {adminTabs.map((tab) => {
         const isActive = tab.exact
           ? pathname === tab.href
@@ -42,7 +42,7 @@ export function AdminNav() {
           return (
             <span
               key={tab.href}
-              className="flex items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground/50 cursor-not-allowed"
+              className="flex items-center gap-1.5 border-b-2 border-transparent px-2.5 py-2 text-sm text-muted-foreground/50 cursor-not-allowed"
             >
               <Icon className="h-4 w-4" />
               <span className="hidden sm:inline">{tab.label}</span>
@@ -55,7 +55,7 @@ export function AdminNav() {
             key={tab.href}
             href={tab.href}
             className={cn(
-              "flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm font-medium transition-colors whitespace-nowrap",
               isActive
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"

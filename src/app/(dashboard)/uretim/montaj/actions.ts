@@ -207,7 +207,7 @@ export async function getMontajOperators() {
       .from("users")
       .select("user_id, full_name, role")
       .eq("is_active", true)
-      .in("station", ["Montaj", "Montaj Hattı"])
+      .eq("station", "Montaj")
       .order("full_name");
 
     if (error) return { success: false as const, error: error.message };
@@ -304,41 +304,60 @@ export async function getStepTrend(sku: string, days: number = 30) {
   }
 }
 
-/** Son 3 ayda en çok montajlanan ürünleri getir (quick-select) */
+/** Günlük satış hızına göre en çok satan ürünleri getir (quick-select) */
 export async function getTopMontajProducts(limit: number = 10) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
+    // Son 30 gün satış verileri
     const since = new Date();
-    since.setMonth(since.getMonth() - 3);
+    since.setDate(since.getDate() - 30);
+    const dayCount = 30;
 
     const { data, error } = await supabase
-      .from("montaj_sessions")
-      .select("sku, qty")
-      .eq("durum", "tamamlandi")
-      .gte("end_time", since.toISOString());
+      .from("satis_satirlari")
+      .select("sku, miktar, tarih")
+      .gte("tarih", since.toISOString().split("T")[0])
+      .not("sku", "is", null);
 
     if (error) return { success: false as const, error: error.message };
 
-    const skuMap = new Map<string, { totalQty: number; sessionCount: number }>();
+    // SKU bazlı toplam satış
+    const skuMap = new Map<string, { totalQty: number; orderCount: number }>();
     for (const row of data ?? []) {
       if (!row.sku) continue;
       const existing = skuMap.get(row.sku);
+      const qty = Number(row.miktar) || 0;
       if (existing) {
-        existing.totalQty += Number(row.qty) || 0;
-        existing.sessionCount += 1;
+        existing.totalQty += qty;
+        existing.orderCount += 1;
       } else {
-        skuMap.set(row.sku, { totalQty: Number(row.qty) || 0, sessionCount: 1 });
+        skuMap.set(row.sku, { totalQty: qty, orderCount: 1 });
       }
     }
 
+    // Günlük satış hızına göre sırala
     const sorted = Array.from(skuMap.entries())
-      .sort((a, b) => b[1].totalQty - a[1].totalQty)
+      .map(([sku, stats]) => ({
+        sku,
+        dailyVelocity: Math.round((stats.totalQty / dayCount) * 100) / 100,
+        totalQty: stats.totalQty,
+        orderCount: stats.orderCount,
+      }))
+      .sort((a, b) => b.dailyVelocity - a.dailyVelocity)
       .slice(0, limit);
 
-    const skus = sorted.map(([sku]) => sku);
+    const skus = sorted.map((s) => s.sku);
     if (skus.length === 0) return { success: true as const, data: [] };
+
+    // Sadece montaj adımı olan ürünleri filtrele
+    const { data: stepsData } = await supabase
+      .from("assembly_steps")
+      .select("sku")
+      .in("sku", skus);
+
+    const skusWithSteps = new Set((stepsData ?? []).map((s) => s.sku));
 
     const { data: products } = await supabase
       .from("products")
@@ -350,12 +369,14 @@ export async function getTopMontajProducts(limit: number = 10) {
       productMap.set(p.sku, p.urun_adi ?? p.sku);
     }
 
-    const result = sorted.map(([sku, stats]) => ({
-      sku,
-      urun_adi: productMap.get(sku) ?? sku,
-      totalQty: stats.totalQty,
-      sessionCount: stats.sessionCount,
-    }));
+    const result = sorted
+      .filter((s) => skusWithSteps.has(s.sku))
+      .map((s) => ({
+        sku: s.sku,
+        urun_adi: productMap.get(s.sku) ?? s.sku,
+        totalQty: s.totalQty,
+        sessionCount: s.orderCount,
+      }));
 
     return { success: true as const, data: result };
   } catch (e) {
@@ -480,6 +501,94 @@ export async function getStepPerformance(sku: string) {
       .sort((a, b) => a.seq_no - b.seq_no);
 
     return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Tamamlanan seanslar — filtreleme + sayfalama */
+export async function getCompletedSessions(params: {
+  period?: "today" | "week" | "month" | "all";
+  sku?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const page = params.page || 1;
+    const pageSize = params.pageSize || 25;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from("montaj_sessions")
+      .select("session_id, sku, step_name, seq_no, is_final_step, qty, start_time, end_time, durum, worker_count, workers, birim_montaj_dk, operator_name", { count: "exact" })
+      .eq("durum", "tamamlandi")
+      .order("end_time", { ascending: false });
+
+    // Period filter
+    if (params.period && params.period !== "all") {
+      const now = new Date();
+      let since: Date;
+      if (params.period === "today") {
+        since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (params.period === "week") {
+        since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+      } else {
+        since = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      }
+      query = query.gte("end_time", since.toISOString());
+    }
+
+    // Date range filter
+    if (params.dateFrom) {
+      query = query.gte("end_time", `${params.dateFrom}T00:00:00`);
+    }
+    if (params.dateTo) {
+      query = query.lte("end_time", `${params.dateTo}T23:59:59`);
+    }
+
+    // SKU filter
+    if (params.sku) {
+      query = query.eq("sku", params.sku);
+    }
+
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) return { success: false as const, error: error.message };
+
+    // Ürün isimleri
+    const skus = [...new Set((data ?? []).map((s) => s.sku).filter(Boolean) as string[])];
+    let productMap = new Map<string, string>();
+    if (skus.length > 0) {
+      const { data: products } = await supabase
+        .from("products")
+        .select("sku, urun_adi")
+        .in("sku", skus);
+      productMap = new Map((products ?? []).map((p) => [p.sku, p.urun_adi ?? ""]));
+    }
+
+    const enriched = (data ?? []).map((s) => ({
+      ...s,
+      workers: s.workers as Array<{ id: string; name: string }> | null,
+      birim_montaj_dk: s.birim_montaj_dk ? Number(s.birim_montaj_dk) : null,
+      qty: Number(s.qty) || 0,
+      urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
+    }));
+
+    return {
+      success: true as const,
+      data: enriched,
+      total: count ?? 0,
+      page,
+      pageSize,
+    };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

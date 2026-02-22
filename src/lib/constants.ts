@@ -591,6 +591,47 @@ export const MALIYET_KATEGORILERI = [
   "Yatırım Giderleri",
 ] as const;
 
+// ─── Faaliyet Hesapları Sabitleri ────────────────────────────
+
+/** Faaliyet markalar */
+export const FAALIYET_MARKALAR = ["VIGO WOOD", "HAS-MOB"] as const;
+
+/** Faaliyet kanalları */
+export const FAALIYET_KANALLARI = ["YURTİÇİ", "İHRACAT"] as const;
+
+/** Faaliyet türleri */
+export const FAALIYET_TURLERI = ["FAALIYET", "FAALIYET_DISI"] as const;
+
+/** Maliyet grupları */
+export const MALIYET_GRUPLARI = ["VIGO_WOOD", "HAS_MOB", "ORTAK"] as const;
+
+/** Ay etikletleri (Türkçe) */
+export const AY_LABELS = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+] as const;
+
+/** Kalem türü → P&L satır tipi */
+export const KALEM_TURLERI = [
+  "GELIR", "GIDER", "TOPLAM", "KAR", "MARJ", "FD_GELIR", "FD_GIDER",
+] as const;
+
+/** Maliyet kategorileri → faaliyet türü mapping (ilk 9 FAALIYET, son 3 FAALIYET_DISI) */
+export const MALIYET_KATEGORI_TURLERI: Record<string, "FAALIYET" | "FAALIYET_DISI"> = {
+  "Personel & SGK Giderleri": "FAALIYET",
+  "Üretim & Hammadde Giderleri": "FAALIYET",
+  "Operasyon & Bakım Giderleri": "FAALIYET",
+  "Enerji Giderleri": "FAALIYET",
+  "Satış Giderleri": "FAALIYET",
+  "Pazarlama Giderleri": "FAALIYET",
+  "Vergi Giderleri": "FAALIYET",
+  "Nakliye Giderleri": "FAALIYET",
+  "Genel Yönetim Giderleri": "FAALIYET",
+  "Faiz ve Komisyon Giderleri": "FAALIYET_DISI",
+  "Faaliyet Dışı Giderler": "FAALIYET_DISI",
+  "Yatırım Giderleri": "FAALIYET_DISI",
+};
+
 /** Nakit giriş kanalları (TL) */
 export const NAKIT_GIRIS_KANALLARI_TL = [
   "vigowood.com", "Trendyol", "Hepsiburada", "Amazon",

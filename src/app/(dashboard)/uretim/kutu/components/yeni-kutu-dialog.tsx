@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useCallback, useTransition } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,27 +10,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AdetInput } from "@/components/shared/adet-input";
 import { cn } from "@/lib/utils";
 import { createKutuSession, getKartonSablonlarForSku, getTopKutuSkus, getKutuOperators } from "../actions";
 import {
   ArrowLeft,
   Check,
-  ChevronsUpDown,
+  Search,
   Box,
   User,
   Loader2,
@@ -55,6 +44,17 @@ interface KartonSablon {
   part_kritik: number;
 }
 
+interface TopSku {
+  sku: string;
+  count: number;
+  urun_adi: string;
+}
+
+interface ProductOption {
+  sku: string;
+  urun_adi: string;
+}
+
 interface Operator {
   user_id: string;
   full_name: string;
@@ -66,9 +66,9 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
   const [isPending, startTransition] = useTransition();
 
   // Step 1 state
-  const [skuOpen, setSkuOpen] = useState(false);
   const [selectedSku, setSelectedSku] = useState("");
-  const [topSkus, setTopSkus] = useState<string[]>([]);
+  const [selectedSkuLabel, setSelectedSkuLabel] = useState("");
+  const [topSkus, setTopSkus] = useState<TopSku[]>([]);
   const [sablonlar, setSablonlar] = useState<KartonSablon[]>([]);
   const [selectedSablon, setSelectedSablon] = useState<KartonSablon | null>(null);
   const [loadingSablonlar, setLoadingSablonlar] = useState(false);
@@ -79,8 +79,10 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
   const [operators, setOperators] = useState<Operator[]>([]);
   const [notText, setNotText] = useState("");
 
-  // All products for SKU search
-  const [allProducts, setAllProducts] = useState<{ sku: string; urun_adi: string }[]>([]);
+  // Search
+  const [skuSearch, setSkuSearch] = useState("");
+  const [allProducts, setAllProducts] = useState<ProductOption[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -88,27 +90,25 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
       // Reset
       setStep(1);
       setSelectedSku("");
+      setSelectedSkuLabel("");
       setSelectedSablon(null);
       setSablonlar([]);
       setQty(10);
       setSelectedOperator(null);
       setNotText("");
+      setSkuSearch("");
 
-      // Load top SKUs
-      getTopKutuSkus(10).then((r) => {
-        if (r.success) setTopSkus(r.data);
+      // Load top SKUs + operators + products
+      setProductsLoading(true);
+      Promise.all([
+        getTopKutuSkus(10),
+        getKutuOperators(),
+      ]).then(([topRes, opRes]) => {
+        if (topRes.success) setTopSkus(topRes.data);
+        if (opRes.success) setOperators(opRes.data);
       });
 
-      // Load operators
-      getKutuOperators().then((r) => {
-        if (r.success) setOperators(r.data);
-      });
-    }
-  }, [open]);
-
-  // Load products for combobox (lazy on first open)
-  useEffect(() => {
-    if (open && allProducts.length === 0) {
+      // Load all products for search
       import("@/lib/supabase/client").then(async ({ createClient }) => {
         const supabase = createClient();
         const { data } = await supabase
@@ -116,10 +116,11 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
           .select("sku, urun_adi")
           .eq("aktif_mi", true)
           .order("sku");
-        if (data) setAllProducts(data as { sku: string; urun_adi: string }[]);
+        if (data) setAllProducts(data as ProductOption[]);
+        setProductsLoading(false);
       });
     }
-  }, [open, allProducts.length]);
+  }, [open]);
 
   // Load sablonlar when SKU changes
   useEffect(() => {
@@ -151,6 +152,13 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
     }
   }, [selectedSku, selectedSablon, step]);
 
+  const handleSkuSelect = useCallback((sku: string, label: string) => {
+    setSelectedSku(sku);
+    setSelectedSkuLabel(label);
+    setSelectedSablon(null);
+    setSkuSearch("");
+  }, []);
+
   const handleSubmit = () => {
     if (!selectedSku || !selectedSablon || !selectedSablon.part_id) return;
 
@@ -174,12 +182,18 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
     });
   };
 
-  const selectedProduct = allProducts.find((p) => p.sku === selectedSku);
+  const filteredProducts = skuSearch
+    ? allProducts.filter(
+        (p) =>
+          p.sku.toLowerCase().includes(skuSearch.toLowerCase()) ||
+          (p.urun_adi ?? "").toLowerCase().includes(skuSearch.toLowerCase())
+      )
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             {step === 2 && (
               <Button
@@ -191,246 +205,268 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             )}
+            <Box className="w-5 h-5" />
             {step === 1 ? "Yeni Kutu Üretimi — Seçimler" : "Yeni Kutu Üretimi — Detaylar"}
           </DialogTitle>
         </DialogHeader>
 
-        {step === 1 && (
-          <div className="space-y-6">
-            {/* 1. Ürün Seçimi */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium">1. Ürün Seçin</label>
+        <div className="px-6 pb-6 space-y-5">
+          {step === 1 && (
+            <>
+              {/* 1. Ürün Seçimi */}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                  1. Ürün
+                  {selectedSku && (
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {selectedSku}
+                      <button
+                        type="button"
+                        className="ml-1 hover:text-destructive"
+                        onClick={() => {
+                          setSelectedSku("");
+                          setSelectedSkuLabel("");
+                          setSelectedSablon(null);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  )}
+                </h3>
 
-              {/* Hızlı butonlar */}
-              {topSkus.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {topSkus.map((sku) => (
-                    <Button
-                      key={sku}
-                      variant={selectedSku === sku ? "default" : "outline"}
-                      size="sm"
-                      className="text-xs h-7"
-                      onClick={() => setSelectedSku(sku)}
-                    >
-                      {sku}
-                    </Button>
-                  ))}
-                </div>
-              )}
+                {!selectedSku && (
+                  <>
+                    {/* Search input */}
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="SKU veya ürün adı ara..."
+                        className="pl-9"
+                        value={skuSearch}
+                        onChange={(e) => setSkuSearch(e.target.value)}
+                      />
+                    </div>
 
-              {/* Combobox */}
-              <Popover open={skuOpen} onOpenChange={setSkuOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                  >
-                    {selectedProduct ? (
-                      <span className="truncate">{selectedSku} — {selectedProduct.urun_adi}</span>
-                    ) : selectedSku ? (
-                      <span>{selectedSku}</span>
-                    ) : (
-                      <span className="text-muted-foreground">SKU ara...</span>
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="SKU veya ürün adı ara..." />
-                    <CommandList>
-                      <CommandEmpty>Ürün bulunamadı</CommandEmpty>
-                      <CommandGroup>
-                        {allProducts.map((p) => (
-                          <CommandItem
+                    {/* Search results */}
+                    {skuSearch && filteredProducts.length > 0 && (
+                      <div className="max-h-40 overflow-y-auto border rounded-lg mb-3">
+                        {filteredProducts.slice(0, 20).map((p) => (
+                          <button
                             key={p.sku}
-                            value={`${p.sku} ${p.urun_adi}`}
-                            onSelect={() => {
-                              setSelectedSku(p.sku);
-                              setSkuOpen(false);
-                            }}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm border-b last:border-b-0"
+                            onClick={() => handleSkuSelect(p.sku, p.urun_adi ?? p.sku)}
                           >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedSku === p.sku ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <span className="font-mono text-xs mr-2">{p.sku}</span>
-                            <span className="truncate text-sm">{p.urun_adi}</span>
-                          </CommandItem>
+                            <span className="font-mono text-xs text-muted-foreground">{p.sku}</span>
+                            <span className="ml-2">{p.urun_adi}</span>
+                          </button>
                         ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+                      </div>
+                    )}
 
-            {/* 2. Karton Şablon Seçimi */}
-            {selectedSku && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium">2. Karton Şablon Seçin</label>
+                    {skuSearch && filteredProducts.length === 0 && !productsLoading && (
+                      <p className="text-sm text-muted-foreground mb-3">Sonuç bulunamadı</p>
+                    )}
 
-                {loadingSablonlar ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : sablonlar.length === 0 ? (
-                  <div className="text-center py-6 text-sm text-muted-foreground">
-                    <Box className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    Bu SKU için karton şablon bulunamadı.
-                    <br />
-                    <span className="text-xs">Admin panelinden şablon ekleyin.</span>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {sablonlar.map((s) => {
-                      const isSelected = selectedSablon?.plaka_id === s.plaka_id;
-                      const isLowStock = s.part_stok < s.part_kritik;
-                      return (
-                        <Card
-                          key={s.plaka_id}
-                          className={cn(
-                            "p-3 cursor-pointer transition-all",
-                            isSelected
-                              ? "border-primary bg-primary/5 ring-1 ring-primary"
-                              : "hover:border-muted-foreground/30"
-                          )}
-                          onClick={() => setSelectedSablon(s)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{s.plaka_adi}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                {s.tipi && (
-                                  <Badge variant="outline" className="text-[10px]">{s.tipi}</Badge>
+                    {/* Top SKUs quick cards (Kesim pattern) */}
+                    {!skuSearch && topSkus.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1.5">En çok üretilen:</p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {topSkus.map((s) => (
+                            <button
+                              key={s.sku}
+                              type="button"
+                              className="text-left px-2.5 py-2 rounded-md border hover:bg-muted/50 transition-colors"
+                              onClick={() => handleSkuSelect(s.sku, s.urun_adi)}
+                            >
+                              <p className="text-xs font-medium truncate">{s.urun_adi}</p>
+                              <p className="text-[10px] text-muted-foreground font-mono">{s.sku}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {productsLoading && (
+                      <div className="space-y-2">
+                        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* 2. Karton Şablon Seçimi */}
+              {selectedSku && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">2. Karton Şablon</h3>
+
+                  {loadingSablonlar ? (
+                    <div className="space-y-2">
+                      {[1, 2].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+                    </div>
+                  ) : sablonlar.length === 0 ? (
+                    <div className="text-center py-6 text-sm text-muted-foreground">
+                      <Box className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      Bu SKU için karton şablon bulunamadı.
+                      <br />
+                      <span className="text-xs">Admin panelinden şablon ekleyin.</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                      {sablonlar.map((s) => {
+                        const isSelected = selectedSablon?.plaka_id === s.plaka_id;
+                        const isLowStock = s.part_stok < s.part_kritik;
+                        return (
+                          <Card
+                            key={s.plaka_id}
+                            className={cn(
+                              "p-3 cursor-pointer transition-all",
+                              isSelected
+                                ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                : "hover:border-muted-foreground/30"
+                            )}
+                            onClick={() => setSelectedSablon(s)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{s.plaka_adi}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {s.tipi && (
+                                    <Badge variant="outline" className="text-[10px]">{s.tipi}</Badge>
+                                  )}
+                                  {s.renk && (
+                                    <Badge variant="outline" className="text-[10px]">{s.renk}</Badge>
+                                  )}
+                                  {s.kutu_sure_dk != null && (
+                                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700">
+                                      {s.kutu_sure_dk} dk
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 ml-3">
+                                {/* Parça stok badge */}
+                                {s.part_adi && (
+                                  <div className="text-right">
+                                    <p className="text-xs text-muted-foreground truncate max-w-[100px]">{s.part_adi}</p>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px]",
+                                        isLowStock ? "bg-red-50 text-red-700 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      )}
+                                    >
+                                      Stok: {s.part_stok}
+                                    </Badge>
+                                  </div>
                                 )}
-                                {s.renk && (
-                                  <Badge variant="outline" className="text-[10px]">{s.renk}</Badge>
-                                )}
-                                {s.kutu_sure_dk != null && (
-                                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700">
-                                    {s.kutu_sure_dk} dk
-                                  </Badge>
+
+                                {isSelected && (
+                                  <Check className="w-5 h-5 text-primary" />
                                 )}
                               </div>
                             </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
-                            <div className="flex items-center gap-2 shrink-0 ml-3">
-                              {/* Parça stok badge */}
-                              {s.part_adi && (
-                                <div className="text-right">
-                                  <p className="text-xs text-muted-foreground truncate max-w-[100px]">{s.part_adi}</p>
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-[10px]",
-                                      isLowStock ? "bg-red-50 text-red-700 border-red-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    )}
-                                  >
-                                    Stok: {s.part_stok}
-                                  </Badge>
-                                </div>
-                              )}
-
-                              {isSelected && (
-                                <Check className="w-5 h-5 text-primary" />
-                              )}
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
+          {step === 2 && (
+            <>
+              {/* Özet badges */}
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ürün:</span>
+                  <span className="font-medium">{selectedSkuLabel || selectedSku}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Şablon:</span>
+                  <span className="font-medium truncate ml-4">{selectedSablon?.plaka_adi}</span>
+                </div>
+                {selectedSablon?.part_adi && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Çıkan Parça:</span>
+                    <span className="font-medium truncate ml-4">{selectedSablon.part_adi}</span>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        )}
 
-        {step === 2 && (
-          <div className="space-y-6">
-            {/* Özet */}
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ürün:</span>
-                <span className="font-medium">{selectedSku}</span>
+              {/* Adet */}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">Adet</h3>
+                <AdetInput
+                  value={qty}
+                  onChange={setQty}
+                  min={1}
+                  max={1000}
+                  quickValues={[1, 5, 10, 15, 20]}
+                />
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Şablon:</span>
-                <span className="font-medium truncate ml-4">{selectedSablon?.plaka_adi}</span>
-              </div>
-              {selectedSablon?.part_adi && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Çıkan Parça:</span>
-                  <span className="font-medium truncate ml-4">{selectedSablon.part_adi}</span>
+
+              {/* Operatör */}
+              {operators.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Operatör</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {operators.map((op) => (
+                      <button
+                        key={op.user_id}
+                        type="button"
+                        className={cn(
+                          "flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all text-left",
+                          selectedOperator?.user_id === op.user_id
+                            ? "border-primary bg-primary/5"
+                            : "border-muted hover:border-primary/30"
+                        )}
+                        onClick={() => setSelectedOperator(
+                          selectedOperator?.user_id === op.user_id ? null : op
+                        )}
+                      >
+                        <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{op.full_name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* Adet */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Adet</label>
-              <AdetInput
-                value={qty}
-                onChange={setQty}
-                min={1}
-                max={1000}
-                quickValues={[1, 5, 10, 15, 20]}
-              />
-            </div>
-
-            {/* Operatör */}
-            {operators.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Operatör</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {operators.map((op) => (
-                    <Button
-                      key={op.user_id}
-                      variant={selectedOperator?.user_id === op.user_id ? "default" : "outline"}
-                      className="justify-start h-10 text-sm"
-                      onClick={() => setSelectedOperator(
-                        selectedOperator?.user_id === op.user_id ? null : op
-                      )}
-                    >
-                      <User className="w-4 h-4 mr-2 shrink-0" />
-                      <span className="truncate">{op.full_name}</span>
-                    </Button>
-                  ))}
-                </div>
+              {/* Not */}
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">Not (opsiyonel)</h3>
+                <Textarea
+                  value={notText}
+                  onChange={(e) => setNotText(e.target.value)}
+                  placeholder="Ek bilgi..."
+                  rows={2}
+                  className="resize-none"
+                />
               </div>
-            )}
 
-            {/* Not */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Not (opsiyonel)</label>
-              <Textarea
-                value={notText}
-                onChange={(e) => setNotText(e.target.value)}
-                placeholder="Ek bilgi..."
-                rows={2}
-                className="resize-none"
-              />
-            </div>
-
-            {/* Kaydet */}
-            <Button
-              className="w-full h-14 text-base"
-              onClick={handleSubmit}
-              disabled={isPending || !selectedSku || !selectedSablon?.part_id}
-            >
-              {isPending ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              ) : (
-                <Play className="w-5 h-5 mr-2" />
-              )}
-              Üretime Başlat
-            </Button>
-          </div>
-        )}
+              {/* Kaydet */}
+              <Button
+                className="w-full h-14 text-base"
+                onClick={handleSubmit}
+                disabled={isPending || !selectedSku || !selectedSablon?.part_id}
+              >
+                {isPending ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Play className="w-5 h-5 mr-2" />
+                )}
+                Üretime Başlat
+              </Button>
+            </>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
