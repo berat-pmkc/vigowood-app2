@@ -151,6 +151,28 @@
   }
 }
 
+/* Sidebar scrollbar — hide by default, thin on hover */
+[data-sidebar="content"] {
+  scrollbar-width: none; /* Firefox */
+}
+[data-sidebar="content"]::-webkit-scrollbar {
+  width: 0; /* Chrome/Safari — hidden by default */
+}
+[data-sidebar="content"]:hover {
+  scrollbar-width: thin; /* Firefox — thin on hover */
+  scrollbar-color: var(--sidebar-accent) transparent;
+}
+[data-sidebar="content"]:hover::-webkit-scrollbar {
+  width: 4px;
+}
+[data-sidebar="content"]:hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-sidebar="content"]:hover::-webkit-scrollbar-thumb {
+  background-color: var(--sidebar-accent);
+  border-radius: 4px;
+}
+
 /* Accessibility — reduce motion */
 @media (prefers-reduced-motion: reduce) {
   *,
