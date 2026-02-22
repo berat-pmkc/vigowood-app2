@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MALIYET_PARA_BIRIMLERI } from "@/lib/constants";
+import type { MaliyetAyarlari } from "@/lib/shipment-settings-types";
 import {
   getSevkiyatMaliyet,
   upsertSevkiyatMaliyet,
@@ -30,16 +30,6 @@ import {
 import { DollarSign, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
-const MALIYET_FIELDS = [
-  { key: "navlun", label: "Navlun", defaultCur: "USD" },
-  { key: "ic_nakliye", label: "İç Nakliye", defaultCur: "TRY" },
-  { key: "ara_depo", label: "Ara Depo", defaultCur: "TRY" },
-  { key: "amazon_pickup", label: "Amazon Pickup", defaultCur: "USD" },
-  { key: "ydg", label: "YDG", defaultCur: "USD" },
-  { key: "tr_gumruk", label: "TR Gümrük", defaultCur: "TRY" },
-  { key: "diger", label: "Diğer", defaultCur: "TRY" },
-] as const;
-
 interface MaliyetEditSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,6 +37,7 @@ interface MaliyetEditSheetProps {
   sevkiyatAdi: string;
   totalDesi: number;
   sonKur: DovizKuruRow | null;
+  maliyetAyarlari: MaliyetAyarlari;
   onSaved: () => void;
 }
 
@@ -57,8 +48,15 @@ export function MaliyetEditSheet({
   sevkiyatAdi,
   totalDesi,
   sonKur,
+  maliyetAyarlari,
   onSaved,
 }: MaliyetEditSheetProps) {
+  const MALIYET_FIELDS = maliyetAyarlari.fields.map((f) => ({
+    key: f.key,
+    label: f.label,
+    defaultCur: f.defaultCurrency,
+  }));
+  const paraBirimleri = maliyetAyarlari.paraBirimleri;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [values, setValues] = useState<Record<string, number | string>>({});
@@ -175,7 +173,7 @@ export function MaliyetEditSheet({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {MALIYET_PARA_BIRIMLERI.map((c) => (
+                        {paraBirimleri.map((c) => (
                           <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
                         ))}
                       </SelectContent>

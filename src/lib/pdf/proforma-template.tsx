@@ -8,7 +8,7 @@ import {
   Image,
   StyleSheet,
 } from "@react-pdf/renderer";
-import { PROFORMA_CONFIG, PALET_WEIGHT_KG } from "@/lib/constants";
+import { PROFORMA_CONFIG } from "@/lib/constants";
 import {
   registerTurkishFonts,
   formatPdfCurrency,
@@ -205,6 +205,7 @@ export interface ProformaData {
   buyerConfig?: ProformaBuyerConfig;
   buyerContactConfig?: ProformaBuyerContactConfig;
   bankConfig?: ProformaBankConfig;
+  paletWeightKg?: number;
 }
 
 export function ProformaDocument({ data }: { data: ProformaData }) {
@@ -250,7 +251,7 @@ export function ProformaDocument({ data }: { data: ProformaData }) {
     grandTotal += item.toplam_fiyat;
   }
 
-  const grossWeight = Math.round(totalWeight + totalPallets * PALET_WEIGHT_KG);
+  const grossWeight = Math.round(totalWeight + totalPallets * (data.paletWeightKg ?? 15));
 
   return (
     <Document>

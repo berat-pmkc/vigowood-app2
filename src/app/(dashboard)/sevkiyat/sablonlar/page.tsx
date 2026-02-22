@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { SablonDataTable } from "./components/sablon-data-table";
 import type { PaletSablonRow } from "./actions";
 
@@ -58,7 +59,10 @@ export default async function SevkiyatSablonlarPage({ searchParams }: PageProps)
   query = query.order(sortColumn, { ascending: sortOrder });
   query = query.range(from, to);
 
-  const { data: sablonlar, count, error } = await query;
+  const [{ data: sablonlar, count, error }, settings] = await Promise.all([
+    query,
+    getShipmentSettings(),
+  ]);
 
   if (error) {
     return (
@@ -85,6 +89,7 @@ export default async function SevkiyatSablonlarPage({ searchParams }: PageProps)
         paletBoyut={paletBoyut}
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
+        paletBoyutlari={settings.paletAyarlari.boyutlar}
       />
     </div>
   );

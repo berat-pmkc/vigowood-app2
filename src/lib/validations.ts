@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, IADE_DURUM, SEVKIYAT_COUNTRY_CODES, FIRMA_TIPLERI, MALIYET_PARA_BIRIMLERI, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -116,8 +116,9 @@ export const makineUpdateSchema = z.object({
 export type MakineUpdateData = z.infer<typeof makineUpdateSchema>;
 
 export const kesimSureleriSchema = z.object({
-  "BÜYÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
-  "KÜÇÜK": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
+  "MAK-1": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
+  "MAK-2": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
+  "MAK-3": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
   "KUTU": z.number().int("Tam sayı olmalıdır").min(0, "0 veya üzeri olmalıdır").nullable().optional(),
 });
 
@@ -178,7 +179,7 @@ export type StepBomItemFormData = z.infer<typeof stepBomItemSchema>;
 
 // Kesim Batch oluşturma
 export const cutBatchCreateSchema = z.object({
-  makine_id: z.enum(MAKINE_IDS, {
+  makine_id: z.enum(KESIM_MAKINE_IDS, {
     error: "Geçerli bir makine seçiniz",
   }),
   sku: z.string().min(1, "Ürün seçimi gereklidir"),
@@ -188,6 +189,7 @@ export const cutBatchCreateSchema = z.object({
     .int("Tam sayı olmalıdır")
     .min(1, "En az 1 adet olmalıdır")
     .max(100, "En fazla 100 adet olabilir"),
+  operator_id: z.string().min(1, "Operatör seçimi gereklidir"),
   plk_notu: z.string().max(500, "Not en fazla 500 karakter olabilir").nullable(),
 });
 
@@ -287,8 +289,8 @@ export type IadeGirisData = z.infer<typeof iadeGirisSchema>;
 
 // Sevkiyat oluşturma (v4 — ülke bazlı + araç tipi + tarih + dorse + taşıyıcı)
 export const sevkiyatCreateSchema = z.object({
-  country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
-  arac_tipi: z.enum(["konteyner", "tir"]),
+  country_code: z.string().min(1, "Ülke seçimi gereklidir"),
+  arac_tipi: z.string().min(1, "Araç tipi gereklidir"),
   konteyner_no: z.string().max(50, "Konteyner no en fazla 50 karakter").nullable(),
   konteyner_tipi: z.string().nullable(),
   tir_plaka: z.string().max(20, "Tır plaka en fazla 20 karakter").nullable(),
@@ -319,7 +321,7 @@ export type SevkiyatItemData = z.infer<typeof sevkiyatItemSchema>;
 
 // Sevkiyat fiyat
 export const sevkiyatFiyatSchema = z.object({
-  country_code: z.enum(SEVKIYAT_COUNTRY_CODES, { message: "Ülke seçimi gereklidir" }),
+  country_code: z.string().min(1, "Ülke seçimi gereklidir"),
   sku: z.string().min(1, "SKU gereklidir"),
   urun_adi_en: z.string().max(300, "Ürün adı en fazla 300 karakter").nullable(),
   gtip: z.string().max(30, "GTIP en fazla 30 karakter").nullable(),
@@ -348,7 +350,7 @@ export type PaletSablonData = z.infer<typeof paletSablonSchema>;
 
 // Firma profili
 export const sevkiyatFirmaSchema = z.object({
-  firma_tipi: z.enum(FIRMA_TIPLERI, { message: "Firma tipi gereklidir" }),
+  firma_tipi: z.string().min(1, "Firma tipi gereklidir"),
   country_code: z.string().max(10).nullable(),
   profil_adi: z.string().min(1, "Profil adı gereklidir").max(200),
   firma_adi: z.string().max(300).nullable(),
@@ -376,19 +378,19 @@ export type SevkiyatFirmaData = z.infer<typeof sevkiyatFirmaSchema>;
 // Sevkiyat maliyet
 export const sevkiyatMaliyetSchema = z.object({
   navlun: z.number().min(0).default(0),
-  navlun_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("USD"),
+  navlun_currency: z.string().default("USD"),
   ic_nakliye: z.number().min(0).default(0),
-  ic_nakliye_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  ic_nakliye_currency: z.string().default("TRY"),
   ara_depo: z.number().min(0).default(0),
-  ara_depo_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  ara_depo_currency: z.string().default("TRY"),
   amazon_pickup: z.number().min(0).default(0),
-  amazon_pickup_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("USD"),
+  amazon_pickup_currency: z.string().default("USD"),
   ydg: z.number().min(0).default(0),
-  ydg_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("USD"),
+  ydg_currency: z.string().default("USD"),
   tr_gumruk: z.number().min(0).default(0),
-  tr_gumruk_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  tr_gumruk_currency: z.string().default("TRY"),
   diger: z.number().min(0).default(0),
-  diger_currency: z.enum(MALIYET_PARA_BIRIMLERI).default("TRY"),
+  diger_currency: z.string().default("TRY"),
   not_text: z.string().max(500).nullable(),
 });
 
@@ -565,3 +567,50 @@ export const userUpdateSchema = z.object({
 });
 
 export type UserUpdateData = z.infer<typeof userUpdateSchema>;
+
+// ─── Muhasebe & Finans ─────────────────────────────────────
+
+/** Ödeme oluşturma/güncelleme */
+export const odemeCreateSchema = z.object({
+  tanimi: z
+    .string()
+    .min(1, "Ödeme tanımı gereklidir")
+    .max(500, "Tanım en fazla 500 karakter olabilir"),
+  tutar: z
+    .number()
+    .min(0, "Tutar 0 veya üzeri olmalıdır"),
+  cinsi: z.enum(PARA_BIRIMLERI, {
+    error: "Geçerli bir para birimi seçiniz",
+  }),
+  tarih: z.string().min(1, "Tarih gereklidir"),
+  turu: z.enum(ODEME_TURLERI, {
+    error: "Geçerli bir ödeme türü seçiniz",
+  }),
+  odeme_durum: z.enum(ODEME_DURUMLARI, {
+    error: "Geçerli bir durum seçiniz",
+  }),
+});
+
+export type OdemeCreateData = z.infer<typeof odemeCreateSchema>;
+
+/** Nakit giriş takip oluşturma/güncelleme */
+export const nakitGirisTakipSchema = z.object({
+  tanimi: z
+    .string()
+    .min(1, "Tanım gereklidir")
+    .max(500, "Tanım en fazla 500 karakter olabilir"),
+  tutar: z
+    .number()
+    .min(0, "Tutar 0 veya üzeri olmalıdır"),
+  cinsi: z.enum(PARA_BIRIMLERI, {
+    error: "Geçerli bir para birimi seçiniz",
+  }),
+  tarih: z.string().nullable(),
+  turu: z.string().max(100, "Tür en fazla 100 karakter olabilir").nullable(),
+  marka: z.string().max(100, "Marka en fazla 100 karakter olabilir").nullable(),
+  odeme_durum: z.enum(ODEME_DURUMLARI, {
+    error: "Geçerli bir durum seçiniz",
+  }),
+});
+
+export type NakitGirisTakipData = z.infer<typeof nakitGirisTakipSchema>;

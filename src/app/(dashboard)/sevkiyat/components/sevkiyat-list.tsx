@@ -5,7 +5,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SevkiyatCard, type SevkiyatRow } from "./sevkiyat-card";
-import { SEVKIYAT_STATUS, SEVKIYAT_STATUS_LABELS, SEVKIYAT_COUNTRIES } from "@/lib/constants";
+import { SEVKIYAT_STATUS, SEVKIYAT_STATUS_LABELS } from "@/lib/constants";
+import type { ShipmentCountry, KonteynerTipi } from "@/lib/shipment-settings-types";
 import { useSevkiyatRealtime } from "@/hooks/use-sevkiyat-realtime";
 import { Plus, Truck } from "lucide-react";
 import Link from "next/link";
@@ -15,9 +16,11 @@ interface SevkiyatListProps {
   counts: Record<string, number>;
   selectedStatus: string;
   selectedCountry: string;
+  ulkeler: ShipmentCountry[];
+  konteynerTipleri: KonteynerTipi[];
 }
 
-export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCountry }: SevkiyatListProps) {
+export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCountry, ulkeler, konteynerTipleri }: SevkiyatListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   useSevkiyatRealtime();
@@ -73,7 +76,7 @@ export function SevkiyatList({ sevkiyatlar, counts, selectedStatus, selectedCoun
         >
           Tümü
         </Button>
-        {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
+        {ulkeler.map((c) => (
           <Button
             key={c.code}
             variant={selectedCountry === c.code ? "default" : "outline"}

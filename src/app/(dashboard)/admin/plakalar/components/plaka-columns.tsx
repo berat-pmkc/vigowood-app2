@@ -37,8 +37,9 @@ interface ColumnOptions {
 }
 
 const makineBadgeColors: Record<string, string> = {
-  BÜYÜK: "bg-blue-100 text-blue-800 border-blue-200",
-  KÜÇÜK: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "MAK-1": "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "MAK-2": "bg-blue-100 text-blue-800 border-blue-200",
+  "MAK-3": "bg-purple-100 text-purple-800 border-purple-200",
   KUTU: "bg-amber-100 text-amber-800 border-amber-200",
 };
 
@@ -51,14 +52,15 @@ function KesimSureleriCell({ kesimSureleri }: { kesimSureleri: unknown }) {
   }
 
   const labels: Record<string, string> = {
-    BÜYÜK: "B",
-    KÜÇÜK: "K",
+    "MAK-1": "M1",
+    "MAK-2": "M2",
+    "MAK-3": "M3",
     KUTU: "KU",
   };
 
   return (
     <div className="flex gap-1.5 flex-wrap">
-      {(["BÜYÜK", "KÜÇÜK", "KUTU"] as const).map((key) => {
+      {(["MAK-1", "MAK-2", "MAK-3", "KUTU"] as const).map((key) => {
         const val = ks[key];
         if (val == null) return null;
         return (

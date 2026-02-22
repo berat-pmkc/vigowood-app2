@@ -11,16 +11,17 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Search, X, Plus } from "lucide-react";
-import { SEVKIYAT_COUNTRIES } from "@/lib/constants";
+import type { ShipmentCountry } from "@/lib/shipment-settings-types";
 import { useCallback, useState } from "react";
 
 interface FiyatlarToolbarProps {
   search: string;
   countryCode: string;
   onAddNew: () => void;
+  ulkeler: ShipmentCountry[];
 }
 
-export function FiyatlarToolbar({ search, countryCode, onAddNew }: FiyatlarToolbarProps) {
+export function FiyatlarToolbar({ search, countryCode, onAddNew, ulkeler }: FiyatlarToolbarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState(search);
@@ -82,7 +83,7 @@ export function FiyatlarToolbar({ search, countryCode, onAddNew }: FiyatlarToolb
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tüm Ülkeler</SelectItem>
-            {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
+            {ulkeler.map((c) => (
               <SelectItem key={c.code} value={c.code}>
                 {c.code} - {c.name}
               </SelectItem>

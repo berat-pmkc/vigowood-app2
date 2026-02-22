@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FIRMA_TIPI_LABELS, type FirmaTipi } from "@/lib/constants";
+import type { FirmaTipi, ShipmentCountry } from "@/lib/shipment-settings-types";
 import { FirmaEditSheet } from "./firma-edit-sheet";
 import { deleteFirma } from "../actions";
 import type { SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
@@ -15,9 +15,11 @@ import { toast } from "sonner";
 
 interface FirmalarClientProps {
   firmalar: SevkiyatFirmaRow[];
+  firmaTipleri: FirmaTipi[];
+  ulkeler: ShipmentCountry[];
 }
 
-export function FirmalarClient({ firmalar }: FirmalarClientProps) {
+export function FirmalarClient({ firmalar, firmaTipleri, ulkeler }: FirmalarClientProps) {
   const router = useRouter();
   const [editItem, setEditItem] = useState<SevkiyatFirmaRow | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -87,15 +89,15 @@ export function FirmalarClient({ firmalar }: FirmalarClientProps) {
           >
             Tümü
           </Button>
-          {(Object.entries(FIRMA_TIPI_LABELS) as [FirmaTipi, string][]).map(([key, label]) => (
+          {firmaTipleri.map((ft) => (
             <Button
-              key={key}
-              variant={filterTip === key ? "default" : "outline"}
+              key={ft.id}
+              variant={filterTip === ft.id ? "default" : "outline"}
               size="sm"
               className="h-9 text-xs"
-              onClick={() => setFilterTip(key)}
+              onClick={() => setFilterTip(ft.id)}
             >
-              {label}
+              {ft.label}
             </Button>
           ))}
         </div>
@@ -136,7 +138,7 @@ export function FirmalarClient({ firmalar }: FirmalarClientProps) {
             </div>
             <div className="flex flex-wrap gap-1.5">
               <Badge variant="secondary" className="text-[10px]">
-                {FIRMA_TIPI_LABELS[firma.firma_tipi as FirmaTipi] ?? firma.firma_tipi}
+                {firmaTipleri.find((f) => f.id === firma.firma_tipi)?.label ?? firma.firma_tipi}
               </Badge>
               {firma.country_code && (
                 <Badge variant="outline" className="text-[10px]">{firma.country_code}</Badge>
@@ -172,6 +174,8 @@ export function FirmalarClient({ firmalar }: FirmalarClientProps) {
           setEditItem(null);
           setIsNew(false);
         }}
+        firmaTipleri={firmaTipleri}
+        ulkeler={ulkeler}
       />
     </div>
   );

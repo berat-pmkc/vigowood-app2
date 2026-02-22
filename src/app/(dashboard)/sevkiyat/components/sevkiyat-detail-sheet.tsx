@@ -19,10 +19,8 @@ import {
   cancelSevkiyat,
 } from "../actions";
 import type { SevkiyatStatus } from "@/lib/constants";
-import {
-  KONTEYNER_TYPE_LABELS,
-  type KonteynerType,
-} from "@/lib/constants";
+import type { KonteynerTipi } from "@/lib/shipment-settings-types";
+import { getKonteynerLabel } from "@/lib/shipment-settings-types";
 import { formatDate } from "@/lib/utils";
 import {
   PackageCheck,
@@ -43,9 +41,10 @@ interface SevkiyatDetailSheetProps {
   sevkiyat: SevkiyatRow;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  konteynerTipleri: KonteynerTipi[];
 }
 
-export function SevkiyatDetailSheet({ sevkiyat, open, onOpenChange }: SevkiyatDetailSheetProps) {
+export function SevkiyatDetailSheet({ sevkiyat, open, onOpenChange, konteynerTipleri }: SevkiyatDetailSheetProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const durum = sevkiyat.durum as SevkiyatStatus;
   const isReadonly = durum === "yolda" || durum === "teslim_edildi";
@@ -147,7 +146,7 @@ export function SevkiyatDetailSheet({ sevkiyat, open, onOpenChange }: SevkiyatDe
               <div>
                 <p className="text-muted-foreground">Konteyner Tipi</p>
                 <p className="font-medium">
-                  {KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ?? sevkiyat.konteyner_tipi}
+                  {getKonteynerLabel(sevkiyat.konteyner_tipi, konteynerTipleri)}
                 </p>
               </div>
             )}

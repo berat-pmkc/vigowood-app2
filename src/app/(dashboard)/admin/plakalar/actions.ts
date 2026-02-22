@@ -361,8 +361,9 @@ export async function deletePlaka(plakalarId: string): Promise<ActionResult> {
 
 /** Export helper: flatten kesim_sureleri into separate columns */
 interface ExportPlaka extends Omit<Plaka, "kesim_sureleri"> {
-  buyuk_dk: number | null;
-  kucuk_dk: number | null;
+  mak1_dk: number | null;
+  mak2_dk: number | null;
+  mak3_dk: number | null;
   kutu_dk: number | null;
 }
 
@@ -384,8 +385,9 @@ export async function exportPlakalar(): Promise<
       const { kesim_sureleri: _ks, ...rest } = p;
       return {
         ...rest,
-        buyuk_dk: ks["BÜYÜK"] ?? null,
-        kucuk_dk: ks["KÜÇÜK"] ?? null,
+        mak1_dk: ks["MAK-1"] ?? null,
+        mak2_dk: ks["MAK-2"] ?? null,
+        mak3_dk: ks["MAK-3"] ?? null,
         kutu_dk: ks["KUTU"] ?? null,
       };
     });
@@ -403,8 +405,9 @@ export async function importPlakalar(
     plaka_adi: string;
     tipi?: string;
     renk?: string;
-    buyuk_dk?: string;
-    kucuk_dk?: string;
+    mak1_dk?: string;
+    mak2_dk?: string;
+    mak3_dk?: string;
     kutu_dk?: string;
     sku?: string;
   }[]
@@ -417,15 +420,19 @@ export async function importPlakalar(
     for (const row of rows) {
       if (!row.plaka_id || !row.plaka_adi) continue;
 
-      // Build kesim_sureleri from 3 columns
+      // Build kesim_sureleri from 4 columns
       const kesimSureleri: Record<string, number> = {};
-      if (row.buyuk_dk) {
-        const v = parseInt(row.buyuk_dk, 10);
-        if (!isNaN(v)) kesimSureleri["BÜYÜK"] = v;
+      if (row.mak1_dk) {
+        const v = parseInt(row.mak1_dk, 10);
+        if (!isNaN(v)) kesimSureleri["MAK-1"] = v;
       }
-      if (row.kucuk_dk) {
-        const v = parseInt(row.kucuk_dk, 10);
-        if (!isNaN(v)) kesimSureleri["KÜÇÜK"] = v;
+      if (row.mak2_dk) {
+        const v = parseInt(row.mak2_dk, 10);
+        if (!isNaN(v)) kesimSureleri["MAK-2"] = v;
+      }
+      if (row.mak3_dk) {
+        const v = parseInt(row.mak3_dk, 10);
+        if (!isNaN(v)) kesimSureleri["MAK-3"] = v;
       }
       if (row.kutu_dk) {
         const v = parseInt(row.kutu_dk, 10);

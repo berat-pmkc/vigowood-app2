@@ -13,6 +13,7 @@ import { FiyatlarToolbar } from "./fiyatlar-toolbar";
 import { FiyatEditSheet, type ProductOption } from "./fiyat-edit-sheet";
 import { getFiyatColumns } from "./fiyat-columns";
 import { deleteFiyat, type FiyatRow } from "../actions";
+import type { ShipmentCountry } from "@/lib/shipment-settings-types";
 import { toast } from "sonner";
 
 interface FiyatlarDataTableProps {
@@ -25,6 +26,7 @@ interface FiyatlarDataTableProps {
   sortBy: string;
   sortOrder: "asc" | "desc";
   products: ProductOption[];
+  ulkeler: ShipmentCountry[];
 }
 
 export function FiyatlarDataTable({
@@ -37,6 +39,7 @@ export function FiyatlarDataTable({
   sortBy,
   sortOrder,
   products,
+  ulkeler,
 }: FiyatlarDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -119,8 +122,9 @@ export function FiyatlarDataTable({
         onSort: handleSort,
         onEdit: handleEdit,
         onDelete: handleDelete,
+        ulkeler,
       }),
-    [handleSort, handleEdit, handleDelete]
+    [handleSort, handleEdit, handleDelete, ulkeler]
   );
 
   const table = useReactTable({
@@ -143,6 +147,7 @@ export function FiyatlarDataTable({
         search={search}
         countryCode={countryCode}
         onAddNew={handleAddNew}
+        ulkeler={ulkeler}
       />
 
       <DataTable
@@ -169,6 +174,7 @@ export function FiyatlarDataTable({
           if (!open) router.refresh();
         }}
         products={products}
+        ulkeler={ulkeler}
       />
     </div>
   );

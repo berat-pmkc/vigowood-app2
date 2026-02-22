@@ -11,16 +11,16 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Search, X, Plus } from "lucide-react";
-import { PALET_BOYUTLARI } from "@/lib/constants";
 import { useCallback, useState } from "react";
 
 interface SablonToolbarProps {
   search: string;
   paletBoyut: string;
   onAddNew: () => void;
+  paletBoyutlari: string[];
 }
 
-export function SablonToolbar({ search, paletBoyut, onAddNew }: SablonToolbarProps) {
+export function SablonToolbar({ search, paletBoyut, onAddNew, paletBoyutlari }: SablonToolbarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState(search);
@@ -82,7 +82,7 @@ export function SablonToolbar({ search, paletBoyut, onAddNew }: SablonToolbarPro
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tüm Boyutlar</SelectItem>
-            {PALET_BOYUTLARI.map((b) => (
+            {paletBoyutlari.map((b) => (
               <SelectItem key={b} value={b}>
                 {b} cm
               </SelectItem>

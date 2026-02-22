@@ -11,20 +11,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
-import { SEVKIYAT_COUNTRIES, type SevkiyatCountryCode } from "@/lib/constants";
+import type { ShipmentCountry } from "@/lib/shipment-settings-types";
 import type { FiyatRow } from "../actions";
 
 interface ColumnOptions {
   onSort: (columnId: string, desc: boolean) => void;
   onEdit: (fiyat: FiyatRow) => void;
   onDelete: (fiyat: FiyatRow) => void;
+  ulkeler: ShipmentCountry[];
 }
 
 export function getFiyatColumns({
   onSort,
   onEdit,
   onDelete,
+  ulkeler,
 }: ColumnOptions): ColumnDef<FiyatRow>[] {
+  const countryMap = Object.fromEntries(ulkeler.map((c) => [c.code, c]));
   return [
     {
       accessorKey: "country_code",
@@ -33,10 +36,9 @@ export function getFiyatColumns({
       ),
       cell: ({ row }) => {
         const code = row.getValue("country_code") as string;
-        const country = SEVKIYAT_COUNTRIES[code as SevkiyatCountryCode];
         return (
           <Badge variant="outline" className="text-xs font-mono">
-            {country?.code ?? code}
+            {countryMap[code]?.code ?? code}
           </Badge>
         );
       },
@@ -91,8 +93,8 @@ export function getFiyatColumns({
       ),
       cell: ({ row }) => {
         const fiyat = row.getValue("birim_fiyat") as number;
-        const code = row.original.country_code as SevkiyatCountryCode;
-        const symbol = SEVKIYAT_COUNTRIES[code]?.currencySymbol ?? "$";
+        const code = row.original.country_code;
+        const symbol = countryMap[code]?.currencySymbol ?? "$";
         return (
           <div className="text-right font-mono text-sm font-semibold">
             {symbol}{fiyat.toFixed(2)}

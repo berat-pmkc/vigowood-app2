@@ -24,6 +24,7 @@ interface SablonDataTableProps {
   paletBoyut: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
+  paletBoyutlari: string[];
 }
 
 export function SablonDataTable({
@@ -35,6 +36,7 @@ export function SablonDataTable({
   paletBoyut,
   sortBy,
   sortOrder,
+  paletBoyutlari,
 }: SablonDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -141,6 +143,7 @@ export function SablonDataTable({
         search={search}
         paletBoyut={paletBoyut}
         onAddNew={handleAddNew}
+        paletBoyutlari={paletBoyutlari}
       />
 
       <DataTable
@@ -166,6 +169,7 @@ export function SablonDataTable({
           setSheetOpen(open);
           if (!open) router.refresh();
         }}
+        paletBoyutlari={paletBoyutlari}
       />
     </div>
   );

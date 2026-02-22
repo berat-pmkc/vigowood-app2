@@ -36,7 +36,7 @@ import {
 import { ChevronsUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { sevkiyatFiyatSchema, type SevkiyatFiyatData } from "@/lib/validations";
-import { SEVKIYAT_COUNTRIES } from "@/lib/constants";
+import type { ShipmentCountry } from "@/lib/shipment-settings-types";
 import { createFiyat, updateFiyat, type FiyatRow } from "../actions";
 import { toast } from "sonner";
 
@@ -51,9 +51,10 @@ interface FiyatEditSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: ProductOption[];
+  ulkeler: ShipmentCountry[];
 }
 
-export function FiyatEditSheet({ fiyat, isNew, open, onOpenChange, products }: FiyatEditSheetProps) {
+export function FiyatEditSheet({ fiyat, isNew, open, onOpenChange, products, ulkeler }: FiyatEditSheetProps) {
   const [loading, setLoading] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
@@ -171,7 +172,7 @@ export function FiyatEditSheet({ fiyat, isNew, open, onOpenChange, products }: F
                 <SelectValue placeholder="Ülke seçin" />
               </SelectTrigger>
               <SelectContent>
-                {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
+                {ulkeler.map((c) => (
                   <SelectItem key={c.code} value={c.code}>
                     {c.code} - {c.name}
                   </SelectItem>

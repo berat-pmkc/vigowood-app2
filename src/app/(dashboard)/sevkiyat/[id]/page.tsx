@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { ShipmentPlanning } from "./components/shipment-planning";
 import type { SevkiyatRow, SevkiyatItemRow } from "../actions";
 
@@ -21,6 +22,7 @@ export default async function SevkiyatDetailPage({ params }: PageProps) {
   }
 
   const { id } = await params;
+  const settings = await getShipmentSettings();
   const supabase = await createClient();
 
   // Sevkiyat bilgilerini getir
@@ -64,6 +66,8 @@ export default async function SevkiyatDetailPage({ params }: PageProps) {
       sevkiyat={sevkiyat}
       initialItems={itemRows}
       products={productList}
+      konteynerTipleri={settings.konteynerTipleri}
+      maliyetAyarlari={settings.maliyetAyarlari}
     />
   );
 }

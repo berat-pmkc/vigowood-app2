@@ -70,8 +70,9 @@ export function PlakaEditSheet({
         tipi: plaka.tipi || null,
         renk: plaka.renk || null,
         kesim_sureleri: {
-          "BÜYÜK": ks["BÜYÜK"] ?? null,
-          "KÜÇÜK": ks["KÜÇÜK"] ?? null,
+          "MAK-1": ks["MAK-1"] ?? null,
+          "MAK-2": ks["MAK-2"] ?? null,
+          "MAK-3": ks["MAK-3"] ?? null,
           "KUTU": ks["KUTU"] ?? null,
         },
         sku: plaka.sku || null,
@@ -184,16 +185,16 @@ export function PlakaEditSheet({
                 </div>
               </div>
 
-              {/* Kesim Süreleri — 3 makine */}
+              {/* Kesim Süreleri — 4 makine */}
               <div className="space-y-2">
                 <Label>Kesim Süreleri (dk)</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Büyük</label>
+                    <label className="text-xs text-muted-foreground">MAK-1 (300W)</label>
                     <Input
                       type="number"
                       min={0}
-                      {...register("kesim_sureleri.BÜYÜK", {
+                      {...register("kesim_sureleri.MAK-1", {
                         setValueAs: (v) =>
                           v === "" || v === null || v === undefined
                             ? null
@@ -203,11 +204,25 @@ export function PlakaEditSheet({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs text-muted-foreground">Küçük</label>
+                    <label className="text-xs text-muted-foreground">MAK-2 (600W)</label>
                     <Input
                       type="number"
                       min={0}
-                      {...register("kesim_sureleri.KÜÇÜK", {
+                      {...register("kesim_sureleri.MAK-2", {
+                        setValueAs: (v) =>
+                          v === "" || v === null || v === undefined
+                            ? null
+                            : Number(v),
+                      })}
+                      placeholder="—"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">MAK-3 (600W Yeni)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      {...register("kesim_sureleri.MAK-3", {
                         setValueAs: (v) =>
                           v === "" || v === null || v === undefined
                             ? null

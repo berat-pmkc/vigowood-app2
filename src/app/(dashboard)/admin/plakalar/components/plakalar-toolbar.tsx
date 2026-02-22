@@ -22,8 +22,9 @@ const PLAKA_EXPORT_COLUMNS: ExcelColumn[] = [
   { key: "plaka_adi", header: "Plaka Adı", width: 35 },
   { key: "tipi", header: "Tip", width: 15 },
   { key: "renk", header: "Renk", width: 15 },
-  { key: "buyuk_dk", header: "Büyük (dk)", width: 12 },
-  { key: "kucuk_dk", header: "Küçük (dk)", width: 12 },
+  { key: "mak1_dk", header: "MAK-1 (dk)", width: 12 },
+  { key: "mak2_dk", header: "MAK-2 (dk)", width: 12 },
+  { key: "mak3_dk", header: "MAK-3 (dk)", width: 12 },
   { key: "kutu_dk", header: "Kutu (dk)", width: 12 },
   { key: "sku", header: "SKU", width: 15 },
 ];
@@ -81,8 +82,9 @@ export function PlakalarToolbar({
         plaka_adi: r["Plaka Adı"] || r["plaka_adi"] || "",
         tipi: r["Tip"] || r["tipi"] || undefined,
         renk: r["Renk"] || r["renk"] || undefined,
-        buyuk_dk: r["Büyük (dk)"] || r["buyuk_dk"] || undefined,
-        kucuk_dk: r["Küçük (dk)"] || r["kucuk_dk"] || undefined,
+        mak1_dk: r["MAK-1 (dk)"] || r["mak1_dk"] || undefined,
+        mak2_dk: r["MAK-2 (dk)"] || r["mak2_dk"] || undefined,
+        mak3_dk: r["MAK-3 (dk)"] || r["mak3_dk"] || undefined,
         kutu_dk: r["Kutu (dk)"] || r["kutu_dk"] || undefined,
         sku: r["SKU"] || r["sku"] || undefined,
       }))

@@ -3,6 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { PackingListDocument } from "@/lib/pdf/packing-list-template";
 import type { PackingListData, PackingListItem, PLExporterConfig, PLBuyerConfig, PLDispatchConfig, PLSignatoryConfig, PLContactConfig } from "@/lib/pdf/packing-list-template";
 import type { SevkiyatItemRow, SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
@@ -133,6 +134,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
       }
     }
 
+    // Palet ağırlığı ayardan
+    const settings = await getShipmentSettings();
+
     // Packing list veri hazırla
     const plItems: PackingListItem[] = itemRows.map((item) => ({
       sku: item.sku,
@@ -159,6 +163,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       dispatchConfig: plDispatch,
       signatoryConfig: plSignatory,
       contactConfig: plContact,
+      paletWeightKg: settings.paletAyarlari.paletWeightKg,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

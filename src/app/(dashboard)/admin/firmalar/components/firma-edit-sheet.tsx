@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { sevkiyatFirmaSchema, type SevkiyatFirmaData } from "@/lib/validations";
-import { FIRMA_TIPI_LABELS, SEVKIYAT_COUNTRY_CODES, type FirmaTipi } from "@/lib/constants";
+import type { FirmaTipi, ShipmentCountry } from "@/lib/shipment-settings-types";
 import { createFirma, updateFirma } from "../actions";
 import type { SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
 import { Loader2, Save } from "lucide-react";
@@ -34,9 +34,11 @@ interface FirmaEditSheetProps {
   isNew: boolean;
   open: boolean;
   onClose: () => void;
+  firmaTipleri: FirmaTipi[];
+  ulkeler: ShipmentCountry[];
 }
 
-export function FirmaEditSheet({ firma, isNew, open, onClose }: FirmaEditSheetProps) {
+export function FirmaEditSheet({ firma, isNew, open, onClose, firmaTipleri, ulkeler }: FirmaEditSheetProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -56,7 +58,7 @@ export function FirmaEditSheet({ firma, isNew, open, onClose }: FirmaEditSheetPr
     if (open) {
       if (firma && !isNew) {
         reset({
-          firma_tipi: firma.firma_tipi as FirmaTipi,
+          firma_tipi: firma.firma_tipi,
           country_code: firma.country_code,
           profil_adi: firma.profil_adi,
           firma_adi: firma.firma_adi,
@@ -152,14 +154,14 @@ export function FirmaEditSheet({ firma, isNew, open, onClose }: FirmaEditSheetPr
               <Label className="text-xs">Firma Tipi *</Label>
               <Select
                 value={firmaTipi}
-                onValueChange={(v) => setValue("firma_tipi", v as FirmaTipi)}
+                onValueChange={(v) => setValue("firma_tipi", v)}
               >
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(FIRMA_TIPI_LABELS) as [FirmaTipi, string][]).map(([k, l]) => (
-                    <SelectItem key={k} value={k}>{l}</SelectItem>
+                  {firmaTipleri.map((ft) => (
+                    <SelectItem key={ft.id} value={ft.id}>{ft.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -175,8 +177,8 @@ export function FirmaEditSheet({ firma, isNew, open, onClose }: FirmaEditSheetPr
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_global">Global</SelectItem>
-                  {SEVKIYAT_COUNTRY_CODES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  {ulkeler.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>{c.code} - {c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

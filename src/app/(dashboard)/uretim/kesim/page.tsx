@@ -3,66 +3,54 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
-import { KesimList } from "./components/kesim-list";
-import type { CutBatchRow } from "./components/kesim-card";
+import { KesimDashboard } from "./components/kesim-dashboard";
+import type { CutBatchRow } from "./components/active-cut-card";
 
 export const metadata: Metadata = { title: "Kesim" };
 
-interface PageProps {
-  searchParams: Promise<{ tarih?: string; durum?: string }>;
-}
-
-export default async function KesimPage({ searchParams }: PageProps) {
+export default async function KesimPage() {
   const user = await getCurrentUser();
   if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
     redirect("/");
   }
 
-  const params = await searchParams;
-
-  // Default: bugünün tarihi
-  const today = new Date().toISOString().split("T")[0];
-  const selectedDate = params.tarih || today;
-  const selectedStatus = params.durum || "all";
-
   const supabase = await createClient();
 
-  // Günün başlangıç/bitiş
-  const dayStart = `${selectedDate}T00:00:00.000Z`;
-  const dayEnd = `${selectedDate}T23:59:59.999Z`;
+  const today = new Date().toISOString().split("T")[0];
+  const dayStart = `${today}T00:00:00.000Z`;
+  const dayEnd = `${today}T23:59:59.999Z`;
 
-  // Tüm kesimler (günlük)
-  let query = supabase
-    .from("cut_batches")
-    .select("*")
-    .gte("tarih", dayStart)
-    .lte("tarih", dayEnd)
-    .order("created_at", { ascending: false });
+  // Parallel fetches: aktif kesimler, bugünün tamamlananları, makineler
+  const [activeBatchesRes, completedBatchesRes, makinelerRes] = await Promise.all([
+    supabase
+      .from("cut_batches")
+      .select("*")
+      .eq("durum", "kesiliyor")
+      .order("baslama_zamani", { ascending: false }),
+    supabase
+      .from("cut_batches")
+      .select("*")
+      .eq("durum", "tamamlandi")
+      .gte("bitis_zamani", dayStart)
+      .lte("bitis_zamani", dayEnd)
+      .order("bitis_zamani", { ascending: false }),
+    supabase
+      .from("kesim_makinesi")
+      .select("makine_id, tipi, bolum, aktif")
+      .eq("bolum", "Kesim")
+      .eq("aktif", true)
+      .order("makine_id"),
+  ]);
 
-  const { data: allBatches } = await query;
-  const batches = (allBatches ?? []) as CutBatchRow[];
+  const activeBatches = (activeBatchesRes.data ?? []) as CutBatchRow[];
+  const completedBatches = (completedBatchesRes.data ?? []) as CutBatchRow[];
+  const allBatches = [...activeBatches, ...completedBatches];
 
-  // Durum sayaçları
-  const counts: Record<string, number> = {
-    bekliyor: 0,
-    kesiliyor: 0,
-    tamamlandi: 0,
-  };
-  batches.forEach((b) => {
-    if (counts[b.durum] !== undefined) counts[b.durum]++;
-  });
+  // Enrich: plaka adları, ürün adları, operatör adları
+  const plakaIds = [...new Set(allBatches.map((b) => b.plaka_id).filter(Boolean) as string[])];
+  const skus = [...new Set(allBatches.map((b) => b.sku).filter(Boolean) as string[])];
+  const operatorIds = [...new Set(allBatches.map((b) => b.operator_id).filter(Boolean) as string[])];
 
-  // Durum filtrele
-  const filtered = selectedStatus === "all"
-    ? batches
-    : batches.filter((b) => b.durum === selectedStatus);
-
-  // Plaka adları ve ürün adları enrich
-  const plakaIds = [...new Set(filtered.map((b) => b.plaka_id).filter(Boolean) as string[])];
-  const skus = [...new Set(filtered.map((b) => b.sku).filter(Boolean) as string[])];
-  const operatorIds = [...new Set(filtered.map((b) => b.operator_id).filter(Boolean) as string[])];
-
-  // Parallel lookups
   const [plakaResult, productResult, operatorResult] = await Promise.all([
     plakaIds.length > 0
       ? supabase.from("plakalar").select("plaka_id, plaka_adi").in("plaka_id", plakaIds)
@@ -85,20 +73,28 @@ export default async function KesimPage({ searchParams }: PageProps) {
     (operatorResult.data ?? []).map((u) => [u.user_id, u.full_name])
   );
 
-  const enriched: CutBatchRow[] = filtered.map((b) => ({
+  const enrich = (b: CutBatchRow): CutBatchRow => ({
     ...b,
     plaka_adi: b.plaka_id ? plakaMap.get(b.plaka_id) ?? undefined : undefined,
     urun_adi: b.sku ? productMap.get(b.sku) ?? undefined : undefined,
     operator_adi: b.operator_id ? operatorMap.get(b.operator_id) ?? undefined : undefined,
-  }));
+  });
+
+  const enrichedActive = activeBatches.map(enrich);
+  const enrichedCompleted = completedBatches.map(enrich);
+
+  // Bugünün KPI için toplam adet
+  const todayTotalAdet = completedBatches.reduce((sum, b) => sum + b.adet, 0);
+  const todayTotalBatch = completedBatches.length;
 
   return (
     <div className="pb-20 md:pb-6">
-      <KesimList
-        batches={enriched}
-        counts={counts}
-        selectedDate={selectedDate}
-        selectedStatus={selectedStatus}
+      <KesimDashboard
+        activeCuts={enrichedActive}
+        completedCuts={enrichedCompleted}
+        todayTotalAdet={todayTotalAdet}
+        todayTotalBatch={todayTotalBatch}
+        makineler={(makinelerRes.data ?? []) as { makine_id: string; tipi: string; bolum: string; aktif: boolean }[]}
       />
     </div>
   );

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sevkiyatCreateSchema, sevkiyatItemSchema } from "@/lib/validations";
-import { SEVKIYAT_ACCESS_ROLES, SEVKIYAT_COUNTRIES, type SevkiyatCountryCode } from "@/lib/constants";
+import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings, getCountryByCode } from "@/lib/shipment-settings";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -25,6 +26,7 @@ function calculateLogistics(input: {
   palette_koli: number;
   koli_agirlik: number;
   palet_sayisi: number;
+  desiCarpani?: number;
 }) {
   const toplam_koli = input.palette_koli * input.palet_sayisi;
   const qty = input.koli_adedi * toplam_koli;
@@ -33,7 +35,7 @@ function calculateLogistics(input: {
   // Palet boyutu parse: "80x120" → en=80, boy=120 (cm)
   const [paletEn, paletBoy] = input.palet_boyut.split("x").map(Number);
   const hacim = ((paletEn || 80) * (paletBoy || 120) * input.palet_yukseklik * input.palet_sayisi) / 1_000_000;
-  const desi = hacim * 333.33;
+  const desi = hacim * (input.desiCarpani ?? 333.33);
 
   return { toplam_koli, qty, agirlik, hacim: Math.round(hacim * 1000) / 1000, desi: Math.round(desi * 100) / 100 };
 }
@@ -455,8 +457,10 @@ export async function createSevkiyat(formData: {
     }
 
     const supabase = await createClient();
-    const countryCode = parsed.data.country_code as SevkiyatCountryCode;
-    const country = SEVKIYAT_COUNTRIES[countryCode];
+    const settings = await getShipmentSettings();
+    const countryCode = parsed.data.country_code;
+    const country = getCountryByCode(countryCode, settings.ulkeler);
+    if (!country) return { success: false, error: "Geçersiz ülke kodu" };
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -553,8 +557,10 @@ export async function createSevkiyatWithItems(
     }
 
     const supabase = await createClient();
-    const countryCode = parsed.data.country_code as SevkiyatCountryCode;
-    const country = SEVKIYAT_COUNTRIES[countryCode];
+    const settings = await getShipmentSettings();
+    const countryCode = parsed.data.country_code;
+    const country = getCountryByCode(countryCode, settings.ulkeler);
+    if (!country) return { success: false, error: "Geçersiz ülke kodu" };
 
     const { data: { user: authUser } } = await supabase.auth.getUser();
     const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;

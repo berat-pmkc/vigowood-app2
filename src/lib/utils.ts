@@ -54,6 +54,42 @@ export function formatElapsed(start: string | null): string {
   return formatDuration(start, new Date().toISOString());
 }
 
+/** Format currency with symbol: 1.234,56 ₺ or $1,234.56 */
+export function formatCurrency(
+  n: number | null | undefined,
+  currency: "TL" | "USD" | "EUR" = "TL"
+): string {
+  if (n == null) return "—";
+  if (currency === "USD") {
+    return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (currency === "EUR") {
+    return `€${n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  return `${n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
+}
+
+/** Format compact currency: 1,2M ₺ or $1.2M */
+export function formatCurrencyCompact(
+  n: number | null | undefined,
+  currency: "TL" | "USD" | "EUR" = "TL"
+): string {
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  let formatted: string;
+  if (abs >= 1_000_000) {
+    formatted = (abs / 1_000_000).toFixed(1) + "M";
+  } else if (abs >= 1_000) {
+    formatted = (abs / 1_000).toFixed(1) + "K";
+  } else {
+    formatted = abs.toFixed(0);
+  }
+  if (currency === "USD") return `${sign}$${formatted}`;
+  if (currency === "EUR") return `${sign}€${formatted}`;
+  return `${sign}${formatted} ₺`;
+}
+
 /** Relative time: "5 dk önce", "2 saat önce", "3 gün önce" */
 export function formatDistanceToNow(iso: string | null): string {
   if (!iso) return "";

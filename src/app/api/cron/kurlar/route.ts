@@ -17,9 +17,33 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Frankfurter API — 1 TRY → USD, EUR, GBP, PLN, SEK
+    // Supabase admin client (service role — RLS bypass)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Kur ayarlarını DB'den oku (fallback: hardcoded)
+    let currencies = ["USD", "EUR", "GBP", "PLN", "SEK"];
+    try {
+      const { data: settingsRow } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "sevkiyat_kur_ayarlari")
+        .maybeSingle();
+      if (settingsRow?.value) {
+        const parsed = settingsRow.value as { currencies?: string[] };
+        if (Array.isArray(parsed.currencies) && parsed.currencies.length > 0) {
+          currencies = parsed.currencies;
+        }
+      }
+    } catch {
+      // Fallback — hardcoded currencies
+    }
+
+    // Frankfurter API — 1 TRY → dynamic currencies
     const res = await fetch(
-      "https://api.frankfurter.app/latest?from=TRY&to=USD,EUR,GBP,PLN,SEK"
+      `https://api.frankfurter.app/latest?from=TRY&to=${currencies.join(",")}`
     );
 
     if (!res.ok) {
@@ -31,26 +55,20 @@ export async function GET(request: Request) {
 
     const json = (await res.json()) as {
       date: string;
-      rates: { USD: number; EUR: number; GBP: number; PLN: number; SEK: number };
+      rates: Record<string, number>;
     };
 
-    // Ters çevir: 1 X = ? TRY
-    const usd_try = Math.round((1 / json.rates.USD) * 10000) / 10000;
-    const eur_try = Math.round((1 / json.rates.EUR) * 10000) / 10000;
-    const gbp_try = Math.round((1 / json.rates.GBP) * 10000) / 10000;
-    const pln_try = Math.round((1 / json.rates.PLN) * 10000) / 10000;
-    const sek_try = Math.round((1 / json.rates.SEK) * 10000) / 10000;
+    // Ters çevir: 1 X = ? TRY (sadece gelen kurlar için)
+    const usd_try = json.rates.USD ? Math.round((1 / json.rates.USD) * 10000) / 10000 : null;
+    const eur_try = json.rates.EUR ? Math.round((1 / json.rates.EUR) * 10000) / 10000 : null;
+    const gbp_try = json.rates.GBP ? Math.round((1 / json.rates.GBP) * 10000) / 10000 : null;
+    const pln_try = json.rates.PLN ? Math.round((1 / json.rates.PLN) * 10000) / 10000 : null;
+    const sek_try = json.rates.SEK ? Math.round((1 / json.rates.SEK) * 10000) / 10000 : null;
 
     // Çapraz kurlar
-    const eur_usd = Math.round((eur_try / usd_try) * 10000) / 10000;
-    const gbp_usd = Math.round((gbp_try / usd_try) * 10000) / 10000;
-    const gbp_eur = Math.round((gbp_try / eur_try) * 10000) / 10000;
-
-    // Supabase admin client (service role — RLS bypass)
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const eur_usd = eur_try && usd_try ? Math.round((eur_try / usd_try) * 10000) / 10000 : null;
+    const gbp_usd = gbp_try && usd_try ? Math.round((gbp_try / usd_try) * 10000) / 10000 : null;
+    const gbp_eur = gbp_try && eur_try ? Math.round((gbp_try / eur_try) * 10000) / 10000 : null;
 
     const { error } = await supabase.from("doviz_kurlari").upsert(
       {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { SevkiyatList } from "./components/sevkiyat-list";
 import type { SevkiyatRow } from "./components/sevkiyat-card";
 
@@ -18,6 +19,7 @@ export default async function SevkiyatPage({ searchParams }: PageProps) {
     redirect("/");
   }
 
+  const settings = await getShipmentSettings();
   const params = await searchParams;
   const selectedStatus = params.durum || "all";
   const selectedCountry = params.ulke || "all";
@@ -111,6 +113,8 @@ export default async function SevkiyatPage({ searchParams }: PageProps) {
         counts={counts}
         selectedStatus={selectedStatus}
         selectedCountry={selectedCountry}
+        ulkeler={settings.ulkeler}
+        konteynerTipleri={settings.konteynerTipleri}
       />
     </div>
   );

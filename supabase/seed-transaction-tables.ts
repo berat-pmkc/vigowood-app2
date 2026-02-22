@@ -109,11 +109,14 @@ function parseTime(val: any): string | null {
   return s;
 }
 
-// MakineID mapping: ASCII → Turkish
+// MakineID mapping: ASCII → new IDs
 const MAKINE_MAP: Record<string, string> = {
-  BUYUK: "BÜYÜK",
-  KUCUK: "KÜÇÜK",
+  BUYUK: "MAK-2",
+  KUCUK: "MAK-1",
   KUTU: "KUTU",
+  // Legacy Turkish names (in case DB already has them)
+  "BÜYÜK": "MAK-2",
+  "KÜÇÜK": "MAK-1",
 };
 
 function readSheet(sheetName: string): Record<string, any>[] {

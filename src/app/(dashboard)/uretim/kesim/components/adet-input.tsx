@@ -10,7 +10,7 @@ interface AdetInputProps {
   max?: number;
 }
 
-const QUICK_VALUES = [1, 5, 10, 20];
+const QUICK_VALUES = [1, 5, 10, 15, 20];
 
 export function AdetInput({ value, onChange, min = 1, max = 100 }: AdetInputProps) {
   const decrease = () => onChange(Math.max(min, value - 1));

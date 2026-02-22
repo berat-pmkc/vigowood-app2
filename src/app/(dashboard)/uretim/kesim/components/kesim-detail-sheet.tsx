@@ -17,7 +17,7 @@ import { MAKINE_LABELS, type MakineId, type CutStatus } from "@/lib/constants";
 import { formatDate, formatTime, formatDuration } from "@/lib/utils";
 import { Play, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import type { CutBatchRow } from "./kesim-card";
+import type { CutBatchRow } from "./active-cut-card";
 
 interface KesimDetailSheetProps {
   batch: CutBatchRow;

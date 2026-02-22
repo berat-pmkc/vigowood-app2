@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MALIYET_PARA_BIRIMLERI } from "@/lib/constants";
+import type { MaliyetAyarlari } from "@/lib/shipment-settings-types";
 import {
   getSevkiyatMaliyet,
   upsertSevkiyatMaliyet,
@@ -28,9 +28,10 @@ import { toast } from "sonner";
 interface ShipmentCostsProps {
   sevkiyatId: string;
   totalDesi: number;
+  maliyetAyarlari: MaliyetAyarlari;
 }
 
-const MALIYET_FIELDS = [
+const DEFAULT_MALIYET_FIELDS = [
   { key: "navlun", label: "Navlun", defaultCur: "USD" },
   { key: "ic_nakliye", label: "İç Nakliye", defaultCur: "TRY" },
   { key: "ara_depo", label: "Ara Depo", defaultCur: "TRY" },
@@ -40,9 +41,11 @@ const MALIYET_FIELDS = [
   { key: "diger", label: "Diğer", defaultCur: "TRY" },
 ] as const;
 
-type MaliyetKey = (typeof MALIYET_FIELDS)[number]["key"];
-
-export function ShipmentCosts({ sevkiyatId, totalDesi }: ShipmentCostsProps) {
+export function ShipmentCosts({ sevkiyatId, totalDesi, maliyetAyarlari }: ShipmentCostsProps) {
+  const MALIYET_FIELDS = maliyetAyarlari.fields.length > 0
+    ? maliyetAyarlari.fields.map((f) => ({ key: f.key, label: f.label, defaultCur: f.defaultCurrency }))
+    : DEFAULT_MALIYET_FIELDS;
+  const paraBirimleri = maliyetAyarlari.paraBirimleri;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [values, setValues] = useState<Record<string, number | string>>({});
@@ -157,7 +160,7 @@ export function ShipmentCosts({ sevkiyatId, totalDesi }: ShipmentCostsProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MALIYET_PARA_BIRIMLERI.map((c) => (
+                    {paraBirimleri.map((c) => (
                       <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
                     ))}
                   </SelectContent>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { YeniSevkiyatForm } from "../components/yeni-sevkiyat-form";
 
 export const metadata: Metadata = { title: "Yeni Sevkiyat" };
@@ -13,6 +14,7 @@ export default async function YeniSevkiyatPage() {
     redirect("/");
   }
 
+  const settings = await getShipmentSettings();
   const supabase = await createClient();
 
   // Aktif ürünler (ekleme combobox için)
@@ -31,7 +33,12 @@ export default async function YeniSevkiyatPage() {
 
   return (
     <div className="pb-20 md:pb-6">
-      <YeniSevkiyatForm products={productList} />
+      <YeniSevkiyatForm
+        products={productList}
+        ulkeler={settings.ulkeler}
+        konteynerTipleri={settings.konteynerTipleri}
+        aracTipleri={settings.aracTipleri}
+      />
     </div>
   );
 }

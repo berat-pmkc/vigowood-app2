@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SevkiyatStatusBadge } from "../components/sevkiyat-status-badge";
-import { SEVKIYAT_COUNTRIES, type SevkiyatCountryCode } from "@/lib/constants";
+import type { ShipmentSettings } from "@/lib/shipment-settings-types";
 import { MaliyetEditSheet } from "./maliyet-edit-sheet";
 import type { SevkiyatRow, SevkiyatMaliyetRow, DovizKuruRow } from "../actions";
 import type { LojistikToplam } from "./page";
@@ -17,6 +17,7 @@ interface MaliyetlerClientProps {
   maliyetMap: Record<string, SevkiyatMaliyetRow>;
   lojistikMap: Record<string, LojistikToplam>;
   sonKur: DovizKuruRow | null;
+  settings: ShipmentSettings;
 }
 
 function toUsd(amount: number, currency: string, kur: DovizKuruRow | null): number {
@@ -42,7 +43,8 @@ function getMaliyetToplamUsd(m: SevkiyatMaliyetRow, kur: DovizKuruRow | null): n
   );
 }
 
-export function MaliyetlerClient({ sevkiyatlar, maliyetMap, lojistikMap, sonKur }: MaliyetlerClientProps) {
+export function MaliyetlerClient({ sevkiyatlar, maliyetMap, lojistikMap, sonKur, settings }: MaliyetlerClientProps) {
+  const countryMap = Object.fromEntries(settings.ulkeler.map((c) => [c.code, c]));
   const router = useRouter();
   const [editTarget, setEditTarget] = useState<{
     sevkiyatId: string;
@@ -91,7 +93,7 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, lojistikMap, sonKur 
               const loj = lojistikMap[s.sevkiyat_id] ?? { desi: 0, agirlik: 0, hacim: 0 };
               const toplamUsd = m ? getMaliyetToplamUsd(m, sonKur) : 0;
               const desiUsd = loj.desi > 0 && toplamUsd > 0 ? toplamUsd / loj.desi : 0;
-              const countryCode = s.country_code as SevkiyatCountryCode;
+              const countryCode = s.country_code ?? "";
 
               return (
                 <tr
@@ -110,7 +112,7 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, lojistikMap, sonKur 
                   </td>
                   <td className="py-2 pr-3">
                     <Badge variant="outline" className="text-[10px] font-mono">
-                      {SEVKIYAT_COUNTRIES[countryCode]?.code ?? s.country_code}
+                      {countryMap[countryCode]?.code ?? s.country_code}
                     </Badge>
                   </td>
                   <td className="py-2 pr-3">
@@ -165,6 +167,7 @@ export function MaliyetlerClient({ sevkiyatlar, maliyetMap, lojistikMap, sonKur 
           sevkiyatAdi={editTarget.sevkiyatAdi}
           totalDesi={editTarget.totalDesi}
           sonKur={sonKur}
+          maliyetAyarlari={settings.maliyetAyarlari}
           onSaved={handleSaved}
         />
       )}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { FiyatlarDataTable } from "./components/fiyatlar-data-table";
 import type { FiyatRow } from "./actions";
 
@@ -51,14 +52,15 @@ export default async function FiyatlarPage({ searchParams }: PageProps) {
   query = query.order(sortColumn, { ascending: sortOrder });
   query = query.range(from, to);
 
-  // Fetch products for combobox
-  const [fiyatlarResult, productsResult] = await Promise.all([
+  // Fetch products for combobox + settings
+  const [fiyatlarResult, productsResult, settings] = await Promise.all([
     query,
     supabase
       .from("products")
       .select("sku, urun_adi")
       .eq("aktif_mi", true)
       .order("sku", { ascending: true }),
+    getShipmentSettings(),
   ]);
 
   const { data: fiyatlar, count, error } = fiyatlarResult;
@@ -93,6 +95,7 @@ export default async function FiyatlarPage({ searchParams }: PageProps) {
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
         products={products}
+        ulkeler={settings.ulkeler}
       />
     </div>
   );

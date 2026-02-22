@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { paletSablonSchema, type PaletSablonData } from "@/lib/validations";
-import { PALET_BOYUTLARI } from "@/lib/constants";
 import { createPaletSablon, updatePaletSablon, type PaletSablonRow } from "../actions";
 import { toast } from "sonner";
 
@@ -29,9 +28,10 @@ interface SablonEditSheetProps {
   isNew?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  paletBoyutlari: string[];
 }
 
-export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEditSheetProps) {
+export function SablonEditSheet({ sablon, isNew, open, onOpenChange, paletBoyutlari }: SablonEditSheetProps) {
   const [loading, setLoading] = useState(false);
 
   const {
@@ -135,7 +135,7 @@ export function SablonEditSheet({ sablon, isNew, open, onOpenChange }: SablonEdi
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PALET_BOYUTLARI.map((b) => (
+                  {paletBoyutlari.map((b) => (
                     <SelectItem key={b} value={b}>{b} cm</SelectItem>
                   ))}
                 </SelectContent>

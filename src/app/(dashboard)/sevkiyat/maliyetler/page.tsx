@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_COST_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { MaliyetlerClient } from "./maliyetler-client";
 import type { SevkiyatRow, SevkiyatMaliyetRow, DovizKuruRow } from "../actions";
 
@@ -83,6 +84,7 @@ export default async function MaliyetlerPage() {
         maliyetMap={maliyetMap}
         lojistikMap={lojistikMap}
         sonKur={kurData as DovizKuruRow | null}
+        settings={await getShipmentSettings()}
       />
     </div>
   );

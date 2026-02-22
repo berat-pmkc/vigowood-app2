@@ -35,12 +35,12 @@ import {
 import { Plus, Trash2, Check, ChevronsUpDown, Package, ChevronDown, ChevronUp, Pencil, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { PALET_BOYUTLARI } from "@/lib/constants";
 
 interface SevkiyatItemsPanelProps {
   sevkiyatId: string;
   countryCode: string | null;
   readonly?: boolean;
+  paletBoyutlari?: string[];
 }
 
 interface ProductOption {
@@ -60,7 +60,10 @@ interface SablonData {
   koli_agirlik: number;
 }
 
-export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: SevkiyatItemsPanelProps) {
+const DEFAULT_PALET_BOYUTLARI = ["80x120", "100x120", "114x114", "80x60"];
+
+export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly, paletBoyutlari }: SevkiyatItemsPanelProps) {
+  const boyutlar = paletBoyutlari ?? DEFAULT_PALET_BOYUTLARI;
   const [items, setItems] = useState<SevkiyatItemRow[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -421,7 +424,7 @@ export function SevkiyatItemsPanel({ sevkiyatId, countryCode, readonly }: Sevkiy
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {PALET_BOYUTLARI.map((b) => (
+                          {boyutlar.map((b) => (
                             <SelectItem key={b} value={b}>{b} cm</SelectItem>
                           ))}
                         </SelectContent>

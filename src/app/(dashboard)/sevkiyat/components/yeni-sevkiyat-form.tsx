@@ -31,13 +31,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { sevkiyatCreateSchema, type SevkiyatCreateData } from "@/lib/validations";
-import {
-  KONTEYNER_TYPES,
-  KONTEYNER_TYPE_LABELS,
-  SEVKIYAT_COUNTRIES,
-  ARAC_TIPLERI,
-  type SevkiyatCountryCode,
-} from "@/lib/constants";
+import type { ShipmentCountry, KonteynerTipi, AracTipi } from "@/lib/shipment-settings-types";
 import { createSevkiyatWithItems, getPaletSablonlar } from "../actions";
 import {
   ArrowLeft,
@@ -82,9 +76,12 @@ interface YeniSevkiyatFormProps {
     kategori: string | null;
     stok_aktif: number;
   }[];
+  ulkeler: ShipmentCountry[];
+  konteynerTipleri: KonteynerTipi[];
+  aracTipleri: AracTipi[];
 }
 
-export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
+export function YeniSevkiyatForm({ products, ulkeler, konteynerTipleri, aracTipleri }: YeniSevkiyatFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<LocalItem[]>([]);
@@ -124,9 +121,9 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
     },
   });
 
-  const countryCode = watch("country_code") as SevkiyatCountryCode | undefined;
+  const countryCode = watch("country_code");
   const aracTipi = watch("arac_tipi") ?? "konteyner";
-  const selectedCountry = countryCode ? SEVKIYAT_COUNTRIES[countryCode] : null;
+  const selectedCountry = countryCode ? ulkeler.find((c) => c.code === countryCode) ?? null : null;
 
   const resetItemForm = () => {
     setSelectedSku("");
@@ -273,7 +270,7 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
                     <SelectValue placeholder="Ülke seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.values(SEVKIYAT_COUNTRIES).map((c) => (
+                    {ulkeler.map((c) => (
                       <SelectItem key={c.code} value={c.code}>
                         {c.code} - {c.name} ({c.currencySymbol})
                       </SelectItem>
@@ -328,10 +325,10 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(ARAC_TIPLERI).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>
-                        {key === "konteyner" ? <Container className="w-4 h-4 inline mr-1" /> : <Truck className="w-4 h-4 inline mr-1" />}
-                        {label}
+                    {aracTipleri.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.id === "konteyner" ? <Container className="w-4 h-4 inline mr-1" /> : <Truck className="w-4 h-4 inline mr-1" />}
+                        {a.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -358,9 +355,9 @@ export function YeniSevkiyatForm({ products }: YeniSevkiyatFormProps) {
                         <SelectValue placeholder="Tipi seçin" />
                       </SelectTrigger>
                       <SelectContent>
-                        {KONTEYNER_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {KONTEYNER_TYPE_LABELS[type]}
+                        {konteynerTipleri.map((k) => (
+                          <SelectItem key={k.type} value={k.type}>
+                            {k.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -126,6 +126,7 @@ export async function createCutBatch(formData: {
   sku: string;
   plaka_id: string;
   adet: number;
+  operator_id: string;
   plk_notu: string | null;
 }): Promise<ActionResult> {
   try {
@@ -139,9 +140,9 @@ export async function createCutBatch(formData: {
 
     const supabase = await createClient();
 
-    // Get operator info from auth metadata
+    // Get operator info — use form-provided operator_id
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
+    const operatorId = parsed.data.operator_id;
     const email = authUser?.email ?? user.email;
 
     // Generate next KES-XXXX ID
@@ -168,7 +169,7 @@ export async function createCutBatch(formData: {
 
     const now = new Date().toISOString();
 
-    // Insert cut_batch
+    // Insert cut_batch — auto-start as "kesiliyor"
     const { error: batchError } = await supabase.from("cut_batches").insert({
       cut_id: cutId,
       tarih: now,
@@ -179,7 +180,8 @@ export async function createCutBatch(formData: {
       operator_id: operatorId,
       plk_notu: parsed.data.plk_notu,
       email: email,
-      durum: "bekliyor",
+      durum: "kesiliyor",
+      baslama_zamani: now,
     });
 
     if (batchError) return { success: false, error: batchError.message };
@@ -474,6 +476,78 @@ export async function getCutLines(cutId: string) {
     }));
 
     return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Son 3 ayda en çok kesilen SKU'lar (hızlı seçim için) */
+export async function getTopCutSkus(limit: number = 10) {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const { data, error } = await supabase
+      .from("cut_batches")
+      .select("sku")
+      .gte("tarih", threeMonthsAgo.toISOString())
+      .not("sku", "is", null);
+
+    if (error) return { success: false as const, error: error.message };
+
+    // Group by SKU and count
+    const skuCounts = new Map<string, number>();
+    (data ?? []).forEach((row) => {
+      if (row.sku) {
+        skuCounts.set(row.sku, (skuCounts.get(row.sku) ?? 0) + 1);
+      }
+    });
+
+    // Sort desc and take top N
+    const topSkus = [...skuCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([sku, count]) => ({ sku, count }));
+
+    // Fetch product names
+    const skuList = topSkus.map((s) => s.sku);
+    const { data: products } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .in("sku", skuList.length > 0 ? skuList : ["__none__"]);
+
+    const productMap = new Map(
+      (products ?? []).map((p) => [p.sku, p.urun_adi])
+    );
+
+    const result = topSkus.map((s) => ({
+      ...s,
+      urun_adi: productMap.get(s.sku) ?? s.sku,
+    }));
+
+    return { success: true as const, data: result };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Kesim operatörlerini getir (station='Kesim' veya 'Kesim Hattı') */
+export async function getKesimOperators() {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("user_id, full_name, station")
+      .in("station", ["Kesim", "Kesim Hattı"])
+      .order("full_name");
+
+    if (error) return { success: false as const, error: error.message };
+    return { success: true as const, data: data ?? [] };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

@@ -116,7 +116,7 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
               <Label htmlFor="makine_id">Makine ID</Label>
               <Input
                 id="makine_id"
-                placeholder="ör: BÜYÜK, LAZER-3"
+                placeholder="ör: MAK-4, LAZER-3"
                 {...form.register("makine_id")}
               />
               {form.formState.errors.makine_id && (
@@ -137,7 +137,7 @@ export function MakineEditSheet({ open, onOpenChange, makine }: MakineEditSheetP
             <Label htmlFor="tipi">Makine Tipi</Label>
             <Input
               id="tipi"
-              placeholder="ör: 600W Lazer, BALA"
+              placeholder="ör: 600W Lazer, 300W Lazer"
               {...form.register("tipi")}
             />
             {form.formState.errors.tipi && (

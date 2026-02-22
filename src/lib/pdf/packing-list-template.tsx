@@ -8,7 +8,7 @@ import {
   Image,
   StyleSheet,
 } from "@react-pdf/renderer";
-import { PACKING_LIST_CONFIG, PALET_WEIGHT_KG } from "@/lib/constants";
+import { PACKING_LIST_CONFIG } from "@/lib/constants";
 import { registerTurkishFonts, formatPdfDate } from "./pdf-utils";
 
 // Register Roboto for Turkish character support
@@ -159,6 +159,7 @@ export interface PackingListData {
   dispatchConfig?: PLDispatchConfig;
   signatoryConfig?: PLSignatoryConfig;
   contactConfig?: PLContactConfig;
+  paletWeightKg?: number;
 }
 
 export function PackingListDocument({ data }: { data: PackingListData }) {
@@ -182,7 +183,7 @@ export function PackingListDocument({ data }: { data: PackingListData }) {
 
   const enrichedItems = data.items.map((item) => {
     const netWeight = item.agirlik;
-    const grossWeight = netWeight + item.palet_sayisi * PALET_WEIGHT_KG;
+    const grossWeight = netWeight + item.palet_sayisi * (data.paletWeightKg ?? 15);
     const palletGross = item.palet_sayisi > 0 ? Math.round(grossWeight / item.palet_sayisi) : 0;
 
     // Parse palet boyut

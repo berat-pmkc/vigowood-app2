@@ -7,10 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SevkiyatStatusBadge } from "../../components/sevkiyat-status-badge";
-import {
-  KONTEYNER_TYPE_LABELS,
-  type KonteynerType,
-} from "@/lib/constants";
+import type { KonteynerTipi } from "@/lib/shipment-settings-types";
+import { getKonteynerLabel } from "@/lib/shipment-settings-types";
 import { formatDate } from "@/lib/utils";
 import { updateGerceklesenTarih } from "../../actions";
 import {
@@ -31,9 +29,10 @@ import type { SevkiyatRow } from "../../actions";
 
 interface ShipmentHeaderProps {
   sevkiyat: SevkiyatRow;
+  konteynerTipleri: KonteynerTipi[];
 }
 
-export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
+export function ShipmentHeader({ sevkiyat, konteynerTipleri }: ShipmentHeaderProps) {
   const router = useRouter();
   const [editingDate, setEditingDate] = useState(false);
   const [dateValue, setDateValue] = useState(sevkiyat.gerceklesen_sevk_tarihi ?? "");
@@ -182,7 +181,7 @@ export function ShipmentHeader({ sevkiyat }: ShipmentHeaderProps) {
               )}
               {!isTir && sevkiyat.konteyner_tipi && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {KONTEYNER_TYPE_LABELS[sevkiyat.konteyner_tipi as KonteynerType] ?? sevkiyat.konteyner_tipi}
+                  {getKonteynerLabel(sevkiyat.konteyner_tipi, konteynerTipleri)}
                 </p>
               )}
             </div>

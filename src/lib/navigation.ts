@@ -110,6 +110,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Fiyatlar", href: "/sevkiyat/fiyatlar", icon: DollarSign, roles: SEVK_ROLES },
       { title: "Maliyetler", href: "/sevkiyat/maliyetler", icon: Receipt, roles: ["Yönetici", "Endüstri Mühendisi"] },
       { title: "Kurlar", href: "/sevkiyat/kurlar", icon: Coins, roles: SEVK_ROLES },
+      { title: "Ayarlar", href: "/sevkiyat/ayarlar", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
     ],
   },
   {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { FiyatlarDataTable } from "./components/fiyatlar-data-table";
 import type { FiyatRow } from "./actions";
 
@@ -25,6 +26,7 @@ export default async function SevkiyatFiyatlarPage({ searchParams }: PageProps) 
     redirect("/");
   }
 
+  const settings = await getShipmentSettings();
   const params = await searchParams;
 
   const page = Math.max(0, Number(params.page || "0"));
@@ -101,6 +103,7 @@ export default async function SevkiyatFiyatlarPage({ searchParams }: PageProps) 
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
         products={products}
+        ulkeler={settings.ulkeler}
       />
     </div>
   );

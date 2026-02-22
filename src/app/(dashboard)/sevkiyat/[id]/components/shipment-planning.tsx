@@ -8,6 +8,7 @@ import { AddItemRow } from "./add-item-row";
 import { ShipmentSummary } from "./shipment-summary";
 import { ShipmentActions } from "./shipment-actions";
 import type { SevkiyatRow, SevkiyatItemRow } from "../../actions";
+import type { KonteynerTipi, MaliyetAyarlari } from "@/lib/shipment-settings-types";
 
 interface ShipmentPlanningProps {
   sevkiyat: SevkiyatRow;
@@ -18,12 +19,16 @@ interface ShipmentPlanningProps {
     kategori: string | null;
     stok_aktif: number;
   }[];
+  konteynerTipleri: KonteynerTipi[];
+  maliyetAyarlari: MaliyetAyarlari;
 }
 
 export function ShipmentPlanning({
   sevkiyat,
   initialItems,
   products,
+  konteynerTipleri,
+  maliyetAyarlari,
 }: ShipmentPlanningProps) {
   const router = useRouter();
   const [items, setItems] = useState<SevkiyatItemRow[]>(initialItems);
@@ -72,7 +77,7 @@ export function ShipmentPlanning({
 
   return (
     <div className="space-y-4 pb-24 md:pb-6">
-      <ShipmentHeader sevkiyat={sevkiyat} />
+      <ShipmentHeader sevkiyat={sevkiyat} konteynerTipleri={konteynerTipleri} />
 
       <ShipmentTable
         items={items}

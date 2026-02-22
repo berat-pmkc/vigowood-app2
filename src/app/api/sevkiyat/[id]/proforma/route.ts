@@ -3,6 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { getShipmentSettings } from "@/lib/shipment-settings";
 import { ProformaDocument } from "@/lib/pdf/proforma-template";
 import type { ProformaData, ProformaItem, ProformaExporterConfig, ProformaBuyerConfig, ProformaBuyerContactConfig, ProformaBankConfig } from "@/lib/pdf/proforma-template";
 import type { SevkiyatItemRow, SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
@@ -155,6 +156,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
       }
     }
 
+    // Palet ağırlığı ayardan
+    const settings = await getShipmentSettings();
+
     // Proforma veri hazırla
     const proformaItems: ProformaItem[] = itemRows.map((item) => {
       const fiyat = fiyatlar[item.sku] ?? { urun_adi_en: item.urun_adi ?? item.sku, gtip: "", birim_fiyat: 0 };
@@ -184,6 +188,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       buyerConfig: buyerConfigOverride,
       buyerContactConfig,
       bankConfig,
+      paletWeightKg: settings.paletAyarlari.paletWeightKg,
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

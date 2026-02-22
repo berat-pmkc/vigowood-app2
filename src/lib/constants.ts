@@ -101,15 +101,20 @@ export const PRODUCT_CATEGORIES = [
 ] as const;
 
 // Kesim makinesi IDs (matches kesim_makinesi table)
-export const MAKINE_IDS = ["BÜYÜK", "KÜÇÜK", "KUTU"] as const;
+export const MAKINE_IDS = ["MAK-1", "MAK-2", "MAK-3", "KUTU"] as const;
 
 export type MakineId = (typeof MAKINE_IDS)[number];
 
 export const MAKINE_LABELS: Record<MakineId, string> = {
-  BÜYÜK: "Büyük Lazer (600W)",
-  KÜÇÜK: "Küçük Lazer (300W)",
+  "MAK-1": "300W Lazer",
+  "MAK-2": "600W Lazer",
+  "MAK-3": "600W Yeni Lazer",
   KUTU: "Kutu (BALA)",
 };
+
+// Sadece kesim bölümü makineleri (Kutu hariç)
+export const KESIM_MAKINE_IDS = ["MAK-1", "MAK-2", "MAK-3"] as const;
+export type KesimMakineId = (typeof KESIM_MAKINE_IDS)[number];
 
 // Makine bölümleri
 export const MAKINE_BOLUMLERI = ["Kesim", "Kutu-Koli"] as const;
@@ -313,7 +318,7 @@ export const SEVKIYAT_COST_ROLES: UserRole[] = [
   "Endüstri Mühendisi",
 ];
 
-// Sevkiyat ülke konfigürasyonları
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_ulkeler). Fallback olarak kalıyor. */
 export const SEVKIYAT_COUNTRIES = {
   DE: {
     code: "DE",
@@ -346,32 +351,37 @@ export const SEVKIYAT_COUNTRIES = {
 
 export type SevkiyatCountryCode = keyof typeof SEVKIYAT_COUNTRIES;
 
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_ulkeler). Fallback olarak kalıyor. */
 export const SEVKIYAT_COUNTRY_CODES = ["DE", "UK", "USA"] as const;
 
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_palet_ayarlari). Fallback olarak kalıyor. */
 export const PALET_BOYUTLARI = ["80x120", "100x120"] as const;
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_palet_ayarlari). Fallback olarak kalıyor. */
 export const PALET_WEIGHT_KG = 15;
 
-// Konteyner tipleri
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_konteyner_tipleri). Fallback olarak kalıyor. */
 export const KONTEYNER_TYPES = ["20ft", "40ft", "40ft HC"] as const;
 export type KonteynerType = (typeof KONTEYNER_TYPES)[number];
 
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_konteyner_tipleri). Fallback olarak kalıyor. */
 export const KONTEYNER_TYPE_LABELS: Record<KonteynerType, string> = {
   "20ft": "20' Konteyner",
   "40ft": "40' Konteyner",
   "40ft HC": "40' HC Konteyner",
 };
 
-// Araç tipleri
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_arac_tipleri). Fallback olarak kalıyor. */
 export const ARAC_TIPLERI = { konteyner: "Konteyner", tir: "Tır" } as const;
 export type AracTipi = keyof typeof ARAC_TIPLERI;
 
-// Maliyet para birimleri
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_maliyet_ayarlari). Fallback olarak kalıyor. */
 export const MALIYET_PARA_BIRIMLERI = ["USD", "EUR", "GBP", "TRY"] as const;
 export type MaliyetParaBirimi = (typeof MALIYET_PARA_BIRIMLERI)[number];
 
-// Firma tipleri
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_firma_tipleri). Fallback olarak kalıyor. */
 export const FIRMA_TIPLERI = ["ihracatci", "alici", "banka", "imzalayan", "contact"] as const;
 export type FirmaTipi = (typeof FIRMA_TIPLERI)[number];
+/** @deprecated DB'den okunuyor (app_settings.sevkiyat_firma_tipleri). Fallback olarak kalıyor. */
 export const FIRMA_TIPI_LABELS: Record<FirmaTipi, string> = {
   ihracatci: "İhracatçı",
   alici: "Alıcı",
@@ -567,6 +577,81 @@ export const NAKIT_GIRIS_KANALLARI_TL = [
 /** Nakit giriş kanalları (USD) */
 export const NAKIT_GIRIS_KANALLARI_USD = [
   "Amazon Y.Dışı", "Diğer Y.Dışı",
+] as const;
+
+/** DB kolon → Türkçe etiket map'leri (nakit_girisler tablosu) */
+export const NAKIT_GIRIS_LABELS: Record<string, string> = {
+  vigowood_com: "vigowood.com",
+  trendyol: "Trendyol",
+  hepsiburada: "Hepsiburada",
+  amazon: "Amazon",
+  diger_pazaryeri: "Diğer Pazaryeri",
+  has_mob: "HAS-MOB",
+  doviz_satisi: "Döviz Satışı",
+  nakit_kredi: "Nakit Kredi",
+  toplam_tl: "TOPLAM TL",
+  amazon_yurtdisi: "Amazon Y.Dışı ($)",
+  diger_yurtdisi: "Diğer Y.Dışı ($)",
+  toplam_yurtdisi: "Toplam Y.Dışı ($)",
+};
+
+/** TL giriş kolon isimleri (toplam hariç) */
+export const NAKIT_GIRIS_TL_KOLONLAR = [
+  "vigowood_com", "trendyol", "hepsiburada", "amazon",
+  "diger_pazaryeri", "has_mob", "doviz_satisi", "nakit_kredi",
+] as const;
+
+/** USD giriş kolon isimleri (toplam hariç) */
+export const NAKIT_GIRIS_USD_KOLONLAR = [
+  "amazon_yurtdisi", "diger_yurtdisi",
+] as const;
+
+/** DB kolon → Türkçe etiket map'leri (nakit_cikislar TL) */
+export const NAKIT_CIKIS_TL_LABELS: Record<string, string> = {
+  maas: "Maaş",
+  sgk: "SGK",
+  hammadde: "Hammadde",
+  akaryakit: "Akaryakıt",
+  arac_bakim: "Araç Bakım",
+  demirbas: "Demirbaş",
+  elektrik: "Elektrik",
+  su: "Su",
+  pazaryeri: "Pazaryeri",
+  telekom: "Telekom",
+  makine_bakim: "Makine Bakım",
+  nakliye: "Nakliye",
+  vergi: "Vergi",
+  mutfak: "Mutfak",
+  hukuk: "Hukuk",
+  muhasebe: "Muhasebe",
+  kredi_karti: "Kredi Kartı",
+  kredi_odemesi: "Kredi Ödemesi",
+  masraf_komisyon: "Masraf/Komisyon",
+  diger_giderler: "Diğer",
+  faaliyet_disi_harcamalar: "Faaliyet Dışı",
+  toplam_tl: "TOPLAM TL",
+};
+
+/** TL çıkış kolon isimleri (toplam hariç) */
+export const NAKIT_CIKIS_TL_KOLONLAR = [
+  "maas", "sgk", "hammadde", "akaryakit", "arac_bakim", "demirbas",
+  "elektrik", "su", "pazaryeri", "telekom", "makine_bakim", "nakliye",
+  "vergi", "mutfak", "hukuk", "muhasebe", "kredi_karti", "kredi_odemesi",
+  "masraf_komisyon", "diger_giderler", "faaliyet_disi_harcamalar",
+] as const;
+
+/** DB kolon → Türkçe etiket map'leri (nakit_cikislar USD) */
+export const NAKIT_CIKIS_USD_LABELS: Record<string, string> = {
+  gumruk_usd: "Gümrük ($)",
+  navlun_usd: "Navlun ($)",
+  diger_usd: "Diğer ($)",
+  doviz_bozdurma_usd: "Döviz Bozdurma ($)",
+  toplam_yurtdisi_usd: "Toplam Y.Dışı ($)",
+};
+
+/** USD çıkış kolon isimleri (toplam hariç) */
+export const NAKIT_CIKIS_USD_KOLONLAR = [
+  "gumruk_usd", "navlun_usd", "diger_usd", "doviz_bozdurma_usd",
 ] as const;
 
 // ─── Personel & Yoklama Sabitleri ────────────────────────────
