@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, lazy, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, List, GitBranch, Download } from "lucide-react";
+import { Plus, List, GitBranch, Download, Workflow, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductSelector } from "./product-selector";
 import { AssemblyStepsList } from "./assembly-steps-list";
@@ -12,6 +12,12 @@ import { RecipeTreeView } from "./recipe-tree-view";
 import { createStep, exportBomData } from "../actions";
 import { exportToExcel, type ExcelColumn } from "@/lib/excel-utils";
 import type { AssemblyStepFormData } from "@/lib/validations";
+
+const AssemblyFlowDiagram = lazy(() =>
+  import("./assembly-flow-diagram").then((m) => ({
+    default: m.AssemblyFlowDiagram,
+  }))
+);
 
 const BOM_EXPORT_COLUMNS: ExcelColumn[] = [
   { key: "step_id", header: "Adım ID", width: 15 },
@@ -22,6 +28,8 @@ const BOM_EXPORT_COLUMNS: ExcelColumn[] = [
   { key: "part_name", header: "Parça Adı", width: 30 },
   { key: "qty_per", header: "Miktar", width: 10 },
 ];
+
+type ViewMode = "steps" | "tree" | "flow";
 
 interface AssemblyStepWithBomCount {
   step_id: string;
@@ -47,7 +55,7 @@ export function BomPageClient({
   allParts,
 }: BomPageClientProps) {
   const router = useRouter();
-  const [view, setView] = useState<"steps" | "tree">("steps");
+  const [view, setView] = useState<ViewMode>("steps");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [, startExportTransition] = useTransition();
@@ -83,6 +91,12 @@ export function BomPageClient({
       ? Math.max(...steps.map((s) => s.seq_no || 0)) + 1
       : 1;
 
+  // Assembly steps for combobox in tree/flow views
+  const assemblyStepOptions = steps.map((s) => ({
+    step_id: s.step_id,
+    step_name: s.step_name,
+  }));
+
   function handleExport() {
     if (!selectedSku) return;
     startExportTransition(async () => {
@@ -100,6 +114,12 @@ export function BomPageClient({
     });
   }
 
+  const VIEW_BUTTONS: { key: ViewMode; label: string; icon: typeof List }[] = [
+    { key: "steps", label: "Adımlar", icon: List },
+    { key: "tree", label: "Reçete Ağacı", icon: GitBranch },
+    { key: "flow", label: "Akış Diyagramı", icon: Workflow },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Top Bar: Product Selector + Actions */}
@@ -112,26 +132,26 @@ export function BomPageClient({
 
         {selectedSku && (
           <div className="flex items-center gap-2">
-            {/* View Toggle */}
+            {/* View Toggle — 3 buttons */}
             <div className="flex rounded-md border">
-              <Button
-                variant={view === "steps" ? "default" : "ghost"}
-                size="sm"
-                className="rounded-r-none h-8"
-                onClick={() => setView("steps")}
-              >
-                <List className="h-3.5 w-3.5 mr-1.5" />
-                Adımlar
-              </Button>
-              <Button
-                variant={view === "tree" ? "default" : "ghost"}
-                size="sm"
-                className="rounded-l-none h-8"
-                onClick={() => setView("tree")}
-              >
-                <GitBranch className="h-3.5 w-3.5 mr-1.5" />
-                Reçete Ağacı
-              </Button>
+              {VIEW_BUTTONS.map((btn, idx) => (
+                <Button
+                  key={btn.key}
+                  variant={view === btn.key ? "default" : "ghost"}
+                  size="sm"
+                  className={`h-8 ${
+                    idx === 0
+                      ? "rounded-r-none"
+                      : idx === VIEW_BUTTONS.length - 1
+                        ? "rounded-l-none"
+                        : "rounded-none"
+                  }`}
+                  onClick={() => setView(btn.key)}
+                >
+                  <btn.icon className="h-3.5 w-3.5 mr-1.5" />
+                  <span className="hidden sm:inline">{btn.label}</span>
+                </Button>
+              ))}
             </div>
 
             <Button
@@ -174,12 +194,23 @@ export function BomPageClient({
           allParts={allParts}
           onRefresh={handleRefresh}
         />
-      ) : (
+      ) : view === "tree" ? (
         <RecipeTreeView
           sku={selectedSku}
-          onSwitchToSteps={() => setView("steps")}
+          allParts={allParts}
+          assemblySteps={assemblyStepOptions}
           onRefresh={handleRefresh}
         />
+      ) : (
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          }
+        >
+          <AssemblyFlowDiagram sku={selectedSku} />
+        </Suspense>
       )}
 
       {/* Create Dialog */}
