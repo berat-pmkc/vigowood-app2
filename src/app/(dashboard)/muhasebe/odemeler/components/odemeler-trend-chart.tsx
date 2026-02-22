@@ -40,11 +40,11 @@ export function OdemelerTrendChart({ data }: { data: TrendItem[] }) {
                 }
               />
               <Tooltip
-                formatter={(value: number, name: string) => [
+                formatter={(value, name) => [
                   new Intl.NumberFormat("tr-TR", {
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
-                  }).format(value) + " ₺",
+                  }).format(Number(value)) + " ₺",
                   name === "tamamlanan" ? "Tamamlanan" : "Bekleyen",
                 ]}
                 labelFormatter={(_, payload) => {

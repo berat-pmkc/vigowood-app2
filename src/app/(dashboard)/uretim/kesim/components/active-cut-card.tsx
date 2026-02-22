@@ -47,7 +47,7 @@ const MAKINE_BADGE_COLORS: Record<string, string> = {
 
 function LiveTimer({ startTime }: { startTime: string }) {
   const [elapsed, setElapsed] = useState("");
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => {
     const update = () => {

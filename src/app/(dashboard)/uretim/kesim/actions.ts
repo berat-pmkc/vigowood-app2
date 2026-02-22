@@ -37,45 +37,31 @@ export async function getActiveProducts() {
   }
 }
 
-/** Makine + SKU'ya göre plaka listesi */
-export async function getPlakalarForKesim(makineId: string, sku?: string) {
+/** SKU'ya göre plaka listesi (plakalar makineye bağlı değil, sadece SKU'ya bağlı) */
+export async function getPlakalarForKesim(sku: string) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    let query = supabase
+    const { data, error } = await supabase
       .from("plakalar")
-      .select("plakalar_id, plaka_id, plaka_adi, sku, tipi, renk, kesim_sureleri");
-
-    if (sku) {
-      query = query.eq("sku", sku);
-    }
-
-    const { data, error } = await query.order("plaka_adi");
+      .select("plakalar_id, plaka_id, plaka_adi, sku, tipi, renk, kesim_sureleri")
+      .eq("sku", sku)
+      .order("plaka_adi");
 
     if (error) return { success: false as const, error: error.message };
 
-    // Filter client-side: only plakalar that have a kesim süresi for this makine
-    const filtered = (data ?? [])
-      .filter((p) => {
-        const ks = (p.kesim_sureleri ?? {}) as Record<string, number>;
-        return ks[makineId] != null;
-      })
-      .map((p) => {
-        const ks = (p.kesim_sureleri ?? {}) as Record<string, number>;
-        return {
-          plakalar_id: p.plakalar_id,
-          plaka_id: p.plaka_id,
-          plaka_adi: p.plaka_adi,
-          sku: p.sku,
-          tipi: p.tipi,
-          renk: p.renk,
-          makine_id: makineId,
-          std_kesim_suresi_dk: ks[makineId] ?? null,
-        };
-      });
+    const result = (data ?? []).map((p) => ({
+      plakalar_id: p.plakalar_id,
+      plaka_id: p.plaka_id,
+      plaka_adi: p.plaka_adi,
+      sku: p.sku,
+      tipi: p.tipi,
+      renk: p.renk,
+      kesim_sureleri: (p.kesim_sureleri ?? {}) as Record<string, number | null>,
+    }));
 
-    return { success: true as const, data: filtered };
+    return { success: true as const, data: result };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

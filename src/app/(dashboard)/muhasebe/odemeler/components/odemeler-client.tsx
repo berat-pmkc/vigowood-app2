@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, FileDown } from "lucide-react";
 import { OdemelerKpiCards } from "./odemeler-kpi-cards";
 import { OdemelerDataTable } from "./odemeler-data-table";
 import { OdemelerToolbar } from "./odemeler-toolbar";
@@ -100,10 +100,21 @@ export function OdemelerClient({
             Ödeme kayıtları, takip ve analiz
           </p>
         </div>
-        <Button onClick={handleNewRecord} size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          Yeni Ödeme
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <a
+              href={`/api/muhasebe/odemeler/pdf${turu || durum || cinsi ? `?${new URLSearchParams(Object.entries({ turu, durum, cinsi }).filter(([, v]) => v)).toString()}` : ""}`}
+              download
+            >
+              <FileDown className="mr-1.5 h-4 w-4" />
+              <span className="hidden sm:inline">PDF</span>
+            </a>
+          </Button>
+          <Button onClick={handleNewRecord} size="sm">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Yeni Ödeme
+          </Button>
+        </div>
       </div>
 
       <OdemelerKpiCards data={kpiData} />

@@ -42,7 +42,7 @@ interface YeniKesimDialogProps {
 
 interface ProductOption {
   sku: string;
-  urun_adi: string;
+  urun_adi: string | null;
   kategori: string | null;
 }
 
@@ -53,8 +53,7 @@ interface PlakaOption {
   sku: string | null;
   tipi: string | null;
   renk: string | null;
-  makine_id: string;
-  std_kesim_suresi_dk: number | null;
+  kesim_sureleri: Record<string, number | null>;
 }
 
 interface TopSku {
@@ -134,19 +133,19 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
     }
   }, [open]);
 
-  // When makine + sku selected, load plakalar
+  // When sku selected, load plakalar (plakalar makineye bağlı değil, sadece SKU'ya bağlı)
   useEffect(() => {
-    if (selectedMakine && selectedSku) {
+    if (selectedSku) {
       setPlakalarLoading(true);
       setSelectedPlaka(null);
-      getPlakalarForKesim(selectedMakine, selectedSku).then((res) => {
+      getPlakalarForKesim(selectedSku).then((res) => {
         if (res.success) setPlakalar(res.data);
         setPlakalarLoading(false);
       });
     } else {
       setPlakalar([]);
     }
-  }, [selectedMakine, selectedSku]);
+  }, [selectedSku]);
 
   // Auto-advance to step 2 when all selections made
   useEffect(() => {
@@ -187,7 +186,7 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
     ? products.filter(
         (p) =>
           p.sku.toLowerCase().includes(skuSearch.toLowerCase()) ||
-          p.urun_adi.toLowerCase().includes(skuSearch.toLowerCase())
+          (p.urun_adi ?? "").toLowerCase().includes(skuSearch.toLowerCase())
       )
     : [];
 
@@ -282,7 +281,7 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
                               type="button"
                               className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm border-b last:border-b-0"
                               onClick={() => {
-                                handleSkuSelect(p.sku, p.urun_adi);
+                                handleSkuSelect(p.sku, p.urun_adi ?? p.sku);
                                 setSkuSearch("");
                               }}
                             >
@@ -327,8 +326,8 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
                 </div>
               )}
 
-              {/* 3. Plaka Seçimi */}
-              {selectedMakine && selectedSku && (
+              {/* 3. Plaka Seçimi (SKU seçildiğinde görünür, makine bağımsız) */}
+              {selectedSku && (
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">3. Plaka</h3>
 
@@ -338,12 +337,13 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
                     </div>
                   ) : plakalar.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Bu makine + ürün için plaka bulunamadı
+                      Bu ürün için plaka bulunamadı
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 gap-2">
                       {plakalar.map((p) => {
                         const isSelected = selectedPlaka?.plaka_id === p.plaka_id;
+                        const sureDk = selectedMakine ? p.kesim_sureleri[selectedMakine] : null;
                         return (
                           <button
                             key={p.plakalar_id}
@@ -363,9 +363,9 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
                                   {[p.tipi, p.renk].filter(Boolean).join(" • ") || p.plaka_id}
                                 </p>
                               </div>
-                              {p.std_kesim_suresi_dk != null && (
+                              {sureDk != null && (
                                 <Badge variant="outline" className="text-xs">
-                                  {p.std_kesim_suresi_dk} dk
+                                  {sureDk} dk
                                 </Badge>
                               )}
                             </div>

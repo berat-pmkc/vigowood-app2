@@ -2467,6 +2467,11 @@ export type IadeGiris = Database["public"]["Tables"]["iade_giris"]["Row"];
 export type PackEvent = Database["public"]["Tables"]["pack_events"]["Row"];
 export type KesimMakinesi = Database["public"]["Tables"]["kesim_makinesi"]["Row"];
 export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type Odeme = Database["public"]["Tables"]["odemeler"]["Row"];
+export type NakitDonem = Database["public"]["Tables"]["nakit_donemler"]["Row"];
+export type NakitGiris = Database["public"]["Tables"]["nakit_girisler"]["Row"];
+export type NakitCikis = Database["public"]["Tables"]["nakit_cikislar"]["Row"];
+export type NakitGirisTakip = Database["public"]["Tables"]["nakit_giris_takip"]["Row"];
 
 // ─── Enum Type Aliases ────────────────────────────────────
 export type UserRole = Database["public"]["Enums"]["user_role"];
