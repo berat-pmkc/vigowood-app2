@@ -43,7 +43,7 @@ export default async function KullanicilarPage({ searchParams }: PageProps) {
 
   let query = supabase
     .from("users")
-    .select("*", { count: "exact" });
+    .select("user_id, auth_id, email, full_name, role, station, is_active, password_plain, created_at, updated_at", { count: "exact" });
 
   // Search filter
   if (search) {

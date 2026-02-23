@@ -7,8 +7,14 @@ import { Plus, Package, ClipboardList } from "lucide-react";
 import { ActiveSessions } from "./active-sessions";
 import { NewSessionDialog } from "./new-session-dialog";
 import { CloseSessionDialog } from "./close-session-dialog";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { SummaryCards } from "./summary-cards";
-import { ProductTrendChart } from "./product-trend-chart";
+
+const ProductTrendChart = dynamic(
+  () => import("./product-trend-chart").then(mod => ({ default: mod.ProductTrendChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 import { CompletedSessionsSheet, type CompletedSession } from "./completed-sessions";
 import type { ActiveSession } from "./session-card";
 import { cancelSession } from "../actions";

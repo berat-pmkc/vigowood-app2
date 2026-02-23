@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
  * Cron endpoint: Frankfurter API'den günlük döviz kurlarını çeker.
@@ -8,6 +9,12 @@ import { createClient } from "@supabase/supabase-js";
  * GET /api/cron/kurlar?secret=CRON_SECRET
  */
 export async function GET(request: Request) {
+  // Rate limit: 2 req/dk
+  const rl = rateLimit(getRateLimitKey(request, "cron-kurlar"), { limit: 2, windowSeconds: 60 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   // Güvenlik: CRON_SECRET kontrolü
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get("secret");

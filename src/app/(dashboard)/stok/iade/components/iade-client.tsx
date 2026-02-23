@@ -1,7 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { KpiCards, type IadeKpiData } from "./kpi-cards";
-import { TrendChart, type DailyIadeChartData } from "./trend-chart";
+import type { DailyIadeChartData } from "./trend-chart";
+
+const TrendChart = dynamic(
+  () => import("./trend-chart").then(mod => ({ default: mod.TrendChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 import { IadeDataTable, type IadeRecord } from "./iade-data-table";
 import { IadeGirisDialog } from "./iade-giris-dialog";
 

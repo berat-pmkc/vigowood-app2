@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { KRITIK_STOK_DEFAULT_GUN, KRITIK_STOK_DEFAULT_LOOKBACK_DAYS } from "@/lib/constants";
 import type { Database, Json } from "@/lib/supabase/types";
+import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
  * Cron endpoint: Kritik stok hesaplama
@@ -10,6 +11,12 @@ import type { Database, Json } from "@/lib/supabase/types";
  * GET /api/cron/kritik-stok?secret=CRON_SECRET
  */
 export async function GET(request: Request) {
+  // Rate limit: 2 req/dk
+  const rl = rateLimit(getRateLimitKey(request, "cron-kritik-stok"), { limit: 2, windowSeconds: 60 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get("secret");
 

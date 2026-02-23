@@ -11,9 +11,15 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { PieChart as PieChartIcon, TrendingUp, TrendingDown, DollarSign, Percent } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { GelirTablosu } from "./gelir-tablosu";
 import { MarkaKarsilastirma } from "./marka-karsilastirma";
-import { KarlilikCharts } from "./karlilik-charts";
+
+const KarlilikCharts = dynamic(
+  () => import("./karlilik-charts").then(mod => ({ default: mod.KarlilikCharts })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 
 interface AggRow {
   marka: string;

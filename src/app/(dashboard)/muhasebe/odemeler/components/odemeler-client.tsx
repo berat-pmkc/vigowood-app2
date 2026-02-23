@@ -10,8 +10,14 @@ import { OdemelerDataTable } from "./odemeler-data-table";
 import { OdemelerToolbar } from "./odemeler-toolbar";
 import { OdemeFormSheet } from "./odeme-form-sheet";
 import { OdemelerCalendarView } from "./odemeler-calendar-view";
-import { OdemelerSummaryTab } from "./odemeler-summary-tab";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { KrediSection } from "./kredi-section";
+
+const OdemelerSummaryTab = dynamic(
+  () => import("./odemeler-summary-tab").then(mod => ({ default: mod.OdemelerSummaryTab })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 import type { Odeme } from "@/lib/supabase/types";
 
 interface SummaryItem {

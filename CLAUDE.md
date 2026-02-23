@@ -425,3 +425,14 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [ ] Amazon SP-API, Trendyol/Hepsiburada API
 - [ ] WhatsApp bildirimler
 - [ ] PPC dashboard, AI tahmin
+
+### KATMAN 29: Test & Güvenlik Denetimi ✅
+- [x] Güvenlik: 38/38 server action + 9/9 API route auth guard doğrulandı
+- [x] Güvenlik: admin.ts'e `import "server-only"` eklendi
+- [x] Güvenlik: CSP + Permissions-Policy header'ları eklendi
+- [x] Güvenlik: password_plain getCurrentUser()'dan kaldırıldı (UserProfile type güncellendi)
+- [x] Güvenlik: 8 API route'a rate limiting eklendi (cron: 2/dk, PDF: 5/dk)
+- [x] Güvenlik: .env.example'a CRON_SECRET eklendi
+- [x] Performans: 17 chart component'e Recharts lazy loading (next/dynamic + ssr:false + ChartSkeleton)
+- [x] Performans: personel inline chart → ayrı PersonelCharts component'e çıkarıldı
+- [x] Build: 59 route, sıfır TypeScript hatası

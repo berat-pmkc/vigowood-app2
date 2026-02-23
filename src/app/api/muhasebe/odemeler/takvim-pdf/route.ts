@@ -9,8 +9,15 @@ import {
   type OdemelerTakvimPdfProps,
 } from "@/lib/pdf/odemeler-takvim-template";
 import React from "react";
+import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
+  // Rate limit: 5 req/dk
+  const rl = rateLimit(getRateLimitKey(request, "odemeler-takvim-pdf"), { limit: 5, windowSeconds: 60 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const user = await getCurrentUser();
     if (!user || !FINANCE_ROLES.includes(user.role as (typeof FINANCE_ROLES)[number])) {

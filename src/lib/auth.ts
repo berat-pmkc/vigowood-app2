@@ -7,7 +7,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Database, UserRole, Station } from "@/lib/supabase/types";
 
-export type UserProfile = Database["public"]["Tables"]["users"]["Row"];
+export type UserProfile = Omit<Database["public"]["Tables"]["users"]["Row"], "password_plain">;
 
 /** Auth metadata from Supabase auth (operator selection etc.) */
 export type AuthMeta = {
@@ -32,7 +32,7 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   // Önce auth_id ile ara
   const { data: profile } = await supabase
     .from("users")
-    .select("user_id, auth_id, email, full_name, role, station, is_active, password_plain, created_at, updated_at")
+    .select("user_id, auth_id, email, full_name, role, station, is_active, created_at, updated_at")
     .eq("auth_id", authUser.id)
     .single();
 
@@ -42,7 +42,7 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   if (authUser.email) {
     const { data: emailProfile } = await supabase
       .from("users")
-      .select("user_id, auth_id, email, full_name, role, station, is_active, password_plain, created_at, updated_at")
+      .select("user_id, auth_id, email, full_name, role, station, is_active, created_at, updated_at")
       .eq("email", authUser.email)
       .single();
 

@@ -2,7 +2,14 @@
 
 import { SatisKpiCards, type SatisKpiData } from "./kpi-cards";
 import { PeriodFilter } from "./period-filter";
-import { SatisChart, type DailySalesData } from "./satis-chart";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import type { DailySalesData } from "./satis-chart";
+
+const SatisChart = dynamic(
+  () => import("./satis-chart").then(mod => ({ default: mod.SatisChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 import { SatisTable, type SkuSalesRow } from "./satis-table";
 import { ExcelUpload } from "./excel-upload";
 import type { PeriodType } from "../actions";

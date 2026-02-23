@@ -13,9 +13,15 @@ import { GelirYapisiCard } from "./gelir-yapisi-card";
 import { SatisKanallariTable } from "./satis-kanallari-table";
 import { GiderDagilimiTable } from "./gider-dagilimi-table";
 import { BorcYapisiTable } from "./borc-yapisi-table";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { UyariKartlari } from "./uyari-kartlari";
-import { NakitTrendChart } from "./nakit-trend-chart";
 import { NakitGirisTakipTab } from "./nakit-giris-takip-tab";
+
+const NakitTrendChart = dynamic(
+  () => import("./nakit-trend-chart").then(mod => ({ default: mod.NakitTrendChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 
 interface DonemOption {
   id: string;

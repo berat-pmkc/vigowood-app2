@@ -8,12 +8,19 @@ import { PackingListDocument } from "@/lib/pdf/packing-list-template";
 import type { PackingListData, PackingListItem, PLExporterConfig, PLBuyerConfig, PLDispatchConfig, PLSignatoryConfig, PLContactConfig } from "@/lib/pdf/packing-list-template";
 import type { SevkiyatItemRow, SevkiyatFirmaRow } from "@/app/(dashboard)/sevkiyat/actions";
 import React from "react";
+import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
+  // Rate limit: 5 req/dk
+  const rl = rateLimit(getRateLimitKey(_request, "packing-list-pdf"), { limit: 5, windowSeconds: 60 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const user = await getCurrentUser();
     if (!user || !SEVKIYAT_ACCESS_ROLES.includes(user.role)) {

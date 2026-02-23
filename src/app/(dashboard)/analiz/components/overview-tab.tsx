@@ -1,17 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import {
   OverviewKpiCards,
   type OverviewKpiData,
 } from "./overview-kpi-cards";
-import {
-  OverviewProductionChart,
-  type DailyOverviewData,
-} from "./overview-production-chart";
-import {
-  OverviewTrendChart,
-  type MonthlyTrendData,
-} from "./overview-trend-chart";
+import type { DailyOverviewData } from "./overview-production-chart";
+import type { MonthlyTrendData } from "./overview-trend-chart";
+
+const OverviewProductionChart = dynamic(
+  () => import("./overview-production-chart").then(mod => ({ default: mod.OverviewProductionChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+const OverviewTrendChart = dynamic(
+  () => import("./overview-trend-chart").then(mod => ({ default: mod.OverviewTrendChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 
 interface OverviewTabProps {
   kpiData: OverviewKpiData;

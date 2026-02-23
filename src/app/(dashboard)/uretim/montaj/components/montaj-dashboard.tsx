@@ -8,10 +8,19 @@ import Link from "next/link";
 import { ActiveSessions } from "./active-sessions";
 import { NewSessionDialog } from "./new-session-dialog";
 import { CloseSessionDialog } from "./close-session-dialog";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { SummaryCards } from "./summary-cards";
-import { StepPerformanceChart } from "./step-performance-chart";
-import { ProductTrendChart } from "./product-trend-chart";
 import { PackageReadyDialog } from "./package-ready-widget";
+
+const StepPerformanceChart = dynamic(
+  () => import("./step-performance-chart").then(mod => ({ default: mod.StepPerformanceChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+const ProductTrendChart = dynamic(
+  () => import("./product-trend-chart").then(mod => ({ default: mod.ProductTrendChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 import type { ActiveMontajSession } from "./session-card";
 import { cancelMontajSession } from "../actions";
 import { toast } from "sonner";

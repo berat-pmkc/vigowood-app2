@@ -3,8 +3,15 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
+import dynamic from "next/dynamic";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { KpiCards } from "./kpi-cards";
-import { TrendChart, type DailyChartData } from "./trend-chart";
+import type { DailyChartData } from "./trend-chart";
+
+const TrendChart = dynamic(
+  () => import("./trend-chart").then(mod => ({ default: mod.TrendChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 import { StokDataTable, type StokProduct } from "./stok-data-table";
 import { HareketlerDataTable, type StokMovement } from "./hareketler-data-table";
 import { useStokMamulRealtime } from "@/hooks/use-stok-mamul-realtime";
