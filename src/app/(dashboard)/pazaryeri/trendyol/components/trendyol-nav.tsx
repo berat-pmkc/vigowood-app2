@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { ShoppingCart, Package, MessageSquareText, DollarSign } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, MessageSquareText, DollarSign } from "lucide-react";
 
 const tabs = [
+  { title: "Dashboard", href: "/pazaryeri/trendyol", icon: LayoutDashboard, exact: true },
   { title: "Siparişler", href: "/pazaryeri/trendyol/siparisler", icon: ShoppingCart },
   { title: "Ürünler", href: "/pazaryeri/trendyol/urunler", icon: Package },
   { title: "Sorular", href: "/pazaryeri/trendyol/sorular", icon: MessageSquareText },
@@ -24,7 +25,9 @@ export function TrendyolNav() {
         <span className="hidden text-sm font-semibold text-vw-dark sm:inline">Trendyol</span>
       </div>
       {tabs.map((tab) => {
-        const isActive = pathname.startsWith(tab.href);
+        const isActive = (tab as { exact?: boolean }).exact
+          ? pathname === tab.href
+          : pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}
