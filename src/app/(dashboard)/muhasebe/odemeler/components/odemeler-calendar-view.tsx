@@ -163,7 +163,7 @@ export function OdemelerCalendarView({
   return (
     <div className="space-y-4">
       {/* Category Filter Cards */}
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 md:flex-wrap md:overflow-x-visible md:gap-1.5">
         {ODEME_TURLERI.map((turu) => {
           const colors = ODEME_TURU_COLORS[turu];
           const totals = categoryTotals[turu];
@@ -180,7 +180,7 @@ export function OdemelerCalendarView({
               type="button"
               onClick={() => setSelectedCategory(isActive ? null : turu)}
               className={cn(
-                "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                "flex flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[11px] font-medium whitespace-nowrap transition-all shrink-0 md:shrink md:px-2.5 md:py-1.5",
                 isActive ? "scale-105" : "hover:opacity-80"
               )}
               style={{
@@ -190,7 +190,7 @@ export function OdemelerCalendarView({
               }}
             >
               <span>{ODEME_TURU_LABELS[turu]}</span>
-              <span className="text-[10px] font-bold tabular-nums opacity-80">
+              <span className="text-[9px] font-bold tabular-nums opacity-80">
                 {totalStr}
               </span>
             </button>

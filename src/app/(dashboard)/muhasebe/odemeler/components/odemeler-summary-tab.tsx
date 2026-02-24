@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -63,15 +64,45 @@ function getWeekKey(dateStr: string): string {
 }
 
 export function OdemelerSummaryTab({ data }: { data: SummaryItem[] }) {
+  const currentYear = new Date().getFullYear();
   const [viewMode, setViewMode] = useState<ViewMode>("aylik");
   const [selectedTuru, setSelectedTuru] = useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
 
-  // Filter TL only
-  const tlData = useMemo(() => data.filter((d) => d.cinsi === "TL"), [data]);
+  // Available years from data
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    for (const item of data) {
+      if (item.tarih) {
+        years.add(parseInt(item.tarih.substring(0, 4)));
+      }
+    }
+    // Always include current year
+    years.add(currentYear);
+    return Array.from(years).sort((a, b) => a - b);
+  }, [data, currentYear]);
+
+  // Filter TL only + selected year
+  const tlData = useMemo(
+    () =>
+      data.filter(
+        (d) =>
+          d.cinsi === "TL" &&
+          d.tarih &&
+          d.tarih.startsWith(String(selectedYear))
+      ),
+    [data, selectedYear]
+  );
 
   // Monthly grouped data
   const monthlyData = useMemo(() => {
     const map = new Map<string, Record<string, number>>();
+
+    // Initialize all 12 months for the selected year
+    for (let m = 0; m < 12; m++) {
+      const key = `${selectedYear}-${String(m + 1).padStart(2, "0")}`;
+      map.set(key, {});
+    }
 
     for (const item of tlData) {
       if (!item.tarih) continue;
@@ -90,11 +121,11 @@ export function OdemelerSummaryTab({ data }: { data: SummaryItem[] }) {
         const d = new Date(key + "-01");
         return {
           key,
-          label: `${AY_KISALTMA[d.getMonth()]} ${d.getFullYear().toString().slice(2)}`,
+          label: AY_KISALTMA[d.getMonth()],
           ...values,
         };
       });
-  }, [tlData]);
+  }, [tlData, selectedYear]);
 
   // Weekly grouped data
   const weeklyData = useMemo(() => {
@@ -131,6 +162,9 @@ export function OdemelerSummaryTab({ data }: { data: SummaryItem[] }) {
     return ODEME_TURLERI.filter((t) => keys.has(t));
   }, [tlData]);
 
+  const canGoPrev = availableYears[0] < selectedYear;
+  const canGoNext = selectedYear < availableYears[availableYears.length - 1] || selectedYear < currentYear + 1;
+
   return (
     <div className="space-y-4">
       {/* Controls */}
@@ -152,6 +186,39 @@ export function OdemelerSummaryTab({ data }: { data: SummaryItem[] }) {
             onClick={() => setViewMode("aylik")}
           >
             Aylık
+          </Button>
+        </div>
+
+        {/* Year selector */}
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => setSelectedYear((y) => y - 1)}
+            disabled={!canGoPrev}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          {availableYears.map((year) => (
+            <Button
+              key={year}
+              size="sm"
+              variant={selectedYear === year ? "default" : "outline"}
+              className="h-7 text-xs px-3"
+              onClick={() => setSelectedYear(year)}
+            >
+              {year}
+            </Button>
+          ))}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => setSelectedYear((y) => y + 1)}
+            disabled={!canGoNext}
+          >
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -193,8 +260,8 @@ export function OdemelerSummaryTab({ data }: { data: SummaryItem[] }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
             {selectedTuru
-              ? `${ODEME_TURU_LABELS[selectedTuru as OdemeTuruConst]} Trendi`
-              : `Ödeme Trendi (Son 12 Ay — ${viewMode === "aylik" ? "Aylık" : "Haftalık"})`}
+              ? `${ODEME_TURU_LABELS[selectedTuru as OdemeTuruConst]} Trendi — ${selectedYear}`
+              : `Ödeme Trendi — ${selectedYear} (${viewMode === "aylik" ? "Aylık" : "Haftalık"})`}
           </CardTitle>
         </CardHeader>
         <CardContent>

@@ -154,45 +154,45 @@ export function OdemelerClient({
   }, [krediOdemeler]);
 
   return (
-    <div className="space-y-4 pb-20 md:pb-6">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="space-y-4 pb-20 md:pb-6 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">Ödemeler</h1>
           <p className="text-sm text-muted-foreground">
             Ödeme kayıtları, takip ve analiz
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" asChild>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <Button size="sm" variant="outline" className="h-8 px-2 sm:px-3" asChild>
             <a
               href={`/api/muhasebe/odemeler/takvim-pdf?year=${calYear}&month=${calMonth}`}
               download
             >
-              <CalendarDays className="mr-1.5 h-4 w-4" />
+              <CalendarDays className="h-4 w-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Takvim PDF</span>
             </a>
           </Button>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" className="h-8 px-2 sm:px-3" asChild>
             <a
               href={`/api/muhasebe/odemeler/pdf${turu || durum || cinsi ? `?${new URLSearchParams(Object.entries({ turu, durum, cinsi }).filter(([, v]) => v)).toString()}` : ""}`}
               download
             >
-              <FileDown className="mr-1.5 h-4 w-4" />
+              <FileDown className="h-4 w-4 sm:mr-1.5" />
               <span className="hidden sm:inline">PDF</span>
             </a>
           </Button>
           {krediOdemeler.length > 0 && (
-            <Button size="sm" variant="outline" onClick={() => setKrediSheetOpen(true)}>
-              <CreditCard className="mr-1.5 h-4 w-4" />
+            <Button size="sm" variant="outline" className="h-8 px-2 sm:px-3" onClick={() => setKrediSheetOpen(true)}>
+              <CreditCard className="h-4 w-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Kredi Borçları</span>
-              <Badge variant="secondary" className="ml-1.5 text-[10px]">
+              <Badge variant="secondary" className="ml-1 text-[10px] hidden sm:inline-flex">
                 {krediOdemeler.length}
               </Badge>
             </Button>
           )}
-          <Button onClick={handleNewRecord} size="sm">
-            <Plus className="mr-1.5 h-4 w-4" />
-            Yeni Ödeme
+          <Button onClick={handleNewRecord} size="sm" className="h-8 px-2 sm:px-3">
+            <Plus className="h-4 w-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Yeni Ödeme</span>
           </Button>
         </div>
       </div>

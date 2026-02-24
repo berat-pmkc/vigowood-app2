@@ -105,15 +105,10 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
     .from("odemeler")
     .select("id, tutar, cinsi, tarih, turu, odeme_durum");
 
-  // ---------- 4. Trend (son 12 ay) ----------
-  const twelveMonthsAgo = new Date(today);
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
-
+  // ---------- 4. Trend (tüm veriler — yıl filtresi client-side) ----------
   const trendQuery = supabase
     .from("odemeler")
     .select("tarih, tutar, odeme_durum, cinsi, turu")
-    .gte("tarih", twelveMonthsAgoStr)
     .order("tarih");
 
   // ---------- 5. Kredi borçları (tümü, yakın tarihten uzağa) ----------
