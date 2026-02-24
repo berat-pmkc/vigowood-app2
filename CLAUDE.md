@@ -434,6 +434,19 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Auth guard: MARKETPLACE_ACCESS_ROLES, tüm sayfalar ve server action'larda kontrol
 - [x] Mock data: API credentials invalid olduğunda otomatik mock data fallback (gerçekçi VigoWood ürünleri)
 
+### KATMAN 28B: Pazaryeri Entegrasyonu — İkas (vigowood.com) ✅
+- [x] lib/ikas/ altyapı: client.ts (OAuth2 GraphQL, token caching, mock fallback), types.ts, queries.ts, helpers.ts, mock-data.ts
+- [x] .env.local: IKAS_CLIENT_ID, IKAS_CLIENT_SECRET, IKAS_STORE_NAME
+- [x] Sidebar: vigowood.com navigasyonu (Globe icon, Pazaryeri grubu altında)
+- [x] /pazaryeri/vigowood-com/siparisler: TanStack Table, tab filtreleri, tarih aralığı, arama, sipariş detay Sheet
+- [x] /pazaryeri/vigowood-com/urunler: Ürün listesi, stok güncelleme, filtreler (aktif/stok yok)
+- [x] /pazaryeri/vigowood-com/musteriler: Müşteri listesi, müşteri detay Sheet, VIP/Sadık/Aktif badge
+- [x] VigowoodNav tab navigasyonu (layout.tsx + vigowood-nav.tsx)
+- [x] /pazaryeri/genel güncelleme: Trendyol + İkas birleşik KPI, kanal kartları, stacked bar trend chart
+- [x] Auth guard: MARKETPLACE_ACCESS_ROLES, tüm sayfa ve server action'larda kontrol
+- [x] Gerçek İkas API bağlantısı: 15.166 sipariş, 17.525 müşteri, 3 stok lokasyonu
+- [x] Build: 72 route, sıfır TypeScript hatası
+
 ### KATMAN 28+: İleri Özellikler
 - [ ] Amazon SP-API, Hepsiburada API
 - [ ] Trendyol API gerçek credentials bağlantısı (mevcut: 401 auth hatası, mock data aktif)
