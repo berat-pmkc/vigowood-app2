@@ -99,46 +99,100 @@ export const ORDER_TAB_FILTERS: { label: string; packageStatus: IkasPackageStatu
 ];
 
 // ─── Date Helpers ───────────────────────────────────────
-/** İkas timestamp (ms) → DD.MM.YYYY HH:mm */
+// Turkey UTC+3 — Vercel server UTC'de çalışır, İkas TR saatini kullanır
+const TURKEY_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** Get current date/time in Turkey timezone */
+function nowInTurkey(): Date {
+  return new Date(Date.now() + TURKEY_OFFSET_MS);
+}
+
+/** Turkey date parts (year, month 0-based, day) using UTC methods on offset date */
+function turkeyDateParts(d?: Date): { year: number; month: number; day: number } {
+  const t = d ? new Date(d.getTime() + TURKEY_OFFSET_MS) : nowInTurkey();
+  return { year: t.getUTCFullYear(), month: t.getUTCMonth(), day: t.getUTCDate() };
+}
+
+/** İkas timestamp (ms) → DD.MM.YYYY HH:mm (Turkey time) */
 export function formatIkasDate(ts: number): string {
-  const d = new Date(ts);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const d = new Date(ts + TURKEY_OFFSET_MS);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  const hours = String(d.getUTCHours()).padStart(2, "0");
+  const minutes = String(d.getUTCMinutes()).padStart(2, "0");
   return `${day}.${month}.${year} ${hours}:${minutes}`;
 }
 
-/** İkas timestamp (ms) → DD.MM.YYYY */
+/** İkas timestamp (ms) → DD.MM.YYYY (Turkey time) */
 export function formatIkasDateShort(ts: number): string {
-  const d = new Date(ts);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
+  const d = new Date(ts + TURKEY_OFFSET_MS);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
   return `${day}.${month}.${year}`;
 }
 
-/** Start of day N days ago as ISO string */
+/** Start of day N days ago as ISO string (Turkey midnight → UTC) */
 export function daysAgoISO(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(0, 0, 0, 0);
+  const { year, month, day } = turkeyDateParts();
+  const d = new Date(Date.UTC(year, month, day - days, 0, 0, 0, 0));
+  // Convert Turkey midnight to UTC: subtract 3 hours
+  d.setTime(d.getTime() - TURKEY_OFFSET_MS);
   return d.toISOString();
 }
 
-/** End of today as ISO string */
+/** End of today as ISO string (Turkey 23:59:59 → UTC) */
 export function endOfTodayISO(): string {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
+  const { year, month, day } = turkeyDateParts();
+  const d = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+  d.setTime(d.getTime() - TURKEY_OFFSET_MS);
   return d.toISOString();
 }
 
-/** Start of today as ISO string */
+/** Start of today as ISO string (Turkey 00:00:00 → UTC) */
 export function startOfTodayISO(): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
+  const { year, month, day } = turkeyDateParts();
+  const d = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  d.setTime(d.getTime() - TURKEY_OFFSET_MS);
   return d.toISOString();
+}
+
+/** Start of a specific month as ISO string (Turkey time → UTC) */
+export function monthStartISO(year: number, month: number): string {
+  const d = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+  d.setTime(d.getTime() - TURKEY_OFFSET_MS);
+  return d.toISOString();
+}
+
+/** End of a specific month as ISO string (Turkey time → UTC) */
+export function monthEndISO(year: number, month: number): string {
+  // Day 0 of next month = last day of current month
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const d = new Date(Date.UTC(year, month - 1, lastDay, 23, 59, 59, 999));
+  d.setTime(d.getTime() - TURKEY_OFFSET_MS);
+  return d.toISOString();
+}
+
+/** Get Turkey's current YYYY-MM string */
+export function currentMonthKey(): string {
+  const { year, month } = turkeyDateParts();
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+/** Get Turkey's today YYYY-MM-DD string */
+export function todayKeyTR(): string {
+  const { year, month, day } = turkeyDateParts();
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Convert İkas orderedAt (ms) to Turkey YYYY-MM-DD */
+export function orderDateKeyTR(orderedAt: number): string {
+  const d = new Date(orderedAt + TURKEY_OFFSET_MS);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 // ─── Price Helpers ──────────────────────────────────────

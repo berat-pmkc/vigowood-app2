@@ -52,12 +52,25 @@ const SKU_COLORS = [
 ];
 
 export default function SkuFilterChart({ skuDailyData, availableSkus }: Props) {
-  // Default to "TÜMÜ" if available
   const [selectedSkus, setSelectedSkus] = useState<string[]>(
     availableSkus.some((s) => s.sku === "TÜMÜ") ? ["TÜMÜ"] : []
   );
   const [metric, setMetric] = useState<"revenue" | "orders">("revenue");
   const [open, setOpen] = useState(false);
+
+  // Calculate totals for selected SKUs
+  const totals = useMemo(() => {
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    for (const sku of selectedSkus) {
+      const entries = skuDailyData[sku] || [];
+      for (const e of entries) {
+        totalRevenue += e.revenue;
+        totalOrders += e.orders;
+      }
+    }
+    return { revenue: totalRevenue, orders: totalOrders };
+  }, [selectedSkus, skuDailyData]);
 
   const chartData = useMemo(() => {
     if (selectedSkus.length === 0) return [];
@@ -126,22 +139,29 @@ export default function SkuFilterChart({ skuDailyData, availableSkus }: Props) {
           </PopoverContent>
         </Popover>
 
+        {/* Metric toggle with total values */}
         <div className="flex gap-1">
           <Button
             variant={metric === "revenue" ? "default" : "outline"}
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-xs gap-1.5"
             onClick={() => setMetric("revenue")}
           >
             Ciro
+            {selectedSkus.length > 0 && (
+              <span className="font-semibold">{formatTRY(totals.revenue)}</span>
+            )}
           </Button>
           <Button
             variant={metric === "orders" ? "default" : "outline"}
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-xs gap-1.5"
             onClick={() => setMetric("orders")}
           >
             Adet
+            {selectedSkus.length > 0 && (
+              <span className="font-semibold">{totals.orders.toLocaleString("tr-TR")}</span>
+            )}
           </Button>
         </div>
       </div>
