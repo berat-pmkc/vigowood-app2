@@ -30,6 +30,9 @@ import {
   ShoppingBag,
   Globe,
   MessageSquareText,
+  Kanban,
+  Inbox,
+  CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
@@ -67,6 +70,9 @@ const FINANCE_ROLES: UserRole[] = ["Yönetici", "Muhasebe", "E-Ticaret Müdürü
 
 const MARKETPLACE_ROLES: UserRole[] = ["Yönetici", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Pazaryeri Sorumlusu"];
 
+/** Onay sayfasını görebilecek roller */
+const APPROVAL_NAV_ROLES: UserRole[] = ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"];
+
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Ana Sayfa",
@@ -77,6 +83,15 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: LayoutDashboard,
         roles: "all",
       },
+    ],
+  },
+  {
+    label: "Ops Center",
+    items: [
+      { title: "Genel Bakış", href: "/ops", icon: BarChart3, roles: "all" },
+      { title: "Board", href: "/ops/board", icon: Kanban, roles: "all" },
+      { title: "Görevlerim", href: "/ops/gorevlerim", icon: Inbox, roles: "all" },
+      { title: "Onaylar", href: "/ops/onaylar", icon: CheckCircle2, roles: APPROVAL_NAV_ROLES },
     ],
   },
   {

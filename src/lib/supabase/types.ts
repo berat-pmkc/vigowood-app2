@@ -2244,6 +2244,141 @@ export type Database = {
         }
         Relationships: []
       }
+      tasks: {
+        Row: {
+          id: string
+          title: string
+          description: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          priority: Database["public"]["Enums"]["task_priority"]
+          assigned_to: string | null
+          created_by: string
+          department: Database["public"]["Enums"]["task_department"]
+          due_date: string | null
+          parent_id: string | null
+          source_type: Database["public"]["Enums"]["task_source_type"]
+          source_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          priority?: Database["public"]["Enums"]["task_priority"]
+          assigned_to?: string | null
+          created_by: string
+          department?: Database["public"]["Enums"]["task_department"]
+          due_date?: string | null
+          parent_id?: string | null
+          source_type?: Database["public"]["Enums"]["task_source_type"]
+          source_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          description?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          priority?: Database["public"]["Enums"]["task_priority"]
+          assigned_to?: string | null
+          created_by?: string
+          department?: Database["public"]["Enums"]["task_department"]
+          due_date?: string | null
+          parent_id?: string | null
+          source_type?: Database["public"]["Enums"]["task_source_type"]
+          source_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_comments: {
+        Row: {
+          id: string
+          task_id: string
+          author_id: string
+          content: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          author_id: string
+          content: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          author_id?: string
+          content?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      task_attachments: {
+        Row: {
+          id: string
+          task_id: string
+          file_url: string
+          file_name: string
+          file_size: number | null
+          uploaded_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          file_url: string
+          file_name: string
+          file_size?: number | null
+          uploaded_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          file_url?: string
+          file_name?: string
+          file_size?: number | null
+          uploaded_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      task_activity: {
+        Row: {
+          id: string
+          task_id: string
+          actor_id: string
+          action: Database["public"]["Enums"]["task_activity_action"]
+          old_value: string | null
+          new_value: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          actor_id: string
+          action: Database["public"]["Enums"]["task_activity_action"]
+          old_value?: string | null
+          new_value?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          actor_id?: string
+          action?: Database["public"]["Enums"]["task_activity_action"]
+          old_value?: string | null
+          new_value?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2269,6 +2404,11 @@ export type Database = {
     }
     Enums: {
       faaliyet_turu: "FAALIYET" | "FAALIYET_DISI"
+      task_status: "backlog" | "open" | "in_progress" | "waiting_approval" | "blocked" | "done"
+      task_priority: "low" | "medium" | "high" | "urgent"
+      task_department: "uretim" | "stok" | "sevkiyat" | "muhasebe" | "pazaryeri" | "genel"
+      task_source_type: "manual" | "recurring_job" | "alert"
+      task_activity_action: "created" | "status_changed" | "assigned" | "commented" | "file_added" | "priority_changed"
       kalem_turu:
         | "GELIR"
         | "GIDER"

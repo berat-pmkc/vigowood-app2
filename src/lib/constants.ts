@@ -893,3 +893,98 @@ export const PACKING_LIST_CONFIG = {
     },
   } as Record<string, { name1: string; name2: string; vat: string; address: string }>,
 } as const;
+
+// ─── Ops Center Sabitleri ──────────────────────────────────────
+
+/** Görev durumları */
+export const TASK_STATUSES = [
+  "backlog", "open", "in_progress", "waiting_approval", "blocked", "done",
+] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  backlog: "Backlog",
+  open: "Açık",
+  in_progress: "Devam Ediyor",
+  waiting_approval: "Onay Bekliyor",
+  blocked: "Bloke",
+  done: "Tamamlandı",
+};
+
+export const TASK_STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: string }> = {
+  backlog: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" },
+  open: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  in_progress: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  waiting_approval: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
+  blocked: { bg: "bg-red-50", text: "text-red-700", border: "border-red-300" },
+  done: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+/** Görev öncelikleri */
+export const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Düşük",
+  medium: "Orta",
+  high: "Yüksek",
+  urgent: "Acil",
+};
+
+export const TASK_PRIORITY_COLORS: Record<TaskPriority, { bg: string; text: string }> = {
+  low: { bg: "bg-slate-100", text: "text-slate-600" },
+  medium: { bg: "bg-blue-100", text: "text-blue-700" },
+  high: { bg: "bg-orange-100", text: "text-orange-700" },
+  urgent: { bg: "bg-red-100", text: "text-red-700" },
+};
+
+/** Görev departmanları */
+export const TASK_DEPARTMENTS = [
+  "uretim", "stok", "sevkiyat", "muhasebe", "pazaryeri", "genel",
+] as const;
+export type TaskDepartment = (typeof TASK_DEPARTMENTS)[number];
+
+export const TASK_DEPARTMENT_LABELS: Record<TaskDepartment, string> = {
+  uretim: "Üretim",
+  stok: "Stok",
+  sevkiyat: "Sevkiyat",
+  muhasebe: "Muhasebe",
+  pazaryeri: "Pazaryeri",
+  genel: "Genel",
+};
+
+export const TASK_DEPARTMENT_COLORS: Record<TaskDepartment, { bg: string; text: string }> = {
+  uretim: { bg: "bg-indigo-100", text: "text-indigo-700" },
+  stok: { bg: "bg-teal-100", text: "text-teal-700" },
+  sevkiyat: { bg: "bg-cyan-100", text: "text-cyan-700" },
+  muhasebe: { bg: "bg-pink-100", text: "text-pink-700" },
+  pazaryeri: { bg: "bg-violet-100", text: "text-violet-700" },
+  genel: { bg: "bg-gray-100", text: "text-gray-700" },
+};
+
+/** Görev kaynak türleri */
+export const TASK_SOURCE_TYPES = ["manual", "recurring_job", "alert"] as const;
+export type TaskSourceType = (typeof TASK_SOURCE_TYPES)[number];
+
+/** Görev aktivite aksiyonları */
+export const TASK_ACTIVITY_ACTIONS = [
+  "created", "status_changed", "assigned", "commented", "file_added", "priority_changed",
+] as const;
+export type TaskActivityAction = (typeof TASK_ACTIVITY_ACTIONS)[number];
+
+export const TASK_ACTIVITY_LABELS: Record<TaskActivityAction, string> = {
+  created: "oluşturuldu",
+  status_changed: "durumu değiştirildi",
+  assigned: "atandı",
+  commented: "yorum ekledi",
+  file_added: "dosya ekledi",
+  priority_changed: "önceliği değiştirildi",
+};
+
+/** Onay yetkisi olan roller */
+export const APPROVAL_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+  "E-Ticaret Müdürü",
+  "Dış Ticaret Müdürü",
+];

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI, TASK_STATUSES, TASK_PRIORITIES, TASK_DEPARTMENTS, TASK_SOURCE_TYPES } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -724,3 +724,68 @@ export const maliyetGirisBatchSchema = z.object({
 });
 
 export type MaliyetGirisBatchData = z.infer<typeof maliyetGirisBatchSchema>;
+
+// ─── Ops Center — Task Management ────────────────────────────
+
+/** Hızlı görev oluşturma (sadece başlık) */
+export const taskQuickCreateSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Görev başlığı gereklidir")
+    .max(300, "Başlık en fazla 300 karakter olabilir"),
+});
+
+export type TaskQuickCreateData = z.infer<typeof taskQuickCreateSchema>;
+
+/** Detaylı görev oluşturma */
+export const taskCreateSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Görev başlığı gereklidir")
+    .max(300, "Başlık en fazla 300 karakter olabilir"),
+  description: z
+    .string()
+    .max(5000, "Açıklama en fazla 5000 karakter olabilir")
+    .nullable()
+    .optional(),
+  status: z.enum(TASK_STATUSES).default("open"),
+  priority: z.enum(TASK_PRIORITIES).default("medium"),
+  assigned_to: z.string().nullable().optional(),
+  department: z.enum(TASK_DEPARTMENTS).default("genel"),
+  due_date: z.string().nullable().optional(),
+  parent_id: z.string().uuid("Geçersiz üst görev ID").nullable().optional(),
+  source_type: z.enum(TASK_SOURCE_TYPES).default("manual"),
+});
+
+export type TaskCreateData = z.infer<typeof taskCreateSchema>;
+
+/** Görev güncelleme */
+export const taskUpdateSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Görev başlığı gereklidir")
+    .max(300, "Başlık en fazla 300 karakter olabilir")
+    .optional(),
+  description: z
+    .string()
+    .max(5000, "Açıklama en fazla 5000 karakter olabilir")
+    .nullable()
+    .optional(),
+  status: z.enum(TASK_STATUSES).optional(),
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  assigned_to: z.string().nullable().optional(),
+  department: z.enum(TASK_DEPARTMENTS).optional(),
+  due_date: z.string().nullable().optional(),
+});
+
+export type TaskUpdateData = z.infer<typeof taskUpdateSchema>;
+
+/** Yorum ekleme */
+export const taskCommentSchema = z.object({
+  content: z
+    .string()
+    .min(1, "Yorum içeriği gereklidir")
+    .max(5000, "Yorum en fazla 5000 karakter olabilir"),
+});
+
+export type TaskCommentData = z.infer<typeof taskCommentSchema>;
