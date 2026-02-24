@@ -17,34 +17,35 @@ export default async function MontajPage() {
 
   const supabase = await createClient();
 
-  // Devam eden seanslar
-  const { data: activeData } = await supabase
-    .from("montaj_sessions")
-    .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name, workers")
-    .eq("durum", "montajda")
-    .order("start_time", { ascending: true });
+  // Parallel: aktif seanslar + tüm aktif ürünler (birbirinden bağımsız)
+  const [activeDataRes, activeProductsRes] = await Promise.all([
+    supabase
+      .from("montaj_sessions")
+      .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name, workers")
+      .eq("durum", "montajda")
+      .order("start_time", { ascending: true }),
+    supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .eq("aktif_mi", true)
+      .order("urun_adi"),
+  ]);
 
-  // Ürün adlarını çek
+  const activeData = activeDataRes.data;
+  const activeProducts = activeProductsRes.data;
+
+  // Ürün adlarını çek (sadece aktif seanslardaki SKU'lar için)
   const activeSkus = [...new Set((activeData ?? []).map((s) => s.sku).filter(Boolean) as string[])];
 
   let productMap = new Map<string, string>();
   if (activeSkus.length > 0) {
-    const { data: products } = await supabase
-      .from("products")
-      .select("sku, urun_adi")
-      .in("sku", activeSkus);
-
-    productMap = new Map(
-      (products ?? []).map((p) => [p.sku, p.urun_adi ?? ""])
-    );
+    // activeProducts zaten yüklendi, ondan build et
+    (activeProducts ?? []).forEach((p) => {
+      if (activeSkus.includes(p.sku)) {
+        productMap.set(p.sku, p.urun_adi ?? "");
+      }
+    });
   }
-
-  // Aktif ürünler (chart seçicileri için)
-  const { data: activeProducts } = await supabase
-    .from("products")
-    .select("sku, urun_adi")
-    .eq("aktif_mi", true)
-    .order("urun_adi");
 
   const productOptions = (activeProducts ?? []).map((p) => ({
     sku: p.sku,

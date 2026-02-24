@@ -112,12 +112,13 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
     .select("qty, direction")
     .gte("tarih", todayStr);
 
-  // 5. Chart data: last 30 days movements
+  // 5. Chart data: last 30 days movements (limit to prevent huge payloads on 234K table)
   const chartQuery = supabase
     .from("yari_mamul_stok")
     .select("tarih, qty, direction")
     .gte("tarih", thirtyDaysAgoStr)
-    .order("tarih", { ascending: true });
+    .order("tarih", { ascending: true })
+    .limit(5000);
 
   // Execute all in parallel
   const [

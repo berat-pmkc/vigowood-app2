@@ -20,6 +20,9 @@ interface PageProps {
 
 export const metadata: Metadata = { title: "Plaka Yonetimi" };
 
+// Admin verisi sık değişmez — 60 saniye cache
+export const revalidate = 60;
+
 export default async function PlakalarPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
@@ -73,15 +76,19 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
   // Pagination
   query = query.range(from, to);
 
-  const { data: plakalar, count, error } = await query;
+  // Execute main query + SKU dropdown in parallel
+  const [mainResult, skuResult] = await Promise.all([
+    query,
+    supabase
+      .from("plakalar")
+      .select("sku")
+      .eq("plaka_kategori", "MDF")
+      .not("sku", "is", null)
+      .order("sku"),
+  ]);
 
-  // Also fetch distinct SKUs for filter dropdown
-  const { data: skuList } = await supabase
-    .from("plakalar")
-    .select("sku")
-    .eq("plaka_kategori", "MDF")
-    .not("sku", "is", null)
-    .order("sku");
+  const { data: plakalar, count, error } = mainResult;
+  const { data: skuList } = skuResult;
 
   const uniqueSkus = [
     ...new Set((skuList ?? []).map((r) => r.sku).filter(Boolean)),

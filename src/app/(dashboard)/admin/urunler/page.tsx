@@ -19,6 +19,9 @@ interface PageProps {
 
 export const metadata: Metadata = { title: "Urun Yonetimi" };
 
+// Admin verisi sık değişmez — 60 saniye cache
+export const revalidate = 60;
+
 export default async function UrunlerPage({ searchParams }: PageProps) {
   const params = await searchParams;
 

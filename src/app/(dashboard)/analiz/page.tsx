@@ -60,6 +60,9 @@ interface PageProps {
 
 export const metadata: Metadata = { title: "Analiz" };
 
+// Analiz dashboard — 30 saniye cache (sık güncellenen ama hızlı olmalı)
+export const revalidate = 30;
+
 export default async function AnalizPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const period = (params.period || "month") as PeriodType;

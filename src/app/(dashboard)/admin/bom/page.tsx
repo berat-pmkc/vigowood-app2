@@ -11,6 +11,9 @@ interface PageProps {
 
 export const metadata: Metadata = { title: "BOM ve Montaj" };
 
+// BOM verisi sık değişmez — 60 saniye cache
+export const revalidate = 60;
+
 export default async function BomPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const selectedSku = params.sku || "";

@@ -18,6 +18,9 @@ interface PageProps {
 
 export const metadata: Metadata = { title: "Parca Yonetimi" };
 
+// Admin verisi sık değişmez — 60 saniye cache
+export const revalidate = 60;
+
 export default async function ParcalarPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
