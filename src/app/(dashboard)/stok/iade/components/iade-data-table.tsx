@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
-import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { formatNumber, formatDate, formatTime } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 import { IADE_DURUM_LABELS, IADE_DURUM_COLORS } from "@/lib/constants";
 import type { IadeDurum } from "@/lib/constants";
 
@@ -49,67 +48,37 @@ interface IadeDataTableProps {
   sortOrder: "asc" | "desc";
 }
 
-function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<IadeRecord>[] {
+function getColumns(): ColumnDef<IadeRecord>[] {
   return [
     {
-      accessorKey: "tarih",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Tarih" onSort={onSort} />
-      ),
+      accessorKey: "sku",
+      header: () => <span className="text-xs font-medium">Ürün Kodu</span>,
       cell: ({ row }) => (
-        <div className="text-sm">
-          <div>{formatDate(row.original.tarih)}</div>
-          <div className="text-xs text-muted-foreground">
-            {formatTime(row.original.tarih)}
-          </div>
-        </div>
-      ),
-      size: 120,
-    },
-    {
-      accessorKey: "iade_id",
-      header: "İade ID",
-      cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">
-          {row.original.iade_id}
+        <span className="font-mono text-xs sm:text-sm whitespace-nowrap">
+          {row.original.sku || "—"}
         </span>
       ),
-      size: 170,
+      size: 120,
       enableSorting: false,
-      meta: { className: "hidden md:table-cell" },
-    },
-    {
-      accessorKey: "sku",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ürün" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <div>
-          <span className="font-mono text-sm">{row.original.sku || "—"}</span>
-          {row.original.urun_adi && (
-            <div className="max-w-[160px] truncate text-xs text-muted-foreground">
-              {row.original.urun_adi}
-            </div>
-          )}
-        </div>
-      ),
-      size: 200,
     },
     {
       accessorKey: "qty",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Adet" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="font-medium tabular-nums">{formatNumber(row.original.qty)}</span>
-      ),
+      header: () => <span className="text-xs font-medium">Adet</span>,
+      cell: ({ row }) => {
+        const durum = row.original.durum as IadeDurum | null;
+        const isUsable = durum === "Kullanilabilir";
+        return (
+          <span className={`font-medium tabular-nums text-sm ${isUsable ? "text-emerald-700" : "text-red-600"}`}>
+            {formatNumber(row.original.qty)}
+          </span>
+        );
+      },
       size: 80,
+      enableSorting: false,
     },
     {
       accessorKey: "durum",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Durum" onSort={onSort} />
-      ),
+      header: () => <span className="text-xs font-medium">Durum</span>,
       cell: ({ row }) => {
         const durum = row.original.durum as IadeDurum | null;
         if (!durum) return <span className="text-sm text-muted-foreground">—</span>;
@@ -123,31 +92,9 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Iade
           <Badge variant="outline">{durum}</Badge>
         );
       },
+      meta: { className: "hidden sm:table-cell" },
       size: 130,
-    },
-    {
-      accessorKey: "iade_nedeni",
-      header: "İade Nedeni",
-      cell: ({ row }) => (
-        <span className="max-w-[180px] truncate text-xs text-muted-foreground">
-          {row.original.iade_nedeni || "—"}
-        </span>
-      ),
-      size: 180,
       enableSorting: false,
-      meta: { className: "hidden lg:table-cell" },
-    },
-    {
-      accessorKey: "musteri_bilgisi",
-      header: "Müşteri",
-      cell: ({ row }) => (
-        <span className="max-w-[120px] truncate text-xs text-muted-foreground">
-          {row.original.musteri_bilgisi || "—"}
-        </span>
-      ),
-      size: 120,
-      enableSorting: false,
-      meta: { className: "hidden lg:table-cell" },
     },
   ];
 }
@@ -191,23 +138,12 @@ export function IadeDataTable({
     [buildUrl, router]
   );
 
-  const handleSort = useCallback(
-    (columnId: string, desc: boolean) => {
-      navigate({
-        sortBy: columnId,
-        sortOrder: desc ? "desc" : "asc",
-        page: "0",
-      });
-    },
-    [navigate]
-  );
-
   const sorting: SortingState = useMemo(
     () => [{ id: sortBy, desc: sortOrder === "desc" }],
     [sortBy, sortOrder]
   );
 
-  const columns = useMemo(() => getColumns(handleSort), [handleSort]);
+  const columns = useMemo(() => getColumns(), []);
 
   const table = useReactTable({
     data,
@@ -225,11 +161,11 @@ export function IadeDataTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="SKU veya iade ID ara..."
+            placeholder="SKU ara..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -251,7 +187,7 @@ export function IadeDataTable({
             navigate({ durum: v === "all" ? undefined : v, page: "0" })
           }
         >
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="w-[140px] sm:w-[180px]">
             <SelectValue placeholder="Tüm Durumlar" />
           </SelectTrigger>
           <SelectContent>

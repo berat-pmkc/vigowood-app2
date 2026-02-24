@@ -1,21 +1,15 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { BarChart3 } from "lucide-react";
 import { KpiCards, type IadeKpiData } from "./kpi-cards";
-import type { DailyIadeChartData } from "./trend-chart";
-
-const TrendChart = dynamic(
-  () => import("./trend-chart").then(mod => ({ default: mod.TrendChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> }
-);
 import { IadeDataTable, type IadeRecord } from "./iade-data-table";
 import { IadeGirisDialog } from "./iade-giris-dialog";
 
 interface IadeClientProps {
   canAddIade: boolean;
   kpiData: IadeKpiData;
-  chartData: DailyIadeChartData[];
   iadeData: IadeRecord[];
   iadeTotalCount: number;
   iadePageIndex: number;
@@ -29,7 +23,6 @@ interface IadeClientProps {
 export function IadeClient({
   canAddIade,
   kpiData,
-  chartData,
   iadeData,
   iadeTotalCount,
   iadePageIndex,
@@ -48,12 +41,18 @@ export function IadeClient({
             İade edilen ürünlerin kaydı ve takibi
           </p>
         </div>
-        {canAddIade && <IadeGirisDialog />}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/stok/iade/grafik">
+              <BarChart3 className="mr-1.5 h-4 w-4" />
+              Grafik
+            </Link>
+          </Button>
+          {canAddIade && <IadeGirisDialog />}
+        </div>
       </div>
 
       <KpiCards data={kpiData} />
-
-      <TrendChart data={chartData} />
 
       <IadeDataTable
         data={iadeData}
