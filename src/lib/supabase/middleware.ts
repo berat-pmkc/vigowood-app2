@@ -60,7 +60,7 @@ export async function updateSession(request: NextRequest) {
 
   // Public paths — no auth required
   const isAuthPage =
-    pathname.startsWith("/login") || pathname.startsWith("/select-operator") || pathname.startsWith("/api/test-ikas");
+    pathname.startsWith("/login") || pathname.startsWith("/select-operator");
 
   // If not logged in → redirect to login (except auth pages)
   if (!user && !isAuthPage) {
