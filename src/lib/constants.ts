@@ -1093,3 +1093,125 @@ export const AGENT_STATUS_COLORS: Record<AgentStatus, { bg: string; text: string
   paused: { bg: "bg-amber-100", text: "text-amber-700" },
   disabled: { bg: "bg-gray-100", text: "text-gray-500" },
 };
+
+// ─── Agent System Constants ─── //
+
+/** Agent hafıza türleri */
+export const MEMORY_TYPES = ["learned_pattern", "user_preference", "business_rule", "relationship", "mistake"] as const;
+export type MemoryType = (typeof MEMORY_TYPES)[number];
+
+export const MEMORY_TYPE_LABELS: Record<MemoryType, string> = {
+  learned_pattern: "Öğrenilen Kalıp",
+  user_preference: "Kullanıcı Tercihi",
+  business_rule: "İş Kuralı",
+  relationship: "İlişki",
+  mistake: "Hata Kaydı",
+};
+
+/** Agent aksiyon türleri */
+export const ACTION_TYPES = ["query", "analyze", "report", "comment", "alert", "approval_request"] as const;
+export type ActionType = (typeof ACTION_TYPES)[number];
+
+export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
+  query: "Sorgu",
+  analyze: "Analiz",
+  report: "Rapor",
+  comment: "Yorum",
+  alert: "Alarm",
+  approval_request: "Onay Talebi",
+};
+
+/** Agent aksiyon sonuçları */
+export const ACTION_RESULTS = ["success", "fail", "partial", "skipped"] as const;
+export type ActionResult = (typeof ACTION_RESULTS)[number];
+
+export const ACTION_RESULT_LABELS: Record<ActionResult, string> = {
+  success: "Başarılı",
+  fail: "Başarısız",
+  partial: "Kısmi",
+  skipped: "Atlandı",
+};
+
+export const ACTION_RESULT_COLORS: Record<ActionResult, { bg: string; text: string }> = {
+  success: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  fail: { bg: "bg-red-100", text: "text-red-700" },
+  partial: { bg: "bg-amber-100", text: "text-amber-700" },
+  skipped: { bg: "bg-gray-100", text: "text-gray-500" },
+};
+
+/** Agent mesaj türleri */
+export const MESSAGE_TYPES = ["daily_report", "alert", "question", "handoff", "summary"] as const;
+export type MessageType = (typeof MESSAGE_TYPES)[number];
+
+export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
+  daily_report: "Günlük Rapor",
+  alert: "Alarm",
+  question: "Soru",
+  handoff: "Devir",
+  summary: "Özet",
+};
+
+/** Job run durumları */
+export const JOB_RUN_STATUSES = ["running", "success", "fail", "skipped"] as const;
+export type JobRunStatus = (typeof JOB_RUN_STATUSES)[number];
+
+export const JOB_RUN_STATUS_LABELS: Record<JobRunStatus, string> = {
+  running: "Çalışıyor",
+  success: "Başarılı",
+  fail: "Başarısız",
+  skipped: "Atlandı",
+};
+
+export const JOB_RUN_STATUS_COLORS: Record<JobRunStatus, { bg: string; text: string }> = {
+  running: { bg: "bg-blue-100", text: "text-blue-700" },
+  success: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  fail: { bg: "bg-red-100", text: "text-red-700" },
+  skipped: { bg: "bg-gray-100", text: "text-gray-500" },
+};
+
+/** Monitor türleri */
+export const MONITOR_TYPES = ["threshold", "trend", "anomaly", "schedule"] as const;
+export type MonitorType = (typeof MONITOR_TYPES)[number];
+
+export const MONITOR_TYPE_LABELS: Record<MonitorType, string> = {
+  threshold: "Eşik Değer",
+  trend: "Trend",
+  anomaly: "Anomali",
+  schedule: "Zamanlı",
+};
+
+/** Alert severity */
+export const ALERT_SEVERITIES = ["low", "medium", "high", "critical"] as const;
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
+
+export const ALERT_SEVERITY_LABELS: Record<AlertSeverity, string> = {
+  low: "Düşük",
+  medium: "Orta",
+  high: "Yüksek",
+  critical: "Kritik",
+};
+
+export const ALERT_SEVERITY_COLORS: Record<AlertSeverity, { bg: string; text: string; border: string }> = {
+  low: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" },
+  medium: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300" },
+  high: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300" },
+  critical: { bg: "bg-red-100", text: "text-red-700", border: "border-red-300" },
+};
+
+/** Alert durumları */
+export const ALERT_STATUSES = ["open", "acknowledged", "resolved", "muted"] as const;
+export type AlertStatus = (typeof ALERT_STATUSES)[number];
+
+export const ALERT_STATUS_LABELS: Record<AlertStatus, string> = {
+  open: "Açık",
+  acknowledged: "Görüldü",
+  resolved: "Çözüldü",
+  muted: "Sessize Alındı",
+};
+
+export const ALERT_STATUS_COLORS: Record<AlertStatus, { bg: string; text: string }> = {
+  open: { bg: "bg-red-100", text: "text-red-700" },
+  acknowledged: { bg: "bg-amber-100", text: "text-amber-700" },
+  resolved: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  muted: { bg: "bg-gray-100", text: "text-gray-500" },
+};

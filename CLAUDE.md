@@ -447,6 +447,12 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Gerçek İkas API bağlantısı: 15.166 sipariş, 17.525 müşteri, 3 stok lokasyonu
 - [x] Build: 72 route, sıfır TypeScript hatası
 
+### KATMAN 28C: İkas Sipariş Sync — DB Altyapısı ✅
+- [x] ikas_orders tablosu (ikas_id UNIQUE, order_number, status, total_price, currency, city, country, line_items JSONB, ikas_created_at)
+- [x] RLS: SELECT authenticated, INSERT/UPDATE service_role only
+- [x] Indexes: ikas_id (unique), order_number, ikas_created_at DESC, status
+- [x] Types: IkasOrder alias
+
 ### KATMAN 28+: İleri Özellikler
 - [ ] Amazon SP-API, Hepsiburada API
 - [ ] Trendyol API gerçek credentials bağlantısı (mevcut: 401 auth hatası, mock data aktif)
