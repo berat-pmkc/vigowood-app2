@@ -271,7 +271,7 @@ export async function syncOrders(
 
         if (result.content.length === 0) break;
 
-        // Upsert orders
+        // Upsert orders in bulk
         const orderRows = result.content.map(mapOrderToRow);
         const { error: orderErr } = await supabase
           .from("trendyol_orders")
@@ -279,26 +279,23 @@ export async function syncOrders(
 
         if (orderErr) throw new Error(`Order upsert failed: ${orderErr.message}`);
 
-        // Upsert order lines — delete existing first, then insert
+        // Bulk upsert order lines — collect all lines, then batch upsert
+        const allLineRows: ReturnType<typeof mapOrderLineToRow>[] = [];
         for (const order of result.content) {
           if (order.lines.length === 0) continue;
-
-          // Delete existing lines for this order
-          await supabase
-            .from("trendyol_order_lines")
-            .delete()
-            .eq("order_id", order.shipmentPackageId);
-
-          // Insert new lines
-          const lineRows = order.lines.map((l) =>
-            mapOrderLineToRow(l, order.shipmentPackageId)
-          );
+          for (const l of order.lines) {
+            allLineRows.push(mapOrderLineToRow(l, order.shipmentPackageId));
+          }
+        }
+        // Upsert in batches of 500
+        for (let i = 0; i < allLineRows.length; i += 500) {
+          const batch = allLineRows.slice(i, i + 500);
           const { error: lineErr } = await supabase
             .from("trendyol_order_lines")
-            .insert(lineRows);
+            .upsert(batch, { onConflict: "id" });
 
           if (lineErr) {
-            console.warn(`[Trendyol Sync] Order line insert failed for ${order.shipmentPackageId}: ${lineErr.message}`);
+            console.warn(`[Trendyol Sync] Order lines upsert failed: ${lineErr.message}`);
           }
         }
 
