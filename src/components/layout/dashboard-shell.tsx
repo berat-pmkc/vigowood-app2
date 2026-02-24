@@ -47,9 +47,9 @@ export function DashboardShell({
             displayRole={displayRole}
             onLogout={handleLogout}
           />
-          <SidebarInset>
+          <SidebarInset className="min-w-0">
             <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} />
-            <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">
+            <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6">
               {children}
             </main>
           </SidebarInset>

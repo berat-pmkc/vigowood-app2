@@ -84,14 +84,14 @@ function StokCell({ stok, kritik }: { stok: number; kritik: number }) {
 function getColumns(): ColumnDef<HazirElemanStok>[] {
   return [
     {
-      accessorKey: "part_id",
-      header: () => <span className="text-xs font-medium">Parça ID</span>,
+      accessorKey: "part_adi",
+      header: () => <span className="text-xs font-medium">Parça Adı</span>,
       cell: ({ row }) => (
-        <span className="font-mono text-xs sm:text-sm whitespace-nowrap">
-          {row.original.part_id}
+        <span className="text-xs sm:text-sm line-clamp-1">
+          {row.original.part_adi || row.original.part_id}
         </span>
       ),
-      size: 120,
+      size: 160,
       enableSorting: false,
     },
     {
@@ -174,7 +174,7 @@ export function ParcaStokDataTable({
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Parça ID ara..."
+            placeholder="Parça ara..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
