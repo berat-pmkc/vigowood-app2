@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { YariMamulStokClient } from "./components/yari-mamul-stok-client";
 import type { ParcaStok } from "./components/parca-stok-data-table";
 import type { YariMamulHareket } from "./components/hareketler-data-table";
-import type { DailyChartData } from "./components/trend-chart";
 import type { Database } from "@/lib/supabase/types";
 
 type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
@@ -55,12 +54,9 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
   const mSortBy = params.mSortBy || "tarih";
   const mSortOrder = params.mSortOrder === "asc" ? "asc" as const : "desc" as const;
 
-  // ---------- FETCH ALL DATA IN PARALLEL ----------
+  // ---------- FETCH DATA IN PARALLEL ----------
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
   // 1. Parts query (YARIMAMUL only) with filters
   let partsQuery = supabase
@@ -112,27 +108,17 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
     .select("qty, direction")
     .gte("tarih", todayStr);
 
-  // 5. Chart data: last 30 days movements (limit to prevent huge payloads on 234K table)
-  const chartQuery = supabase
-    .from("yari_mamul_stok")
-    .select("tarih, qty, direction")
-    .gte("tarih", thirtyDaysAgoStr)
-    .order("tarih", { ascending: true })
-    .limit(5000);
-
   // Execute all in parallel
   const [
     partsResult,
     movementsResult,
     kpiResult,
     todayResult,
-    chartResult,
   ] = await Promise.all([
     partsQuery,
     movementsQuery,
     kpiQuery,
     todayMovementsQuery,
-    chartQuery,
   ]);
 
   // ---------- PROCESS KPI DATA ----------
@@ -148,40 +134,11 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
     .filter((m) => m.direction === "IN")
     .reduce((sum, m) => sum + m.qty, 0);
 
-  // ---------- PROCESS CHART DATA ----------
-  const dailyMap = new Map<string, { giris: number; cikis: number }>();
-  // Fill all 30 days
-  for (let i = 0; i <= 30; i++) {
-    const d = new Date(thirtyDaysAgo);
-    d.setDate(d.getDate() + i);
-    const key = d.toISOString().split("T")[0];
-    dailyMap.set(key, { giris: 0, cikis: 0 });
-  }
-  (chartResult.data || []).forEach((m: { tarih: string | null; qty: number; direction: string | null }) => {
-    if (!m.tarih) return;
-    const day = m.tarih.split("T")[0];
-    const existing = dailyMap.get(day);
-    if (existing) {
-      if (m.direction === "IN") {
-        existing.giris += m.qty;
-      } else {
-        existing.cikis += m.qty;
-      }
-    }
-  });
-  const chartData: DailyChartData[] = Array.from(dailyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, vals]) => ({
-      date,
-      giris: vals.giris,
-      cikis: vals.cikis,
-    }));
-
   // ---------- FETCH LAST MOVEMENT DATES FOR CURRENT PAGE PARTS ----------
   const partsList = (partsResult.data || []) as AllPart[];
   const partIds = partsList.map((p) => p.part_id);
 
-  let lastMovementMap = new Map<string, string>();
+  const lastMovementMap = new Map<string, string>();
   if (partIds.length > 0) {
     const { data: lastMovements } = await supabase
       .from("yari_mamul_stok")
@@ -196,7 +153,7 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
     });
   }
 
-  // ---------- ENRICH PARTS WITH LAST MOVEMENT DATE ----------
+  // ---------- ENRICH PARTS ----------
   const parts: ParcaStok[] = partsList.map((p) => ({
     part_id: p.part_id,
     part_adi: p.part_adi,
@@ -239,7 +196,6 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
           todayIn,
           todayMovements: todayMovementCount,
         }}
-        chartData={chartData}
         stokData={parts}
         stokTotalCount={partsResult.count ?? 0}
         stokPageIndex={stokPage}

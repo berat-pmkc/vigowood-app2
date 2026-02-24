@@ -1,29 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import dynamic from "next/dynamic";
-import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import { BarChart3 } from "lucide-react";
 import { KpiCards, type YariMamulKpiData } from "./kpi-cards";
-import type { DailyChartData } from "./trend-chart";
-
-const TrendChart = dynamic(
-  () => import("./trend-chart").then(mod => ({ default: mod.TrendChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> }
-);
 import { ParcaStokDataTable, type ParcaStok } from "./parca-stok-data-table";
 import { HareketlerDataTable, type YariMamulHareket } from "./hareketler-data-table";
 import { useStokYariMamulRealtime } from "@/hooks/use-stok-yari-mamul-realtime";
 import { LastUpdatedBadge } from "@/components/shared/last-updated-badge";
 
 interface YariMamulStokClientProps {
-  // Tab
   activeTab: string;
-  // KPI
   kpiData: YariMamulKpiData;
-  // Chart
-  chartData: DailyChartData[];
   // Parts stock table
   stokData: ParcaStok[];
   stokTotalCount: number;
@@ -46,7 +37,6 @@ interface YariMamulStokClientProps {
 export function YariMamulStokClient({
   activeTab,
   kpiData,
-  chartData,
   stokData,
   stokTotalCount,
   stokPageIndex,
@@ -64,7 +54,6 @@ export function YariMamulStokClient({
   movementsSortOrder,
 }: YariMamulStokClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
   const { lastUpdated } = useStokYariMamulRealtime();
 
@@ -84,10 +73,18 @@ export function YariMamulStokClient({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Yarı Mamül Stok</h1>
           <p className="text-sm text-muted-foreground">
-            Parça bazlı yarı mamül stok takibi, hareketler ve trend analizi
+            Parça bazlı yarı mamül stok takibi ve hareketler
           </p>
         </div>
-        <LastUpdatedBadge lastUpdated={lastUpdated} />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/stok/yari-mamul/grafik">
+              <BarChart3 className="mr-1.5 h-4 w-4" />
+              Grafik
+            </Link>
+          </Button>
+          <LastUpdatedBadge lastUpdated={lastUpdated} />
+        </div>
       </div>
 
       <KpiCards data={kpiData} />
@@ -98,8 +95,7 @@ export function YariMamulStokClient({
           <TabsTrigger value="hareketler">Hareketler</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ozet" className="mt-4 space-y-4">
-          <TrendChart data={chartData} />
+        <TabsContent value="ozet" className="mt-4">
           <ParcaStokDataTable
             data={stokData}
             totalCount={stokTotalCount}

@@ -10,11 +10,9 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
-import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { formatNumber, formatDate } from "@/lib/utils";
+import { formatNumber, cn } from "@/lib/utils";
 
 export interface ParcaStok {
   part_id: string;
@@ -34,129 +32,68 @@ interface ParcaStokDataTableProps {
   sortOrder: "asc" | "desc";
 }
 
-function StokBadge({ stok, kritik }: { stok: number; kritik: number }) {
+function getStokColor(stok: number, kritik: number) {
   if (kritik <= 0) {
-    return (
-      <span className="font-medium tabular-nums">{formatNumber(stok)}</span>
-    );
+    return { bg: "bg-slate-100", bar: "bg-slate-300", text: "text-slate-700" };
   }
-  if (stok < kritik) {
-    return (
-      <Badge variant="destructive" className="tabular-nums font-medium">
-        {formatNumber(stok)}
-      </Badge>
-    );
+  const ratio = stok / kritik;
+  if (ratio < 0.5) {
+    return { bg: "bg-red-50", bar: "bg-red-500", text: "text-red-700 font-semibold" };
   }
-  if (stok <= kritik * 1.5) {
-    return (
-      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 tabular-nums font-medium">
-        {formatNumber(stok)}
-      </Badge>
-    );
+  if (ratio < 1.0) {
+    return { bg: "bg-red-50", bar: "bg-red-400", text: "text-red-600 font-semibold" };
   }
+  if (ratio < 1.5) {
+    return { bg: "bg-amber-50", bar: "bg-amber-400", text: "text-amber-700" };
+  }
+  if (ratio < 3.0) {
+    return { bg: "bg-emerald-50", bar: "bg-emerald-400", text: "text-emerald-700" };
+  }
+  return { bg: "bg-emerald-50", bar: "bg-emerald-500", text: "text-emerald-800" };
+}
+
+function StokCell({ stok, kritik }: { stok: number; kritik: number }) {
+  const color = getStokColor(stok, kritik);
+  const barPct = kritik > 0 ? Math.min((stok / kritik / 4) * 100, 100) : 50;
+
   return (
-    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 tabular-nums font-medium">
-      {formatNumber(stok)}
-    </Badge>
+    <div className="flex items-center gap-2 min-w-0">
+      <span className={cn("tabular-nums text-sm whitespace-nowrap", color.text)}>
+        {formatNumber(stok)}
+      </span>
+      <div className={cn("h-3 flex-1 rounded-full overflow-hidden", color.bg)}>
+        <div
+          className={cn("h-full rounded-full transition-all", color.bar)}
+          style={{ width: `${barPct}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
-function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<ParcaStok>[] {
+function getColumns(): ColumnDef<ParcaStok>[] {
   return [
     {
       accessorKey: "part_id",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Parça ID" onSort={onSort} />
-      ),
+      header: () => <span className="text-xs font-medium">Parça ID</span>,
       cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.original.part_id}</span>
-      ),
-      size: 140,
-    },
-    {
-      accessorKey: "part_adi",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Parça Adı" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="max-w-[220px] truncate text-sm">
-          {row.original.part_adi || "—"}
+        <span className="font-mono text-xs sm:text-sm whitespace-nowrap">
+          {row.original.part_id}
         </span>
       ),
-      size: 240,
+      size: 120,
+      enableSorting: false,
     },
     {
       accessorKey: "yari_mamul_stok",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Mevcut Stok" onSort={onSort} />
-      ),
+      header: () => <span className="text-xs font-medium">Stok</span>,
       cell: ({ row }) => (
-        <StokBadge
+        <StokCell
           stok={row.original.yari_mamul_stok}
           kritik={row.original.hazir_eleman_kritik_stok}
         />
       ),
-      size: 120,
-    },
-    {
-      accessorKey: "hazir_eleman_kritik_stok",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Kritik Eşik" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="tabular-nums text-sm text-muted-foreground">
-          {row.original.hazir_eleman_kritik_stok > 0
-            ? formatNumber(row.original.hazir_eleman_kritik_stok)
-            : "—"}
-        </span>
-      ),
-      size: 100,
-    },
-    {
-      accessorKey: "son_hareket_tarihi",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Son Hareket" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {formatDate(row.original.son_hareket_tarihi)}
-        </span>
-      ),
-      meta: { className: "hidden lg:table-cell" },
-      size: 120,
-    },
-    {
-      id: "durum",
-      header: "Durum",
-      cell: ({ row }) => {
-        const { yari_mamul_stok, hazir_eleman_kritik_stok } = row.original;
-        if (hazir_eleman_kritik_stok <= 0) return null;
-        if (yari_mamul_stok < hazir_eleman_kritik_stok) {
-          return (
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
-              <span className="text-xs text-red-600">Kritik</span>
-            </div>
-          );
-        }
-        if (yari_mamul_stok <= hazir_eleman_kritik_stok * 1.5) {
-          return (
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="text-xs text-amber-600">Düşük</span>
-            </div>
-          );
-        }
-        return (
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span className="text-xs text-emerald-600">Yeterli</span>
-          </div>
-        );
-      },
-      size: 90,
       enableSorting: false,
-      meta: { className: "hidden md:table-cell" },
     },
   ];
 }
@@ -199,23 +136,12 @@ export function ParcaStokDataTable({
     [buildUrl, router]
   );
 
-  const handleSort = useCallback(
-    (columnId: string, desc: boolean) => {
-      navigate({
-        sortBy: columnId,
-        sortOrder: desc ? "desc" : "asc",
-        page: "0",
-      });
-    },
-    [navigate]
-  );
-
   const sorting: SortingState = useMemo(
     () => [{ id: sortBy, desc: sortOrder === "desc" }],
     [sortBy, sortOrder]
   );
 
-  const columns = useMemo(() => getColumns(handleSort), [handleSort]);
+  const columns = useMemo(() => getColumns(), []);
 
   const table = useReactTable({
     data,
@@ -233,12 +159,11 @@ export function ParcaStokDataTable({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Parça ID veya parça adı ara..."
+            placeholder="Parça ID ara..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {

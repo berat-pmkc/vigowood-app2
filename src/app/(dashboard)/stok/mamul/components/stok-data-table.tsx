@@ -12,8 +12,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { formatNumber } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { formatNumber, cn } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
@@ -33,68 +32,28 @@ interface StokDataTableProps {
   sortOrder: "asc" | "desc";
 }
 
-/**
- * Stok/Kritik oranına göre renk döndürür.
- * ratio < 0.5 → koyu kırmızı
- * ratio 0.5–1.0 → kırmızı
- * ratio 1.0–1.5 → amber/sarı
- * ratio 1.5–3.0 → açık yeşil
- * ratio > 3.0 → koyu yeşil
- * kritik = 0 → nötr gri
- */
 function getStokColor(stok: number, kritik: number) {
   if (kritik <= 0) {
-    return {
-      bg: "bg-slate-100",
-      bar: "bg-slate-300",
-      text: "text-slate-700",
-      ratio: 1,
-    };
+    return { bg: "bg-slate-100", bar: "bg-slate-300", text: "text-slate-700" };
   }
   const ratio = stok / kritik;
   if (ratio < 0.5) {
-    return {
-      bg: "bg-red-50",
-      bar: "bg-red-500",
-      text: "text-red-700 font-semibold",
-      ratio,
-    };
+    return { bg: "bg-red-50", bar: "bg-red-500", text: "text-red-700 font-semibold" };
   }
   if (ratio < 1.0) {
-    return {
-      bg: "bg-red-50",
-      bar: "bg-red-400",
-      text: "text-red-600 font-semibold",
-      ratio,
-    };
+    return { bg: "bg-red-50", bar: "bg-red-400", text: "text-red-600 font-semibold" };
   }
   if (ratio < 1.5) {
-    return {
-      bg: "bg-amber-50",
-      bar: "bg-amber-400",
-      text: "text-amber-700",
-      ratio,
-    };
+    return { bg: "bg-amber-50", bar: "bg-amber-400", text: "text-amber-700" };
   }
   if (ratio < 3.0) {
-    return {
-      bg: "bg-emerald-50",
-      bar: "bg-emerald-400",
-      text: "text-emerald-700",
-      ratio,
-    };
+    return { bg: "bg-emerald-50", bar: "bg-emerald-400", text: "text-emerald-700" };
   }
-  return {
-    bg: "bg-emerald-50",
-    bar: "bg-emerald-500",
-    text: "text-emerald-800",
-    ratio,
-  };
+  return { bg: "bg-emerald-50", bar: "bg-emerald-500", text: "text-emerald-800" };
 }
 
 function StokCell({ stok, kritik }: { stok: number; kritik: number }) {
   const color = getStokColor(stok, kritik);
-  // Bar width: capped at ratio 4 (100%)
   const barPct = kritik > 0 ? Math.min((stok / kritik / 4) * 100, 100) : 50;
 
   return (
@@ -116,9 +75,7 @@ function getColumns(): ColumnDef<StokProduct>[] {
   return [
     {
       accessorKey: "sku",
-      header: () => (
-        <span className="text-xs font-medium">Ürün Kodu</span>
-      ),
+      header: () => <span className="text-xs font-medium">Ürün Kodu</span>,
       cell: ({ row }) => (
         <span className="font-mono text-xs sm:text-sm whitespace-nowrap">
           {row.original.sku}
@@ -128,10 +85,22 @@ function getColumns(): ColumnDef<StokProduct>[] {
       enableSorting: false,
     },
     {
-      accessorKey: "stok_aktif",
-      header: () => (
-        <span className="text-xs font-medium">Stok</span>
+      accessorKey: "gunluk_satis",
+      header: () => <span className="text-xs font-medium">Günlük Satış</span>,
+      cell: ({ row }) => (
+        <span className="tabular-nums text-sm text-muted-foreground">
+          {row.original.gunluk_satis > 0
+            ? formatNumber(row.original.gunluk_satis)
+            : "—"}
+        </span>
       ),
+      meta: { className: "hidden sm:table-cell" },
+      size: 100,
+      enableSorting: false,
+    },
+    {
+      accessorKey: "stok_aktif",
+      header: () => <span className="text-xs font-medium">Stok</span>,
       cell: ({ row }) => (
         <StokCell
           stok={row.original.stok_aktif}
@@ -204,7 +173,6 @@ export function StokDataTable({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
