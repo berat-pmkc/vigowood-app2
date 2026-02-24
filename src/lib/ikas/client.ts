@@ -132,38 +132,28 @@ export class IkasError extends Error {
   }
 }
 
-// ─── Mock Data Flag ─────────────────────────────────────
-// NOT: Modül seviyesinde hasCredentials() çağırmıyoruz — Next.js'te
-// process.env modül yüklenirken henüz hazır olmayabiliyor.
-let forceMock = false;
-
-function shouldUseMock(): boolean {
-  if (forceMock) return true;
-  return !hasCredentials();
-}
+// ─── Mock Data Logic ─────────────────────────────────────
 
 async function tryFetchOrMock<T>(
   fetchFn: () => Promise<T>,
   mockFn: () => T
 ): Promise<T> {
-  if (shouldUseMock()) return mockFn();
+  if (!hasCredentials()) {
+    console.log("[İkas] No credentials found — using mock data");
+    return mockFn();
+  }
   try {
     return await fetchFn();
   } catch (err) {
-    const isAuthError =
-      err instanceof IkasError && (err.status === 401 || err.status === 403);
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[İkas] API error${isAuthError ? " (auth)" : ""}: ${errorMsg} — falling back to mock data`
-    );
-    forceMock = true;
+    console.error(`[İkas] API error: ${errorMsg} — falling back to mock data`);
     return mockFn();
   }
 }
 
 /** Check if currently using mock data */
 export function isUsingMockData(): boolean {
-  return shouldUseMock();
+  return !hasCredentials();
 }
 
 // ─── Orders ─────────────────────────────────────────────
@@ -259,7 +249,7 @@ export async function getCustomerOrders(
   page = 1,
   limit = 20
 ): Promise<IkasPaginatedResponse<IkasOrder>> {
-  if (shouldUseMock()) {
+  if (!hasCredentials()) {
     const all = getMockOrders();
     const filtered = all.data.filter(
       (o) => o.customer.email.includes("mock") || true
@@ -282,7 +272,7 @@ export async function getCustomerOrders(
 export async function updateStock(
   inputs: IkasStockUpdateInput[]
 ): Promise<boolean> {
-  if (shouldUseMock()) return true;
+  if (!hasCredentials()) return true;
 
   const data = await ikasGraphQL<{ saveProductStockLocations: boolean }>(
     UPDATE_STOCK_MUTATION,
@@ -297,7 +287,7 @@ export async function updatePrice(
   priceListId: string,
   inputs: IkasVariantPriceInput[]
 ): Promise<boolean> {
-  if (shouldUseMock()) return true;
+  if (!hasCredentials()) return true;
 
   const data = await ikasGraphQL<{ saveVariantPrices: boolean }>(
     UPDATE_PRICES_MUTATION,
@@ -309,7 +299,7 @@ export async function updatePrice(
 
 // ─── Stock Locations ────────────────────────────────────
 export async function getStockLocations(): Promise<IkasStockLocation[]> {
-  if (shouldUseMock()) {
+  if (!hasCredentials()) {
     return [
       { id: "mock-ana-depo", name: "Ana Depo", description: null },
       { id: "mock-almanya", name: "Almanya Stok", description: null },
@@ -325,7 +315,7 @@ export async function getStockLocations(): Promise<IkasStockLocation[]> {
 
 // ─── Price Lists ────────────────────────────────────────
 export async function getPriceLists(): Promise<IkasPriceList[]> {
-  if (shouldUseMock()) {
+  if (!hasCredentials()) {
     return [
       { id: "mock-tr", name: "TR Fiyat Listesi", currency: "TRY", currencyCode: "TRY", type: "MANUAL" },
     ];
