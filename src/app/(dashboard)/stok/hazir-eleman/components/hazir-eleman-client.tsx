@@ -1,17 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import dynamic from "next/dynamic";
-import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import { BarChart3 } from "lucide-react";
 import { KpiCards, type HazirElemanKpiData } from "./kpi-cards";
-import type { DailyChartData } from "./trend-chart";
-
-const TrendChart = dynamic(
-  () => import("./trend-chart").then(mod => ({ default: mod.TrendChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> }
-);
 import { ParcaStokDataTable, type HazirElemanStok } from "./parca-stok-data-table";
 import { HareketlerDataTable, type HazirElemanHareket } from "./hareketler-data-table";
 import { StokGirisDialog } from "./stok-giris-dialog";
@@ -22,7 +17,6 @@ interface HazirElemanClientProps {
   activeTab: string;
   canAddStock: boolean;
   kpiData: HazirElemanKpiData;
-  chartData: DailyChartData[];
   stokData: HazirElemanStok[];
   stokTotalCount: number;
   stokPageIndex: number;
@@ -44,7 +38,6 @@ export function HazirElemanClient({
   activeTab,
   canAddStock,
   kpiData,
-  chartData,
   stokData,
   stokTotalCount,
   stokPageIndex,
@@ -81,10 +74,16 @@ export function HazirElemanClient({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Hazır Eleman Stok</h1>
           <p className="text-sm text-muted-foreground">
-            Hazır eleman, kutu ve karton stok takibi, kritik uyarılar ve giriş işlemleri
+            Hazır eleman, kutu ve karton stok takibi
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/stok/hazir-eleman/grafik">
+              <BarChart3 className="mr-1.5 h-4 w-4" />
+              Grafik
+            </Link>
+          </Button>
           <LastUpdatedBadge lastUpdated={lastUpdated} />
           {canAddStock && <StokGirisDialog />}
         </div>
@@ -98,8 +97,7 @@ export function HazirElemanClient({
           <TabsTrigger value="hareketler">Hareketler</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ozet" className="mt-4 space-y-4">
-          <TrendChart data={chartData} />
+        <TabsContent value="ozet" className="mt-4">
           <ParcaStokDataTable
             data={stokData}
             totalCount={stokTotalCount}

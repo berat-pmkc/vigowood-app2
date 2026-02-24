@@ -5,7 +5,6 @@ import { STOCK_ACCESS_ROLES } from "@/lib/constants";
 import { HazirElemanClient } from "./components/hazir-eleman-client";
 import type { HazirElemanStok } from "./components/parca-stok-data-table";
 import type { HazirElemanHareket } from "./components/hareketler-data-table";
-import type { DailyChartData } from "./components/trend-chart";
 import type { Database } from "@/lib/supabase/types";
 
 type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
@@ -34,7 +33,6 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
-  // Check stock access for add button
   const user = await getCurrentUser();
   const canAddStock = !!user && STOCK_ACCESS_ROLES.includes(user.role);
 
@@ -59,12 +57,9 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
   const mSortBy = params.mSortBy || "tarih";
   const mSortOrder = params.mSortOrder === "asc" ? "asc" as const : "desc" as const;
 
-  // ---------- FETCH ALL DATA IN PARALLEL ----------
+  // ---------- FETCH DATA IN PARALLEL ----------
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
   // 1. Parts query (HAZIR + KUTU + KARTON) with filters
   let partsQuery = supabase
@@ -116,26 +111,17 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
     .select("qty")
     .gte("tarih", todayStr);
 
-  // 5. Chart data: last 30 days movements
-  const chartQuery = supabase
-    .from("hazir_eleman_akis")
-    .select("tarih, qty")
-    .gte("tarih", thirtyDaysAgoStr)
-    .order("tarih", { ascending: true });
-
   // Execute all in parallel
   const [
     partsResult,
     movementsResult,
     kpiResult,
     todayResult,
-    chartResult,
   ] = await Promise.all([
     partsQuery,
     movementsQuery,
     kpiQuery,
     todayMovementsQuery,
-    chartQuery,
   ]);
 
   // ---------- PROCESS KPI DATA ----------
@@ -149,31 +135,11 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
   const todayMovementCount = todayMovements.length;
   const todayIn = todayMovements.reduce((sum, m) => sum + m.qty, 0);
 
-  // ---------- PROCESS CHART DATA ----------
-  const dailyMap = new Map<string, number>();
-  for (let i = 0; i <= 30; i++) {
-    const d = new Date(thirtyDaysAgo);
-    d.setDate(d.getDate() + i);
-    const key = d.toISOString().split("T")[0];
-    dailyMap.set(key, 0);
-  }
-  (chartResult.data || []).forEach((m: { tarih: string; qty: number }) => {
-    if (!m.tarih) return;
-    const day = m.tarih.split("T")[0];
-    const existing = dailyMap.get(day);
-    if (existing !== undefined) {
-      dailyMap.set(day, existing + m.qty);
-    }
-  });
-  const chartData: DailyChartData[] = Array.from(dailyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, giris]) => ({ date, giris }));
-
   // ---------- FETCH LAST MOVEMENT DATES FOR CURRENT PAGE PARTS ----------
   const partsList = (partsResult.data || []) as AllPart[];
   const partIds = partsList.map((p) => p.part_id);
 
-  let lastMovementMap = new Map<string, string>();
+  const lastMovementMap = new Map<string, string>();
   if (partIds.length > 0) {
     const { data: lastMovements } = await supabase
       .from("hazir_eleman_akis")
@@ -204,7 +170,7 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
     if (m.part_id) movementPartIds.add(m.part_id);
   });
 
-  let partNameMap = new Map<string, string>();
+  const partNameMap = new Map<string, string>();
   if (movementPartIds.size > 0) {
     const { data: partNames } = await supabase
       .from("all_parts")
@@ -246,7 +212,6 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
           todayIn,
           todayMovements: todayMovementCount,
         }}
-        chartData={chartData}
         stokData={parts}
         stokTotalCount={partsResult.count ?? 0}
         stokPageIndex={stokPage}
