@@ -455,17 +455,21 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [ ] PPC dashboard, AI tahmin
 
 ### KATMAN 30: Ops Center — Task Management ✅
-- [x] DB: tasks, task_comments, task_attachments, task_activity tabloları + 5 enum + RLS + realtime
-- [x] Sidebar: Ops Center menü grubu (Genel Bakış, Board, Görevlerim, Onaylar)
-- [x] /ops: KPI kartları, geciken görevler, bugün tamamlanan, son aktiviteler
-- [x] /ops/board: 6 kolonlu Kanban board, @dnd-kit sürükle-bırak, filtreler
+- [x] **Aşama 1**: DB: tasks, task_comments, task_attachments, task_activity tabloları + 5 enum + RLS + realtime
+- [x] Sidebar: Ops Center menü grubu (Genel Bakış, Board, Görevlerim, Onaylar, Raporlar, Ajanlar)
+- [x] /ops: KPI kartları (7 adet: görev + approval + ajan + çıktı), geciken görevler, bekleyen onaylar, bugün tamamlanan, son aktiviteler
+- [x] /ops/board: 6 kolonlu Kanban board, @dnd-kit sürükle-bırak, filtreler (dept, assignee+agents, priority)
 - [x] Task kartları: başlık, assignee, öncelik+departman badge, due date, subtask/attachment/comment
-- [x] Hızlı + detaylı görev oluşturma
+- [x] Hızlı + detaylı görev oluşturma, Çalışanlar/Ajanlar tab'lı assignee picker
 - [x] Task detail sheet: inline edit, yorumlar, dosyalar (Storage), aktivite, alt görevler
 - [x] /ops/gorevlerim: Inbox, filtre + sıralama
-- [x] /ops/onaylar: Onay bekleyen görevler, onayla/geri gönder
 - [x] Supabase Storage bucket: task-attachments
-- [x] Build: 76 route, sıfır TypeScript hatası
+- [x] **Aşama 2**: DB: ops_agents, ops_approvals, ops_outputs tabloları + 5 enum + RLS + realtime
+- [x] 6 sanal ajan seed: Elif(stok), Kerem(üretim), Zeynep(pazaryeri), Burak(sevkiyat), Derya(muhasebe), Can(genel)
+- [x] /ops/onaylar: Approval sistemi — aksiyon türü, risk seviyesi, payload karşılaştırma, onayla/reddet/revizyon
+- [x] /ops/raporlar: Çıktılar sayfası — dosya listesi, tür+ajan filtre, indir/aç/sil
+- [x] /ops/ajanlar: Ajan profilleri — kart listesi, detay sheet, yetenekler, çalışma planı, durum kontrolleri
+- [x] Build: 78 route, sıfır TypeScript hatası
 
 ### KATMAN 29: Test & Güvenlik Denetimi ✅
 - [x] Güvenlik: 38/38 server action + 9/9 API route auth guard doğrulandı
