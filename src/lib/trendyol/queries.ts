@@ -138,6 +138,31 @@ interface SettlementRow {
   shipment_package_id: number | null;
 }
 
+// ─── Settlement Normalization ────────────────────────────
+// Trendyol API returns Turkish transaction types — normalize to English
+const TR_TO_EN_TYPE: Record<string, string> = {
+  "Satış": "Sale",
+  "İade": "Return",
+  "İndirim": "Discount",
+  "İndirimİptal": "DiscountCancel",
+  "Kupon": "Coupon",
+  "KuponİIptal": "CouponCancel",
+  "KomisyonArtı": "CommissionPositive",
+  "KomisyonEksi": "CommissionNegative",
+  "TYİndirim": "TYDiscount",
+  "TYİndirimİptal": "TYDiscountCancel",
+  "SatıcıGelirArtı": "SellerRevenuePositive",
+  "SatıcıGelirEksi": "SellerRevenueNegative",
+};
+
+/** Convert timestamp string (ms) to ISO date string */
+function tsToISO(ts: string | null): string {
+  if (!ts) return "";
+  const n = parseInt(ts, 10);
+  if (isNaN(n)) return ts; // already ISO string
+  return new Date(n).toISOString();
+}
+
 // ─── Mappers ─────────────────────────────────────────────
 
 function mapLineRow(row: OrderLineRow): TrendyolOrderLine {
@@ -266,16 +291,22 @@ function mapQuestionRow(row: QuestionRow): TrendyolQuestion {
 }
 
 function mapSettlementRow(row: SettlementRow): TrendyolSettlement {
+  // Normalize Turkish type → English
+  const enType = TR_TO_EN_TYPE[row.transaction_type] || row.transaction_type;
+  // Convert timestamp strings → ISO dates
+  const txDate = tsToISO(row.transaction_date);
+  const pmtDate = tsToISO(row.payment_date);
+
   return {
     id: row.id,
-    transactionDate: row.transaction_date || "",
-    transactionType: row.transaction_type as TrendyolSettlement["transactionType"],
+    transactionDate: txDate,
+    transactionType: enType as TrendyolSettlement["transactionType"],
     debt: row.debt,
     credit: row.credit,
     receiptId: row.receipt_id ?? undefined,
     barcode: row.barcode ?? undefined,
     paymentOrderId: row.payment_order_id ?? undefined,
-    paymentDate: row.payment_date ?? undefined,
+    paymentDate: pmtDate || undefined,
     commissionRate: row.commission_rate ?? undefined,
     commissionAmount: row.commission_amount ?? undefined,
     sellerRevenue: row.seller_revenue ?? undefined,
@@ -484,21 +515,17 @@ export async function getSettlementsFromDB(
     .from("trendyol_settlements")
     .select("*", { count: "exact" });
 
-  // Date filter on transaction_date (text format YYYY-MM-DD...)
-  // Convert timestamps to date strings for comparison
+  // Date filter: transaction_date is stored as ms-timestamp string (e.g. "1770632955335")
+  // Compare as strings — works for same-length 13-digit timestamps
   if (params.startDate) {
-    const startStr = new Date(params.startDate).toISOString().split("T")[0];
-    query = query.gte("transaction_date", startStr);
+    query = query.gte("transaction_date", String(params.startDate));
   }
   if (params.endDate) {
-    const endStr = new Date(params.endDate).toISOString().split("T")[0] + "T23:59:59";
-    query = query.lte("transaction_date", endStr);
+    query = query.lte("transaction_date", String(params.endDate));
   }
 
-  if (params.transactionType) {
-    const types = params.transactionType.split(",").map((t) => t.trim());
-    query = query.in("transaction_type", types);
-  }
+  // transaction_type: DB has Turkish values (Satış, İade, etc.)
+  // Don't filter — mapper normalizes Turkish→English, aggregation handles filtering
 
   query = query.order("transaction_date", { ascending: false }).range(from, to);
 

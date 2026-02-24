@@ -17,8 +17,8 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const lastSyncAt = await getOverallLastSyncAt();
 
-  // Default: last 15 days
-  let startDate = daysAgoTimestamp(15);
+  // Default: last 30 days
+  let startDate = daysAgoTimestamp(30);
   let endDate = endOfTodayTimestamp();
 
   if (params.startDate) {
@@ -30,10 +30,7 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
     endDate = ed.getTime();
   }
 
-  const allTypes = "Sale,Return,Discount,DiscountCancel,Coupon,CouponCancel,CommissionPositive,CommissionNegative,TYDiscount,TYDiscountCancel,SellerRevenuePositive,SellerRevenueNegative";
-
   const result = await getSettlementsFromDB({
-    transactionType: allTypes,
     startDate,
     endDate,
     size: 500,

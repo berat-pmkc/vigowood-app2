@@ -270,7 +270,7 @@ export function FinansClient({
                   recentSettlements.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="text-sm">
-                        {s.transactionDate}
+                        {s.transactionDate ? new Date(s.transactionDate).toLocaleDateString("tr-TR") : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge

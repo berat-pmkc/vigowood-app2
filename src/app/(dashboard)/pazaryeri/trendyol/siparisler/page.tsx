@@ -24,8 +24,8 @@ export default async function TrendyolSiparislerPage({ searchParams }: PageProps
   const search = params.search || "";
   const page = parseInt(params.page || "0", 10);
 
-  // Date range — default last 14 days
-  let startDate = daysAgoTimestamp(14);
+  // Date range — default last 30 days
+  let startDate = daysAgoTimestamp(30);
   let endDate = endOfTodayTimestamp();
 
   if (params.startDate) {
