@@ -11,15 +11,15 @@
     },
     {
       "path": "/api/cron/trendyol-orders?secret=${CRON_SECRET}",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api/cron/trendyol-products?secret=${CRON_SECRET}",
-      "schedule": "0 * * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/trendyol-settlements?secret=${CRON_SECRET}",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
