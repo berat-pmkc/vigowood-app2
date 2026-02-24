@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { ShoppingCart, Package, Users } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, Users } from "lucide-react";
 
 const tabs = [
+  { title: "Dashboard", href: "/pazaryeri/vigowood-com", icon: LayoutDashboard, exact: true },
   { title: "Siparişler", href: "/pazaryeri/vigowood-com/siparisler", icon: ShoppingCart },
   { title: "Ürünler", href: "/pazaryeri/vigowood-com/urunler", icon: Package },
   { title: "Müşteriler", href: "/pazaryeri/vigowood-com/musteriler", icon: Users },
@@ -23,7 +24,9 @@ export function VigowoodNav() {
         <span className="hidden text-sm font-semibold text-vw-dark sm:inline">vigowood.com</span>
       </div>
       {tabs.map((tab) => {
-        const isActive = pathname.startsWith(tab.href);
+        const isActive = tab.exact
+          ? pathname === tab.href
+          : pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}

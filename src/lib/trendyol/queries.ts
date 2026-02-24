@@ -158,8 +158,10 @@ const TR_TO_EN_TYPE: Record<string, string> = {
 /** Convert timestamp string (ms) to ISO date string */
 function tsToISO(ts: string | null): string {
   if (!ts) return "";
+  // If it looks like an ISO date (contains '-' or 'T'), return as-is
+  if (ts.includes("-") || ts.includes("T")) return ts;
   const n = parseInt(ts, 10);
-  if (isNaN(n)) return ts; // already ISO string
+  if (isNaN(n)) return ts;
   return new Date(n).toISOString();
 }
 

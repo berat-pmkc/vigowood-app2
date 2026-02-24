@@ -24,7 +24,7 @@ import {
 import dynamic from "next/dynamic";
 import { SyncStatus } from "../../components/sync-status";
 import type { TrendyolSettlement } from "@/lib/trendyol/types";
-import { formatTRY, formatTrendyolDateShort } from "@/lib/trendyol/helpers";
+import { formatTRY } from "@/lib/trendyol/helpers";
 
 const FinansChart = dynamic(() => import("./finans-chart"), {
   ssr: false,

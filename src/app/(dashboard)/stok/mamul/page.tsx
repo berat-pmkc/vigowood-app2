@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { MamulStokClient } from "./components/mamul-stok-client";
 import type { StokProduct } from "./components/stok-data-table";
 import type { StokMovement } from "./components/hareketler-data-table";
-import type { DailyChartData } from "./components/trend-chart";
 import type { Database, ProductCategory } from "@/lib/supabase/types";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
@@ -56,12 +55,9 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   const mSortBy = params.mSortBy || "tarih";
   const mSortOrder = params.mSortOrder === "asc" ? "asc" as const : "desc" as const;
 
-  // ---------- FETCH ALL DATA IN PARALLEL ----------
+  // ---------- FETCH DATA IN PARALLEL ----------
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
   // 1. Products query with filters
   let productsQuery = supabase
@@ -81,7 +77,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   ];
   const stokSortColumn = validStokSortColumns.includes(stokSortBy as keyof Product)
     ? stokSortBy
-    : "sku";
+    : "gunluk_satis";
   productsQuery = productsQuery
     .order(stokSortColumn, { ascending: stokSortOrder === "asc" })
     .range(stokPage * stokPageSize, stokPage * stokPageSize + stokPageSize - 1);
@@ -116,27 +112,17 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     .select("qty")
     .gte("tarih", todayStr);
 
-  // 5. Chart data: last 30 days movements (limit to prevent huge payloads)
-  const chartQuery = supabase
-    .from("stock_movements")
-    .select("tarih, qty")
-    .gte("tarih", thirtyDaysAgoStr)
-    .order("tarih", { ascending: true })
-    .limit(5000);
-
   // Execute all in parallel
   const [
     productsResult,
     movementsResult,
     kpiResult,
     todayResult,
-    chartResult,
   ] = await Promise.all([
     productsQuery,
     movementsQuery,
     kpiQuery,
     todayMovementsQuery,
-    chartQuery,
   ]);
 
   // ---------- PROCESS KPI DATA ----------
@@ -151,35 +137,6 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   const todayProduction = todayMovements
     .filter((m) => m.qty > 0)
     .reduce((sum, m) => sum + m.qty, 0);
-
-  // ---------- PROCESS CHART DATA ----------
-  const dailyMap = new Map<string, { giris: number; cikis: number }>();
-  // Fill all 30 days
-  for (let i = 0; i <= 30; i++) {
-    const d = new Date(thirtyDaysAgo);
-    d.setDate(d.getDate() + i);
-    const key = d.toISOString().split("T")[0];
-    dailyMap.set(key, { giris: 0, cikis: 0 });
-  }
-  (chartResult.data || []).forEach((m: { tarih: string | null; qty: number }) => {
-    if (!m.tarih) return;
-    const day = m.tarih.split("T")[0];
-    const existing = dailyMap.get(day);
-    if (existing) {
-      if (m.qty > 0) {
-        existing.giris += m.qty;
-      } else {
-        existing.cikis += Math.abs(m.qty);
-      }
-    }
-  });
-  const chartData: DailyChartData[] = Array.from(dailyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, vals]) => ({
-      date,
-      giris: vals.giris,
-      cikis: vals.cikis,
-    }));
 
   // ---------- FETCH LAST MOVEMENT DATES FOR CURRENT PAGE SKUs ONLY ----------
   const pageSkus = ((productsResult.data || []) as Product[]).map((p) => p.sku);
@@ -205,13 +162,12 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   }));
 
   // ---------- ENRICH MOVEMENTS WITH PRODUCT NAMES ----------
-  // Collect unique SKUs from movements
   const movementSkus = new Set<string>();
   ((movementsResult.data || []) as { sku: string | null }[]).forEach((m) => {
     if (m.sku) movementSkus.add(m.sku);
   });
 
-  let skuNameMap = new Map<string, string>();
+  const skuNameMap = new Map<string, string>();
   if (movementSkus.size > 0) {
     const { data: skuNames } = await supabase
       .from("products")
@@ -255,7 +211,6 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
           todayMovements: todayMovementCount,
           todayProduction,
         }}
-        chartData={chartData}
         stokData={products}
         stokTotalCount={productsResult.count ?? 0}
         stokPageIndex={stokPage}

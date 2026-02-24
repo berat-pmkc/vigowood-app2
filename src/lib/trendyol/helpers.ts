@@ -143,6 +143,7 @@ export function aggregateSettlements(settlements: TrendyolSettlement[]): {
   let totalReturns = 0;
   let totalCommission = 0;
   let totalDiscount = 0;
+  let totalSellerRevenue = 0;
 
   for (const s of settlements) {
     const credit = s.credit ?? 0;
@@ -151,12 +152,21 @@ export function aggregateSettlements(settlements: TrendyolSettlement[]): {
     switch (s.transactionType) {
       case "Sale":
         totalSales += credit;
+        // Use per-row commission data when available (Trendyol provides
+        // commissionAmount and sellerRevenue on each Sale row)
+        if (s.commissionAmount) {
+          totalCommission += s.commissionAmount;
+        }
+        if (s.sellerRevenue) {
+          totalSellerRevenue += s.sellerRevenue;
+        }
         break;
       case "Return":
         totalReturns += debt;
         break;
       case "CommissionNegative":
       case "CommissionPositive":
+        // Separate commission entries (if they exist alongside Sale rows)
         totalCommission += debt - credit;
         break;
       case "Discount":
@@ -166,12 +176,18 @@ export function aggregateSettlements(settlements: TrendyolSettlement[]): {
     }
   }
 
+  // If we have sellerRevenue data, use it for a more accurate net amount.
+  // Otherwise fall back to the manual calculation.
+  const netAmount = totalSellerRevenue > 0
+    ? totalSellerRevenue - totalReturns
+    : totalSales - totalReturns - totalCommission - totalDiscount;
+
   return {
     totalSales,
     totalReturns,
     totalCommission,
     totalDiscount,
-    netAmount: totalSales - totalReturns - totalCommission - totalDiscount,
+    netAmount,
   };
 }
 

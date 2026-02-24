@@ -19,6 +19,7 @@ import {
   getQuestions,
   getSettlements,
   isUsingMockData,
+  resetMockDataFlag,
 } from "./client";
 import { daysAgoTimestamp, endOfTodayTimestamp } from "./helpers";
 
@@ -221,6 +222,8 @@ function mapSettlementToRow(s: TrendyolSettlement) {
 export async function syncOrders(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
+  // Reset mock flag to give the real API a chance during manual sync
+  resetMockDataFlag();
   if (isUsingMockData()) {
     return { synced: 0, error: "Mock mode active — skipping sync" };
   }
@@ -304,6 +307,7 @@ export async function syncOrders(
 export async function syncProducts(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
+  resetMockDataFlag();
   if (isUsingMockData()) {
     return { synced: 0, error: "Mock mode active — skipping sync" };
   }
@@ -350,6 +354,7 @@ export async function syncProducts(
 export async function syncQuestions(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
+  resetMockDataFlag();
   if (isUsingMockData()) {
     return { synced: 0, error: "Mock mode active — skipping sync" };
   }
@@ -407,6 +412,7 @@ export async function syncQuestions(
 export async function syncSettlements(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
+  resetMockDataFlag();
   if (isUsingMockData()) {
     return { synced: 0, error: "Mock mode active — skipping sync" };
   }
@@ -420,7 +426,10 @@ export async function syncSettlements(
     const now = Date.now();
     const thirtyDaysAgo = now - 30 * 86_400_000;
 
-    const allTypes = "Sale,Return,Discount,DiscountCancel,Coupon,CouponCancel,CommissionPositive,CommissionNegative,TYDiscount,TYDiscountCancel,SellerRevenuePositive,SellerRevenueNegative";
+    // Trendyol returns Turkish transaction type names in responses
+    // (e.g., "Satış" for Sale). Don't filter by type — get everything.
+    // Each Sale row already includes commission_rate, commission_amount,
+    // seller_revenue for complete financial data.
 
     // 2 chunks of 15 days
     const chunks = [
@@ -440,7 +449,6 @@ export async function syncSettlements(
         }
 
         const result = await getSettlements({
-          transactionType: allTypes,
           startDate: chunk.start,
           endDate: chunk.end,
           page,

@@ -10,11 +10,10 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
-import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
@@ -34,116 +33,111 @@ interface StokDataTableProps {
   sortOrder: "asc" | "desc";
 }
 
-function StokBadge({ stok, kritik }: { stok: number; kritik: number }) {
+/**
+ * Stok/Kritik oranına göre renk döndürür.
+ * ratio < 0.5 → koyu kırmızı
+ * ratio 0.5–1.0 → kırmızı
+ * ratio 1.0–1.5 → amber/sarı
+ * ratio 1.5–3.0 → açık yeşil
+ * ratio > 3.0 → koyu yeşil
+ * kritik = 0 → nötr gri
+ */
+function getStokColor(stok: number, kritik: number) {
   if (kritik <= 0) {
-    return (
-      <span className="font-medium tabular-nums">{formatNumber(stok)}</span>
-    );
+    return {
+      bg: "bg-slate-100",
+      bar: "bg-slate-300",
+      text: "text-slate-700",
+      ratio: 1,
+    };
   }
-  if (stok < kritik) {
-    return (
-      <Badge variant="destructive" className="tabular-nums font-medium">
-        {formatNumber(stok)}
-      </Badge>
-    );
+  const ratio = stok / kritik;
+  if (ratio < 0.5) {
+    return {
+      bg: "bg-red-50",
+      bar: "bg-red-500",
+      text: "text-red-700 font-semibold",
+      ratio,
+    };
   }
-  if (stok <= kritik * 1.5) {
-    return (
-      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 tabular-nums font-medium">
-        {formatNumber(stok)}
-      </Badge>
-    );
+  if (ratio < 1.0) {
+    return {
+      bg: "bg-red-50",
+      bar: "bg-red-400",
+      text: "text-red-600 font-semibold",
+      ratio,
+    };
   }
+  if (ratio < 1.5) {
+    return {
+      bg: "bg-amber-50",
+      bar: "bg-amber-400",
+      text: "text-amber-700",
+      ratio,
+    };
+  }
+  if (ratio < 3.0) {
+    return {
+      bg: "bg-emerald-50",
+      bar: "bg-emerald-400",
+      text: "text-emerald-700",
+      ratio,
+    };
+  }
+  return {
+    bg: "bg-emerald-50",
+    bar: "bg-emerald-500",
+    text: "text-emerald-800",
+    ratio,
+  };
+}
+
+function StokCell({ stok, kritik }: { stok: number; kritik: number }) {
+  const color = getStokColor(stok, kritik);
+  // Bar width: capped at ratio 4 (100%)
+  const barPct = kritik > 0 ? Math.min((stok / kritik / 4) * 100, 100) : 50;
+
   return (
-    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 tabular-nums font-medium">
-      {formatNumber(stok)}
-    </Badge>
+    <div className="flex items-center gap-2 min-w-0">
+      <span className={cn("tabular-nums text-sm whitespace-nowrap", color.text)}>
+        {formatNumber(stok)}
+      </span>
+      <div className={cn("h-3 flex-1 rounded-full overflow-hidden", color.bg)}>
+        <div
+          className={cn("h-full rounded-full transition-all", color.bar)}
+          style={{ width: `${barPct}%` }}
+        />
+      </div>
+    </div>
   );
 }
 
-function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<StokProduct>[] {
+function getColumns(): ColumnDef<StokProduct>[] {
   return [
     {
       accessorKey: "sku",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Ürün Kodu" onSort={onSort} />
+      header: () => (
+        <span className="text-xs font-medium">Ürün Kodu</span>
       ),
       cell: ({ row }) => (
-        <span className="font-mono text-sm">{row.original.sku}</span>
-      ),
-      size: 130,
-    },
-    {
-      accessorKey: "gunluk_satis",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Günlük Satış" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="tabular-nums text-sm">
-          {row.original.gunluk_satis > 0
-            ? formatNumber(row.original.gunluk_satis)
-            : "—"}
+        <span className="font-mono text-xs sm:text-sm whitespace-nowrap">
+          {row.original.sku}
         </span>
       ),
-      size: 110,
+      size: 120,
+      enableSorting: false,
     },
     {
       accessorKey: "stok_aktif",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Mevcut Stok" onSort={onSort} />
+      header: () => (
+        <span className="text-xs font-medium">Stok</span>
       ),
       cell: ({ row }) => (
-        <StokBadge
+        <StokCell
           stok={row.original.stok_aktif}
           kritik={row.original.mamul_stok_kritik}
         />
       ),
-      size: 120,
-    },
-    {
-      accessorKey: "mamul_stok_kritik",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Kritik Stok" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="tabular-nums text-sm text-muted-foreground">
-          {row.original.mamul_stok_kritik > 0
-            ? formatNumber(row.original.mamul_stok_kritik)
-            : "—"}
-        </span>
-      ),
-      size: 100,
-    },
-    {
-      id: "durum",
-      header: "Durum",
-      cell: ({ row }) => {
-        const { stok_aktif, mamul_stok_kritik } = row.original;
-        if (mamul_stok_kritik <= 0) return null;
-        if (stok_aktif < mamul_stok_kritik) {
-          return (
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
-              <span className="text-xs text-red-600">Kritik</span>
-            </div>
-          );
-        }
-        if (stok_aktif <= mamul_stok_kritik * 1.5) {
-          return (
-            <div className="flex items-center gap-1.5">
-              <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="text-xs text-amber-600">Düşük</span>
-            </div>
-          );
-        }
-        return (
-          <div className="flex items-center gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span className="text-xs text-emerald-600">Yeterli</span>
-          </div>
-        );
-      },
-      size: 90,
       enableSorting: false,
     },
   ];
@@ -155,7 +149,6 @@ export function StokDataTable({
   pageIndex,
   pageSize,
   search,
-  kategori,
   sortBy,
   sortOrder,
 }: StokDataTableProps) {
@@ -188,23 +181,12 @@ export function StokDataTable({
     [buildUrl, router]
   );
 
-  const handleSort = useCallback(
-    (columnId: string, desc: boolean) => {
-      navigate({
-        sortBy: columnId,
-        sortOrder: desc ? "desc" : "asc",
-        page: "0",
-      });
-    },
-    [navigate]
-  );
-
   const sorting: SortingState = useMemo(
     () => [{ id: sortBy, desc: sortOrder === "desc" }],
     [sortBy, sortOrder]
   );
 
-  const columns = useMemo(() => getColumns(handleSort), [handleSort]);
+  const columns = useMemo(() => getColumns(), []);
 
   const table = useReactTable({
     data,
@@ -223,8 +205,8 @@ export function StokDataTable({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Ürün kodu ara..."

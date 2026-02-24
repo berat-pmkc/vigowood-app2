@@ -26,7 +26,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import type { IkasOrder } from "@/lib/ikas/types";
 import {
   ORDER_TAB_FILTERS,
@@ -37,6 +37,51 @@ import {
   getDisplayStatus,
 } from "@/lib/ikas/helpers";
 import { SiparisDetay } from "./siparis-detay";
+import { IkasSyncButton } from "../../components/ikas-sync-button";
+
+const DATE_QUICK_FILTERS = [
+  { label: "Bugün", value: "today" },
+  { label: "Bu Hafta", value: "week" },
+  { label: "Bu Ay", value: "month" },
+  { label: "Son 14 Gün", value: "14days" },
+] as const;
+
+function getQuickFilterRange(value: string): { startDate: string; endDate: string } {
+  const now = new Date();
+  const endDate = now.toISOString().split("T")[0];
+
+  switch (value) {
+    case "today":
+      return { startDate: endDate, endDate };
+    case "week": {
+      const day = now.getDay();
+      const diff = day === 0 ? 6 : day - 1; // Monday-based
+      const start = new Date(now);
+      start.setDate(start.getDate() - diff);
+      return { startDate: start.toISOString().split("T")[0], endDate };
+    }
+    case "month": {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { startDate: start.toISOString().split("T")[0], endDate };
+    }
+    case "14days":
+    default: {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 14);
+      return { startDate: start.toISOString().split("T")[0], endDate };
+    }
+  }
+}
+
+function getActiveQuickFilter(startDate: string, endDate: string): string | null {
+  for (const qf of DATE_QUICK_FILTERS) {
+    const range = getQuickFilterRange(qf.value);
+    if (startDate === range.startDate && endDate === range.endDate) {
+      return qf.value;
+    }
+  }
+  return null;
+}
 
 interface Props {
   orders: IkasOrder[];
@@ -150,6 +195,7 @@ export function SiparislerClient({
             {totalCount} sipariş {isMock && "(demo veri)"}
           </p>
         </div>
+        <IkasSyncButton isMock={isMock} />
       </div>
 
       {/* Filters */}
@@ -165,6 +211,25 @@ export function SiparislerClient({
                 onClick={() => updateParams({ status: tab.packageStatus === "all" ? "" : tab.packageStatus, page: "1" })}
               >
                 {tab.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Quick Date Filters */}
+          <div className="flex flex-wrap items-center gap-1">
+            <CalendarDays className="mr-1 h-4 w-4 text-muted-foreground" />
+            {DATE_QUICK_FILTERS.map((qf) => (
+              <Button
+                key={qf.value}
+                variant={getActiveQuickFilter(startDate, endDate) === qf.value ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => {
+                  const range = getQuickFilterRange(qf.value);
+                  updateParams({ startDate: range.startDate, endDate: range.endDate, page: "1" });
+                }}
+              >
+                {qf.label}
               </Button>
             ))}
           </div>
