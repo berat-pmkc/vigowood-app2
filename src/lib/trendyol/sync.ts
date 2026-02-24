@@ -232,11 +232,9 @@ export async function syncOrders(
   let totalSynced = 0;
 
   try {
-    // Get last sync time, default to 30 days ago
-    const lastSync = await getLastSyncTime(supabase, "orders");
-    const startDate = lastSync || daysAgoTimestamp(30);
-    const endDate = endOfTodayTimestamp();
-
+    // Trendyol API date filtering is unreliable (different ranges return
+    // inconsistent results). Fetch ALL orders without date filter and upsert.
+    // ~2000 orders = ~10 pages = ~10 API calls — fast and reliable.
     let page = 0;
     let hasMore = true;
     let requestCount = 0;
@@ -248,8 +246,6 @@ export async function syncOrders(
       }
 
       const result = await getOrders({
-        startDate,
-        endDate,
         page,
         size: 200,
         orderByField: "PackageLastModifiedDate",
