@@ -26,6 +26,10 @@ import { getMockOrders, getMockProducts, getMockQuestions, getMockSettlements } 
 // ─── Config ──────────────────────────────────────────────
 const BASE_URL = "https://apigw.trendyol.com/integration";
 
+function hasCredentials(): boolean {
+  return !!(process.env.TRENDYOL_API_KEY && process.env.TRENDYOL_API_SECRET && process.env.TRENDYOL_SELLER_ID);
+}
+
 function getConfig() {
   const apiKey = process.env.TRENDYOL_API_KEY;
   const apiSecret = process.env.TRENDYOL_API_SECRET;
@@ -154,8 +158,8 @@ export class TrendyolError extends Error {
 
 // ─── Use Mock Data Flag ──────────────────────────────────
 // Set to true to use mock data instead of real API
-// This is automatically enabled when API returns 401
-let useMockData = false;
+// Automatically enabled when credentials are missing or API returns error
+let useMockData = !hasCredentials();
 
 async function tryFetchOrMock<T>(
   fetchFn: () => Promise<T>,
@@ -165,17 +169,19 @@ async function tryFetchOrMock<T>(
   try {
     return await fetchFn();
   } catch (err) {
-    if (err instanceof TrendyolError && (err.status === 401 || err.status === 403)) {
-      console.warn("[Trendyol] API auth failed, falling back to mock data");
-      useMockData = true;
-      return mockFn();
-    }
-    throw err;
+    // Fall back to mock data for any API error
+    const isAuthError = err instanceof TrendyolError && (err.status === 401 || err.status === 403);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.warn(`[Trendyol] API error${isAuthError ? " (auth)" : ""}: ${errorMsg} — falling back to mock data`);
+    useMockData = true;
+    return mockFn();
   }
 }
 
 /** Check if currently using mock data */
 export function isUsingMockData(): boolean {
+  // Re-check: credentials might not be set
+  if (!hasCredentials()) useMockData = true;
   return useMockData;
 }
 
