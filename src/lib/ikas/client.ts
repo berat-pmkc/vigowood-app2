@@ -133,13 +133,20 @@ export class IkasError extends Error {
 }
 
 // ─── Mock Data Flag ─────────────────────────────────────
-let useMockData = !hasCredentials();
+// NOT: Modül seviyesinde hasCredentials() çağırmıyoruz — Next.js'te
+// process.env modül yüklenirken henüz hazır olmayabiliyor.
+let forceMock = false;
+
+function shouldUseMock(): boolean {
+  if (forceMock) return true;
+  return !hasCredentials();
+}
 
 async function tryFetchOrMock<T>(
   fetchFn: () => Promise<T>,
   mockFn: () => T
 ): Promise<T> {
-  if (useMockData) return mockFn();
+  if (shouldUseMock()) return mockFn();
   try {
     return await fetchFn();
   } catch (err) {
@@ -149,15 +156,14 @@ async function tryFetchOrMock<T>(
     console.warn(
       `[İkas] API error${isAuthError ? " (auth)" : ""}: ${errorMsg} — falling back to mock data`
     );
-    useMockData = true;
+    forceMock = true;
     return mockFn();
   }
 }
 
 /** Check if currently using mock data */
 export function isUsingMockData(): boolean {
-  if (!hasCredentials()) useMockData = true;
-  return useMockData;
+  return shouldUseMock();
 }
 
 // ─── Orders ─────────────────────────────────────────────
@@ -253,7 +259,7 @@ export async function getCustomerOrders(
   page = 1,
   limit = 20
 ): Promise<IkasPaginatedResponse<IkasOrder>> {
-  if (useMockData) {
+  if (shouldUseMock()) {
     const all = getMockOrders();
     const filtered = all.data.filter(
       (o) => o.customer.email.includes("mock") || true
@@ -276,7 +282,7 @@ export async function getCustomerOrders(
 export async function updateStock(
   inputs: IkasStockUpdateInput[]
 ): Promise<boolean> {
-  if (useMockData) return true;
+  if (shouldUseMock()) return true;
 
   const data = await ikasGraphQL<{ saveProductStockLocations: boolean }>(
     UPDATE_STOCK_MUTATION,
@@ -291,7 +297,7 @@ export async function updatePrice(
   priceListId: string,
   inputs: IkasVariantPriceInput[]
 ): Promise<boolean> {
-  if (useMockData) return true;
+  if (shouldUseMock()) return true;
 
   const data = await ikasGraphQL<{ saveVariantPrices: boolean }>(
     UPDATE_PRICES_MUTATION,
@@ -303,7 +309,7 @@ export async function updatePrice(
 
 // ─── Stock Locations ────────────────────────────────────
 export async function getStockLocations(): Promise<IkasStockLocation[]> {
-  if (useMockData) {
+  if (shouldUseMock()) {
     return [
       { id: "mock-ana-depo", name: "Ana Depo", description: null },
       { id: "mock-almanya", name: "Almanya Stok", description: null },
@@ -319,7 +325,7 @@ export async function getStockLocations(): Promise<IkasStockLocation[]> {
 
 // ─── Price Lists ────────────────────────────────────────
 export async function getPriceLists(): Promise<IkasPriceList[]> {
-  if (useMockData) {
+  if (shouldUseMock()) {
     return [
       { id: "mock-tr", name: "TR Fiyat Listesi", currency: "TRY", currencyCode: "TRY", type: "MANUAL" },
     ];
