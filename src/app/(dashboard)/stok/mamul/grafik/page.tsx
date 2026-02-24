@@ -13,12 +13,25 @@ export default async function GrafikPage() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
-  const { data: chartResult } = await supabase
-    .from("stock_movements")
-    .select("tarih, qty")
-    .gte("tarih", thirtyDaysAgoStr)
-    .order("tarih", { ascending: true })
-    .limit(5000);
+  // Fetch ALL movements in last 30 days (paginated to avoid truncation)
+  const allMovements: { tarih: string | null; qty: number }[] = [];
+  const PAGE_SIZE = 5000;
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data } = await supabase
+      .from("stock_movements")
+      .select("tarih, qty")
+      .gte("tarih", thirtyDaysAgoStr)
+      .order("tarih", { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    const rows = (data || []) as { tarih: string | null; qty: number }[];
+    allMovements.push(...rows);
+    hasMore = rows.length === PAGE_SIZE;
+    offset += PAGE_SIZE;
+  }
 
   // Aggregate by day
   const dailyMap = new Map<string, { giris: number; cikis: number }>();
@@ -28,7 +41,7 @@ export default async function GrafikPage() {
     const key = d.toISOString().split("T")[0];
     dailyMap.set(key, { giris: 0, cikis: 0 });
   }
-  (chartResult || []).forEach((m: { tarih: string | null; qty: number }) => {
+  allMovements.forEach((m) => {
     if (!m.tarih) return;
     const day = m.tarih.split("T")[0];
     const existing = dailyMap.get(day);
