@@ -116,18 +116,13 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     .select("qty")
     .gte("tarih", todayStr);
 
-  // 5. Chart data: last 30 days movements
+  // 5. Chart data: last 30 days movements (limit to prevent huge payloads)
   const chartQuery = supabase
     .from("stock_movements")
     .select("tarih, qty")
     .gte("tarih", thirtyDaysAgoStr)
-    .order("tarih", { ascending: true });
-
-  // 6. Last movement date per SKU (for stock table)
-  const lastMovementQuery = supabase
-    .from("stock_movements")
-    .select("sku, tarih")
-    .order("tarih", { ascending: false });
+    .order("tarih", { ascending: true })
+    .limit(5000);
 
   // Execute all in parallel
   const [
@@ -136,14 +131,12 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     kpiResult,
     todayResult,
     chartResult,
-    lastMovementResult,
   ] = await Promise.all([
     productsQuery,
     movementsQuery,
     kpiQuery,
     todayMovementsQuery,
     chartQuery,
-    lastMovementQuery,
   ]);
 
   // ---------- PROCESS KPI DATA ----------
@@ -188,13 +181,22 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
       cikis: vals.cikis,
     }));
 
-  // ---------- PROCESS LAST MOVEMENT DATES ----------
+  // ---------- FETCH LAST MOVEMENT DATES FOR CURRENT PAGE SKUs ONLY ----------
+  const pageSkus = ((productsResult.data || []) as Product[]).map((p) => p.sku);
   const lastMovementMap = new Map<string, string>();
-  ((lastMovementResult.data || []) as { sku: string | null; tarih: string | null }[]).forEach((m) => {
-    if (m.sku && m.tarih && !lastMovementMap.has(m.sku)) {
-      lastMovementMap.set(m.sku, m.tarih);
-    }
-  });
+  if (pageSkus.length > 0) {
+    const { data: lastMovements } = await supabase
+      .from("stock_movements")
+      .select("sku, tarih")
+      .in("sku", pageSkus)
+      .order("tarih", { ascending: false });
+
+    ((lastMovements || []) as { sku: string | null; tarih: string | null }[]).forEach((m) => {
+      if (m.sku && m.tarih && !lastMovementMap.has(m.sku)) {
+        lastMovementMap.set(m.sku, m.tarih);
+      }
+    });
+  }
 
   // ---------- ENRICH PRODUCTS WITH LAST MOVEMENT DATE ----------
   const products = ((productsResult.data || []) as Product[]).map((p): StokProduct => ({
