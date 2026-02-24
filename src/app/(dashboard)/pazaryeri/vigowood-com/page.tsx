@@ -9,9 +9,16 @@ export default async function VigowoodDashboardPage() {
   const isMock = isUsingMockData();
 
   // ─── Parallel data fetches ──────────────────────────
-  const [todayOrders, monthOrders, products, customers] = await Promise.all([
+  // Fetch today/week/month separately for accurate counts
+  const [todayResult, weekResult, monthResult, products, customers] = await Promise.all([
     getOrders({
       startDate: startOfTodayISO(),
+      endDate: endOfTodayISO(),
+      limit: 200,
+      sort: "orderedAt:desc",
+    }),
+    getOrders({
+      startDate: daysAgoISO(7),
       endDate: endOfTodayISO(),
       limit: 200,
       sort: "orderedAt:desc",
@@ -26,20 +33,21 @@ export default async function VigowoodDashboardPage() {
     getCustomers({ limit: 1, sort: "lastOrderDate:desc" }),
   ]);
 
-  // ─── Week orders (filter from month data) ───────────
-  const weekAgo = Date.now() - 7 * 86_400_000;
-  const weekOrders = monthOrders.data.filter((o) => o.orderedAt >= weekAgo);
+  // Use API count for totals (more accurate than data.length when limit < total)
+  const todayData = todayResult.data;
+  const weekData = weekResult.data;
+  const monthData = monthResult.data;
 
   // ─── KPIs ───────────────────────────────────────────
   const kpi = {
-    todayOrderCount: todayOrders.data.length,
-    todayCiro: todayOrders.data.reduce((s, o) => s + o.totalFinalPrice, 0),
-    weekOrderCount: weekOrders.length,
-    weekCiro: weekOrders.reduce((s, o) => s + o.totalFinalPrice, 0),
-    pendingCount: monthOrders.data.filter(
+    todayOrderCount: todayResult.count,
+    todayCiro: todayData.reduce((s, o) => s + o.totalFinalPrice, 0),
+    weekOrderCount: weekResult.count,
+    weekCiro: weekData.reduce((s, o) => s + o.totalFinalPrice, 0),
+    pendingCount: monthData.filter(
       (o) => o.orderPackageStatus === "UNFULFILLED" || o.orderPackageStatus === "FULFILLED"
     ).length,
-    cancelledCount: monthOrders.data.filter(
+    cancelledCount: monthData.filter(
       (o) =>
         o.status === "CANCELLED" ||
         o.status === "REFUNDED" ||
@@ -59,7 +67,7 @@ export default async function VigowoodDashboardPage() {
     const dayLabel = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
     trendMap.set(key, { date: dayLabel, orders: 0, ciro: 0 });
   }
-  for (const order of monthOrders.data) {
+  for (const order of monthData) {
     const key = new Date(order.orderedAt).toISOString().split("T")[0];
     const entry = trendMap.get(key);
     if (entry) {
@@ -71,14 +79,14 @@ export default async function VigowoodDashboardPage() {
 
   // ─── Order status distribution ──────────────────────
   const statusDistribution: Record<string, number> = {};
-  for (const order of monthOrders.data) {
+  for (const order of monthData) {
     const status = order.orderPackageStatus;
     statusDistribution[status] = (statusDistribution[status] || 0) + 1;
   }
 
   // ─── Top selling products (SKU aggregation) ─────────
   const skuMap = new Map<string, { sku: string; name: string; quantity: number; revenue: number }>();
-  for (const order of monthOrders.data) {
+  for (const order of monthData) {
     for (const line of order.orderLineItems) {
       const sku = line.variant.sku || "N/A";
       const existing = skuMap.get(sku) || { sku, name: line.variant.name, quantity: 0, revenue: 0 };
@@ -93,7 +101,7 @@ export default async function VigowoodDashboardPage() {
 
   // ─── SKU daily data for filterable chart ─────────────
   const skuDailyMap = new Map<string, Map<string, { orders: number; revenue: number }>>();
-  for (const order of monthOrders.data) {
+  for (const order of monthData) {
     const dayKey = new Date(order.orderedAt).toISOString().split("T")[0];
     for (const line of order.orderLineItems) {
       const sku = line.variant.sku || "N/A";
