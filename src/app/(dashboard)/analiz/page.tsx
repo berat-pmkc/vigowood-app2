@@ -192,11 +192,12 @@ export default async function AnalizPage({ searchParams }: PageProps) {
         "part_id, part_type, yari_mamul_stok, hazir_eleman_aktif_stok, hazir_eleman_kritik_stok",
       ),
 
-    // 10 — stock movements last 30 days
+    // 10 — stock movements last 30 days (limit to prevent huge payloads)
     supabase
       .from("stock_movements")
       .select("tarih, qty")
-      .gte("tarih", thirtyDaysAgoStr),
+      .gte("tarih", thirtyDaysAgoStr)
+      .limit(5000),
 
     // 11 — critical stock products
     supabase

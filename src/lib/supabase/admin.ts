@@ -8,6 +8,16 @@ import type { Database } from "./types";
 export function createAdminClient() {
   return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      global: {
+        fetch: (url, options) => {
+          return fetch(url, {
+            ...options,
+            keepalive: true,
+          });
+        },
+      },
+    }
   );
 }

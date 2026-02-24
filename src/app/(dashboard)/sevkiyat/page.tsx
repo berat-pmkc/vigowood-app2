@@ -14,13 +14,15 @@ interface PageProps {
 }
 
 export default async function SevkiyatPage({ searchParams }: PageProps) {
-  const user = await getCurrentUser();
+  // Auth + settings + params paralel çek
+  const [user, settings, params] = await Promise.all([
+    getCurrentUser(),
+    getShipmentSettings(),
+    searchParams,
+  ]);
   if (!user || !SEVKIYAT_ACCESS_ROLES.includes(user.role)) {
     redirect("/");
   }
-
-  const settings = await getShipmentSettings();
-  const params = await searchParams;
   const selectedStatus = params.durum || "all";
   const selectedCountry = params.ulke || "all";
 

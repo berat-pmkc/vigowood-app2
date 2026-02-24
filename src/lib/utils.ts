@@ -138,6 +138,16 @@ export function getMonthRange(year: number, month: number): { start: Date; end: 
   return { start, end };
 }
 
+/** Dev-only: time a Promise and log to console */
+export async function timedQuery<T>(label: string, query: Promise<T>): Promise<T> {
+  if (process.env.NODE_ENV !== "development") return query;
+  const start = performance.now();
+  const result = await query;
+  const ms = (performance.now() - start).toFixed(0);
+  console.log(`[DB] ${label}: ${ms}ms`);
+  return result;
+}
+
 /** Relative time: "5 dk önce", "2 saat önce", "3 gün önce" */
 export function formatDistanceToNow(iso: string | null): string {
   if (!iso) return "";
