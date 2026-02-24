@@ -81,7 +81,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   // ─── Parallel data fetches ──────────────────────────
   // 1. All orders in selected month (paginated to avoid truncation)
   const allOrders: OrderRow[] = [];
-  const PAGE_SIZE = 5000;
+  const PAGE_SIZE = 1000; // Supabase max rows per request
   let offset = 0;
   let hasMore = true;
 

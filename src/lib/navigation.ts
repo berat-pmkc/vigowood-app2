@@ -112,7 +112,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Pazaryeri",
     items: [
       { title: "Genel Bakış", href: "/pazaryeri/genel", icon: Store, roles: MARKETPLACE_ROLES },
-      { title: "Trendyol", href: "/pazaryeri/trendyol/siparisler", icon: ShoppingBag, roles: MARKETPLACE_ROLES },
+      { title: "Trendyol", href: "/pazaryeri/trendyol", icon: ShoppingBag, roles: MARKETPLACE_ROLES },
       { title: "vigowood.com", href: "/pazaryeri/vigowood-com", icon: Globe, roles: MARKETPLACE_ROLES },
     ],
   },
