@@ -4,7 +4,14 @@ import { useState, useTransition, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown, CalendarDays } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Plus, FileDown, CalendarDays, CreditCard } from "lucide-react";
 import { OdemelerKpiCards } from "./odemeler-kpi-cards";
 import { OdemelerDataTable } from "./odemeler-data-table";
 import { OdemelerToolbar } from "./odemeler-toolbar";
@@ -12,7 +19,7 @@ import { OdemeFormSheet } from "./odeme-form-sheet";
 import { OdemelerCalendarView } from "./odemeler-calendar-view";
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
-import { KrediSection } from "./kredi-section";
+import { formatCurrency } from "@/lib/utils";
 
 const OdemelerSummaryTab = dynamic(
   () => import("./odemeler-summary-tab").then(mod => ({ default: mod.OdemelerSummaryTab })),
@@ -56,6 +63,7 @@ interface OdemelerClientProps {
   calYear: number;
   calMonth: number;
   allOdemeler: OdemeKpiRow[];
+  krediOdemeler: Odeme[];
 }
 
 export function OdemelerClient({
@@ -77,6 +85,7 @@ export function OdemelerClient({
   calYear,
   calMonth,
   allOdemeler,
+  krediOdemeler,
 }: OdemelerClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -129,43 +138,20 @@ export function OdemelerClient({
     setPrefillDate(null);
   };
 
-  // Kredi ödemeleri (Madde 9)
-  const krediOdemeler = useMemo(
-    () =>
-      allOdemeler
-        .filter((o) => o.turu === "KREDİ")
-        .map((o) => ({
-          tutar: Number(o.tutar),
-          cinsi: o.cinsi,
-          odeme_durum: o.odeme_durum,
-          kredi_grubu: null as string | null, // Hafif sorgudan gelmiyor, full data'dan bakarız
-        })),
-    [allOdemeler]
-  );
+  // Kredi borçları sheet state
+  const [krediSheetOpen, setKrediSheetOpen] = useState(false);
 
-  // calendarData'dan kredi bilgisi (tam veri)
-  const allKrediWithGrup = useMemo(() => {
-    // allOdemeler kredi_grubu içermiyor, calendarData'da var
-    // Tüm veriyi KPI'dan süzmek yerine calendar + list data'dan çıkaralım
-    // Aslında odemeler tablosundan tüm kredi kayıtları lazım
-    // Ama zaten allOdemeler light sorgu — kredi grubu eklemek için page.tsx değişmeli
-    // Şimdilik calendarData'daki ve listData'daki kayıtlardan çıkaralım
-    return [...calendarData, ...listData]
-      .filter((o) => o.turu === "KREDİ")
-      .reduce((acc, o) => {
-        // Dedup by id
-        if (!acc.find((x) => x.id === o.id)) {
-          acc.push(o);
-        }
-        return acc;
-      }, [] as Odeme[])
-      .map((o) => ({
-        tutar: Number(o.tutar),
-        cinsi: o.cinsi,
-        odeme_durum: o.odeme_durum,
-        kredi_grubu: o.kredi_grubu,
-      }));
-  }, [calendarData, listData]);
+  // Kredi toplam hesaplama
+  const bekleyenKrediToplam = useMemo(() => {
+    let tl = 0, usd = 0;
+    for (const o of krediOdemeler) {
+      if (o.odeme_durum === "BEKLİYOR") {
+        if (o.cinsi === "USD") usd += Number(o.tutar);
+        else tl += Number(o.tutar);
+      }
+    }
+    return { tl, usd };
+  }, [krediOdemeler]);
 
   return (
     <div className="space-y-4 pb-20 md:pb-6">
@@ -195,6 +181,15 @@ export function OdemelerClient({
               <span className="hidden sm:inline">PDF</span>
             </a>
           </Button>
+          {krediOdemeler.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setKrediSheetOpen(true)}>
+              <CreditCard className="mr-1.5 h-4 w-4" />
+              <span className="hidden sm:inline">Kredi Borçları</span>
+              <Badge variant="secondary" className="ml-1.5 text-[10px]">
+                {krediOdemeler.length}
+              </Badge>
+            </Button>
+          )}
           <Button onClick={handleNewRecord} size="sm">
             <Plus className="mr-1.5 h-4 w-4" />
             Yeni Ödeme
@@ -207,11 +202,6 @@ export function OdemelerClient({
         allOdemeler={allOdemeler}
         dateRange={calendarDateRange}
       />
-
-      {/* Madde 9: Kredi bölümü */}
-      {allKrediWithGrup.length > 0 && (
-        <KrediSection odemeler={allKrediWithGrup} />
-      )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
@@ -262,6 +252,86 @@ export function OdemelerClient({
         editingRecord={editingRecord}
         prefillDate={prefillDate}
       />
+
+      {/* Kredi Borçları Sheet */}
+      <Sheet open={krediSheetOpen} onOpenChange={setKrediSheetOpen}>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-muted-foreground" />
+              Kredi Borçları
+              <Badge variant="outline" className="ml-auto text-xs">
+                {krediOdemeler.length} kayıt
+              </Badge>
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="mt-4 flex gap-3">
+            {bekleyenKrediToplam.tl > 0 && (
+              <div className="rounded-lg bg-red-50 px-3 py-2 flex-1">
+                <p className="text-xs text-red-600">Bekleyen TL</p>
+                <p className="text-sm font-bold text-red-800 tabular-nums">
+                  {formatCurrency(bekleyenKrediToplam.tl, "TL")}
+                </p>
+              </div>
+            )}
+            {bekleyenKrediToplam.usd > 0 && (
+              <div className="rounded-lg bg-blue-50 px-3 py-2 flex-1">
+                <p className="text-xs text-blue-600">Bekleyen USD</p>
+                <p className="text-sm font-bold text-blue-800 tabular-nums">
+                  {formatCurrency(bekleyenKrediToplam.usd, "USD")}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {krediOdemeler.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => {
+                  setKrediSheetOpen(false);
+                  handleEdit(o);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-border/50 p-3 text-left transition-colors hover:bg-accent/50"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{o.tanimi}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {o.tarih
+                        ? new Date(o.tarih + "T00:00:00").toLocaleDateString("tr-TR")
+                        : "-"}
+                    </span>
+                    {o.kredi_grubu && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {o.kredi_grubu}
+                      </Badge>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] border-0 ${
+                        o.odeme_durum === "TAMAMLANDI"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {o.odeme_durum === "TAMAMLANDI" ? "Tamamlandı" : "Bekliyor"}
+                    </Badge>
+                  </div>
+                </div>
+                <span className="shrink-0 text-sm font-semibold tabular-nums">
+                  {formatCurrency(
+                    Number(o.tutar),
+                    (o.cinsi as "TL" | "USD" | "EUR") || "TL"
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

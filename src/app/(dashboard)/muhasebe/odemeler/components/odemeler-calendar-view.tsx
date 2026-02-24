@@ -11,8 +11,15 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Plus, CalendarIcon } from "lucide-react";
-import { getDaysInMonthGrid, formatCurrency, getWeekRange } from "@/lib/utils";
-import { ODEME_DURUM_COLORS, type OdemeDurumuConst } from "@/lib/constants";
+import { cn, getDaysInMonthGrid, formatCurrency, getWeekRange } from "@/lib/utils";
+import {
+  ODEME_DURUM_COLORS,
+  ODEME_TURLERI,
+  ODEME_TURU_COLORS,
+  ODEME_TURU_LABELS,
+  type OdemeDurumuConst,
+  type OdemeTuruConst,
+} from "@/lib/constants";
 import { OdemeTuruBadge } from "./odeme-turu-badge";
 import { CalendarDayCell } from "./calendar-day-cell";
 import type { Odeme } from "@/lib/supabase/types";
@@ -24,6 +31,13 @@ const AY_ISIMLERI = [
 ];
 
 type ViewMode = "ay" | "hafta";
+
+function formatCompact(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+  if (value > 0) return value.toFixed(0);
+  return "-";
+}
 
 interface OdemelerCalendarViewProps {
   calendarData: Odeme[];
@@ -47,6 +61,7 @@ export function OdemelerCalendarView({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("ay");
+  const [selectedCategory, setSelectedCategory] = useState<OdemeTuruConst | null>(null);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -86,6 +101,26 @@ export function OdemelerCalendarView({
     return map;
   }, [calendarData]);
 
+  // Kategori bazlı aylık toplamlar
+  const categoryTotals = useMemo(() => {
+    const map: Partial<Record<OdemeTuruConst, { tl: number; usd: number; count: number }>> = {};
+    for (const turu of ODEME_TURLERI) {
+      map[turu] = { tl: 0, usd: 0, count: 0 };
+    }
+    for (const o of calendarData) {
+      if (!o.turu) continue;
+      const entry = map[o.turu as OdemeTuruConst];
+      if (!entry) continue;
+      entry.count += 1;
+      if (o.cinsi === "USD") {
+        entry.usd += Number(o.tutar);
+      } else {
+        entry.tl += Number(o.tutar);
+      }
+    }
+    return map;
+  }, [calendarData]);
+
   const dateToKey = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -107,10 +142,7 @@ export function OdemelerCalendarView({
 
   const handleDaySelect = (date: Date) => {
     setSelectedDate(date);
-    const dayOdemeler = odemelerByDate.get(dateToKey(date)) || [];
-    if (dayOdemeler.length > 0) {
-      setDialogOpen(true);
-    }
+    setDialogOpen(true);
   };
 
   // Madde 13: Takvim aralığını parent'a bildir
@@ -130,6 +162,42 @@ export function OdemelerCalendarView({
 
   return (
     <div className="space-y-4">
+      {/* Category Filter Cards */}
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+        {ODEME_TURLERI.map((turu) => {
+          const colors = ODEME_TURU_COLORS[turu];
+          const totals = categoryTotals[turu];
+          const isActive = selectedCategory === turu;
+          const totalStr = totals && totals.tl > 0
+            ? formatCompact(totals.tl) + " ₺"
+            : totals && totals.usd > 0
+              ? "$" + formatCompact(totals.usd)
+              : "-";
+
+          return (
+            <button
+              key={turu}
+              type="button"
+              onClick={() => setSelectedCategory(isActive ? null : turu)}
+              className={cn(
+                "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                isActive ? "scale-105" : "hover:opacity-80"
+              )}
+              style={{
+                backgroundColor: colors.bg,
+                color: colors.text,
+                ...(isActive ? { boxShadow: `0 0 0 2px ${colors.text}` } : {}),
+              }}
+            >
+              <span>{ODEME_TURU_LABELS[turu]}</span>
+              <span className="text-[10px] font-bold tabular-nums opacity-80">
+                {totalStr}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Month Navigation + View Toggle */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigateMonth(-1)}>
@@ -202,6 +270,7 @@ export function OdemelerCalendarView({
                 odeme_durum: o.odeme_durum,
               }))}
               onSelect={handleDaySelect}
+              highlightTuru={selectedCategory}
             />
           );
         })}

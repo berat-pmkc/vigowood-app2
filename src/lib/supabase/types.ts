@@ -2379,6 +2379,162 @@ export type Database = {
         }
         Relationships: []
       }
+      ops_agents: {
+        Row: {
+          id: string
+          name: string
+          code: string
+          department: string
+          description: string | null
+          avatar_url: string | null
+          capabilities: Json
+          schedule: Json
+          status: Database["public"]["Enums"]["agent_status"]
+          is_active: boolean
+          total_tasks_completed: number
+          total_approvals_requested: number
+          total_outputs_generated: number
+          last_active_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          code: string
+          department?: string
+          description?: string | null
+          avatar_url?: string | null
+          capabilities?: Json
+          schedule?: Json
+          status?: Database["public"]["Enums"]["agent_status"]
+          is_active?: boolean
+          total_tasks_completed?: number
+          total_approvals_requested?: number
+          total_outputs_generated?: number
+          last_active_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          code?: string
+          department?: string
+          description?: string | null
+          avatar_url?: string | null
+          capabilities?: Json
+          schedule?: Json
+          status?: Database["public"]["Enums"]["agent_status"]
+          is_active?: boolean
+          total_tasks_completed?: number
+          total_approvals_requested?: number
+          total_outputs_generated?: number
+          last_active_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ops_approvals: {
+        Row: {
+          id: string
+          task_id: string | null
+          agent_id: string | null
+          action_type: Database["public"]["Enums"]["approval_action_type"]
+          risk_level: Database["public"]["Enums"]["approval_risk_level"]
+          status: Database["public"]["Enums"]["approval_status"]
+          title: string
+          description: string | null
+          requested_by: string
+          reviewer_id: string | null
+          payload: Json
+          old_payload: Json
+          review_note: string | null
+          requested_at: string
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id?: string | null
+          agent_id?: string | null
+          action_type: Database["public"]["Enums"]["approval_action_type"]
+          risk_level?: Database["public"]["Enums"]["approval_risk_level"]
+          status?: Database["public"]["Enums"]["approval_status"]
+          title: string
+          description?: string | null
+          requested_by: string
+          reviewer_id?: string | null
+          payload?: Json
+          old_payload?: Json
+          review_note?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string | null
+          agent_id?: string | null
+          action_type?: Database["public"]["Enums"]["approval_action_type"]
+          risk_level?: Database["public"]["Enums"]["approval_risk_level"]
+          status?: Database["public"]["Enums"]["approval_status"]
+          title?: string
+          description?: string | null
+          requested_by?: string
+          reviewer_id?: string | null
+          payload?: Json
+          old_payload?: Json
+          review_note?: string | null
+          requested_at?: string
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ops_outputs: {
+        Row: {
+          id: string
+          task_id: string | null
+          agent_id: string | null
+          file_type: Database["public"]["Enums"]["output_file_type"]
+          file_name: string
+          file_url: string
+          file_size: number | null
+          description: string | null
+          metadata: Json
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id?: string | null
+          agent_id?: string | null
+          file_type?: Database["public"]["Enums"]["output_file_type"]
+          file_name: string
+          file_url: string
+          file_size?: number | null
+          description?: string | null
+          metadata?: Json
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string | null
+          agent_id?: string | null
+          file_type?: Database["public"]["Enums"]["output_file_type"]
+          file_name?: string
+          file_url?: string
+          file_size?: number | null
+          description?: string | null
+          metadata?: Json
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2409,6 +2565,11 @@ export type Database = {
       task_department: "uretim" | "stok" | "sevkiyat" | "muhasebe" | "pazaryeri" | "genel"
       task_source_type: "manual" | "recurring_job" | "alert"
       task_activity_action: "created" | "status_changed" | "assigned" | "commented" | "file_added" | "priority_changed"
+      approval_action_type: "task_status_change" | "stock_adjustment" | "shipment_release" | "price_change" | "bulk_operation" | "system_config"
+      approval_risk_level: "low" | "medium" | "high" | "critical"
+      approval_status: "pending" | "approved" | "rejected" | "revision_requested"
+      output_file_type: "report" | "export" | "pdf" | "csv" | "image" | "other"
+      agent_status: "active" | "paused" | "disabled"
       kalem_turu:
         | "GELIR"
         | "GIDER"

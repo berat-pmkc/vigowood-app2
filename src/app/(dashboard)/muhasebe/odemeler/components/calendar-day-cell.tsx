@@ -19,6 +19,7 @@ interface CalendarDayCellProps {
   isSelected: boolean;
   odemeler: CalendarOdeme[];
   onSelect: (date: Date) => void;
+  highlightTuru?: string | null;
 }
 
 function formatCompact(value: number): string {
@@ -34,6 +35,7 @@ export function CalendarDayCell({
   isSelected,
   odemeler,
   onSelect,
+  highlightTuru,
 }: CalendarDayCellProps) {
   const maxDots = 3;
   const visibleOdemeler = odemeler.slice(0, maxDots);
@@ -60,6 +62,14 @@ export function CalendarDayCell({
     return "";
   }, [odemeler.length, totals]);
 
+  // Kategori highlight
+  const hasHighlightMatch = highlightTuru
+    ? odemeler.some((o) => o.turu === highlightTuru)
+    : false;
+  const highlightColors = highlightTuru
+    ? ODEME_TURU_COLORS[highlightTuru as OdemeTuruConst]
+    : null;
+
   return (
     <button
       type="button"
@@ -71,9 +81,19 @@ export function CalendarDayCell({
         !isCurrentMonth && "opacity-40",
         isToday && "border-primary border-2",
         isSelected && "bg-accent ring-1 ring-primary",
-        !isSelected && !isToday && "border-border/50",
-        !isSelected && intensityClass
+        !isSelected && !isToday && !hasHighlightMatch && "border-border/50",
+        !isSelected && !hasHighlightMatch && intensityClass,
+        highlightTuru && !hasHighlightMatch && isCurrentMonth && "opacity-40"
       )}
+      style={
+        hasHighlightMatch && highlightColors
+          ? {
+              borderLeftWidth: "4px",
+              borderLeftColor: highlightColors.text,
+              backgroundColor: highlightColors.bg,
+            }
+          : undefined
+      }
     >
       <span
         className={cn(

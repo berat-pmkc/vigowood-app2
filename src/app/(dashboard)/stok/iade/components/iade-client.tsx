@@ -18,6 +18,7 @@ interface IadeClientProps {
   iadeDurum: string;
   iadeSortBy: string;
   iadeSortOrder: "asc" | "desc";
+  ay: string;
 }
 
 export function IadeClient({
@@ -31,6 +32,7 @@ export function IadeClient({
   iadeDurum,
   iadeSortBy,
   iadeSortOrder,
+  ay,
 }: IadeClientProps) {
   return (
     <div className="space-y-4 pb-20 md:pb-6">
@@ -63,6 +65,7 @@ export function IadeClient({
         durum={iadeDurum}
         sortBy={iadeSortBy}
         sortOrder={iadeSortOrder}
+        ay={ay}
       />
     </div>
   );

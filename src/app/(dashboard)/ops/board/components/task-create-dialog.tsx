@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -21,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Bot, Users } from "lucide-react";
 import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABELS,
@@ -29,7 +30,6 @@ import {
   type TaskPriority,
   type TaskDepartment,
 } from "@/lib/constants";
-import { taskCreateSchema } from "@/lib/validations";
 import { createTask } from "../../actions";
 
 type FormValues = {
@@ -45,11 +45,13 @@ type FormValues = {
 };
 
 type User = { user_id: string; full_name: string; role: string };
+type Agent = { id: string; name: string; code: string; department: string; status: string };
 
 interface TaskCreateDialogProps {
   open: boolean;
   onClose: () => void;
   users: User[];
+  agents?: Agent[];
   parentId?: string;
 }
 
@@ -57,6 +59,7 @@ export function TaskCreateDialog({
   open,
   onClose,
   users,
+  agents = [],
   parentId,
 }: TaskCreateDialogProps) {
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +106,8 @@ export function TaskCreateDialog({
       toast.error(result.error || "Görev oluşturulamadı");
     }
   };
+
+  const currentAssignee = watch("assigned_to");
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -180,40 +185,77 @@ export function TaskCreateDialog({
             </div>
           </div>
 
-          {/* Row: Assignee + Due Date */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Atanan Kişi</Label>
-              <Select
-                value={watch("assigned_to") ?? "unassigned"}
-                onValueChange={(v) =>
-                  setValue("assigned_to", v === "unassigned" ? null : v)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seçiniz" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Atanmamış</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.user_id} value={u.user_id}>
-                      {u.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Assignee with Tabs (Çalışanlar / Ajanlar) */}
+          <div>
+            <Label>Atanan Kişi</Label>
+            <Tabs defaultValue="users" className="mt-1">
+              <TabsList className="h-7">
+                <TabsTrigger value="users" className="text-xs h-6 px-2">
+                  <Users className="mr-1 h-3 w-3" />
+                  Çalışanlar
+                </TabsTrigger>
+                {agents.length > 0 && (
+                  <TabsTrigger value="agents" className="text-xs h-6 px-2">
+                    <Bot className="mr-1 h-3 w-3" />
+                    Ajanlar
+                  </TabsTrigger>
+                )}
+              </TabsList>
+              <TabsContent value="users" className="mt-1">
+                <Select
+                  value={currentAssignee ?? "unassigned"}
+                  onValueChange={(v) =>
+                    setValue("assigned_to", v === "unassigned" ? null : v)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seçiniz" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Atanmamış</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.user_id} value={u.user_id}>
+                        {u.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TabsContent>
+              {agents.length > 0 && (
+                <TabsContent value="agents" className="mt-1">
+                  <Select
+                    value={currentAssignee ?? "unassigned"}
+                    onValueChange={(v) =>
+                      setValue("assigned_to", v === "unassigned" ? null : v)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ajan seçiniz" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Atanmamış</SelectItem>
+                      {agents.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          🤖 {a.name} ({a.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TabsContent>
+              )}
+            </Tabs>
+          </div>
 
-            <div>
-              <Label>Bitiş Tarihi</Label>
-              <Input
-                type="date"
-                value={watch("due_date") ?? ""}
-                onChange={(e) =>
-                  setValue("due_date", e.target.value || null)
-                }
-              />
-            </div>
+          {/* Due Date */}
+          <div>
+            <Label>Bitiş Tarihi</Label>
+            <Input
+              type="date"
+              value={watch("due_date") ?? ""}
+              onChange={(e) =>
+                setValue("due_date", e.target.value || null)
+              }
+            />
           </div>
 
           {/* Actions */}

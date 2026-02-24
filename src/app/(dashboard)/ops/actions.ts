@@ -3,7 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
-import type { TaskStatus, TaskPriority, TaskDepartment, TaskSourceType, TaskActivityAction } from "@/lib/constants";
+import type {
+  TaskStatus,
+  TaskPriority,
+  TaskDepartment,
+  TaskSourceType,
+  TaskActivityAction,
+  ApprovalActionType,
+  ApprovalRiskLevel,
+  ApprovalStatus,
+  OutputFileType,
+  AgentStatus,
+} from "@/lib/constants";
 
 async function requireUser() {
   const user = await getCurrentUser();
@@ -598,6 +609,340 @@ export async function getAssignableUsers() {
 
 // ─── Dashboard Stats ─────────────────────────────────────────
 
+// ─── Agent Types ────────────────────────────────────────────
+
+export type OpsAgent = {
+  id: string;
+  name: string;
+  code: string;
+  department: string;
+  description: string | null;
+  avatar_url: string | null;
+  capabilities: string[];
+  schedule: Record<string, string>;
+  status: AgentStatus;
+  is_active: boolean;
+  total_tasks_completed: number;
+  total_approvals_requested: number;
+  total_outputs_generated: number;
+  last_active_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OpsApproval = {
+  id: string;
+  task_id: string | null;
+  agent_id: string | null;
+  action_type: ApprovalActionType;
+  risk_level: ApprovalRiskLevel;
+  status: ApprovalStatus;
+  title: string;
+  description: string | null;
+  requested_by: string;
+  reviewer_id: string | null;
+  payload: Record<string, unknown>;
+  old_payload: Record<string, unknown>;
+  review_note: string | null;
+  requested_at: string;
+  reviewed_at: string | null;
+  created_at: string;
+  requester_name?: string;
+  reviewer_name?: string;
+  agent_name?: string;
+};
+
+export type OpsOutput = {
+  id: string;
+  task_id: string | null;
+  agent_id: string | null;
+  file_type: OutputFileType;
+  file_name: string;
+  file_url: string;
+  file_size: number | null;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  created_by: string;
+  created_at: string;
+  creator_name?: string;
+  agent_name?: string;
+};
+
+// ─── Agents ─────────────────────────────────────────────────
+
+export async function getAgents(filters?: { department?: string; status?: string }) {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("ops_agents")
+    .select("*")
+    .order("name");
+
+  if (filters?.department && filters.department !== "all") {
+    query = query.eq("department", filters.department);
+  }
+  if (filters?.status && filters.status !== "all") {
+    query = query.eq("status", filters.status as AgentStatus);
+  }
+
+  const { data, error } = await query;
+  if (error) return [];
+
+  return (data ?? []).map((a) => ({
+    ...a,
+    capabilities: Array.isArray(a.capabilities) ? a.capabilities as string[] : [],
+    schedule: (a.schedule ?? {}) as Record<string, string>,
+  })) as OpsAgent[];
+}
+
+export async function getAgentById(agentId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("ops_agents")
+    .select("*")
+    .eq("id", agentId)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    ...data,
+    capabilities: Array.isArray(data.capabilities) ? data.capabilities as string[] : [],
+    schedule: (data.schedule ?? {}) as Record<string, string>,
+  } as OpsAgent;
+}
+
+export async function updateAgent(
+  agentId: string,
+  data: { status?: AgentStatus; is_active?: boolean; description?: string }
+) {
+  const user = await requireUser();
+  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+    return { success: false, error: "Yetkiniz yok" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ops_agents")
+    .update(data)
+    .eq("id", agentId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/ajanlar");
+  revalidatePath("/ops");
+  return { success: true };
+}
+
+// ─── Approvals ──────────────────────────────────────────────
+
+export async function getApprovals(filters?: {
+  status?: string;
+  action_type?: string;
+  risk_level?: string;
+}) {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("ops_approvals")
+    .select("*")
+    .order("requested_at", { ascending: false });
+
+  if (filters?.status && filters.status !== "all") {
+    query = query.eq("status", filters.status as ApprovalStatus);
+  }
+  if (filters?.action_type && filters.action_type !== "all") {
+    query = query.eq("action_type", filters.action_type as ApprovalActionType);
+  }
+  if (filters?.risk_level && filters.risk_level !== "all") {
+    query = query.eq("risk_level", filters.risk_level as ApprovalRiskLevel);
+  }
+
+  const { data, error } = await query;
+  if (error) return [];
+
+  if (!data || data.length === 0) return [];
+
+  // Resolve names
+  const userIds = new Set<string>();
+  const agentIds = new Set<string>();
+
+  for (const a of data) {
+    if (a.requested_by) userIds.add(a.requested_by);
+    if (a.reviewer_id) userIds.add(a.reviewer_id);
+    if (a.agent_id) agentIds.add(a.agent_id);
+  }
+
+  const [{ data: users }, { data: agents }] = await Promise.all([
+    supabase.from("users").select("user_id, full_name").in("user_id", Array.from(userIds)),
+    agentIds.size > 0
+      ? supabase.from("ops_agents").select("id, name").in("id", Array.from(agentIds))
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+
+  const userMap = new Map(users?.map((u) => [u.user_id, u.full_name]) ?? []);
+  const agentMap = new Map(agents?.map((a) => [a.id, a.name]) ?? []);
+
+  return data.map((a) => ({
+    ...a,
+    payload: (a.payload ?? {}) as Record<string, unknown>,
+    old_payload: (a.old_payload ?? {}) as Record<string, unknown>,
+    requester_name: userMap.get(a.requested_by) ?? agentMap.get(a.requested_by) ?? a.requested_by,
+    reviewer_name: a.reviewer_id ? userMap.get(a.reviewer_id) ?? null : null,
+    agent_name: a.agent_id ? agentMap.get(a.agent_id) ?? null : null,
+  })) as OpsApproval[];
+}
+
+export async function createApproval(data: {
+  task_id?: string | null;
+  agent_id?: string | null;
+  action_type: ApprovalActionType;
+  risk_level?: ApprovalRiskLevel;
+  title: string;
+  description?: string | null;
+  payload?: Record<string, unknown>;
+  old_payload?: Record<string, unknown>;
+}) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const insertData = {
+    task_id: data.task_id ?? null,
+    agent_id: data.agent_id ?? null,
+    action_type: data.action_type,
+    risk_level: data.risk_level ?? ("medium" as ApprovalRiskLevel),
+    title: data.title,
+    description: data.description ?? null,
+    requested_by: user.user_id,
+    payload: data.payload ?? {},
+    old_payload: data.old_payload ?? {},
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await supabase
+    .from("ops_approvals")
+    .insert(insertData as any);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/onaylar");
+  revalidatePath("/ops");
+  return { success: true };
+}
+
+export async function reviewApproval(
+  approvalId: string,
+  decision: "approved" | "rejected" | "revision_requested",
+  reviewNote?: string
+) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("ops_approvals")
+    .update({
+      status: decision as ApprovalStatus,
+      reviewer_id: user.user_id,
+      review_note: reviewNote ?? null,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", approvalId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/onaylar");
+  revalidatePath("/ops");
+  return { success: true };
+}
+
+// ─── Outputs ────────────────────────────────────────────────
+
+export async function getOutputs(filters?: {
+  file_type?: string;
+  agent_id?: string;
+}) {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("ops_outputs")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (filters?.file_type && filters.file_type !== "all") {
+    query = query.eq("file_type", filters.file_type as OutputFileType);
+  }
+  if (filters?.agent_id && filters.agent_id !== "all") {
+    query = query.eq("agent_id", filters.agent_id);
+  }
+
+  const { data, error } = await query;
+  if (error) return [];
+
+  if (!data || data.length === 0) return [];
+
+  const userIds = new Set<string>();
+  const agentIds = new Set<string>();
+
+  for (const o of data) {
+    if (o.created_by) userIds.add(o.created_by);
+    if (o.agent_id) agentIds.add(o.agent_id);
+  }
+
+  const [{ data: users }, { data: agents }] = await Promise.all([
+    supabase.from("users").select("user_id, full_name").in("user_id", Array.from(userIds)),
+    agentIds.size > 0
+      ? supabase.from("ops_agents").select("id, name").in("id", Array.from(agentIds))
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+
+  const userMap = new Map(users?.map((u) => [u.user_id, u.full_name]) ?? []);
+  const agentMap = new Map(agents?.map((a) => [a.id, a.name]) ?? []);
+
+  return data.map((o) => ({
+    ...o,
+    metadata: (o.metadata ?? {}) as Record<string, unknown>,
+    creator_name: userMap.get(o.created_by) ?? agentMap.get(o.created_by) ?? o.created_by,
+    agent_name: o.agent_id ? agentMap.get(o.agent_id) ?? null : null,
+  })) as OpsOutput[];
+}
+
+export async function deleteOutput(outputId: string) {
+  const user = await requireUser();
+  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+    return { success: false, error: "Yetkiniz yok" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ops_outputs")
+    .delete()
+    .eq("id", outputId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/raporlar");
+  return { success: true };
+}
+
+// ─── Assignable Agents (for task assignment) ────────────────
+
+export async function getAssignableAgents() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("ops_agents")
+    .select("id, name, code, department, status")
+    .eq("is_active", true)
+    .eq("status", "active")
+    .order("name");
+
+  if (error) return [];
+  return data;
+}
+
+// ─── Dashboard Stats (Updated) ──────────────────────────────
+
 export async function getOpsStats() {
   const supabase = await createClient();
   const today = new Date().toISOString().split("T")[0];
@@ -659,6 +1004,33 @@ export async function getOpsStats() {
     }
   }
 
+  // V2: Approval, agent, output stats
+  const [
+    { count: pendingApprovalsCount },
+    { count: activeAgentsCount },
+    { count: recentOutputsCount },
+    { data: pendingApprovals },
+  ] = await Promise.all([
+    supabase
+      .from("ops_approvals")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("ops_agents")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active"),
+    supabase
+      .from("ops_outputs")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", `${today}T00:00:00`),
+    supabase
+      .from("ops_approvals")
+      .select("id, title, action_type, risk_level, requested_by, requested_at")
+      .eq("status", "pending")
+      .order("requested_at", { ascending: false })
+      .limit(5),
+  ]);
+
   return {
     openCount: openCount ?? 0,
     dueTodayCount: dueTodayCount ?? 0,
@@ -666,5 +1038,9 @@ export async function getOpsStats() {
     blockedCount: blockedCount ?? 0,
     overdueTasks: overdueTasks ?? [],
     todayDoneTasks: todayDoneTasks ?? [],
+    pendingApprovalsCount: pendingApprovalsCount ?? 0,
+    activeAgentsCount: activeAgentsCount ?? 0,
+    recentOutputsCount: recentOutputsCount ?? 0,
+    pendingApprovals: pendingApprovals ?? [],
   };
 }

@@ -988,3 +988,108 @@ export const APPROVAL_ROLES: UserRole[] = [
   "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
 ];
+
+// ─── Ops Center V2: Approvals + Agents + Outputs ──────────────
+
+/** Onay aksiyon türleri */
+export const APPROVAL_ACTION_TYPES = [
+  "task_status_change",
+  "stock_adjustment",
+  "shipment_release",
+  "price_change",
+  "bulk_operation",
+  "system_config",
+] as const;
+export type ApprovalActionType = (typeof APPROVAL_ACTION_TYPES)[number];
+
+export const APPROVAL_ACTION_TYPE_LABELS: Record<ApprovalActionType, string> = {
+  task_status_change: "Görev Durum Değişikliği",
+  stock_adjustment: "Stok Düzeltmesi",
+  shipment_release: "Sevkiyat Onayı",
+  price_change: "Fiyat Değişikliği",
+  bulk_operation: "Toplu İşlem",
+  system_config: "Sistem Ayarı",
+};
+
+export const APPROVAL_ACTION_TYPE_ICONS: Record<ApprovalActionType, string> = {
+  task_status_change: "ListChecks",
+  stock_adjustment: "Warehouse",
+  shipment_release: "Truck",
+  price_change: "DollarSign",
+  bulk_operation: "Layers",
+  system_config: "Settings",
+};
+
+/** Onay risk seviyeleri */
+export const APPROVAL_RISK_LEVELS = ["low", "medium", "high", "critical"] as const;
+export type ApprovalRiskLevel = (typeof APPROVAL_RISK_LEVELS)[number];
+
+export const APPROVAL_RISK_LEVEL_LABELS: Record<ApprovalRiskLevel, string> = {
+  low: "Düşük",
+  medium: "Orta",
+  high: "Yüksek",
+  critical: "Kritik",
+};
+
+export const APPROVAL_RISK_LEVEL_COLORS: Record<ApprovalRiskLevel, { bg: string; text: string; border: string }> = {
+  low: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" },
+  medium: { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300" },
+  high: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300" },
+  critical: { bg: "bg-red-100", text: "text-red-700", border: "border-red-300" },
+};
+
+/** Onay durumları */
+export const APPROVAL_STATUSES = ["pending", "approved", "rejected", "revision_requested"] as const;
+export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
+
+export const APPROVAL_STATUS_LABELS: Record<ApprovalStatus, string> = {
+  pending: "Bekliyor",
+  approved: "Onaylandı",
+  rejected: "Reddedildi",
+  revision_requested: "Revizyon İstendi",
+};
+
+export const APPROVAL_STATUS_COLORS: Record<ApprovalStatus, { bg: string; text: string }> = {
+  pending: { bg: "bg-amber-100", text: "text-amber-700" },
+  approved: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  rejected: { bg: "bg-red-100", text: "text-red-700" },
+  revision_requested: { bg: "bg-purple-100", text: "text-purple-700" },
+};
+
+/** Output dosya türleri */
+export const OUTPUT_FILE_TYPES = ["report", "export", "pdf", "csv", "image", "other"] as const;
+export type OutputFileType = (typeof OUTPUT_FILE_TYPES)[number];
+
+export const OUTPUT_FILE_TYPE_LABELS: Record<OutputFileType, string> = {
+  report: "Rapor",
+  export: "Dışa Aktarım",
+  pdf: "PDF",
+  csv: "CSV",
+  image: "Görsel",
+  other: "Diğer",
+};
+
+export const OUTPUT_FILE_TYPE_ICONS: Record<OutputFileType, string> = {
+  report: "FileText",
+  export: "Download",
+  pdf: "FileText",
+  csv: "Table",
+  image: "Image",
+  other: "File",
+};
+
+/** Agent durumları */
+export const AGENT_STATUSES = ["active", "paused", "disabled"] as const;
+export type AgentStatus = (typeof AGENT_STATUSES)[number];
+
+export const AGENT_STATUS_LABELS: Record<AgentStatus, string> = {
+  active: "Aktif",
+  paused: "Duraklatıldı",
+  disabled: "Devre Dışı",
+};
+
+export const AGENT_STATUS_COLORS: Record<AgentStatus, { bg: string; text: string }> = {
+  active: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  paused: { bg: "bg-amber-100", text: "text-amber-700" },
+  disabled: { bg: "bg-gray-100", text: "text-gray-500" },
+};

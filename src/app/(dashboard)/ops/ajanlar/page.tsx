@@ -1,10 +1,10 @@
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { APPROVAL_ROLES } from "@/lib/constants";
-import { getApprovals } from "../actions";
-import { OnaylarClient } from "./onaylar-client";
+import { getAgents } from "../actions";
+import { AjanlarClient } from "./ajanlar-client";
 
-export default async function OnaylarPage() {
+export default async function AjanlarPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
@@ -12,17 +12,17 @@ export default async function OnaylarPage() {
     redirect("/ops");
   }
 
-  const approvals = await getApprovals();
+  const agents = await getAgents();
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-vw-dark">Onaylar</h1>
+        <h1 className="text-2xl font-bold text-vw-dark">Ajanlar</h1>
         <p className="text-sm text-muted-foreground">
-          Onay talepleri ve karar geçmişi
+          Sanal ajan profilleri ve durumları
         </p>
       </div>
-      <OnaylarClient approvals={approvals} />
+      <AjanlarClient agents={agents} />
     </div>
   );
 }

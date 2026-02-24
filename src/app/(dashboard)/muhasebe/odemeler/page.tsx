@@ -116,17 +116,26 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
     .gte("tarih", twelveMonthsAgoStr)
     .order("tarih");
 
+  // ---------- 5. Kredi borçları (tümü, yakın tarihten uzağa) ----------
+  const krediQuery = supabase
+    .from("odemeler")
+    .select("*")
+    .eq("turu", "KREDİ" as Database["public"]["Enums"]["odeme_turu"])
+    .order("tarih", { ascending: true });
+
   // Execute all in parallel
   const [
     listResult,
     calendarResult,
     allOdemelerResult,
     trendResult,
+    krediResult,
   ] = await Promise.all([
     listQuery,
     calendarQuery,
     allOdemelerQuery,
     trendQuery,
+    krediQuery,
   ]);
 
   // ---------- PROCESS SUMMARY (with turu) ----------
@@ -179,6 +188,7 @@ export default async function OdemelerPage({ searchParams }: PageProps) {
           turu: string | null;
           odeme_durum: string | null;
         }[]}
+        krediOdemeler={(krediResult.data ?? []) as Odeme[]}
       />
     </div>
   );

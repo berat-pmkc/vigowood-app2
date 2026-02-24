@@ -232,63 +232,80 @@ export async function syncOrders(
   let totalSynced = 0;
 
   try {
-    // Trendyol API date filtering is unreliable (different ranges return
-    // inconsistent results). Fetch ALL orders without date filter and upsert.
-    // ~2000 orders = ~10 pages = ~10 API calls — fast and reliable.
-    let page = 0;
-    let hasMore = true;
+    // Trendyol API without date filter only returns ~1800 recently-modified orders.
+    // With date range (PackageLastModifiedDate), it returns ALL orders modified in
+    // that window. We sweep the last 90 days in weekly chunks to capture everything.
+    const now = Date.now();
+    const WEEK_MS = 7 * 86_400_000;
+    const TOTAL_WEEKS = 13; // ~90 days
+
+    const chunks: { start: number; end: number }[] = [];
+    for (let w = 0; w < TOTAL_WEEKS; w++) {
+      chunks.push({
+        start: now - (w + 1) * WEEK_MS,
+        end: now - w * WEEK_MS,
+      });
+    }
+
     let requestCount = 0;
 
-    while (hasMore) {
-      // Rate limit: pause every 40 requests
-      if (requestCount > 0 && requestCount % 40 === 0) {
-        await sleep(10_000);
-      }
+    for (const chunk of chunks) {
+      let page = 0;
+      let hasMore = true;
 
-      const result = await getOrders({
-        page,
-        size: 200,
-        orderByField: "PackageLastModifiedDate",
-        orderByDirection: "DESC",
-      });
-      requestCount++;
-
-      if (result.content.length === 0) break;
-
-      // Upsert orders
-      const orderRows = result.content.map(mapOrderToRow);
-      const { error: orderErr } = await supabase
-        .from("trendyol_orders")
-        .upsert(orderRows, { onConflict: "id" });
-
-      if (orderErr) throw new Error(`Order upsert failed: ${orderErr.message}`);
-
-      // Upsert order lines — delete existing first, then insert
-      for (const order of result.content) {
-        if (order.lines.length === 0) continue;
-
-        // Delete existing lines for this order
-        await supabase
-          .from("trendyol_order_lines")
-          .delete()
-          .eq("order_id", order.shipmentPackageId);
-
-        // Insert new lines
-        const lineRows = order.lines.map((l) =>
-          mapOrderLineToRow(l, order.shipmentPackageId)
-        );
-        const { error: lineErr } = await supabase
-          .from("trendyol_order_lines")
-          .insert(lineRows);
-
-        if (lineErr) {
-          console.warn(`[Trendyol Sync] Order line insert failed for ${order.shipmentPackageId}: ${lineErr.message}`);
+      while (hasMore) {
+        // Rate limit: pause every 40 requests
+        if (requestCount > 0 && requestCount % 40 === 0) {
+          await sleep(10_000);
         }
-      }
 
-      totalSynced += result.content.length;
-      page++;
-      hasMore = page < result.totalPages;
+        const result = await getOrders({
+          startDate: chunk.start,
+          endDate: chunk.end,
+          page,
+          size: 200,
+          orderByField: "PackageLastModifiedDate",
+          orderByDirection: "DESC",
+        });
+        requestCount++;
+
+        if (result.content.length === 0) break;
+
+        // Upsert orders
+        const orderRows = result.content.map(mapOrderToRow);
+        const { error: orderErr } = await supabase
+          .from("trendyol_orders")
+          .upsert(orderRows, { onConflict: "id" });
+
+        if (orderErr) throw new Error(`Order upsert failed: ${orderErr.message}`);
+
+        // Upsert order lines — delete existing first, then insert
+        for (const order of result.content) {
+          if (order.lines.length === 0) continue;
+
+          // Delete existing lines for this order
+          await supabase
+            .from("trendyol_order_lines")
+            .delete()
+            .eq("order_id", order.shipmentPackageId);
+
+          // Insert new lines
+          const lineRows = order.lines.map((l) =>
+            mapOrderLineToRow(l, order.shipmentPackageId)
+          );
+          const { error: lineErr } = await supabase
+            .from("trendyol_order_lines")
+            .insert(lineRows);
+
+          if (lineErr) {
+            console.warn(`[Trendyol Sync] Order line insert failed for ${order.shipmentPackageId}: ${lineErr.message}`);
+          }
+        }
+
+        totalSynced += result.content.length;
+        page++;
+        hasMore = page < result.totalPages;
+      }
     }
 
     await completeSyncLog(supabase, logId, totalSynced);

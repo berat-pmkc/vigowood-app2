@@ -16,6 +16,7 @@ interface PageProps {
     durum?: string;
     sortBy?: string;
     sortOrder?: string;
+    ay?: string; // YYYY-MM format
   }>;
 }
 
@@ -38,14 +39,25 @@ export default async function IadeGirisPage({ searchParams }: PageProps) {
   const sortBy = params.sortBy || "tarih";
   const sortOrder = params.sortOrder === "asc" ? "asc" as const : "desc" as const;
 
-  // ---------- FETCH DATA IN PARALLEL ----------
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  // ---------- MONTH FILTER ----------
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const ay = params.ay || defaultMonth; // YYYY-MM
+  const [ayYear, ayMonth] = ay.split("-").map(Number);
+  const monthStart = `${ay}-01T00:00:00.000Z`;
+  const nextMonth = ayMonth === 12
+    ? `${ayYear + 1}-01-01T00:00:00.000Z`
+    : `${ayYear}-${String(ayMonth + 1).padStart(2, "0")}-01T00:00:00.000Z`;
 
-  // 1. İade records with filters
+  // ---------- FETCH DATA IN PARALLEL ----------
+  const todayStr = now.toISOString().split("T")[0];
+
+  // 1. İade records with filters + month
   let iadeQuery = supabase
     .from("iade_giris")
-    .select("*", { count: "exact" });
+    .select("*", { count: "exact" })
+    .gte("tarih", monthStart)
+    .lt("tarih", nextMonth);
 
   if (search) {
     iadeQuery = iadeQuery.or(`sku.ilike.%${search}%,iade_id.ilike.%${search}%`);
@@ -60,10 +72,12 @@ export default async function IadeGirisPage({ searchParams }: PageProps) {
     .order(sortColumn, { ascending: sortOrder === "asc" })
     .range(page * pageSize, page * pageSize + pageSize - 1);
 
-  // 2. KPI: Total counts and sums
+  // 2. KPI: Month counts and sums
   const kpiAllQuery = supabase
     .from("iade_giris")
-    .select("qty, durum");
+    .select("qty, durum")
+    .gte("tarih", monthStart)
+    .lt("tarih", nextMonth);
 
   // 3. Today's returns
   const todayQuery = supabase
@@ -147,6 +161,7 @@ export default async function IadeGirisPage({ searchParams }: PageProps) {
         iadeDurum={durum}
         iadeSortBy={sortColumn}
         iadeSortOrder={sortOrder}
+        ay={ay}
       />
     </div>
   );

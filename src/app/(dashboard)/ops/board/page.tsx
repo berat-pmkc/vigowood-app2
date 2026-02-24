@@ -1,10 +1,11 @@
-import { getTasks, getAssignableUsers } from "../actions";
+import { getTasks, getAssignableUsers, getAssignableAgents } from "../actions";
 import { KanbanBoard } from "./components/kanban-board";
 
 export default async function OpsBoardPage() {
-  const [tasks, users] = await Promise.all([
+  const [tasks, users, agents] = await Promise.all([
     getTasks(),
     getAssignableUsers(),
+    getAssignableAgents(),
   ]);
 
   return (
@@ -17,7 +18,7 @@ export default async function OpsBoardPage() {
           </p>
         </div>
       </div>
-      <KanbanBoard initialTasks={tasks} users={users} />
+      <KanbanBoard initialTasks={tasks} users={users} agents={agents} />
     </div>
   );
 }

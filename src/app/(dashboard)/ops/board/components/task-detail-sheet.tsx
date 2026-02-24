@@ -60,10 +60,12 @@ import {
 } from "../../actions";
 
 type User = { user_id: string; full_name: string; role: string };
+type Agent = { id: string; name: string; code: string; department: string; status: string };
 
 interface TaskDetailSheetProps {
   taskId: string;
   users: User[];
+  agents?: Agent[];
   open: boolean;
   onClose: () => void;
 }
@@ -71,6 +73,7 @@ interface TaskDetailSheetProps {
 export function TaskDetailSheet({
   taskId,
   users,
+  agents = [],
   open,
   onClose,
 }: TaskDetailSheetProps) {
@@ -265,6 +268,16 @@ export function TaskDetailSheet({
                         {u.full_name}
                       </SelectItem>
                     ))}
+                    {agents.length > 0 && (
+                      <>
+                        <SelectItem value="---agents---" disabled>── Ajanlar ──</SelectItem>
+                        {agents.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            🤖 {a.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
 

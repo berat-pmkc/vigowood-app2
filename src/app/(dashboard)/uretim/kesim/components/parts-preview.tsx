@@ -57,7 +57,7 @@ export function PartsPreview({ plakaId, adet }: PartsPreviewProps) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border overflow-hidden">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/50">

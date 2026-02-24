@@ -19,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search } from "lucide-react";
-import { formatNumber } from "@/lib/utils";
-import { IADE_DURUM_LABELS, IADE_DURUM_COLORS } from "@/lib/constants";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { formatDate, formatNumber } from "@/lib/utils";
+import { IADE_DURUM_LABELS, IADE_DURUM_COLORS, AY_LABELS } from "@/lib/constants";
 import type { IadeDurum } from "@/lib/constants";
 
 export interface IadeRecord {
@@ -46,10 +47,22 @@ interface IadeDataTableProps {
   durum: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
+  ay: string;
 }
 
 function getColumns(): ColumnDef<IadeRecord>[] {
   return [
+    {
+      accessorKey: "tarih",
+      header: () => <span className="text-xs font-medium">Tarih</span>,
+      cell: ({ row }) => (
+        <span className="text-sm whitespace-nowrap tabular-nums">
+          {formatDate(row.original.tarih)}
+        </span>
+      ),
+      size: 100,
+      enableSorting: false,
+    },
     {
       accessorKey: "sku",
       header: () => <span className="text-xs font-medium">Ürün Kodu</span>,
@@ -99,6 +112,17 @@ function getColumns(): ColumnDef<IadeRecord>[] {
   ];
 }
 
+function formatMonthLabel(ay: string): string {
+  const [year, month] = ay.split("-").map(Number);
+  return `${AY_LABELS[month - 1]} ${year}`;
+}
+
+function shiftMonth(ay: string, delta: number): string {
+  const [year, month] = ay.split("-").map(Number);
+  const d = new Date(year, month - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function IadeDataTable({
   data,
   totalCount,
@@ -108,11 +132,16 @@ export function IadeDataTable({
   durum,
   sortBy,
   sortOrder,
+  ay,
 }: IadeDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchInput, setSearchInput] = useState(search);
   const [, startTransition] = useTransition();
+
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const isCurrentMonth = ay === currentMonth;
 
   const buildUrl = useCallback(
     (updates: Record<string, string | undefined>) => {
@@ -161,6 +190,30 @@ export function IadeDataTable({
 
   return (
     <div className="space-y-4">
+      {/* Month Navigator */}
+      <div className="flex items-center justify-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigate({ ay: shiftMonth(ay, -1), page: "0" })}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="min-w-[140px] text-center text-sm font-medium">
+          {formatMonthLabel(ay)}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigate({ ay: shiftMonth(ay, 1), page: "0" })}
+          disabled={isCurrentMonth}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />

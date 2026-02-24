@@ -30,7 +30,7 @@ export function MaterialCheckPanel({ items, className }: MaterialCheckPanelProps
   }
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", className)}>
+    <div className={cn("overflow-x-auto rounded-lg border", className)}>
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-muted/50">

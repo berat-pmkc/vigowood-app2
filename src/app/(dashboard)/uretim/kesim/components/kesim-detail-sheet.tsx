@@ -154,7 +154,7 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
             ) : lines.length === 0 ? (
               <p className="text-sm text-muted-foreground">Parça bilgisi yok</p>
             ) : (
-              <div className="rounded-lg border overflow-hidden">
+              <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/50">

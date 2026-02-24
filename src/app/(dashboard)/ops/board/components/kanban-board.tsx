@@ -36,13 +36,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 
 type User = { user_id: string; full_name: string; role: string };
+type Agent = { id: string; name: string; code: string; department: string; status: string };
 
 interface KanbanBoardProps {
   initialTasks: TaskWithRelations[];
   users: User[];
+  agents: Agent[];
 }
 
-export function KanbanBoard({ initialTasks, users }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
   const [tasks, setTasks] = useState(initialTasks);
   const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -160,6 +162,16 @@ export function KanbanBoard({ initialTasks, users }: KanbanBoardProps) {
                   {u.full_name}
                 </SelectItem>
               ))}
+              {agents.length > 0 && (
+                <>
+                  <SelectItem value="---" disabled>── Ajanlar ──</SelectItem>
+                  {agents.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      🤖 {a.name}
+                    </SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
 
@@ -245,6 +257,7 @@ export function KanbanBoard({ initialTasks, users }: KanbanBoardProps) {
         <TaskDetailSheet
           taskId={selectedTaskId}
           users={users}
+          agents={agents}
           open={!!selectedTaskId}
           onClose={() => setSelectedTaskId(null)}
         />
@@ -255,6 +268,7 @@ export function KanbanBoard({ initialTasks, users }: KanbanBoardProps) {
         open={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         users={users}
+        agents={agents}
       />
     </>
   );

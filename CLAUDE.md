@@ -454,6 +454,19 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [ ] WhatsApp bildirimler
 - [ ] PPC dashboard, AI tahmin
 
+### KATMAN 30: Ops Center — Task Management ✅
+- [x] DB: tasks, task_comments, task_attachments, task_activity tabloları + 5 enum + RLS + realtime
+- [x] Sidebar: Ops Center menü grubu (Genel Bakış, Board, Görevlerim, Onaylar)
+- [x] /ops: KPI kartları, geciken görevler, bugün tamamlanan, son aktiviteler
+- [x] /ops/board: 6 kolonlu Kanban board, @dnd-kit sürükle-bırak, filtreler
+- [x] Task kartları: başlık, assignee, öncelik+departman badge, due date, subtask/attachment/comment
+- [x] Hızlı + detaylı görev oluşturma
+- [x] Task detail sheet: inline edit, yorumlar, dosyalar (Storage), aktivite, alt görevler
+- [x] /ops/gorevlerim: Inbox, filtre + sıralama
+- [x] /ops/onaylar: Onay bekleyen görevler, onayla/geri gönder
+- [x] Supabase Storage bucket: task-attachments
+- [x] Build: 76 route, sıfır TypeScript hatası
+
 ### KATMAN 29: Test & Güvenlik Denetimi ✅
 - [x] Güvenlik: 38/38 server action + 9/9 API route auth guard doğrulandı
 - [x] Güvenlik: admin.ts'e `import "server-only"` eklendi
