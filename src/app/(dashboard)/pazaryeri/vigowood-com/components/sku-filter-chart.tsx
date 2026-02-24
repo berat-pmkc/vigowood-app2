@@ -52,7 +52,10 @@ const SKU_COLORS = [
 ];
 
 export default function SkuFilterChart({ skuDailyData, availableSkus }: Props) {
-  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  // Default to "TÜMÜ" if available
+  const [selectedSkus, setSelectedSkus] = useState<string[]>(
+    availableSkus.some((s) => s.sku === "TÜMÜ") ? ["TÜMÜ"] : []
+  );
   const [metric, setMetric] = useState<"revenue" | "orders">("revenue");
   const [open, setOpen] = useState(false);
 

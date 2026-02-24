@@ -193,6 +193,39 @@ export async function getOrders(
   );
 }
 
+// ─── All Orders (paginated fetch) ───────────────────────
+/** Fetch ALL orders matching params by paginating through all pages */
+export async function getAllOrders(
+  params?: Omit<IkasOrderParams, "page" | "limit">
+): Promise<IkasOrder[]> {
+  const PAGE_SIZE = 200;
+  const MAX_PAGES = 20; // safety cap: 20 × 200 = 4000 max
+
+  const firstPage = await getOrders({ ...params, page: 1, limit: PAGE_SIZE });
+  const allOrders = [...firstPage.data];
+
+  if (!firstPage.hasNext) return allOrders;
+
+  // Calculate remaining pages needed
+  const totalPages = Math.min(Math.ceil(firstPage.count / PAGE_SIZE), MAX_PAGES);
+
+  // Fetch remaining pages in batches of 3 (avoid rate limits)
+  for (let batch = 2; batch <= totalPages; batch += 3) {
+    const pagesToFetch = [];
+    for (let p = batch; p < batch + 3 && p <= totalPages; p++) {
+      pagesToFetch.push(p);
+    }
+    const results = await Promise.all(
+      pagesToFetch.map((p) => getOrders({ ...params, page: p, limit: PAGE_SIZE }))
+    );
+    for (const result of results) {
+      allOrders.push(...result.data);
+    }
+  }
+
+  return allOrders;
+}
+
 // ─── Products ───────────────────────────────────────────
 export async function getProducts(
   params?: IkasProductParams

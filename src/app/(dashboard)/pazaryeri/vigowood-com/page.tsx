@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getOrders, getProducts, getCustomers, isUsingMockData } from "@/lib/ikas/client";
+import { getOrders, getAllOrders, getProducts, getCustomers, isUsingMockData } from "@/lib/ikas/client";
 import { daysAgoISO, endOfTodayISO, startOfTodayISO } from "@/lib/ikas/helpers";
 import { VigowoodDashboard } from "./components/vigowood-dashboard";
 
@@ -9,45 +9,53 @@ export default async function VigowoodDashboardPage() {
   const isMock = isUsingMockData();
 
   // ─── Parallel data fetches ──────────────────────────
-  // Fetch today/week/month separately for accurate counts
-  const [todayResult, weekResult, monthResult, products, customers] = await Promise.all([
+  // Use getAllOrders for month data (paginates through all pages)
+  // Use getOrders for today/week (just need count from API)
+  const [todayResult, weekResult, allMonthOrders, products, customers] = await Promise.all([
     getOrders({
       startDate: startOfTodayISO(),
       endDate: endOfTodayISO(),
-      limit: 200,
+      limit: 1,
       sort: "orderedAt:desc",
     }),
     getOrders({
       startDate: daysAgoISO(7),
       endDate: endOfTodayISO(),
-      limit: 200,
+      limit: 1,
       sort: "orderedAt:desc",
     }),
-    getOrders({
+    getAllOrders({
       startDate: daysAgoISO(30),
       endDate: endOfTodayISO(),
-      limit: 200,
       sort: "orderedAt:desc",
     }),
     getProducts({ limit: 200 }),
     getCustomers({ limit: 1, sort: "lastOrderDate:desc" }),
   ]);
 
-  // Use API count for totals (more accurate than data.length when limit < total)
-  const todayData = todayResult.data;
-  const weekData = weekResult.data;
-  const monthData = monthResult.data;
-
   // ─── KPIs ───────────────────────────────────────────
+  const todayCiro = allMonthOrders
+    .filter((o) => {
+      const d = new Date(o.orderedAt);
+      const today = new Date();
+      return d.toISOString().split("T")[0] === today.toISOString().split("T")[0];
+    })
+    .reduce((s, o) => s + o.totalFinalPrice, 0);
+
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const weekCiro = allMonthOrders
+    .filter((o) => o.orderedAt >= weekAgo)
+    .reduce((s, o) => s + o.totalFinalPrice, 0);
+
   const kpi = {
     todayOrderCount: todayResult.count,
-    todayCiro: todayData.reduce((s, o) => s + o.totalFinalPrice, 0),
+    todayCiro,
     weekOrderCount: weekResult.count,
-    weekCiro: weekData.reduce((s, o) => s + o.totalFinalPrice, 0),
-    pendingCount: monthData.filter(
+    weekCiro,
+    pendingCount: allMonthOrders.filter(
       (o) => o.orderPackageStatus === "UNFULFILLED" || o.orderPackageStatus === "FULFILLED"
     ).length,
-    cancelledCount: monthData.filter(
+    cancelledCount: allMonthOrders.filter(
       (o) =>
         o.status === "CANCELLED" ||
         o.status === "REFUNDED" ||
@@ -57,6 +65,7 @@ export default async function VigowoodDashboardPage() {
     totalProducts: products.count,
     outOfStockCount: products.data.filter((p) => p.totalStock === 0).length,
     totalCustomers: customers.count,
+    totalMonthOrders: allMonthOrders.length,
   };
 
   // ─── 30-day trend ───────────────────────────────────
@@ -67,7 +76,7 @@ export default async function VigowoodDashboardPage() {
     const dayLabel = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
     trendMap.set(key, { date: dayLabel, orders: 0, ciro: 0 });
   }
-  for (const order of monthData) {
+  for (const order of allMonthOrders) {
     const key = new Date(order.orderedAt).toISOString().split("T")[0];
     const entry = trendMap.get(key);
     if (entry) {
@@ -79,14 +88,14 @@ export default async function VigowoodDashboardPage() {
 
   // ─── Order status distribution ──────────────────────
   const statusDistribution: Record<string, number> = {};
-  for (const order of monthData) {
+  for (const order of allMonthOrders) {
     const status = order.orderPackageStatus;
     statusDistribution[status] = (statusDistribution[status] || 0) + 1;
   }
 
   // ─── Top selling products (SKU aggregation) ─────────
   const skuMap = new Map<string, { sku: string; name: string; quantity: number; revenue: number }>();
-  for (const order of monthData) {
+  for (const order of allMonthOrders) {
     for (const line of order.orderLineItems) {
       const sku = line.variant.sku || "N/A";
       const existing = skuMap.get(sku) || { sku, name: line.variant.name, quantity: 0, revenue: 0 };
@@ -100,10 +109,20 @@ export default async function VigowoodDashboardPage() {
     .slice(0, 10);
 
   // ─── SKU daily data for filterable chart ─────────────
+  // Also build "ALL" aggregation for default view
+  const allDailyMap = new Map<string, { orders: number; revenue: number }>();
   const skuDailyMap = new Map<string, Map<string, { orders: number; revenue: number }>>();
-  for (const order of monthData) {
+
+  for (const order of allMonthOrders) {
     const dayKey = new Date(order.orderedAt).toISOString().split("T")[0];
+
+    // All SKUs aggregation
+    const allExisting = allDailyMap.get(dayKey) || { orders: 0, revenue: 0 };
     for (const line of order.orderLineItems) {
+      allExisting.orders += line.quantity;
+      allExisting.revenue += line.finalPrice * line.quantity;
+
+      // Per-SKU aggregation
       const sku = line.variant.sku || "N/A";
       if (!skuDailyMap.has(sku)) skuDailyMap.set(sku, new Map());
       const dayMap = skuDailyMap.get(sku)!;
@@ -112,10 +131,24 @@ export default async function VigowoodDashboardPage() {
       existing.revenue += line.finalPrice * line.quantity;
       dayMap.set(dayKey, existing);
     }
+    allDailyMap.set(dayKey, allExisting);
   }
 
   // Convert to serializable format
   const skuDailyData: Record<string, { date: string; orders: number; revenue: number }[]> = {};
+
+  // "TÜMÜ" (all) entry
+  const allEntries: { date: string; orders: number; revenue: number }[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86_400_000);
+    const key = d.toISOString().split("T")[0];
+    const dayLabel = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const data = allDailyMap.get(key) || { orders: 0, revenue: 0 };
+    allEntries.push({ date: dayLabel, ...data });
+  }
+  skuDailyData["TÜMÜ"] = allEntries;
+
+  // Per-SKU entries
   for (const [sku, dayMap] of skuDailyMap) {
     const entries: { date: string; orders: number; revenue: number }[] = [];
     for (let i = 29; i >= 0; i--) {
@@ -128,9 +161,12 @@ export default async function VigowoodDashboardPage() {
     skuDailyData[sku] = entries;
   }
 
-  const availableSkus = Array.from(skuMap.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .map((s) => ({ sku: s.sku, name: s.name }));
+  const availableSkus = [
+    { sku: "TÜMÜ", name: "Tüm Ürünler (Toplam)" },
+    ...Array.from(skuMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .map((s) => ({ sku: s.sku, name: s.name })),
+  ];
 
   return (
     <VigowoodDashboard
