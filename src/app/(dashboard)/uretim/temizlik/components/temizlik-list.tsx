@@ -7,6 +7,7 @@ import { TemizlikCard, type TemizlikBatchRow } from "./temizlik-card";
 import { CLEAN_STATUS, CLEAN_STATUS_LABELS } from "@/lib/constants";
 import { useTemizlikRealtime } from "@/hooks/use-temizlik-realtime";
 import { SprayCan } from "lucide-react";
+import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 interface TemizlikListProps {
   batches: TemizlikBatchRow[];
@@ -14,7 +15,9 @@ interface TemizlikListProps {
   selectedStatus: string;
 }
 
-export function TemizlikList({ batches, counts, selectedStatus }: TemizlikListProps) {
+export function TemizlikList({ batches: serverBatches, counts: serverCounts, selectedStatus }: TemizlikListProps) {
+  const batches = useServerDataCache("temizlik-batches", serverBatches);
+  const counts = useServerDataCache("temizlik-counts", serverCounts);
   const router = useRouter();
   const searchParams = useSearchParams();
   useTemizlikRealtime();

@@ -8,6 +8,7 @@ import { KesimSummaryCards } from "./kesim-summary-cards";
 import { YeniKesimDialog } from "./yeni-kesim-dialog";
 import type { CutBatchRow } from "./active-cut-card";
 import { Plus, Scissors } from "lucide-react";
+import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 interface KesimDashboardProps {
   activeCuts: CutBatchRow[];
@@ -18,11 +19,15 @@ interface KesimDashboardProps {
 }
 
 export function KesimDashboard({
-  activeCuts,
-  completedCuts,
-  todayTotalAdet,
-  todayTotalBatch,
+  activeCuts: serverActiveCuts,
+  completedCuts: serverCompletedCuts,
+  todayTotalAdet: serverTodayTotalAdet,
+  todayTotalBatch: serverTodayTotalBatch,
 }: KesimDashboardProps) {
+  const activeCuts = useServerDataCache("kesim-active", serverActiveCuts);
+  const completedCuts = useServerDataCache("kesim-completed", serverCompletedCuts);
+  const todayTotalAdet = useServerDataCache("kesim-adet", serverTodayTotalAdet);
+  const todayTotalBatch = useServerDataCache("kesim-batch", serverTodayTotalBatch);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (

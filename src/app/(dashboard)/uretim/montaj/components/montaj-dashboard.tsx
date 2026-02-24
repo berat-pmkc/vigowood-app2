@@ -25,6 +25,7 @@ import type { ActiveMontajSession } from "./session-card";
 import { cancelMontajSession } from "../actions";
 import { toast } from "sonner";
 import { useMontajSessionRealtime } from "@/hooks/use-montaj-session-realtime";
+import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 interface ProductOption {
   sku: string;
@@ -37,9 +38,11 @@ interface MontajDashboardProps {
 }
 
 export function MontajDashboard({
-  activeSessions,
-  productOptions,
+  activeSessions: serverActiveSessions,
+  productOptions: serverProductOptions,
 }: MontajDashboardProps) {
+  const activeSessions = useServerDataCache("montaj-sessions", serverActiveSessions);
+  const productOptions = useServerDataCache("montaj-products", serverProductOptions);
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [packageReadyOpen, setPackageReadyOpen] = useState(false);

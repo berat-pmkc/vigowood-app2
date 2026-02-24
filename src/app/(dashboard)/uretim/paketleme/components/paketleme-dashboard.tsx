@@ -20,6 +20,7 @@ import type { ActiveSession } from "./session-card";
 import { cancelSession } from "../actions";
 import { toast } from "sonner";
 import { usePaketlemeRealtime } from "@/hooks/use-paketleme-realtime";
+import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 interface ProductOption {
   sku: string;
@@ -33,10 +34,13 @@ interface PaketlemeDashboardProps {
 }
 
 export function PaketlemeDashboard({
-  activeSessions,
-  completedSessions,
-  productOptions,
+  activeSessions: serverActiveSessions,
+  completedSessions: serverCompletedSessions,
+  productOptions: serverProductOptions,
 }: PaketlemeDashboardProps) {
+  const activeSessions = useServerDataCache("paketleme-sessions", serverActiveSessions);
+  const completedSessions = useServerDataCache("paketleme-completed", serverCompletedSessions);
+  const productOptions = useServerDataCache("paketleme-products", serverProductOptions);
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [completedSheetOpen, setCompletedSheetOpen] = useState(false);

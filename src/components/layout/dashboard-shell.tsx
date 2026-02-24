@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { SWRProvider } from "@/components/providers/swr-provider";
 import type { UserRole } from "@/lib/constants";
 
 type DashboardShellProps = {
@@ -37,22 +38,24 @@ export function DashboardShell({
   }
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar
-          userRole={userRole}
-          displayName={displayName}
-          displayRole={displayRole}
-          onLogout={handleLogout}
-        />
-        <SidebarInset>
-          <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} />
-          <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">
-            {children}
-          </main>
-        </SidebarInset>
-        <MobileBottomNav userRole={userRole} />
-      </SidebarProvider>
-    </TooltipProvider>
+    <SWRProvider>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar
+            userRole={userRole}
+            displayName={displayName}
+            displayRole={displayRole}
+            onLogout={handleLogout}
+          />
+          <SidebarInset>
+            <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} />
+            <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">
+              {children}
+            </main>
+          </SidebarInset>
+          <MobileBottomNav userRole={userRole} />
+        </SidebarProvider>
+      </TooltipProvider>
+    </SWRProvider>
   );
 }
