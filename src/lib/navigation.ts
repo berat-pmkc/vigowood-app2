@@ -26,6 +26,9 @@ import {
   Landmark,
   CreditCard,
   PieChart,
+  Store,
+  ShoppingBag,
+  MessageSquareText,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
@@ -60,6 +63,8 @@ const ALL_INTERNAL: UserRole[] = [...MANAGEMENT_ROLES, "Hat"];
 const SEVK_ROLES: UserRole[] = ["Yönetici", "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"];
 
 const FINANCE_ROLES: UserRole[] = ["Yönetici", "Muhasebe", "E-Ticaret Müdürü"];
+
+const MARKETPLACE_ROLES: UserRole[] = ["Yönetici", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Pazaryeri Sorumlusu"];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -100,6 +105,13 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Pazarlama", href: "/satis/pazarlama", icon: Target, roles: MANAGEMENT_ROLES },
       { title: "Kampanyalar", href: "/satis/kampanyalar", icon: Megaphone, roles: MANAGEMENT_ROLES },
       { title: "Ayarlar", href: "/satis/ayarlar", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
+    ],
+  },
+  {
+    label: "Pazaryeri",
+    items: [
+      { title: "Genel Bakış", href: "/pazaryeri/genel", icon: Store, roles: MARKETPLACE_ROLES },
+      { title: "Trendyol", href: "/pazaryeri/trendyol/siparisler", icon: ShoppingBag, roles: MARKETPLACE_ROLES },
     ],
   },
   {

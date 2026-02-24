@@ -1,0 +1,366 @@
+// Trendyol API Type Definitions
+
+// ─── Pagination ──────────────────────────────────────────
+export interface TrendyolPaginatedResponse<T> {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  content: T[];
+}
+
+// ─── Orders ──────────────────────────────────────────────
+export type TrendyolOrderStatus =
+  | "Created"
+  | "Picking"
+  | "Invoiced"
+  | "Shipped"
+  | "Delivered"
+  | "Cancelled"
+  | "UnSupplied"
+  | "Returned"
+  | "UnDelivered"
+  | "UnPacked"
+  | "AtCollectionPoint"
+  | "Awaiting";
+
+export interface TrendyolAddress {
+  id?: number;
+  firstName: string;
+  lastName: string;
+  company?: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  cityCode: number;
+  district: string;
+  districtId?: number;
+  postalCode: string;
+  countryCode: string;
+  neighborhoodId?: number;
+  fullName?: string;
+  fullAddress: string;
+  phone?: string;
+  email?: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  eInvoiceAvailable?: boolean;
+}
+
+export interface TrendyolOrderLine {
+  id: number;
+  lineId?: number;
+  quantity: number;
+  salesCampaignId?: number;
+  merchantSku: string;
+  sku?: string;
+  stockCode?: string;
+  productName: string;
+  barcode: string;
+  amount: number;
+  discount: number;
+  currencyCode: string;
+  vatBaseAmount: number;
+  vatRate?: number;
+  price: number;
+  orderLineItemStatusName: string;
+  productCategoryId?: number;
+  commission?: number;
+  productSize?: string;
+  productColor?: string;
+  merchantId?: number;
+  imageUrl?: string;
+}
+
+export interface TrendyolPackageHistory {
+  createdDate: number;
+  status: string;
+}
+
+export interface TrendyolOrder {
+  id: number;
+  shipmentPackageId: number;
+  orderNumber: string;
+  customerId: number;
+  customerFirstName: string;
+  customerLastName: string;
+  customerEmail?: string;
+  grossAmount: number;
+  packageGrossAmount?: number;
+  totalDiscount: number;
+  totalTyDiscount?: number;
+  shipmentAddress: TrendyolAddress;
+  invoiceAddress: TrendyolAddress;
+  cargoTrackingNumber?: number;
+  cargoTrackingLink?: string;
+  cargoProviderName?: string;
+  cargoSenderNumber?: string;
+  lines: TrendyolOrderLine[];
+  orderDate: number;
+  shipmentPackageStatus: string;
+  status: TrendyolOrderStatus;
+  deliveryType?: string;
+  timeSlotId?: number;
+  estimatedDeliveryStartDate?: number;
+  estimatedDeliveryEndDate?: number;
+  totalPrice: number;
+  deliveryAddressType?: string;
+  lastModifiedDate: number;
+  commercial?: boolean;
+  fastDelivery?: boolean;
+  invoiceLink?: string;
+  packageHistories?: TrendyolPackageHistory[];
+  agreedDeliveryDate?: number;
+  extendedDeliveryDate?: number;
+  agreedDeliveryExtensionEndDate?: number;
+}
+
+// ─── Products ────────────────────────────────────────────
+export interface TrendyolProductImage {
+  url: string;
+}
+
+export interface TrendyolProductAttribute {
+  attributeId: number;
+  attributeName: string;
+  attributeValue?: string;
+  attributeValueId?: number;
+}
+
+export interface TrendyolProduct {
+  id: string;
+  productCode?: number;
+  barcode: string;
+  title: string;
+  description?: string;
+  productMainId?: string;
+  brandId?: number;
+  brand?: string;
+  categoryName?: string;
+  categoryId?: number;
+  quantity: number;
+  stockCode?: string;
+  dimensionalWeight?: number;
+  listPrice: number;
+  salePrice: number;
+  vatRate?: number;
+  images?: TrendyolProductImage[];
+  approved?: boolean;
+  archived?: boolean;
+  locked?: boolean;
+  onSale?: boolean;
+  onsale?: boolean;
+  hasActiveCampaign?: boolean;
+  createDateTime?: number;
+  lastUpdateDate?: number;
+  blacklisted?: boolean;
+  rejected?: boolean;
+  attributes?: TrendyolProductAttribute[];
+  platformListingId?: string;
+  stockUnitType?: string;
+  gender?: string;
+  color?: string;
+  size?: string;
+}
+
+// ─── Q&A (Questions & Answers) ───────────────────────────
+export type TrendyolQuestionStatus =
+  | "WAITING_FOR_ANSWER"
+  | "WAITING_FOR_APPROVE"
+  | "ANSWERED"
+  | "REPORTED"
+  | "REJECTED";
+
+export interface TrendyolAnswer {
+  id: number;
+  text: string;
+  creationDate: number;
+  hasPrivateInfo?: boolean;
+}
+
+export interface TrendyolRejectedAnswer {
+  id: number;
+  text: string;
+  creationDate: number;
+  reason?: string;
+}
+
+export interface TrendyolQuestion {
+  id: number;
+  text: string;
+  status: TrendyolQuestionStatus;
+  creationDate: number;
+  customerId: number;
+  userName?: string;
+  showUserName?: boolean;
+  productName?: string;
+  imageUrl?: string;
+  productMainId?: string;
+  public?: boolean;
+  answeredDateMessage?: string;
+  answer?: TrendyolAnswer;
+  rejectedAnswer?: TrendyolRejectedAnswer;
+  webUrl?: string;
+}
+
+// ─── Finance / Settlements ───────────────────────────────
+export type TrendyolSettlementTransactionType =
+  | "Sale"
+  | "Return"
+  | "Discount"
+  | "DiscountCancel"
+  | "Coupon"
+  | "CouponCancel"
+  | "ProvisionPositive"
+  | "ProvisionNegative"
+  | "ManualRefund"
+  | "ManualRefundCancel"
+  | "TYDiscount"
+  | "TYDiscountCancel"
+  | "TYCoupon"
+  | "TYCouponCancel"
+  | "SellerRevenuePositive"
+  | "SellerRevenueNegative"
+  | "CommissionPositive"
+  | "CommissionNegative";
+
+export interface TrendyolSettlement {
+  id: number;
+  transactionDate: string;
+  transactionType: TrendyolSettlementTransactionType;
+  debt?: number;
+  credit?: number;
+  receiptId?: string;
+  barcode?: string;
+  paymentOrderId?: string;
+  paymentDate?: string;
+  commissionRate?: number;
+  commissionAmount?: number;
+  sellerRevenue?: number;
+  orderNumber?: string;
+  affiliate?: string;
+  shipmentPackageId?: number;
+}
+
+export type TrendyolOtherFinancialType =
+  | "CashAdvance"
+  | "WireTransfer"
+  | "IncomingTransfer"
+  | "ReturnInvoice"
+  | "CommissionAgreementInvoice"
+  | "PaymentOrder"
+  | "DeductionInvoices"
+  | "FinancialItem"
+  | "Stoppage";
+
+export interface TrendyolOtherFinancial {
+  id: number;
+  transactionDate: string;
+  transactionType: TrendyolOtherFinancialType;
+  debt?: number;
+  credit?: number;
+  description?: string;
+}
+
+// ─── Claims / Returns ────────────────────────────────────
+export type TrendyolClaimStatus =
+  | "Created"
+  | "WaitingInAction"
+  | "WaitingFraudCheck"
+  | "Accepted"
+  | "Rejected"
+  | "Unresolved"
+  | "Cancelled"
+  | "InAnalysis";
+
+export interface TrendyolClaimItem {
+  id: string;
+  orderLineId: number;
+  claimItemReasonId?: number;
+  claimItemReasonText?: string;
+  barcode?: string;
+  productName?: string;
+  quantity?: number;
+  customerNote?: string;
+  status?: string;
+}
+
+export interface TrendyolClaim {
+  id: string;
+  orderNumber: string;
+  status: TrendyolClaimStatus;
+  claimDate: number;
+  items: TrendyolClaimItem[];
+  shipmentPackageId?: number;
+  cargoTrackingNumber?: string;
+}
+
+// ─── API Request Params ──────────────────────────────────
+export interface TrendyolOrderParams {
+  startDate?: number;
+  endDate?: number;
+  page?: number;
+  size?: number;
+  status?: TrendyolOrderStatus;
+  orderNumber?: string;
+  orderByField?: "PackageLastModifiedDate";
+  orderByDirection?: "ASC" | "DESC";
+  shipmentPackageIds?: number;
+}
+
+export interface TrendyolProductParams {
+  approved?: boolean;
+  barcode?: string;
+  startDate?: number;
+  endDate?: number;
+  page?: number;
+  size?: number;
+  dateQueryType?: "CREATED_DATE" | "LAST_MODIFIED_DATE";
+  stockCode?: string;
+  archived?: boolean;
+  productMainId?: string;
+  onSale?: boolean;
+  rejected?: boolean;
+  blacklisted?: boolean;
+  brandIds?: number[];
+}
+
+export interface TrendyolQuestionParams {
+  barcode?: number;
+  page?: number;
+  size?: number;
+  startDate?: number;
+  endDate?: number;
+  status?: TrendyolQuestionStatus;
+  orderByField?: "LastModifiedDate" | "CreatedDate";
+  orderByDirection?: "ASC" | "DESC";
+}
+
+export interface TrendyolSettlementParams {
+  transactionType?: string;
+  startDate: number;
+  endDate: number;
+  page?: number;
+  size?: number;
+}
+
+export interface TrendyolStockPriceItem {
+  barcode: string;
+  quantity?: number;
+  salePrice?: number;
+  listPrice?: number;
+}
+
+export interface TrendyolUpdatePackageParams {
+  lines: { lineId: number; quantity: number }[];
+  params?: Record<string, string>;
+  status: "Picking" | "Invoiced";
+}
+
+// ─── API Error ───────────────────────────────────────────
+export interface TrendyolApiError {
+  status: number;
+  message: string;
+  timestamp?: string;
+  path?: string;
+}

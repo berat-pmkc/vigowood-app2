@@ -421,8 +421,23 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Validations: satisGirisBatchSchema, maliyetGirisBatchSchema
 - [x] Type aliases: FaaliyetDonem, SatisGiris, MaliyetGiris, KarlilikData
 
+### KATMAN 28A: Pazaryeri Entegrasyonu — Trendyol ✅
+- [x] lib/trendyol/ altyapı: client.ts (Basic Auth, rate limiting, mock data fallback), types.ts, helpers.ts, mock-data.ts
+- [x] .env.local: TRENDYOL_API_KEY, TRENDYOL_API_SECRET, TRENDYOL_SELLER_ID
+- [x] Sidebar: Pazaryeri menü grubu (E-Ticaret Müdürü, Dış Ticaret Müdürü, Yönetici, Pazaryeri Sorumlusu)
+- [x] /pazaryeri/genel: KPI kartları (sipariş, ciro, iade, stok), kanal kartları, 7 gün trend (Recharts)
+- [x] /pazaryeri/trendyol/siparisler: TanStack Table, tab filtreleri, tarih aralığı, arama, sipariş detay Sheet, kargo gönderme
+- [x] /pazaryeri/trendyol/urunler: Ürün listesi, stok/fiyat güncelleme, filtreler (satışta/beklemede/stok yok)
+- [x] /pazaryeri/trendyol/sorular: Müşteri soruları, cevap yazma, durum filtreleri
+- [x] /pazaryeri/trendyol/finans: Satış/komisyon/iade/net ödeme KPI, aylık özet tablo, işlem geçmişi, bar chart
+- [x] Trendyol tab navigasyonu (layout.tsx + TrendyolNav)
+- [x] Auth guard: MARKETPLACE_ACCESS_ROLES, tüm sayfalar ve server action'larda kontrol
+- [x] Mock data: API credentials invalid olduğunda otomatik mock data fallback (gerçekçi VigoWood ürünleri)
+
 ### KATMAN 28+: İleri Özellikler
-- [ ] Amazon SP-API, Trendyol/Hepsiburada API
+- [ ] Amazon SP-API, Hepsiburada API
+- [ ] Trendyol API gerçek credentials bağlantısı (mevcut: 401 auth hatası, mock data aktif)
+- [ ] Trendyol Ads verisi (API yok — manuel CSV upload ile)
 - [ ] WhatsApp bildirimler
 - [ ] PPC dashboard, AI tahmin
 
