@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquare, Clock, CheckCircle, AlertTriangle, Send } from "lucide-react";
 import { toast } from "sonner";
+import { SyncStatus } from "../../components/sync-status";
 import type { TrendyolQuestion, TrendyolQuestionStatus } from "@/lib/trendyol/types";
 import {
   QUESTION_STATUS_LABELS,
@@ -21,7 +22,7 @@ interface Props {
   totalElements: number;
   currentPage: number;
   currentStatus: string;
-  isMock: boolean;
+  lastSyncAt: string | null;
 }
 
 const STATUS_TABS: { label: string; status: string; icon: React.ElementType }[] = [
@@ -36,7 +37,7 @@ export function SorularClient({
   totalElements,
   currentPage,
   currentStatus,
-  isMock,
+  lastSyncAt,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -93,10 +94,10 @@ export function SorularClient({
         <div>
           <h1 className="text-xl font-bold text-vw-dark">Müşteri Soruları</h1>
           <p className="text-sm text-muted-foreground">
-            {totalElements} soru {waitingCount > 0 && `(${waitingCount} cevap bekliyor)`}{" "}
-            {isMock && "(demo veri)"}
+            {totalElements} soru {waitingCount > 0 && `(${waitingCount} cevap bekliyor)`}
           </p>
         </div>
+        <SyncStatus lastSyncAt={lastSyncAt} entityType="questions" />
       </div>
 
       {/* Status Tabs */}

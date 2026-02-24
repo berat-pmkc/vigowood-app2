@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSettlements, isUsingMockData } from "@/lib/trendyol";
+import { getSettlementsFromDB, getOverallLastSyncAt } from "@/lib/trendyol/queries";
 import { daysAgoTimestamp, endOfTodayTimestamp, aggregateSettlements } from "@/lib/trendyol/helpers";
 import type { TrendyolSettlement } from "@/lib/trendyol/types";
 import { FinansClient } from "./components/finans-client";
@@ -15,9 +15,9 @@ interface PageProps {
 
 export default async function TrendyolFinansPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const isMock = isUsingMockData();
+  const lastSyncAt = await getOverallLastSyncAt();
 
-  // Default: last 15 days (Trendyol max range)
+  // Default: last 15 days
   let startDate = daysAgoTimestamp(15);
   let endDate = endOfTodayTimestamp();
 
@@ -30,10 +30,9 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
     endDate = ed.getTime();
   }
 
-  // Fetch all settlement types
   const allTypes = "Sale,Return,Discount,DiscountCancel,Coupon,CouponCancel,CommissionPositive,CommissionNegative,TYDiscount,TYDiscountCancel,SellerRevenuePositive,SellerRevenueNegative";
 
-  const result = await getSettlements({
+  const result = await getSettlementsFromDB({
     transactionType: allTypes,
     startDate,
     endDate,
@@ -54,10 +53,7 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
   const monthlyData = Array.from(monthlyMap.entries())
     .map(([month, items]) => {
       const agg = aggregateSettlements(items);
-      return {
-        month,
-        ...agg,
-      };
+      return { month, ...agg };
     })
     .sort((a, b) => a.month.localeCompare(b.month));
 
@@ -68,7 +64,7 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
       monthlyData={monthlyData}
       startDate={params.startDate || ""}
       endDate={params.endDate || ""}
-      isMock={isMock}
+      lastSyncAt={lastSyncAt}
     />
   );
 }

@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -27,44 +27,44 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { SyncStatus } from "../../components/sync-status";
-import type { TrendyolOrder, TrendyolOrderStatus } from "@/lib/trendyol/types";
+import type { IkasOrder } from "@/lib/ikas/types";
 import {
-  ORDER_STATUS_LABELS,
-  ORDER_STATUS_COLORS,
   ORDER_TAB_FILTERS,
-  formatTrendyolDate,
+  formatIkasDate,
   formatTRY,
   getCustomerName,
   getOrderProductSummary,
-} from "@/lib/trendyol/helpers";
+  getDisplayStatus,
+} from "@/lib/ikas/helpers";
 import { SiparisDetay } from "./siparis-detay";
 
 interface Props {
-  orders: TrendyolOrder[];
-  totalElements: number;
+  orders: IkasOrder[];
+  totalCount: number;
+  hasNext: boolean;
   currentPage: number;
   currentStatus: string;
   currentSearch: string;
   startDate: string;
   endDate: string;
-  lastSyncAt: string | null;
+  isMock: boolean;
 }
 
 export function SiparislerClient({
   orders,
-  totalElements,
+  totalCount,
+  hasNext,
   currentPage,
   currentStatus,
   currentSearch,
   startDate,
   endDate,
-  lastSyncAt,
+  isMock,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(currentSearch);
-  const [selectedOrder, setSelectedOrder] = useState<TrendyolOrder | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<IkasOrder | null>(null);
 
   function updateParams(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -75,14 +75,14 @@ export function SiparislerClient({
         params.delete(key);
       }
     }
-    router.push(`/pazaryeri/trendyol/siparisler?${params.toString()}`);
+    router.push(`/pazaryeri/vigowood-com/siparisler?${params.toString()}`);
   }
 
   function handleSearch() {
-    updateParams({ search, page: "0" });
+    updateParams({ search, page: "1" });
   }
 
-  const columns: ColumnDef<TrendyolOrder>[] = [
+  const columns: ColumnDef<IkasOrder>[] = [
     {
       accessorKey: "orderNumber",
       header: "Sipariş No",
@@ -91,10 +91,10 @@ export function SiparislerClient({
       ),
     },
     {
-      accessorKey: "orderDate",
+      accessorKey: "orderedAt",
       header: "Tarih",
       cell: ({ row }) => (
-        <span className="text-sm">{formatTrendyolDate(row.original.orderDate)}</span>
+        <span className="text-sm">{formatIkasDate(row.original.orderedAt)}</span>
       ),
     },
     {
@@ -114,21 +114,20 @@ export function SiparislerClient({
       ),
     },
     {
-      accessorKey: "totalPrice",
+      accessorKey: "totalFinalPrice",
       header: "Tutar",
       cell: ({ row }) => (
-        <span className="font-medium">{formatTRY(row.original.totalPrice)}</span>
+        <span className="font-medium">{formatTRY(row.original.totalFinalPrice)}</span>
       ),
     },
     {
-      accessorKey: "status",
+      id: "status",
       header: "Durum",
       cell: ({ row }) => {
-        const status = row.original.status as TrendyolOrderStatus;
-        const colors = ORDER_STATUS_COLORS[status] || { bg: "bg-gray-100", text: "text-gray-800" };
+        const { label, bg, text } = getDisplayStatus(row.original);
         return (
-          <Badge className={`${colors.bg} ${colors.text} hover:${colors.bg}`}>
-            {ORDER_STATUS_LABELS[status] || status}
+          <Badge className={`${bg} ${text} hover:${bg}`}>
+            {label}
           </Badge>
         );
       },
@@ -148,10 +147,9 @@ export function SiparislerClient({
         <div>
           <h1 className="text-xl font-bold text-vw-dark">Siparişler</h1>
           <p className="text-sm text-muted-foreground">
-            {totalElements} sipariş
+            {totalCount} sipariş {isMock && "(demo veri)"}
           </p>
         </div>
-        <SyncStatus lastSyncAt={lastSyncAt} entityType="orders" />
       </div>
 
       {/* Filters */}
@@ -161,10 +159,10 @@ export function SiparislerClient({
           <div className="flex flex-wrap gap-1">
             {ORDER_TAB_FILTERS.map((tab) => (
               <Button
-                key={tab.status}
-                variant={currentStatus === tab.status ? "default" : "outline"}
+                key={tab.packageStatus}
+                variant={currentStatus === tab.packageStatus ? "default" : "outline"}
                 size="sm"
-                onClick={() => updateParams({ status: tab.status === "all" ? "" : tab.status, page: "0" })}
+                onClick={() => updateParams({ status: tab.packageStatus === "all" ? "" : tab.packageStatus, page: "1" })}
               >
                 {tab.label}
               </Button>
@@ -188,13 +186,13 @@ export function SiparislerClient({
                 type="date"
                 className="w-[150px]"
                 value={startDate}
-                onChange={(e) => updateParams({ startDate: e.target.value, page: "0" })}
+                onChange={(e) => updateParams({ startDate: e.target.value, page: "1" })}
               />
               <Input
                 type="date"
                 className="w-[150px]"
                 value={endDate}
-                onChange={(e) => updateParams({ endDate: e.target.value, page: "0" })}
+                onChange={(e) => updateParams({ endDate: e.target.value, page: "1" })}
               />
               <Button size="sm" onClick={handleSearch}>
                 Ara
@@ -249,13 +247,13 @@ export function SiparislerClient({
           {/* Pagination */}
           <div className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-sm text-muted-foreground">
-              Sayfa {currentPage + 1} / {Math.max(1, Math.ceil(totalElements / 50))}
+              Sayfa {currentPage} {hasNext && "/ ..."}
             </p>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                disabled={currentPage === 0}
+                disabled={currentPage <= 1}
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -263,7 +261,7 @@ export function SiparislerClient({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={orders.length < 50}
+                disabled={!hasNext}
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
               >
                 <ChevronRight className="h-4 w-4" />

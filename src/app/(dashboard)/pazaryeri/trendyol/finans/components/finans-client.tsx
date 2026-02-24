@@ -22,6 +22,7 @@ import {
   Minus,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { SyncStatus } from "../../components/sync-status";
 import type { TrendyolSettlement } from "@/lib/trendyol/types";
 import { formatTRY, formatTrendyolDateShort } from "@/lib/trendyol/helpers";
 
@@ -55,7 +56,7 @@ interface Props {
   monthlyData: MonthlyData[];
   startDate: string;
   endDate: string;
-  isMock: boolean;
+  lastSyncAt: string | null;
 }
 
 export function FinansClient({
@@ -64,7 +65,7 @@ export function FinansClient({
   monthlyData,
   startDate,
   endDate,
-  isMock,
+  lastSyncAt,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -97,14 +98,10 @@ export function FinansClient({
         <div>
           <h1 className="text-xl font-bold text-vw-dark">Finans</h1>
           <p className="text-sm text-muted-foreground">
-            Trendyol satış ve komisyon verileri {isMock && "(demo veri)"}
+            Trendyol satış ve komisyon verileri
           </p>
         </div>
-        {isMock && (
-          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
-            Demo Veri
-          </Badge>
-        )}
+        <SyncStatus lastSyncAt={lastSyncAt} entityType="settlements" />
       </div>
 
       {/* Date Filter */}

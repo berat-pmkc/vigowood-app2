@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import { SyncStatus } from "../../trendyol/components/sync-status";
 
 const TrendChart = dynamic(() => import("./trend-chart"), {
   ssr: false,
@@ -30,8 +31,11 @@ interface KpiData {
 
 interface Props {
   kpi: KpiData;
-  trendData: { date: string; orders: number; ciro: number }[];
-  isMock: boolean;
+  trendyolKpi: KpiData;
+  ikasKpi: KpiData;
+  trendData: { date: string; orders: number; ciro: number; trendyolOrders: number; trendyolCiro: number; ikasOrders: number; ikasCiro: number }[];
+  lastSyncAt: string | null;
+  ikasMock: boolean;
 }
 
 function formatTRY(amount: number): string {
@@ -42,7 +46,7 @@ function formatTRY(amount: number): string {
   }).format(amount);
 }
 
-export function GenelDashboard({ kpi, trendData, isMock }: Props) {
+export function GenelDashboard({ kpi, trendyolKpi, ikasKpi, trendData, lastSyncAt, ikasMock }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -53,11 +57,7 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
             Tüm pazaryeri kanallarının özet görünümü
           </p>
         </div>
-        {isMock && (
-          <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
-            Demo Veri
-          </Badge>
-        )}
+        <SyncStatus lastSyncAt={lastSyncAt} />
       </div>
 
       {/* KPI Cards */}
@@ -69,7 +69,9 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{kpi.todayOrderCount}</div>
-            <p className="text-xs text-muted-foreground">Bugün gelen sipariş sayısı</p>
+            <p className="text-xs text-muted-foreground">
+              T: {trendyolKpi.todayOrderCount} · VW: {ikasKpi.todayOrderCount}
+            </p>
           </CardContent>
         </Card>
 
@@ -80,7 +82,9 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{kpi.pendingCount}</div>
-            <p className="text-xs text-muted-foreground">Hazırlanmayı bekleyen</p>
+            <p className="text-xs text-muted-foreground">
+              T: {trendyolKpi.pendingCount} · VW: {ikasKpi.pendingCount}
+            </p>
           </CardContent>
         </Card>
 
@@ -91,7 +95,9 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600">{formatTRY(kpi.todayCiro)}</div>
-            <p className="text-xs text-muted-foreground">Bugünkü satış tutarı</p>
+            <p className="text-xs text-muted-foreground">
+              T: {formatTRY(trendyolKpi.todayCiro)} · VW: {formatTRY(ikasKpi.todayCiro)}
+            </p>
           </CardContent>
         </Card>
 
@@ -102,7 +108,9 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{kpi.returnCount}</div>
-            <p className="text-xs text-muted-foreground">Son 7 gün</p>
+            <p className="text-xs text-muted-foreground">
+              Son 7 gün · T: {trendyolKpi.returnCount} · VW: {ikasKpi.returnCount}
+            </p>
           </CardContent>
         </Card>
 
@@ -113,7 +121,9 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{kpi.totalProducts}</div>
-            <p className="text-xs text-muted-foreground">Aktif ürün sayısı</p>
+            <p className="text-xs text-muted-foreground">
+              T: {trendyolKpi.totalProducts} · VW: {ikasKpi.totalProducts}
+            </p>
           </CardContent>
         </Card>
 
@@ -124,7 +134,9 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{kpi.outOfStockCount}</div>
-            <p className="text-xs text-muted-foreground">Stoğu sıfır ürün</p>
+            <p className="text-xs text-muted-foreground">
+              T: {trendyolKpi.outOfStockCount} · VW: {ikasKpi.outOfStockCount}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -132,7 +144,7 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
       {/* Kanal Kartları */}
       <div>
         <h2 className="mb-3 text-lg font-semibold text-vw-dark">Pazaryeri Kanalları</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="border-l-4 border-l-orange-500">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -142,12 +154,32 @@ export function GenelDashboard({ kpi, trendData, isMock }: Props) {
             </CardHeader>
             <CardContent className="space-y-1">
               <p className="text-sm">
-                <span className="font-medium">{kpi.todayOrderCount}</span> sipariş bugün
+                <span className="font-medium">{trendyolKpi.todayOrderCount}</span> sipariş bugün
               </p>
               <p className="text-sm">
-                <span className="font-medium">{formatTRY(kpi.todayCiro)}</span> ciro
+                <span className="font-medium">{formatTRY(trendyolKpi.todayCiro)}</span> ciro
               </p>
               <Badge className="mt-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Bağlı</Badge>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-emerald-500">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-emerald-100 text-xs font-bold text-emerald-700">VW</span>
+                vigowood.com
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <p className="text-sm">
+                <span className="font-medium">{ikasKpi.todayOrderCount}</span> sipariş bugün
+              </p>
+              <p className="text-sm">
+                <span className="font-medium">{formatTRY(ikasKpi.todayCiro)}</span> ciro
+              </p>
+              <Badge className="mt-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                {ikasMock ? "Demo" : "Bağlı"}
+              </Badge>
             </CardContent>
           </Card>
 

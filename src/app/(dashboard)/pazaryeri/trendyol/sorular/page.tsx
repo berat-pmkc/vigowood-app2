@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getQuestions, isUsingMockData } from "@/lib/trendyol";
+import { getQuestionsFromDB, getOverallLastSyncAt } from "@/lib/trendyol/queries";
 import type { TrendyolQuestionStatus } from "@/lib/trendyol/types";
 import { SorularClient } from "./components/sorular-client";
 
@@ -14,21 +14,14 @@ interface PageProps {
 
 export default async function TrendyolSorularPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const isMock = isUsingMockData();
+  const lastSyncAt = await getOverallLastSyncAt();
   const page = parseInt(params.page || "0", 10);
 
-  const questionParams: Record<string, unknown> = {
+  const result = await getQuestionsFromDB({
     page,
     size: 50,
-    orderByField: "CreatedDate",
-    orderByDirection: "DESC",
-  };
-
-  if (params.status && params.status !== "all") {
-    questionParams.status = params.status;
-  }
-
-  const result = await getQuestions(questionParams as Parameters<typeof getQuestions>[0]);
+    status: (params.status as TrendyolQuestionStatus | "all") || "all",
+  });
 
   return (
     <SorularClient
@@ -36,7 +29,7 @@ export default async function TrendyolSorularPage({ searchParams }: PageProps) {
       totalElements={result.totalElements}
       currentPage={page}
       currentStatus={(params.status as TrendyolQuestionStatus) || "all"}
-      isMock={isMock}
+      lastSyncAt={lastSyncAt}
     />
   );
 }

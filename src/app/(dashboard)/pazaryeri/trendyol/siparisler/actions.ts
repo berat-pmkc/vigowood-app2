@@ -3,6 +3,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { MARKETPLACE_ACCESS_ROLES } from "@/lib/constants";
 import { updatePackageStatus, isUsingMockData } from "@/lib/trendyol";
+import { createClient } from "@supabase/supabase-js";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -42,7 +43,24 @@ export async function updateOrderStatus(
       params.params = { invoiceNumber };
     }
 
+    // API call
     await updatePackageStatus(packageId, params);
+
+    // Dual-write: update local DB
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      await supabase
+        .from("trendyol_orders")
+        .update({ status: newStatus })
+        .eq("id", packageId);
+    } catch (dbErr) {
+      console.warn("[Trendyol] Local DB update failed:", dbErr);
+      // Don't fail the action — API call was successful
+    }
+
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bilinmeyen hata" };

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getOrders, isUsingMockData } from "@/lib/trendyol";
+import { getOrdersFromDB, getOverallLastSyncAt } from "@/lib/trendyol/queries";
 import { daysAgoTimestamp, endOfTodayTimestamp } from "@/lib/trendyol/helpers";
 import type { TrendyolOrderStatus } from "@/lib/trendyol/types";
 import { SiparislerClient } from "./components/siparisler-client";
@@ -18,7 +18,7 @@ interface PageProps {
 
 export default async function TrendyolSiparislerPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const isMock = isUsingMockData();
+  const lastSyncAt = await getOverallLastSyncAt();
 
   const status = params.status as TrendyolOrderStatus | "all" | undefined;
   const search = params.search || "";
@@ -37,61 +37,25 @@ export default async function TrendyolSiparislerPage({ searchParams }: PageProps
     endDate = ed.getTime();
   }
 
-  const orderParams: Record<string, unknown> = {
+  const result = await getOrdersFromDB({
     startDate,
     endDate,
     page,
     size: 50,
-    orderByField: "PackageLastModifiedDate",
-    orderByDirection: "DESC",
-  };
-
-  if (status && status !== "all") {
-    // "İptal/İade" tab - client side filters both
-    if (status === "Cancelled") {
-      // Fetch all and filter client-side for Cancelled+Returned
-    } else {
-      (orderParams as Record<string, unknown>).status = status;
-    }
-  }
-
-  const result = await getOrders(orderParams as Parameters<typeof getOrders>[0]);
-
-  // Client-side filter for search and cancelled/returned combo
-  let orders = result.content;
-
-  if (status === "Cancelled") {
-    // Also include Returned
-    const allOrders = await getOrders({
-      startDate,
-      endDate,
-      size: 200,
-    } as Parameters<typeof getOrders>[0]);
-    orders = allOrders.content.filter(
-      (o) => o.status === "Cancelled" || o.status === "Returned" || o.status === "UnSupplied"
-    );
-  }
-
-  if (search) {
-    const q = search.toLowerCase();
-    orders = orders.filter(
-      (o) =>
-        o.orderNumber.includes(q) ||
-        `${o.customerFirstName} ${o.customerLastName}`.toLowerCase().includes(q) ||
-        o.lines.some((l) => l.productName.toLowerCase().includes(q))
-    );
-  }
+    status: status || "all",
+    search: search || undefined,
+  });
 
   return (
     <SiparislerClient
-      orders={orders}
+      orders={result.content}
       totalElements={result.totalElements}
       currentPage={page}
       currentStatus={status || "all"}
       currentSearch={search}
       startDate={params.startDate || ""}
       endDate={params.endDate || ""}
-      isMock={isMock}
+      lastSyncAt={lastSyncAt}
     />
   );
 }

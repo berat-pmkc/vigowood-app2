@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { MARKETPLACE_ACCESS_ROLES } from "@/lib/constants";
-import { answerQuestion as apiAnswerQuestion, isUsingMockData } from "@/lib/trendyol";
+import { answerQuestion as apiAnswerQuestion } from "@/lib/trendyol";
+import { createClient } from "@supabase/supabase-js";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -30,6 +31,25 @@ export async function answerQuestion(
     }
 
     await apiAnswerQuestion(questionId, text.trim());
+
+    // Dual-write: update local DB
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      await supabase
+        .from("trendyol_questions")
+        .update({
+          status: "ANSWERED",
+          answer_text: text.trim(),
+          answer_date: Date.now(),
+        })
+        .eq("id", questionId);
+    } catch (dbErr) {
+      console.warn("[Trendyol] Local DB update failed:", dbErr);
+    }
+
     revalidatePath("/pazaryeri/trendyol/sorular");
     return { success: true };
   } catch (e) {
