@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useUnreadCount } from "@/hooks/use-unread-count";
 import { RealtimeIndicator } from "@/components/shared/realtime-indicator";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 type TopNavbarProps = {
   displayName: string;
   displayRole: string;
   userId?: string;
+  avatarUrl?: string | null;
 };
 
 function getTodayString() {
@@ -23,7 +25,7 @@ function getTodayString() {
   });
 }
 
-export function TopNavbar({ displayName, displayRole, userId }: TopNavbarProps) {
+export function TopNavbar({ displayName, displayRole, userId, avatarUrl }: TopNavbarProps) {
   const unreadCount = useUnreadCount(userId ?? null);
 
   return (
@@ -51,6 +53,8 @@ export function TopNavbar({ displayName, displayRole, userId }: TopNavbarProps) 
           </Button>
 
           <Separator orientation="vertical" className="h-4" />
+
+          <UserAvatar avatarUrl={avatarUrl} fullName={displayName} size="default" />
 
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium leading-tight">{displayName}</p>

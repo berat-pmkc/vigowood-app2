@@ -16,6 +16,7 @@ type DashboardShellProps = {
   displayName: string;
   displayRole: string;
   userId?: string;
+  avatarUrl?: string | null;
 };
 
 export function DashboardShell({
@@ -24,6 +25,7 @@ export function DashboardShell({
   displayName,
   displayRole,
   userId,
+  avatarUrl,
 }: DashboardShellProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -45,10 +47,11 @@ export function DashboardShell({
             userRole={userRole}
             displayName={displayName}
             displayRole={displayRole}
+            avatarUrl={avatarUrl}
             onLogout={handleLogout}
           />
           <SidebarInset className="min-w-0">
-            <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} />
+            <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} avatarUrl={avatarUrl} />
             <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6">
               {children}
             </main>

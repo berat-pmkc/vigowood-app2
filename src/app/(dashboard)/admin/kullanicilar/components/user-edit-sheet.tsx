@@ -22,13 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { AvatarUpload } from "@/components/shared/avatar-upload";
 import { USER_ROLES, USER_STATIONS, USER_STATION_LABELS } from "@/lib/constants";
 import {
   userCreateSchema,
   type UserCreateData,
 } from "@/lib/validations";
 import { formatDate } from "@/lib/utils";
-import { createUser, updateUser, getNextUserId } from "../actions";
+import { createUser, updateUser, getNextUserId, uploadUserAvatar, deleteUserAvatar } from "../actions";
 import { toast } from "sonner";
 import type { UserWithLastSignIn } from "../page";
 
@@ -145,6 +146,19 @@ export function UserEditSheet({
         </SheetHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 pt-4">
+          {/* Avatar upload — only in edit mode */}
+          {!isCreate && user && (
+            <div className="flex justify-center">
+              <AvatarUpload
+                avatarUrl={user.avatar_url}
+                fullName={user.full_name}
+                userId={user.user_id}
+                onUpload={uploadUserAvatar}
+                onDelete={deleteUserAvatar}
+              />
+            </div>
+          )}
+
           <div className="space-y-4">
             {/* User ID — only editable in create mode */}
             {isCreate ? (

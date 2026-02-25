@@ -14,6 +14,223 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_actions: {
+        Row: {
+          action_type: string
+          agent_id: string
+          cost_estimate: number | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          input: Json | null
+          metadata: Json | null
+          output: Json | null
+          result: string
+          task_id: string | null
+          tokens_used: number | null
+        }
+        Insert: {
+          action_type?: string
+          agent_id: string
+          cost_estimate?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json | null
+          metadata?: Json | null
+          output?: Json | null
+          result?: string
+          task_id?: string | null
+          tokens_used?: number | null
+        }
+        Update: {
+          action_type?: string
+          agent_id?: string
+          cost_estimate?: number | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json | null
+          metadata?: Json | null
+          output?: Json | null
+          result?: string
+          task_id?: string | null
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_actions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_memory: {
+        Row: {
+          agent_id: string
+          confidence: number | null
+          context: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          key: string
+          memory_type: string
+          source: string | null
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          agent_id: string
+          confidence?: number | null
+          context?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key: string
+          memory_type?: string
+          source?: string | null
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          agent_id?: string
+          confidence?: number | null
+          context?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          key?: string
+          memory_type?: string
+          source?: string | null
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      agent_messages: {
+        Row: {
+          body: string
+          created_at: string
+          from_agent: string
+          id: string
+          message_type: string
+          metadata: Json | null
+          read_at: string | null
+          status: string
+          subject: string | null
+          task_id: string | null
+          to_agent: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          from_agent: string
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          read_at?: string | null
+          status?: string
+          subject?: string | null
+          task_id?: string | null
+          to_agent: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          from_agent?: string
+          id?: string
+          message_type?: string
+          metadata?: Json | null
+          read_at?: string | null
+          status?: string
+          subject?: string | null
+          task_id?: string | null
+          to_agent?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_messages_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          agent_id: string
+          created_at: string
+          dedup_key: string | null
+          id: string
+          message: string | null
+          metadata: Json | null
+          monitor_id: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          task_id: string | null
+          title: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          agent_id: string
+          created_at?: string
+          dedup_key?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          monitor_id?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          task_id?: string | null
+          title: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          agent_id?: string
+          created_at?: string
+          dedup_key?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          monitor_id?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          task_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_monitor_id_fkey"
+            columns: ["monitor_id"]
+            isOneToOne: false
+            referencedRelation: "monitor_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       all_parts: {
         Row: {
           created_at: string
@@ -445,6 +662,178 @@ export type Database = {
         }
         Relationships: []
       }
+      ikas_orders: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string
+          currency: string | null
+          id: string
+          ikas_created_at: string | null
+          ikas_id: string
+          line_items: Json | null
+          order_number: string | null
+          status: string | null
+          synced_at: string
+          total_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          ikas_created_at?: string | null
+          ikas_id: string
+          line_items?: Json | null
+          order_number?: string | null
+          status?: string | null
+          synced_at?: string
+          total_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          ikas_created_at?: string | null
+          ikas_id?: string
+          line_items?: Json | null
+          order_number?: string | null
+          status?: string | null
+          synced_at?: string
+          total_price?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_definitions: {
+        Row: {
+          agent_id: string
+          config: Json | null
+          created_at: string
+          creates_task: boolean
+          description: string | null
+          fail_count: number
+          id: string
+          is_active: boolean
+          last_run_at: string | null
+          name: string
+          next_run_at: string | null
+          run_count: number
+          schedule: string
+          task_template: Json | null
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          config?: Json | null
+          created_at?: string
+          creates_task?: boolean
+          description?: string | null
+          fail_count?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string | null
+          run_count?: number
+          schedule: string
+          task_template?: Json | null
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          config?: Json | null
+          created_at?: string
+          creates_task?: boolean
+          description?: string | null
+          fail_count?: number
+          id?: string
+          is_active?: boolean
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string | null
+          run_count?: number
+          schedule?: string
+          task_template?: Json | null
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      job_runs: {
+        Row: {
+          agent_id: string
+          completed_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          input: Json | null
+          job_id: string
+          output: Json | null
+          output_id: string | null
+          started_at: string
+          status: string
+          task_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          completed_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json | null
+          job_id: string
+          output?: Json | null
+          output_id?: string | null
+          started_at?: string
+          status?: string
+          task_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          completed_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input?: Json | null
+          job_id?: string
+          output?: Json | null
+          output_id?: string | null
+          started_at?: string
+          status?: string
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_runs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "job_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_runs_output_id_fkey"
+            columns: ["output_id"]
+            isOneToOne: false
+            referencedRelation: "ops_outputs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       kampanyalar: {
         Row: {
           aktif_mi: boolean
@@ -703,6 +1092,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      monitor_definitions: {
+        Row: {
+          agent_id: string
+          cooldown_minutes: number
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          last_triggered_at: string | null
+          monitor_type: string
+          name: string
+          on_trigger: Json | null
+          query_config: Json
+          severity: string
+          threshold_rule: Json | null
+          trigger_count: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          cooldown_minutes?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          monitor_type?: string
+          name: string
+          on_trigger?: Json | null
+          query_config?: Json
+          severity?: string
+          threshold_rule?: Json | null
+          trigger_count?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          cooldown_minutes?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_triggered_at?: string | null
+          monitor_type?: string
+          name?: string
+          on_trigger?: Json | null
+          query_config?: Json
+          severity?: string
+          threshold_rule?: Json | null
+          trigger_count?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       montaj_batches: {
         Row: {
@@ -1207,6 +1650,198 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      ops_agents: {
+        Row: {
+          avatar_url: string | null
+          capabilities: Json | null
+          code: string
+          created_at: string
+          department: string
+          description: string | null
+          id: string
+          is_active: boolean
+          last_active_at: string | null
+          name: string
+          schedule: Json | null
+          stats: Json | null
+          status: Database["public"]["Enums"]["agent_status"]
+          total_approvals_requested: number
+          total_outputs_generated: number
+          total_tasks_completed: number
+          updated_at: string
+          working_hours: Json | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          capabilities?: Json | null
+          code: string
+          created_at?: string
+          department?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_active_at?: string | null
+          name: string
+          schedule?: Json | null
+          stats?: Json | null
+          status?: Database["public"]["Enums"]["agent_status"]
+          total_approvals_requested?: number
+          total_outputs_generated?: number
+          total_tasks_completed?: number
+          updated_at?: string
+          working_hours?: Json | null
+        }
+        Update: {
+          avatar_url?: string | null
+          capabilities?: Json | null
+          code?: string
+          created_at?: string
+          department?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_active_at?: string | null
+          name?: string
+          schedule?: Json | null
+          stats?: Json | null
+          status?: Database["public"]["Enums"]["agent_status"]
+          total_approvals_requested?: number
+          total_outputs_generated?: number
+          total_tasks_completed?: number
+          updated_at?: string
+          working_hours?: Json | null
+        }
+        Relationships: []
+      }
+      ops_approvals: {
+        Row: {
+          action_type: Database["public"]["Enums"]["approval_action_type"]
+          agent_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          old_payload: Json | null
+          payload: Json | null
+          requested_at: string
+          requested_by: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          risk_level: Database["public"]["Enums"]["approval_risk_level"]
+          status: Database["public"]["Enums"]["approval_status"]
+          task_id: string | null
+          title: string
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["approval_action_type"]
+          agent_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          old_payload?: Json | null
+          payload?: Json | null
+          requested_at?: string
+          requested_by: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          risk_level?: Database["public"]["Enums"]["approval_risk_level"]
+          status?: Database["public"]["Enums"]["approval_status"]
+          task_id?: string | null
+          title: string
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["approval_action_type"]
+          agent_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          old_payload?: Json | null
+          payload?: Json | null
+          requested_at?: string
+          requested_by?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          risk_level?: Database["public"]["Enums"]["approval_risk_level"]
+          status?: Database["public"]["Enums"]["approval_status"]
+          task_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_approvals_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ops_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ops_approvals_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ops_outputs: {
+        Row: {
+          agent_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          file_name: string
+          file_size: number | null
+          file_type: Database["public"]["Enums"]["output_file_type"]
+          file_url: string
+          id: string
+          metadata: Json | null
+          task_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: Database["public"]["Enums"]["output_file_type"]
+          file_url: string
+          id?: string
+          metadata?: Json | null
+          task_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: Database["public"]["Enums"]["output_file_type"]
+          file_url?: string
+          id?: string
+          metadata?: Json | null
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ops_outputs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ops_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ops_outputs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pack_events: {
         Row: {
@@ -2106,6 +2741,208 @@ export type Database = {
         }
         Relationships: []
       }
+      task_activity: {
+        Row: {
+          action: Database["public"]["Enums"]["task_activity_action"]
+          actor_id: string
+          created_at: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          task_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["task_activity_action"]
+          actor_id: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          task_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["task_activity_action"]
+          actor_id?: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_activity_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "task_activity_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          task_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          task_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          task_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      task_comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          created_by: string
+          department: Database["public"]["Enums"]["task_department"]
+          description: string | null
+          due_date: string | null
+          id: string
+          parent_id: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          source_id: string | null
+          source_type: Database["public"]["Enums"]["task_source_type"]
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by: string
+          department?: Database["public"]["Enums"]["task_department"]
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          parent_id?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          source_id?: string | null
+          source_type?: Database["public"]["Enums"]["task_source_type"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          created_by?: string
+          department?: Database["public"]["Enums"]["task_department"]
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          parent_id?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          source_id?: string | null
+          source_type?: Database["public"]["Enums"]["task_source_type"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tr_pazarlama: {
         Row: {
           ay: number
@@ -2163,9 +3000,414 @@ export type Database = {
         }
         Relationships: []
       }
+      trendyol_order_lines: {
+        Row: {
+          amount: number | null
+          barcode: string | null
+          commission: number | null
+          currency_code: string | null
+          discount: number | null
+          id: number
+          image_url: string | null
+          line_id: number | null
+          merchant_sku: string | null
+          order_id: number
+          price: number | null
+          product_color: string | null
+          product_name: string
+          product_size: string | null
+          quantity: number | null
+          sku: string | null
+          status_name: string | null
+          stock_code: string | null
+          vat_base_amount: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          amount?: number | null
+          barcode?: string | null
+          commission?: number | null
+          currency_code?: string | null
+          discount?: number | null
+          id: number
+          image_url?: string | null
+          line_id?: number | null
+          merchant_sku?: string | null
+          order_id: number
+          price?: number | null
+          product_color?: string | null
+          product_name: string
+          product_size?: string | null
+          quantity?: number | null
+          sku?: string | null
+          status_name?: string | null
+          stock_code?: string | null
+          vat_base_amount?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          amount?: number | null
+          barcode?: string | null
+          commission?: number | null
+          currency_code?: string | null
+          discount?: number | null
+          id?: number
+          image_url?: string | null
+          line_id?: number | null
+          merchant_sku?: string | null
+          order_id?: number
+          price?: number | null
+          product_color?: string | null
+          product_name?: string
+          product_size?: string | null
+          quantity?: number | null
+          sku?: string | null
+          status_name?: string | null
+          stock_code?: string | null
+          vat_base_amount?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trendyol_order_lines_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "trendyol_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trendyol_orders: {
+        Row: {
+          cargo_provider_name: string | null
+          cargo_sender_number: string | null
+          cargo_tracking_link: string | null
+          cargo_tracking_number: number | null
+          created_at: string | null
+          customer_email: string | null
+          customer_first_name: string | null
+          customer_id: number | null
+          customer_last_name: string | null
+          delivery_type: string | null
+          gross_amount: number | null
+          id: number
+          invoice_address: Json | null
+          last_modified_date: number | null
+          order_date: number
+          order_number: string
+          package_histories: Json | null
+          raw_data: Json | null
+          shipment_address: Json | null
+          status: string
+          total_discount: number | null
+          total_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cargo_provider_name?: string | null
+          cargo_sender_number?: string | null
+          cargo_tracking_link?: string | null
+          cargo_tracking_number?: number | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_first_name?: string | null
+          customer_id?: number | null
+          customer_last_name?: string | null
+          delivery_type?: string | null
+          gross_amount?: number | null
+          id: number
+          invoice_address?: Json | null
+          last_modified_date?: number | null
+          order_date: number
+          order_number: string
+          package_histories?: Json | null
+          raw_data?: Json | null
+          shipment_address?: Json | null
+          status?: string
+          total_discount?: number | null
+          total_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cargo_provider_name?: string | null
+          cargo_sender_number?: string | null
+          cargo_tracking_link?: string | null
+          cargo_tracking_number?: number | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_first_name?: string | null
+          customer_id?: number | null
+          customer_last_name?: string | null
+          delivery_type?: string | null
+          gross_amount?: number | null
+          id?: number
+          invoice_address?: Json | null
+          last_modified_date?: number | null
+          order_date?: number
+          order_number?: string
+          package_histories?: Json | null
+          raw_data?: Json | null
+          shipment_address?: Json | null
+          status?: string
+          total_discount?: number | null
+          total_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      trendyol_products: {
+        Row: {
+          approved: boolean | null
+          archived: boolean | null
+          attributes: Json | null
+          barcode: string
+          blacklisted: boolean | null
+          brand: string | null
+          brand_id: number | null
+          category_id: number | null
+          category_name: string | null
+          create_date_time: number | null
+          created_at: string | null
+          description: string | null
+          dimensional_weight: number | null
+          id: string
+          images: Json | null
+          last_update_date: number | null
+          list_price: number | null
+          locked: boolean | null
+          on_sale: boolean | null
+          product_main_id: string | null
+          quantity: number | null
+          raw_data: Json | null
+          rejected: boolean | null
+          sale_price: number | null
+          stock_code: string | null
+          title: string
+          updated_at: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          approved?: boolean | null
+          archived?: boolean | null
+          attributes?: Json | null
+          barcode: string
+          blacklisted?: boolean | null
+          brand?: string | null
+          brand_id?: number | null
+          category_id?: number | null
+          category_name?: string | null
+          create_date_time?: number | null
+          created_at?: string | null
+          description?: string | null
+          dimensional_weight?: number | null
+          id: string
+          images?: Json | null
+          last_update_date?: number | null
+          list_price?: number | null
+          locked?: boolean | null
+          on_sale?: boolean | null
+          product_main_id?: string | null
+          quantity?: number | null
+          raw_data?: Json | null
+          rejected?: boolean | null
+          sale_price?: number | null
+          stock_code?: string | null
+          title: string
+          updated_at?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          approved?: boolean | null
+          archived?: boolean | null
+          attributes?: Json | null
+          barcode?: string
+          blacklisted?: boolean | null
+          brand?: string | null
+          brand_id?: number | null
+          category_id?: number | null
+          category_name?: string | null
+          create_date_time?: number | null
+          created_at?: string | null
+          description?: string | null
+          dimensional_weight?: number | null
+          id?: string
+          images?: Json | null
+          last_update_date?: number | null
+          list_price?: number | null
+          locked?: boolean | null
+          on_sale?: boolean | null
+          product_main_id?: string | null
+          quantity?: number | null
+          raw_data?: Json | null
+          rejected?: boolean | null
+          sale_price?: number | null
+          stock_code?: string | null
+          title?: string
+          updated_at?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: []
+      }
+      trendyol_questions: {
+        Row: {
+          answer_date: number | null
+          answer_text: string | null
+          created_at: string | null
+          creation_date: number
+          customer_id: number | null
+          id: number
+          image_url: string | null
+          product_main_id: string | null
+          product_name: string | null
+          public: boolean | null
+          raw_data: Json | null
+          rejected_answer_reason: string | null
+          rejected_answer_text: string | null
+          status: string
+          text: string
+          updated_at: string | null
+          user_name: string | null
+          web_url: string | null
+        }
+        Insert: {
+          answer_date?: number | null
+          answer_text?: string | null
+          created_at?: string | null
+          creation_date: number
+          customer_id?: number | null
+          id: number
+          image_url?: string | null
+          product_main_id?: string | null
+          product_name?: string | null
+          public?: boolean | null
+          raw_data?: Json | null
+          rejected_answer_reason?: string | null
+          rejected_answer_text?: string | null
+          status?: string
+          text: string
+          updated_at?: string | null
+          user_name?: string | null
+          web_url?: string | null
+        }
+        Update: {
+          answer_date?: number | null
+          answer_text?: string | null
+          created_at?: string | null
+          creation_date?: number
+          customer_id?: number | null
+          id?: number
+          image_url?: string | null
+          product_main_id?: string | null
+          product_name?: string | null
+          public?: boolean | null
+          raw_data?: Json | null
+          rejected_answer_reason?: string | null
+          rejected_answer_text?: string | null
+          status?: string
+          text?: string
+          updated_at?: string | null
+          user_name?: string | null
+          web_url?: string | null
+        }
+        Relationships: []
+      }
+      trendyol_settlements: {
+        Row: {
+          affiliate: string | null
+          barcode: string | null
+          commission_amount: number | null
+          commission_rate: number | null
+          created_at: string | null
+          credit: number | null
+          debt: number | null
+          id: number
+          order_number: string | null
+          payment_date: string | null
+          payment_order_id: string | null
+          raw_data: Json | null
+          receipt_id: string | null
+          seller_revenue: number | null
+          shipment_package_id: number | null
+          transaction_date: string | null
+          transaction_type: string
+        }
+        Insert: {
+          affiliate?: string | null
+          barcode?: string | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          created_at?: string | null
+          credit?: number | null
+          debt?: number | null
+          id: number
+          order_number?: string | null
+          payment_date?: string | null
+          payment_order_id?: string | null
+          raw_data?: Json | null
+          receipt_id?: string | null
+          seller_revenue?: number | null
+          shipment_package_id?: number | null
+          transaction_date?: string | null
+          transaction_type: string
+        }
+        Update: {
+          affiliate?: string | null
+          barcode?: string | null
+          commission_amount?: number | null
+          commission_rate?: number | null
+          created_at?: string | null
+          credit?: number | null
+          debt?: number | null
+          id?: number
+          order_number?: string | null
+          payment_date?: string | null
+          payment_order_id?: string | null
+          raw_data?: Json | null
+          receipt_id?: string | null
+          seller_revenue?: number | null
+          shipment_package_id?: number | null
+          transaction_date?: string | null
+          transaction_type?: string
+        }
+        Relationships: []
+      }
+      trendyol_sync_log: {
+        Row: {
+          completed_at: string | null
+          entity_type: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          records_synced: number | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          records_synced?: number | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          records_synced?: number | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           auth_id: string | null
+          avatar_url: string | null
           created_at: string
           email: string | null
           full_name: string
@@ -2178,6 +3420,7 @@ export type Database = {
         }
         Insert: {
           auth_id?: string | null
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name: string
@@ -2190,6 +3433,7 @@ export type Database = {
         }
         Update: {
           auth_id?: string | null
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
           full_name?: string
@@ -2244,693 +3488,6 @@ export type Database = {
         }
         Relationships: []
       }
-      tasks: {
-        Row: {
-          id: string
-          title: string
-          description: string | null
-          status: Database["public"]["Enums"]["task_status"]
-          priority: Database["public"]["Enums"]["task_priority"]
-          assigned_to: string | null
-          created_by: string
-          department: Database["public"]["Enums"]["task_department"]
-          due_date: string | null
-          parent_id: string | null
-          source_type: Database["public"]["Enums"]["task_source_type"]
-          source_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          title: string
-          description?: string | null
-          status?: Database["public"]["Enums"]["task_status"]
-          priority?: Database["public"]["Enums"]["task_priority"]
-          assigned_to?: string | null
-          created_by: string
-          department?: Database["public"]["Enums"]["task_department"]
-          due_date?: string | null
-          parent_id?: string | null
-          source_type?: Database["public"]["Enums"]["task_source_type"]
-          source_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          title?: string
-          description?: string | null
-          status?: Database["public"]["Enums"]["task_status"]
-          priority?: Database["public"]["Enums"]["task_priority"]
-          assigned_to?: string | null
-          created_by?: string
-          department?: Database["public"]["Enums"]["task_department"]
-          due_date?: string | null
-          parent_id?: string | null
-          source_type?: Database["public"]["Enums"]["task_source_type"]
-          source_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      task_comments: {
-        Row: {
-          id: string
-          task_id: string
-          author_id: string
-          content: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          task_id: string
-          author_id: string
-          content: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          task_id?: string
-          author_id?: string
-          content?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      task_attachments: {
-        Row: {
-          id: string
-          task_id: string
-          file_url: string
-          file_name: string
-          file_size: number | null
-          uploaded_by: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          task_id: string
-          file_url: string
-          file_name: string
-          file_size?: number | null
-          uploaded_by: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          task_id?: string
-          file_url?: string
-          file_name?: string
-          file_size?: number | null
-          uploaded_by?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
-      task_activity: {
-        Row: {
-          id: string
-          task_id: string
-          actor_id: string
-          action: Database["public"]["Enums"]["task_activity_action"]
-          old_value: string | null
-          new_value: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          task_id: string
-          actor_id: string
-          action: Database["public"]["Enums"]["task_activity_action"]
-          old_value?: string | null
-          new_value?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          task_id?: string
-          actor_id?: string
-          action?: Database["public"]["Enums"]["task_activity_action"]
-          old_value?: string | null
-          new_value?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      agent_memory: {
-        Row: {
-          id: string
-          agent_id: string
-          memory_type: string
-          key: string
-          value: Json
-          context: string | null
-          confidence: number | null
-          source: string | null
-          is_active: boolean
-          expires_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          agent_id: string
-          memory_type?: string
-          key: string
-          value?: Json
-          context?: string | null
-          confidence?: number | null
-          source?: string | null
-          is_active?: boolean
-          expires_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          agent_id?: string
-          memory_type?: string
-          key?: string
-          value?: Json
-          context?: string | null
-          confidence?: number | null
-          source?: string | null
-          is_active?: boolean
-          expires_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      agent_actions: {
-        Row: {
-          id: string
-          agent_id: string
-          action_type: string
-          task_id: string | null
-          input: Json
-          output: Json
-          result: string
-          error_message: string | null
-          tokens_used: number | null
-          cost_estimate: number | null
-          duration_ms: number | null
-          metadata: Json
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          agent_id: string
-          action_type?: string
-          task_id?: string | null
-          input?: Json
-          output?: Json
-          result?: string
-          error_message?: string | null
-          tokens_used?: number | null
-          cost_estimate?: number | null
-          duration_ms?: number | null
-          metadata?: Json
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          agent_id?: string
-          action_type?: string
-          task_id?: string | null
-          input?: Json
-          output?: Json
-          result?: string
-          error_message?: string | null
-          tokens_used?: number | null
-          cost_estimate?: number | null
-          duration_ms?: number | null
-          metadata?: Json
-          created_at?: string
-        }
-        Relationships: []
-      }
-      agent_messages: {
-        Row: {
-          id: string
-          from_agent: string
-          to_agent: string
-          message_type: string
-          subject: string | null
-          body: string
-          task_id: string | null
-          status: string
-          read_at: string | null
-          metadata: Json
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          from_agent: string
-          to_agent: string
-          message_type?: string
-          subject?: string | null
-          body: string
-          task_id?: string | null
-          status?: string
-          read_at?: string | null
-          metadata?: Json
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          from_agent?: string
-          to_agent?: string
-          message_type?: string
-          subject?: string | null
-          body?: string
-          task_id?: string | null
-          status?: string
-          read_at?: string | null
-          metadata?: Json
-          created_at?: string
-        }
-        Relationships: []
-      }
-      alerts: {
-        Row: {
-          id: string
-          monitor_id: string | null
-          agent_id: string
-          severity: string
-          title: string
-          message: string | null
-          status: string
-          dedup_key: string | null
-          task_id: string | null
-          acknowledged_by: string | null
-          acknowledged_at: string | null
-          resolved_at: string | null
-          metadata: Json
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          monitor_id?: string | null
-          agent_id: string
-          severity?: string
-          title: string
-          message?: string | null
-          status?: string
-          dedup_key?: string | null
-          task_id?: string | null
-          acknowledged_by?: string | null
-          acknowledged_at?: string | null
-          resolved_at?: string | null
-          metadata?: Json
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          monitor_id?: string | null
-          agent_id?: string
-          severity?: string
-          title?: string
-          message?: string | null
-          status?: string
-          dedup_key?: string | null
-          task_id?: string | null
-          acknowledged_by?: string | null
-          acknowledged_at?: string | null
-          resolved_at?: string | null
-          metadata?: Json
-          created_at?: string
-        }
-        Relationships: []
-      }
-      job_definitions: {
-        Row: {
-          id: string
-          agent_id: string
-          name: string
-          description: string | null
-          schedule: string
-          timezone: string
-          creates_task: boolean
-          task_template: Json
-          config: Json
-          is_active: boolean
-          last_run_at: string | null
-          next_run_at: string | null
-          run_count: number
-          fail_count: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          agent_id: string
-          name: string
-          description?: string | null
-          schedule: string
-          timezone?: string
-          creates_task?: boolean
-          task_template?: Json
-          config?: Json
-          is_active?: boolean
-          last_run_at?: string | null
-          next_run_at?: string | null
-          run_count?: number
-          fail_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          agent_id?: string
-          name?: string
-          description?: string | null
-          schedule?: string
-          timezone?: string
-          creates_task?: boolean
-          task_template?: Json
-          config?: Json
-          is_active?: boolean
-          last_run_at?: string | null
-          next_run_at?: string | null
-          run_count?: number
-          fail_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      job_runs: {
-        Row: {
-          id: string
-          job_id: string
-          agent_id: string
-          status: string
-          task_id: string | null
-          output_id: string | null
-          input: Json
-          output: Json
-          error_message: string | null
-          started_at: string
-          completed_at: string | null
-          duration_ms: number | null
-        }
-        Insert: {
-          id?: string
-          job_id: string
-          agent_id: string
-          status?: string
-          task_id?: string | null
-          output_id?: string | null
-          input?: Json
-          output?: Json
-          error_message?: string | null
-          started_at?: string
-          completed_at?: string | null
-          duration_ms?: number | null
-        }
-        Update: {
-          id?: string
-          job_id?: string
-          agent_id?: string
-          status?: string
-          task_id?: string | null
-          output_id?: string | null
-          input?: Json
-          output?: Json
-          error_message?: string | null
-          started_at?: string
-          completed_at?: string | null
-          duration_ms?: number | null
-        }
-        Relationships: []
-      }
-      monitor_definitions: {
-        Row: {
-          id: string
-          agent_id: string
-          name: string
-          description: string | null
-          monitor_type: string
-          query_config: Json
-          threshold_rule: Json
-          on_trigger: Json
-          severity: string
-          cooldown_minutes: number
-          is_active: boolean
-          last_triggered_at: string | null
-          trigger_count: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          agent_id: string
-          name: string
-          description?: string | null
-          monitor_type?: string
-          query_config?: Json
-          threshold_rule?: Json
-          on_trigger?: Json
-          severity?: string
-          cooldown_minutes?: number
-          is_active?: boolean
-          last_triggered_at?: string | null
-          trigger_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          agent_id?: string
-          name?: string
-          description?: string | null
-          monitor_type?: string
-          query_config?: Json
-          threshold_rule?: Json
-          on_trigger?: Json
-          severity?: string
-          cooldown_minutes?: number
-          is_active?: boolean
-          last_triggered_at?: string | null
-          trigger_count?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      ops_agents: {
-        Row: {
-          id: string
-          name: string
-          code: string
-          department: string
-          description: string | null
-          avatar_url: string | null
-          capabilities: Json
-          schedule: Json
-          status: Database["public"]["Enums"]["agent_status"]
-          is_active: boolean
-          total_tasks_completed: number
-          total_approvals_requested: number
-          total_outputs_generated: number
-          last_active_at: string | null
-          working_hours: Json
-          stats: Json
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          code: string
-          department?: string
-          description?: string | null
-          avatar_url?: string | null
-          capabilities?: Json
-          schedule?: Json
-          status?: Database["public"]["Enums"]["agent_status"]
-          is_active?: boolean
-          total_tasks_completed?: number
-          total_approvals_requested?: number
-          total_outputs_generated?: number
-          last_active_at?: string | null
-          working_hours?: Json
-          stats?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          code?: string
-          department?: string
-          description?: string | null
-          avatar_url?: string | null
-          capabilities?: Json
-          schedule?: Json
-          status?: Database["public"]["Enums"]["agent_status"]
-          is_active?: boolean
-          total_tasks_completed?: number
-          total_approvals_requested?: number
-          total_outputs_generated?: number
-          last_active_at?: string | null
-          working_hours?: Json
-          stats?: Json
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      ikas_orders: {
-        Row: {
-          id: string
-          ikas_id: string
-          order_number: string | null
-          status: string | null
-          total_price: number | null
-          currency: string | null
-          city: string | null
-          country: string | null
-          line_items: Json
-          ikas_created_at: string | null
-          synced_at: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          ikas_id: string
-          order_number?: string | null
-          status?: string | null
-          total_price?: number | null
-          currency?: string | null
-          city?: string | null
-          country?: string | null
-          line_items?: Json
-          ikas_created_at?: string | null
-          synced_at?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          ikas_id?: string
-          order_number?: string | null
-          status?: string | null
-          total_price?: number | null
-          currency?: string | null
-          city?: string | null
-          country?: string | null
-          line_items?: Json
-          ikas_created_at?: string | null
-          synced_at?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      ops_approvals: {
-        Row: {
-          id: string
-          task_id: string | null
-          agent_id: string | null
-          action_type: Database["public"]["Enums"]["approval_action_type"]
-          risk_level: Database["public"]["Enums"]["approval_risk_level"]
-          status: Database["public"]["Enums"]["approval_status"]
-          title: string
-          description: string | null
-          requested_by: string
-          reviewer_id: string | null
-          payload: Json
-          old_payload: Json
-          review_note: string | null
-          requested_at: string
-          reviewed_at: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          task_id?: string | null
-          agent_id?: string | null
-          action_type: Database["public"]["Enums"]["approval_action_type"]
-          risk_level?: Database["public"]["Enums"]["approval_risk_level"]
-          status?: Database["public"]["Enums"]["approval_status"]
-          title: string
-          description?: string | null
-          requested_by: string
-          reviewer_id?: string | null
-          payload?: Json
-          old_payload?: Json
-          review_note?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          task_id?: string | null
-          agent_id?: string | null
-          action_type?: Database["public"]["Enums"]["approval_action_type"]
-          risk_level?: Database["public"]["Enums"]["approval_risk_level"]
-          status?: Database["public"]["Enums"]["approval_status"]
-          title?: string
-          description?: string | null
-          requested_by?: string
-          reviewer_id?: string | null
-          payload?: Json
-          old_payload?: Json
-          review_note?: string | null
-          requested_at?: string
-          reviewed_at?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      ops_outputs: {
-        Row: {
-          id: string
-          task_id: string | null
-          agent_id: string | null
-          file_type: Database["public"]["Enums"]["output_file_type"]
-          file_name: string
-          file_url: string
-          file_size: number | null
-          description: string | null
-          metadata: Json
-          created_by: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          task_id?: string | null
-          agent_id?: string | null
-          file_type?: Database["public"]["Enums"]["output_file_type"]
-          file_name: string
-          file_url: string
-          file_size?: number | null
-          description?: string | null
-          metadata?: Json
-          created_by: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          task_id?: string | null
-          agent_id?: string | null
-          file_type?: Database["public"]["Enums"]["output_file_type"]
-          file_name?: string
-          file_url?: string
-          file_size?: number | null
-          description?: string | null
-          metadata?: Json
-          created_by?: string
-          created_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -2944,6 +3501,7 @@ export type Database = {
         }[]
       }
       get_user_last_sign_in: { Args: { p_auth_id: string }; Returns: string }
+      has_marketplace_access: { Args: never; Returns: boolean }
       has_personel_access: { Args: never; Returns: boolean }
       has_production_access: { Args: never; Returns: boolean }
       has_sales_access: { Args: never; Returns: boolean }
@@ -2955,17 +3513,21 @@ export type Database = {
       next_sevkiyat_item_id: { Args: never; Returns: string }
     }
     Enums: {
-      faaliyet_turu: "FAALIYET" | "FAALIYET_DISI"
-      task_status: "backlog" | "open" | "in_progress" | "waiting_approval" | "blocked" | "done"
-      task_priority: "low" | "medium" | "high" | "urgent"
-      task_department: "uretim" | "stok" | "sevkiyat" | "muhasebe" | "pazaryeri" | "genel"
-      task_source_type: "manual" | "recurring_job" | "alert"
-      task_activity_action: "created" | "status_changed" | "assigned" | "commented" | "file_added" | "priority_changed"
-      approval_action_type: "task_status_change" | "stock_adjustment" | "shipment_release" | "price_change" | "bulk_operation" | "system_config"
-      approval_risk_level: "low" | "medium" | "high" | "critical"
-      approval_status: "pending" | "approved" | "rejected" | "revision_requested"
-      output_file_type: "report" | "export" | "pdf" | "csv" | "image" | "other"
       agent_status: "active" | "paused" | "disabled"
+      approval_action_type:
+        | "task_status_change"
+        | "stock_adjustment"
+        | "shipment_release"
+        | "price_change"
+        | "bulk_operation"
+        | "system_config"
+      approval_risk_level: "low" | "medium" | "high" | "critical"
+      approval_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "revision_requested"
+      faaliyet_turu: "FAALIYET" | "FAALIYET_DISI"
       kalem_turu:
         | "GELIR"
         | "GIDER"
@@ -2990,6 +3552,7 @@ export type Database = {
         | "BANKA"
         | "GENEL"
         | "DİĞER"
+      output_file_type: "report" | "export" | "pdf" | "csv" | "image" | "other"
       para_birimi: "TL" | "USD" | "EUR"
       part_type: "HAZIR" | "KUTU" | "KARTON" | "YARIMAMUL"
       product_category:
@@ -3016,6 +3579,29 @@ export type Database = {
         | "Montaj Hattı"
         | "Paketleme Hattı"
         | "Kutu Hattı"
+      task_activity_action:
+        | "created"
+        | "status_changed"
+        | "assigned"
+        | "commented"
+        | "file_added"
+        | "priority_changed"
+      task_department:
+        | "uretim"
+        | "stok"
+        | "sevkiyat"
+        | "muhasebe"
+        | "pazaryeri"
+        | "genel"
+      task_priority: "low" | "medium" | "high" | "urgent"
+      task_source_type: "manual" | "recurring_job" | "alert"
+      task_status:
+        | "backlog"
+        | "open"
+        | "in_progress"
+        | "waiting_approval"
+        | "blocked"
+        | "done"
       user_role:
         | "Yönetici"
         | "Endüstri Mühendisi"
@@ -3154,6 +3740,22 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agent_status: ["active", "paused", "disabled"],
+      approval_action_type: [
+        "task_status_change",
+        "stock_adjustment",
+        "shipment_release",
+        "price_change",
+        "bulk_operation",
+        "system_config",
+      ],
+      approval_risk_level: ["low", "medium", "high", "critical"],
+      approval_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "revision_requested",
+      ],
       faaliyet_turu: ["FAALIYET", "FAALIYET_DISI"],
       kalem_turu: [
         "GELIR",
@@ -3181,6 +3783,7 @@ export const Constants = {
         "GENEL",
         "DİĞER",
       ],
+      output_file_type: ["report", "export", "pdf", "csv", "image", "other"],
       para_birimi: ["TL", "USD", "EUR"],
       part_type: ["HAZIR", "KUTU", "KARTON", "YARIMAMUL"],
       product_category: [
@@ -3208,6 +3811,32 @@ export const Constants = {
         "Montaj Hattı",
         "Paketleme Hattı",
         "Kutu Hattı",
+      ],
+      task_activity_action: [
+        "created",
+        "status_changed",
+        "assigned",
+        "commented",
+        "file_added",
+        "priority_changed",
+      ],
+      task_department: [
+        "uretim",
+        "stok",
+        "sevkiyat",
+        "muhasebe",
+        "pazaryeri",
+        "genel",
+      ],
+      task_priority: ["low", "medium", "high", "urgent"],
+      task_source_type: ["manual", "recurring_job", "alert"],
+      task_status: [
+        "backlog",
+        "open",
+        "in_progress",
+        "waiting_approval",
+        "blocked",
+        "done",
       ],
       user_role: [
         "Yönetici",

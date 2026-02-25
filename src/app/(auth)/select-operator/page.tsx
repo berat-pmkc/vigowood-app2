@@ -13,12 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogOut, UserCheck, Loader2 } from "lucide-react";
+import { LogOut, Loader2 } from "lucide-react";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 type Operator = {
   user_id: string;
   full_name: string;
   station: string;
+  avatar_url: string | null;
 };
 
 export default function SelectOperatorPage() {
@@ -70,7 +72,7 @@ export default function SelectOperatorPage() {
 
       const { data } = await supabase
         .from("users")
-        .select("user_id, full_name, station")
+        .select("user_id, full_name, station, avatar_url")
         .eq("role", "Üretim")
         .eq("is_active", true)
         .in("station", stations)
@@ -141,7 +143,11 @@ export default function SelectOperatorPage() {
                   {selecting === op.user_id ? (
                     <Loader2 className="size-5 animate-spin text-vw-side" />
                   ) : (
-                    <UserCheck className="size-5 text-vw-deep" />
+                    <UserAvatar
+                      avatarUrl={op.avatar_url}
+                      fullName={op.full_name}
+                      size="default"
+                    />
                   )}
                   <div>
                     <div className="font-medium text-vw-dark">

@@ -32,7 +32,7 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   // Önce auth_id ile ara
   const { data: profile } = await supabase
     .from("users")
-    .select("user_id, auth_id, email, full_name, role, station, is_active, created_at, updated_at")
+    .select("user_id, auth_id, email, full_name, role, station, is_active, avatar_url, created_at, updated_at")
     .eq("auth_id", authUser.id)
     .single();
 
@@ -42,7 +42,7 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   if (authUser.email) {
     const { data: emailProfile } = await supabase
       .from("users")
-      .select("user_id, auth_id, email, full_name, role, station, is_active, created_at, updated_at")
+      .select("user_id, auth_id, email, full_name, role, station, is_active, avatar_url, created_at, updated_at")
       .eq("email", authUser.email)
       .single();
 
@@ -111,7 +111,7 @@ export async function getStationOperators(stationEmail: string) {
 
   const { data } = await supabase
     .from("users")
-    .select("user_id, full_name, station")
+    .select("user_id, full_name, station, avatar_url")
     .eq("role", "Üretim")
     .eq("is_active", true)
     .in("station", stations)

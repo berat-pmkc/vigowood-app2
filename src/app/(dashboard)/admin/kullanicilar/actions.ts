@@ -195,6 +195,104 @@ export async function updateUser(
   }
 }
 
+export async function uploadUserAvatar(formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const file = formData.get("file") as File;
+    const userId = formData.get("userId") as string;
+    if (!file || !userId) return { success: false, error: "Geçersiz istek" };
+
+    // Server-side validation
+    const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
+    if (!ACCEPTED.includes(file.type)) {
+      return { success: false, error: "Sadece JPEG, PNG veya WebP formatı destekleniyor" };
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      return { success: false, error: "Dosya boyutu en fazla 2MB olabilir" };
+    }
+
+    const supabase = await createClient();
+
+    // Clean up old avatar files
+    const { data: existingFiles } = await supabase.storage
+      .from("user-avatars")
+      .list(userId);
+
+    if (existingFiles && existingFiles.length > 0) {
+      const filesToRemove = existingFiles.map((f) => `${userId}/${f.name}`);
+      await supabase.storage.from("user-avatars").remove(filesToRemove);
+    }
+
+    // Upload new file
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${userId}/${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("user-avatars")
+      .upload(path, file);
+
+    if (uploadError) return { success: false, error: uploadError.message };
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from("user-avatars")
+      .getPublicUrl(path);
+
+    // Update user record
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ avatar_url: urlData.publicUrl })
+      .eq("user_id", userId);
+
+    if (updateError) return { success: false, error: updateError.message };
+
+    revalidatePath("/admin/kullanicilar");
+    revalidatePath("/");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Bir hata oluştu",
+    };
+  }
+}
+
+export async function deleteUserAvatar(userId: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+
+    const supabase = await createClient();
+
+    // Delete all files in user's avatar folder
+    const { data: existingFiles } = await supabase.storage
+      .from("user-avatars")
+      .list(userId);
+
+    if (existingFiles && existingFiles.length > 0) {
+      const filesToRemove = existingFiles.map((f) => `${userId}/${f.name}`);
+      await supabase.storage.from("user-avatars").remove(filesToRemove);
+    }
+
+    // Set avatar_url to null
+    const { error } = await supabase
+      .from("users")
+      .update({ avatar_url: null })
+      .eq("user_id", userId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/admin/kullanicilar");
+    revalidatePath("/");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Bir hata oluştu",
+    };
+  }
+}
+
 export async function deleteUser(userId: string): Promise<ActionResult> {
   try {
     const currentUser = await requireAdmin();

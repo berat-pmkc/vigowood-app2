@@ -19,11 +19,13 @@ import {
 import { LogOut } from "lucide-react";
 import { getFilteredNavGroups, type NavGroup } from "@/lib/navigation";
 import type { UserRole } from "@/lib/constants";
+import { UserAvatar } from "@/components/shared/user-avatar";
 
 type AppSidebarProps = {
   userRole: UserRole;
   displayName: string;
   displayRole: string;
+  avatarUrl?: string | null;
   onLogout: () => void;
 };
 
@@ -31,6 +33,7 @@ export function AppSidebar({
   userRole,
   displayName,
   displayRole,
+  avatarUrl,
   onLogout,
 }: AppSidebarProps) {
   const pathname = usePathname();
@@ -106,16 +109,11 @@ export function AppSidebar({
               size="lg"
               className="cursor-default"
             >
-              <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
-                <span className="text-xs font-semibold">
-                  {displayName
-                    .split(" ")
-                    .map((w) => w[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </span>
-              </div>
+              <UserAvatar
+                avatarUrl={avatarUrl}
+                fullName={displayName}
+                size="default"
+              />
               <div className="flex flex-col gap-0.5 leading-none">
                 <span className="truncate text-sm font-medium">{displayName}</span>
                 <span className="truncate text-xs text-sidebar-foreground/60">

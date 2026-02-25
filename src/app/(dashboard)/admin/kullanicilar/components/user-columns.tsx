@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
+import { UserAvatar } from "@/components/shared/user-avatar";
 import { formatDate } from "@/lib/utils";
 import { deleteUser } from "../actions";
 import { toast } from "sonner";
@@ -173,9 +174,16 @@ export function getUserColumns({
         <DataTableColumnHeader column={column} title="Ad Soyad" onSort={onSort} />
       ),
       cell: ({ row }) => (
-        <span className="font-medium">
-          {row.getValue("full_name") || "—"}
-        </span>
+        <div className="flex items-center gap-2">
+          <UserAvatar
+            avatarUrl={row.original.avatar_url}
+            fullName={row.getValue("full_name")}
+            size="sm"
+          />
+          <span className="font-medium">
+            {row.getValue("full_name") || "—"}
+          </span>
+        </div>
       ),
     },
     {
