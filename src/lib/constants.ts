@@ -903,11 +903,11 @@ export const TASK_STATUSES = [
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  backlog: "Backlog",
+  backlog: "Sırada",
   open: "Açık",
   in_progress: "Devam Ediyor",
   waiting_approval: "Onay Bekliyor",
-  blocked: "Bloke",
+  blocked: "Engellendi",
   done: "Tamamlandı",
 };
 

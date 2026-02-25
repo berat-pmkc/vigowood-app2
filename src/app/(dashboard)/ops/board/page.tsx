@@ -12,7 +12,7 @@ export default async function OpsBoardPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-vw-dark">Board</h1>
+          <h1 className="text-2xl font-bold text-vw-dark">Görev Panosu</h1>
           <p className="text-sm text-muted-foreground">
             Görevleri sürükle bırak ile yönetin
           </p>
