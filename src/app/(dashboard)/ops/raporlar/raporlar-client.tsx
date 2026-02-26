@@ -32,6 +32,8 @@ import {
   ExternalLink,
   Search,
   FileBarChart,
+  Eye,
+  FileDown,
 } from "lucide-react";
 import {
   OUTPUT_FILE_TYPES,
@@ -39,6 +41,7 @@ import {
   type OutputFileType,
 } from "@/lib/constants";
 import { deleteOutput, type OpsOutput, type OpsAgent } from "../actions";
+import { OutputViewerDialog } from "./output-viewer-dialog";
 
 interface RaporlarClientProps {
   outputs: OpsOutput[];
@@ -85,6 +88,8 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [selectedOutput, setSelectedOutput] = useState<OpsOutput | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const filtered = outputs.filter((o) => {
     if (search) {
@@ -99,7 +104,8 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
     return true;
   });
 
-  const handleDelete = async (id: string, fileName: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string, fileName: string) => {
+    e.stopPropagation();
     if (!confirm(`"${fileName}" dosyasını silmek istediğinize emin misiniz?`)) return;
     const result = await deleteOutput(id);
     if (result.success) {
@@ -107,6 +113,34 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
       router.refresh();
     } else {
       toast.error(result.error || "Silme başarısız");
+    }
+  };
+
+  const handleRowClick = (output: OpsOutput) => {
+    setSelectedOutput(output);
+    setViewerOpen(true);
+  };
+
+  const handlePdfDownload = async (e: React.MouseEvent, output: OpsOutput) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`/api/ops/output/${output.id}/pdf`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "PDF oluşturulamadı" }));
+        throw new Error(err.error || "PDF oluşturulamadı");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${output.file_name.replace(/\.[^.]+$/, "")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("PDF indirildi");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "PDF indirilemedi");
     }
   };
 
@@ -196,7 +230,7 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
               : "Filtreye uygun dosya bulunamadı"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground/70">
-            Agent'lar görev tamamladığında raporlar burada görünecek
+            Agent&apos;lar görev tamamladığında raporlar burada görünecek
           </p>
         </div>
       ) : (
@@ -205,118 +239,137 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[40px]"></TableHead>
-                <TableHead>Dosya Adı</TableHead>
+                <TableHead>Açıklama</TableHead>
+                <TableHead className="hidden sm:table-cell w-[140px]">Kod</TableHead>
                 <TableHead className="hidden sm:table-cell">Tür</TableHead>
-                <TableHead className="hidden md:table-cell">Boyut</TableHead>
                 <TableHead className="hidden md:table-cell">Oluşturan</TableHead>
                 <TableHead className="hidden lg:table-cell">Tarih</TableHead>
-                <TableHead className="w-[100px] text-right">İşlem</TableHead>
+                <TableHead className="w-[130px] text-right">İşlem</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((output) => (
-                <TableRow key={output.id} className="group">
-                  <TableCell>
-                    <div className="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
-                      {FILE_TYPE_ICONS[output.file_type] ?? FILE_TYPE_ICONS.other}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate max-w-[250px]">
-                        {output.file_name}
-                      </p>
-                      {output.description && (
-                        <p className="text-xs text-muted-foreground truncate max-w-[250px]">
-                          {output.description}
-                        </p>
-                      )}
-                      {/* Mobile-only meta */}
-                      <div className="flex flex-wrap gap-1.5 mt-1 sm:hidden">
-                        <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${FILE_TYPE_BADGE_COLORS[output.file_type] ?? FILE_TYPE_BADGE_COLORS.other}`}>
-                          {OUTPUT_FILE_TYPE_LABELS[output.file_type as OutputFileType]}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {formatFileSize(output.file_size)}
-                        </span>
+              {filtered.map((output) => {
+                const hasContent = !!(output.metadata?.full_content);
+                return (
+                  <TableRow
+                    key={output.id}
+                    className="group cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleRowClick(output)}
+                  >
+                    <TableCell>
+                      <div className="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
+                        {FILE_TYPE_ICONS[output.file_type] ?? FILE_TYPE_ICONS.other}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${FILE_TYPE_BADGE_COLORS[output.file_type] ?? FILE_TYPE_BADGE_COLORS.other}`}>
-                      {OUTPUT_FILE_TYPE_LABELS[output.file_type as OutputFileType]}
-                    </span>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
-                    {formatFileSize(output.file_size)}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      {output.agent_name ? (
-                        <>
-                          <Bot className="h-3 w-3 shrink-0" />
-                          <span className="truncate max-w-[120px]">{output.agent_name}</span>
-                        </>
-                      ) : (
-                        <span className="truncate max-w-[120px]">{output.creator_name}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
-                    {formatDate(output.created_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {output.file_url ? (
+                    </TableCell>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate max-w-[300px]">
+                          {output.description || output.file_name}
+                        </p>
+                        {/* Mobile-only meta */}
+                        <div className="flex flex-wrap gap-1.5 mt-1 sm:hidden">
+                          <Badge variant="outline" className="font-mono text-[10px] px-1">
+                            {output.file_name}
+                          </Badge>
+                          <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${FILE_TYPE_BADGE_COLORS[output.file_type] ?? FILE_TYPE_BADGE_COLORS.other}`}>
+                            {OUTPUT_FILE_TYPE_LABELS[output.file_type as OutputFileType]}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Badge variant="outline" className="font-mono text-[10px] px-1.5 max-w-[130px] truncate">
+                        {output.file_name}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${FILE_TYPE_BADGE_COLORS[output.file_type] ?? FILE_TYPE_BADGE_COLORS.other}`}>
+                        {OUTPUT_FILE_TYPE_LABELS[output.file_type as OutputFileType]}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {output.agent_name ? (
+                          <>
+                            <Bot className="h-3 w-3 shrink-0" />
+                            <span className="truncate max-w-[120px]">{output.agent_name}</span>
+                          </>
+                        ) : (
+                          <span className="truncate max-w-[120px]">{output.creator_name}</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                      {formatDate(output.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           size="icon"
                           variant="ghost"
                           className="h-7 w-7"
-                          asChild
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowClick(output);
+                          }}
+                          title="Görüntüle"
                         >
-                          <a
-                            href={output.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Yeni sekmede aç"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
+                          <Eye className="h-3.5 w-3.5" />
                         </Button>
-                      ) : null}
-                      {output.file_url ? (
+                        {hasContent && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={(e) => handlePdfDownload(e, output)}
+                            title="PDF İndir"
+                          >
+                            <FileDown className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {output.file_url && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={(e) => e.stopPropagation()}
+                            asChild
+                          >
+                            <a
+                              href={output.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="İndir"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-7 w-7"
-                          asChild
+                          className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => handleDelete(e, output.id, output.file_name)}
+                          title="Sil"
                         >
-                          <a
-                            href={output.file_url}
-                            download={output.file_name}
-                            title="İndir"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </a>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                      ) : null}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleDelete(output.id, output.file_name)}
-                        title="Sil"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {/* Output Viewer Dialog */}
+      <OutputViewerDialog
+        output={selectedOutput}
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+      />
     </div>
   );
 }
