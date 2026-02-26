@@ -1,10 +1,9 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import type { TaskStatus } from "@/lib/constants";
 
 interface KanbanColumnProps {
-  status: TaskStatus;
+  status: string;
   label: string;
   colors: { bg: string; text: string; border: string };
   count: number;

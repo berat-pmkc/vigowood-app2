@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, LayoutGrid, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TASK_STATUSES,
@@ -34,9 +34,13 @@ import { TaskDetailSheet } from "./task-detail-sheet";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type User = { user_id: string; full_name: string; role: string };
 type Agent = { id: string; name: string; code: string; department: string; status: string };
+
+type ViewMode = "durum" | "kisi";
+type AssigneeFilterMode = "all" | "users" | "agents";
 
 interface KanbanBoardProps {
   initialTasks: TaskWithRelations[];
@@ -51,37 +55,75 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
 
-  // Filters
+  // View mode & filters
+  const [viewMode, setViewMode] = useState<ViewMode>("durum");
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [assigneeFilterMode, setAssigneeFilterMode] = useState<AssigneeFilterMode>("all");
+
+  const agentIdSet = useMemo(() => new Set(agents.map((a) => a.id)), [agents]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
 
-  const filteredTasks = tasks.filter((t) => {
-    if (deptFilter !== "all" && t.department !== deptFilter) return false;
-    if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
-    if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
-    return true;
-  });
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (t.parent_id) return false; // Exclude subtasks
+      if (deptFilter !== "all" && t.department !== deptFilter) return false;
+      if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
+      if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
+      if (assigneeFilterMode === "users" && t.assigned_to && agentIdSet.has(t.assigned_to)) return false;
+      if (assigneeFilterMode === "agents" && t.assigned_to && !agentIdSet.has(t.assigned_to)) return false;
+      return true;
+    });
+  }, [tasks, deptFilter, assigneeFilter, priorityFilter, assigneeFilterMode, agentIdSet]);
 
   const getTasksByStatus = useCallback(
-    (status: TaskStatus) =>
-      filteredTasks.filter((t) => t.status === status && !t.parent_id),
+    (status: TaskStatus) => filteredTasks.filter((t) => t.status === status),
     [filteredTasks]
   );
+
+  // Person-based grouping
+  const personColumns = useMemo(() => {
+    if (viewMode !== "kisi") return [];
+
+    const groups = new Map<string, { name: string; isAgent: boolean; tasks: TaskWithRelations[] }>();
+    groups.set("unassigned", { name: "Atanmamış", isAgent: false, tasks: [] });
+
+    for (const t of filteredTasks) {
+      if (!t.assigned_to) {
+        groups.get("unassigned")!.tasks.push(t);
+      } else {
+        if (!groups.has(t.assigned_to)) {
+          const isAgent = agentIdSet.has(t.assigned_to);
+          const agent = agents.find((a) => a.id === t.assigned_to);
+          const user = users.find((u) => u.user_id === t.assigned_to);
+          groups.set(t.assigned_to, {
+            name: isAgent ? (agent?.name ?? t.assigned_to) : (user?.full_name ?? t.assignee_name ?? t.assigned_to),
+            isAgent,
+            tasks: [],
+          });
+        }
+        groups.get(t.assigned_to)!.tasks.push(t);
+      }
+    }
+
+    return [...groups.entries()].sort((a, b) => {
+      if (a[0] === "unassigned") return 1;
+      if (b[0] === "unassigned") return -1;
+      return a[1].name.localeCompare(b[1].name, "tr");
+    });
+  }, [viewMode, filteredTasks, agentIdSet, agents, users]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const task = tasks.find((t) => t.id === event.active.id);
     if (task) setActiveTask(task);
   };
 
-  const handleDragOver = (_event: DragOverEvent) => {
-    // Visual feedback handled by DnD kit
-  };
+  const handleDragOver = (_event: DragOverEvent) => {};
 
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveTask(null);
@@ -89,27 +131,46 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
     if (!over) return;
 
     const taskId = active.id as string;
-    const newStatus = over.id as TaskStatus;
-
-    if (!TASK_STATUSES.includes(newStatus as TaskStatus)) return;
-
+    const dropTarget = over.id as string;
     const task = tasks.find((t) => t.id === taskId);
-    if (!task || task.status === newStatus) return;
+    if (!task) return;
 
-    // Optimistic update
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
-    );
+    if (viewMode === "durum") {
+      const newStatus = dropTarget as TaskStatus;
+      if (!TASK_STATUSES.includes(newStatus)) return;
+      if (task.status === newStatus) return;
 
-    const result = await updateTask(taskId, { status: newStatus });
-    if (!result.success) {
-      // Rollback
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t))
+        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
       );
-      toast.error(result.error || "Durum güncellenemedi");
+
+      const result = await updateTask(taskId, { status: newStatus });
+      if (!result.success) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t))
+        );
+        toast.error(result.error || "Durum güncellenemedi");
+      } else {
+        toast.success(`Görev "${TASK_STATUS_LABELS[newStatus]}" durumuna taşındı`);
+      }
     } else {
-      toast.success(`Görev "${TASK_STATUS_LABELS[newStatus]}" durumuna taşındı`);
+      // Person mode: change assigned_to
+      const newAssignee = dropTarget === "unassigned" ? null : dropTarget;
+      if (task.assigned_to === newAssignee) return;
+
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, assigned_to: newAssignee } : t))
+      );
+
+      const result = await updateTask(taskId, { assigned_to: newAssignee });
+      if (!result.success) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, assigned_to: task.assigned_to } : t))
+        );
+        toast.error(result.error || "Atama güncellenemedi");
+      } else {
+        toast.success("Görev atandı");
+      }
     }
   };
 
@@ -119,24 +180,44 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
     if (result.success) {
       toast.success("Görev oluşturuldu");
       setQuickTitle("");
-      // Refresh will be handled by revalidation, but we can add optimistic
     } else {
       toast.error(result.error || "Görev oluşturulamadı");
     }
   };
 
-  const handleQuickKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleQuickCreate();
-    }
-  };
-
   return (
     <>
-      {/* Filters + Quick Create */}
+      {/* Filters + Controls */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-md border">
+            <button
+              onClick={() => setViewMode("durum")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors rounded-l-md",
+                viewMode === "durum"
+                  ? "bg-vw-primary text-vw-dark"
+                  : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Durum
+            </button>
+            <button
+              onClick={() => setViewMode("kisi")}
+              className={cn(
+                "flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-colors rounded-r-md border-l",
+                viewMode === "kisi"
+                  ? "bg-vw-primary text-vw-dark"
+                  : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Kişi
+            </button>
+          </div>
+
           <Select value={deptFilter} onValueChange={setDeptFilter}>
             <SelectTrigger className="h-8 w-[140px]">
               <SelectValue placeholder="Departman" />
@@ -164,10 +245,10 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
               ))}
               {agents.length > 0 && (
                 <>
-                  <SelectItem value="---" disabled>── Ajanlar ──</SelectItem>
+                  <SelectItem value="---" disabled>── Asistanlar ──</SelectItem>
                   {agents.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      🤖 {a.name}
+                      {a.name}
                     </SelectItem>
                   ))}
                 </>
@@ -188,6 +269,27 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Assignee type filter */}
+          <div className="flex rounded-md border">
+            {(["all", "users", "agents"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setAssigneeFilterMode(mode)}
+                className={cn(
+                  "px-2 py-1 text-xs font-medium transition-colors",
+                  mode === "all" && "rounded-l-md",
+                  mode === "agents" && "rounded-r-md",
+                  mode !== "all" && mode !== "agents" && "border-x",
+                  assigneeFilterMode === mode
+                    ? "bg-vw-primary/20 text-vw-dark"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {mode === "all" ? "Tümü" : mode === "users" ? "Çalışanlar" : "Asistanlar"}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -196,7 +298,7 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
             placeholder="Hızlı görev ekle..."
             value={quickTitle}
             onChange={(e) => setQuickTitle(e.target.value)}
-            onKeyDown={handleQuickKeyDown}
+            onKeyDown={(e) => e.key === "Enter" && handleQuickCreate()}
           />
           <Button
             size="sm"
@@ -218,36 +320,67 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-3 overflow-x-auto pb-4">
-          {TASK_STATUSES.map((status) => {
-            const columnTasks = getTasksByStatus(status);
-            return (
-              <KanbanColumn
-                key={status}
-                status={status}
-                label={TASK_STATUS_LABELS[status]}
-                colors={TASK_STATUS_COLORS[status]}
-                count={columnTasks.length}
-              >
-                <SortableContext
-                  items={columnTasks.map((t) => t.id)}
-                  strategy={verticalListSortingStrategy}
+          {viewMode === "durum"
+            ? TASK_STATUSES.map((status) => {
+                const columnTasks = getTasksByStatus(status);
+                return (
+                  <KanbanColumn
+                    key={status}
+                    status={status}
+                    label={TASK_STATUS_LABELS[status]}
+                    colors={TASK_STATUS_COLORS[status]}
+                    count={columnTasks.length}
+                  >
+                    <SortableContext
+                      items={columnTasks.map((t) => t.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {columnTasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          agents={agents}
+                          onClick={() => setSelectedTaskId(task.id)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </KanbanColumn>
+                );
+              })
+            : personColumns.map(([personId, group]) => (
+                <KanbanColumn
+                  key={personId}
+                  status={personId}
+                  label={group.isAgent ? group.name : group.name}
+                  colors={
+                    group.isAgent
+                      ? { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-300" }
+                      : personId === "unassigned"
+                        ? { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" }
+                        : { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" }
+                  }
+                  count={group.tasks.length}
                 >
-                  {columnTasks.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onClick={() => setSelectedTaskId(task.id)}
-                    />
-                  ))}
-                </SortableContext>
-              </KanbanColumn>
-            );
-          })}
+                  <SortableContext
+                    items={group.tasks.map((t) => t.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {group.tasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        agents={agents}
+                        onClick={() => setSelectedTaskId(task.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                </KanbanColumn>
+              ))}
         </div>
 
         <DragOverlay>
           {activeTask ? (
-            <TaskCard task={activeTask} onClick={() => {}} isDragOverlay />
+            <TaskCard task={activeTask} agents={agents} onClick={() => {}} isDragOverlay />
           ) : null}
         </DragOverlay>
       </DndContext>

@@ -190,6 +190,16 @@ export function GorevlerimClient({ tasks }: GorevlerimClientProps) {
                       >
                         {TASK_DEPARTMENT_LABELS[task.department as TaskDepartment]}
                       </span>
+                      {task.is_blocked && (
+                        <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                          Engellendi
+                        </span>
+                      )}
+                      {task.is_waiting_approval && (
+                        <span className="inline-flex items-center rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
+                          Onay Bekliyor
+                        </span>
+                      )}
                     </div>
                   </div>
 

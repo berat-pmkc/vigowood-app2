@@ -37,6 +37,8 @@ export type TaskWithRelations = {
   parent_id: string | null;
   source_type: string;
   source_id: string | null;
+  is_blocked: boolean;
+  is_waiting_approval: boolean;
   created_at: string;
   updated_at: string;
   assignee_name?: string | null;
@@ -230,7 +232,7 @@ export async function createTask(data: {
     .insert({
       title: data.title,
       description: data.description ?? null,
-      status: data.status ?? ("open" as TaskStatus),
+      status: data.status ?? ("queue" as TaskStatus),
       priority: data.priority ?? ("medium" as TaskPriority),
       assigned_to: data.assigned_to ?? null,
       created_by: user.user_id,
@@ -271,6 +273,8 @@ export async function updateTask(
     assigned_to?: string | null;
     department?: TaskDepartment;
     due_date?: string | null;
+    is_blocked?: boolean;
+    is_waiting_approval?: boolean;
   }
 ) {
   const user = await requireUser();
@@ -968,11 +972,11 @@ export async function getOpsStats() {
     supabase
       .from("tasks")
       .select("*", { count: "exact", head: true })
-      .eq("status", "waiting_approval"),
+      .eq("is_waiting_approval", true),
     supabase
       .from("tasks")
       .select("*", { count: "exact", head: true })
-      .eq("status", "blocked"),
+      .eq("is_blocked", true),
     supabase
       .from("tasks")
       .select("id, title, assigned_to, due_date, priority, department")
@@ -1043,5 +1047,299 @@ export async function getOpsStats() {
     activeAgentsCount: activeAgentsCount ?? 0,
     recentOutputsCount: recentOutputsCount ?? 0,
     pendingApprovals: pendingApprovals ?? [],
+  };
+}
+
+// ─── Task Templates ──────────────────────────────────────────
+
+export async function getTaskTemplates() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("task_templates")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function createTaskTemplate(data: {
+  title: string;
+  description?: string | null;
+  department?: TaskDepartment;
+  priority?: TaskPriority;
+  assignee_id?: string | null;
+  checklist?: { text: string; done: boolean }[];
+}) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("task_templates").insert({
+    title: data.title,
+    description: data.description ?? null,
+    department: data.department ?? "genel",
+    priority: data.priority ?? "medium",
+    assignee_id: data.assignee_id ?? null,
+    checklist: data.checklist ?? [],
+    created_by: user.user_id,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/board");
+  return { success: true };
+}
+
+export async function updateTaskTemplate(
+  id: string,
+  data: {
+    title?: string;
+    description?: string | null;
+    department?: TaskDepartment;
+    priority?: TaskPriority;
+    assignee_id?: string | null;
+    checklist?: { text: string; done: boolean }[];
+  }
+) {
+  await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("task_templates")
+    .update(data)
+    .eq("id", id);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/board");
+  return { success: true };
+}
+
+export async function deleteTaskTemplate(id: string) {
+  const user = await requireUser();
+  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+    return { success: false, error: "Yetkiniz yok" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("task_templates").delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/board");
+  return { success: true };
+}
+
+export async function createTaskFromTemplate(
+  templateId: string,
+  overrides?: {
+    title?: string;
+    assigned_to?: string | null;
+    due_date?: string | null;
+  }
+) {
+  const supabase = await createClient();
+
+  const { data: template, error: tErr } = await supabase
+    .from("task_templates")
+    .select("*")
+    .eq("id", templateId)
+    .single();
+
+  if (tErr || !template) return { success: false, error: "Şablon bulunamadı" };
+
+  return createTask({
+    title: overrides?.title ?? template.title,
+    description: template.description,
+    status: "queue" as TaskStatus,
+    priority: template.priority as TaskPriority,
+    assigned_to: overrides?.assigned_to ?? template.assignee_id,
+    department: template.department as TaskDepartment,
+    due_date: overrides?.due_date ?? null,
+  });
+}
+
+// ─── Recurring Tasks ──────────────────────────────────────────
+
+export async function getRecurringTasks() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("recurring_tasks")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function createRecurringTask(data: {
+  title: string;
+  description?: string | null;
+  department?: TaskDepartment;
+  priority?: TaskPriority;
+  assignee_id?: string | null;
+  cron_schedule: string;
+  is_active?: boolean;
+  template_id?: string | null;
+}) {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("recurring_tasks").insert({
+    title: data.title,
+    description: data.description ?? null,
+    department: data.department ?? "genel",
+    priority: data.priority ?? "medium",
+    assignee_id: data.assignee_id ?? null,
+    cron_schedule: data.cron_schedule,
+    is_active: data.is_active ?? true,
+    template_id: data.template_id ?? null,
+    created_by: user.user_id,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/board");
+  return { success: true };
+}
+
+export async function updateRecurringTask(
+  id: string,
+  data: {
+    title?: string;
+    description?: string | null;
+    department?: TaskDepartment;
+    priority?: TaskPriority;
+    assignee_id?: string | null;
+    cron_schedule?: string;
+    is_active?: boolean;
+  }
+) {
+  await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("recurring_tasks")
+    .update(data)
+    .eq("id", id);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/board");
+  return { success: true };
+}
+
+export async function deleteRecurringTask(id: string) {
+  const user = await requireUser();
+  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+    return { success: false, error: "Yetkiniz yok" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("recurring_tasks").delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/board");
+  return { success: true };
+}
+
+export async function getTaskRuns(recurringTaskId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("task_runs")
+    .select("*")
+    .eq("recurring_task_id", recurringTaskId)
+    .order("run_number", { ascending: false })
+    .limit(50);
+
+  if (error) return [];
+  return data ?? [];
+}
+
+// ─── Usage Stats ──────────────────────────────────────────────
+
+export async function getAgentActionsForTask(taskId: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("agent_actions")
+    .select("*")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getUsageStats(period: "day" | "week" | "month" = "week") {
+  const supabase = await createClient();
+
+  const now = new Date();
+  let since: Date;
+  if (period === "day") {
+    since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  } else if (period === "week") {
+    since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  } else {
+    since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  }
+
+  const { data: actions, error } = await supabase
+    .from("agent_actions")
+    .select("*")
+    .gte("created_at", since.toISOString())
+    .order("created_at", { ascending: false });
+
+  if (error) return { totalCost: 0, agents: [], actions: [] };
+
+  const agentStats = new Map<
+    string,
+    {
+      agent_id: string;
+      total_tokens: number;
+      total_cost: number;
+      action_count: number;
+    }
+  >();
+
+  let totalCost = 0;
+
+  for (const a of actions ?? []) {
+    totalCost += (a.cost_estimate ?? 0);
+    const id = a.agent_id ?? "unknown";
+    const existing = agentStats.get(id) ?? {
+      agent_id: id,
+      total_tokens: 0,
+      total_cost: 0,
+      action_count: 0,
+    };
+    existing.total_tokens += (a.tokens_used ?? 0);
+    existing.total_cost += (a.cost_estimate ?? 0);
+    existing.action_count++;
+    agentStats.set(id, existing);
+  }
+
+  // Resolve agent names
+  const agentIds = [...agentStats.keys()].filter((id) => id !== "unknown");
+  let agentMap = new Map<string, string>();
+  if (agentIds.length > 0) {
+    const { data: agents } = await supabase
+      .from("ops_agents")
+      .select("code, name")
+      .in("code", agentIds);
+    agentMap = new Map(agents?.map((a) => [a.code, a.name]) ?? []);
+  }
+
+  const agentList = [...agentStats.values()].map((s) => ({
+    ...s,
+    agent_name: agentMap.get(s.agent_id) ?? s.agent_id,
+  }));
+
+  return {
+    totalCost,
+    agents: agentList.sort((a, b) => b.total_cost - a.total_cost),
+    actions: actions ?? [],
   };
 }

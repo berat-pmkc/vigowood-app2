@@ -462,20 +462,27 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 
 ### KATMAN 30: Ops Center — Task Management ✅
 - [x] **Aşama 1**: DB: tasks, task_comments, task_attachments, task_activity tabloları + 5 enum + RLS + realtime
-- [x] Sidebar: Ops Center menü grubu (Genel Bakış, Board, Görevlerim, Onaylar, Raporlar, Ajanlar)
+- [x] Sidebar: Ops Center menü grubu (Genel Bakış, Board, Görevlerim, Onaylar, Raporlar, Ajanlar, Kullanım)
 - [x] /ops: KPI kartları (7 adet: görev + approval + ajan + çıktı), geciken görevler, bekleyen onaylar, bugün tamamlanan, son aktiviteler
-- [x] /ops/board: 6 kolonlu Kanban board, @dnd-kit sürükle-bırak, filtreler (dept, assignee+agents, priority)
-- [x] Task kartları: başlık, assignee, öncelik+departman badge, due date, subtask/attachment/comment
+- [x] /ops/board: 4 kolonlu Kanban board (scheduled/queue/in_progress/done), @dnd-kit DnD, Durum/Kişi görünüm toggle
+- [x] Task kartları: başlık, assignee (Bot ikonu agent ise), öncelik+departman badge, is_blocked/is_waiting_approval badge'leri
 - [x] Hızlı + detaylı görev oluşturma, Çalışanlar/Ajanlar tab'lı assignee picker
-- [x] Task detail sheet: inline edit, yorumlar, dosyalar (Storage), aktivite, alt görevler
-- [x] /ops/gorevlerim: Inbox, filtre + sıralama
+- [x] Task detail sheet: inline edit, yorumlar, dosyalar (Storage), aktivite, alt görevler, Çalışma Günlüğü tab
+- [x] /ops/gorevlerim: Inbox, filtre + sıralama, is_blocked/is_waiting_approval badge
 - [x] Supabase Storage bucket: task-attachments
 - [x] **Aşama 2**: DB: ops_agents, ops_approvals, ops_outputs tabloları + 5 enum + RLS + realtime
 - [x] 6 sanal ajan seed: Elif(stok), Kerem(üretim), Zeynep(pazaryeri), Burak(sevkiyat), Derya(muhasebe), Can(genel)
 - [x] /ops/onaylar: Approval sistemi — aksiyon türü, risk seviyesi, payload karşılaştırma, onayla/reddet/revizyon
 - [x] /ops/raporlar: Çıktılar sayfası — dosya listesi, tür+ajan filtre, indir/aç/sil
 - [x] /ops/ajanlar: Ajan profilleri — kart listesi, detay sheet, yetenekler, çalışma planı, durum kontrolleri
-- [x] Build: 78 route, sıfır TypeScript hatası
+- [x] **Aşama 3 (V3)**: DB: task_templates, recurring_tasks, task_runs tabloları + enum swap (6→4 status) + is_blocked/is_waiting_approval boolean'lar
+- [x] Enum swap: backlog→scheduled, open→queue, waiting_approval→in_progress+flag, blocked→in_progress+flag
+- [x] /ops/board tab sistemi: Görevler | Şablonlar | Tekrar Eden
+- [x] Şablon CRUD: template-dialog, templates-tab (kart grid, arama, departman filtre, şablondan görev oluştur)
+- [x] Tekrar eden görev CRUD: recurring-dialog, recurring-tab (cron schedule, aktif/pasif toggle, çalışma geçmişi)
+- [x] /ops/kullanim: Agent kullanım istatistikleri — 3 KPI, dönem filtresi, agent bazlı tablo
+- [x] Kanban board: Durum/Kişi görünüm toggle, Tümü/Çalışanlar/Asistanlar atama filtresi
+- [x] Build: 87 route, sıfır TypeScript hatası
 
 ### KATMAN 29: Test & Güvenlik Denetimi ✅
 - [x] Güvenlik: 38/38 server action + 9/9 API route auth guard doğrulandı

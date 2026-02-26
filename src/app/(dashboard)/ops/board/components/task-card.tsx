@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -8,8 +9,10 @@ import {
   MessageSquare,
   ListChecks,
   GripVertical,
+  Bot,
+  ShieldAlert,
+  Clock,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import {
   TASK_PRIORITY_LABELS,
   TASK_PRIORITY_COLORS,
@@ -20,13 +23,16 @@ import {
 } from "@/lib/constants";
 import type { TaskWithRelations } from "../../actions";
 
+type Agent = { id: string; name: string; code: string; department: string; status: string };
+
 interface TaskCardProps {
   task: TaskWithRelations;
+  agents: Agent[];
   onClick: () => void;
   isDragOverlay?: boolean;
 }
 
-export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
+export function TaskCard({ task, agents, onClick, isDragOverlay }: TaskCardProps) {
   const {
     attributes,
     listeners,
@@ -55,14 +61,28 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
     return date.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
   };
 
-  const initials = task.assignee_name
-    ? task.assignee_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : null;
+  const agentIdSet = useMemo(() => new Set(agents.map((a) => a.id)), [agents]);
+  const isAgentAssigned = task.assigned_to ? agentIdSet.has(task.assigned_to) : false;
+
+  const assigneeDisplay = useMemo(() => {
+    if (!task.assigned_to) return null;
+    if (isAgentAssigned) {
+      const agent = agents.find((a) => a.id === task.assigned_to);
+      return { type: "agent" as const, name: agent?.name ?? task.assigned_to };
+    }
+    return {
+      type: "user" as const,
+      name: task.assignee_name ?? task.assigned_to,
+      initials: task.assignee_name
+        ? task.assignee_name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()
+        : "??",
+    };
+  }, [task.assigned_to, task.assignee_name, isAgentAssigned, agents]);
 
   return (
     <div
@@ -98,6 +118,18 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
         >
           {TASK_DEPARTMENT_LABELS[task.department as TaskDepartment]}
         </span>
+        {task.is_blocked && (
+          <span className="inline-flex items-center gap-0.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+            <ShieldAlert className="h-3 w-3" />
+            Engellendi
+          </span>
+        )}
+        {task.is_waiting_approval && (
+          <span className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
+            <Clock className="h-3 w-3" />
+            Onay Bekliyor
+          </span>
+        )}
       </div>
 
       {/* Footer */}
@@ -134,14 +166,21 @@ export function TaskCard({ task, onClick, isDragOverlay }: TaskCardProps) {
         </div>
 
         {/* Assignee avatar */}
-        {initials && (
+        {assigneeDisplay?.type === "agent" ? (
+          <div
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700"
+            title={assigneeDisplay.name}
+          >
+            <Bot className="h-3.5 w-3.5" />
+          </div>
+        ) : assigneeDisplay?.type === "user" ? (
           <div
             className="flex h-6 w-6 items-center justify-center rounded-full bg-vw-primary text-[9px] font-bold text-vw-dark"
-            title={task.assignee_name ?? ""}
+            title={assigneeDisplay.name}
           >
-            {initials}
+            {assigneeDisplay.initials}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

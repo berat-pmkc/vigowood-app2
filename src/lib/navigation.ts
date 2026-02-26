@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   Bot,
   FileOutput,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/lib/constants";
@@ -96,6 +97,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Onaylar", href: "/ops/onaylar", icon: CheckCircle2, roles: APPROVAL_NAV_ROLES },
       { title: "Raporlar", href: "/ops/raporlar", icon: FileOutput, roles: "all" },
       { title: "Ajanlar", href: "/ops/ajanlar", icon: Bot, roles: APPROVAL_NAV_ROLES },
+      { title: "Kullanım", href: "/ops/kullanim", icon: Activity, roles: APPROVAL_NAV_ROLES },
     ],
   },
   {

@@ -898,26 +898,46 @@ export const PACKING_LIST_CONFIG = {
 
 /** Görev durumları */
 export const TASK_STATUSES = [
-  "backlog", "open", "in_progress", "waiting_approval", "blocked", "done",
+  "scheduled", "queue", "in_progress", "done",
 ] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  backlog: "Sırada",
-  open: "Açık",
+  scheduled: "Planlanmış",
+  queue: "Sırada",
   in_progress: "Devam Ediyor",
-  waiting_approval: "Onay Bekliyor",
-  blocked: "Engellendi",
   done: "Tamamlandı",
 };
 
 export const TASK_STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: string }> = {
-  backlog: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" },
-  open: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  scheduled: { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" },
+  queue: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
   in_progress: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
-  waiting_approval: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
-  blocked: { bg: "bg-red-50", text: "text-red-700", border: "border-red-300" },
   done: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+};
+
+/** Tekrar eden görev sıklıkları */
+export const RECURRING_FREQUENCIES = [
+  { value: "0 9 * * *", label: "Günlük (09:00)" },
+  { value: "0 9 * * 1", label: "Haftalık (Pazartesi 09:00)" },
+  { value: "0 9 1 * *", label: "Aylık (1. gün 09:00)" },
+  { value: "custom", label: "Özel (Cron)" },
+] as const;
+
+/** Task run durumları */
+export const TASK_RUN_STATUSES = ["active", "completed", "failed"] as const;
+export type TaskRunStatus = (typeof TASK_RUN_STATUSES)[number];
+
+export const TASK_RUN_STATUS_LABELS: Record<TaskRunStatus, string> = {
+  active: "Çalışıyor",
+  completed: "Tamamlandı",
+  failed: "Başarısız",
+};
+
+export const TASK_RUN_STATUS_COLORS: Record<TaskRunStatus, { bg: string; text: string }> = {
+  active: { bg: "bg-amber-100", text: "text-amber-700" },
+  completed: { bg: "bg-emerald-100", text: "text-emerald-700" },
+  failed: { bg: "bg-red-100", text: "text-red-700" },
 };
 
 /** Görev öncelikleri */

@@ -75,7 +75,7 @@ export function TaskCreateDialog({
     defaultValues: {
       title: "",
       description: null,
-      status: "open",
+      status: "queue",
       priority: "medium",
       assigned_to: null,
       department: "genel",

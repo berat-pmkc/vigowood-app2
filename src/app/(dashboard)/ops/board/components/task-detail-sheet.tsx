@@ -27,6 +27,9 @@ import {
   CheckCircle2,
   Circle,
   Plus,
+  ShieldAlert,
+  Clock,
+  Cpu,
 } from "lucide-react";
 import {
   TASK_STATUSES,
@@ -49,6 +52,7 @@ import {
   getTaskAttachments,
   getTaskActivity,
   getSubtasks,
+  getAgentActionsForTask,
   updateTask,
   addTaskComment,
   addTaskAttachment,
@@ -82,6 +86,7 @@ export function TaskDetailSheet({
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [activity, setActivity] = useState<TaskActivityType[]>([]);
   const [subtasks, setSubtasks] = useState<TaskWithRelations[]>([]);
+  const [agentActions, setAgentActions] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -91,18 +96,20 @@ export function TaskDetailSheet({
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [t, c, a, act, st] = await Promise.all([
+    const [t, c, a, act, st, aa] = await Promise.all([
       getTaskById(taskId),
       getTaskComments(taskId),
       getTaskAttachments(taskId),
       getTaskActivity(taskId),
       getSubtasks(taskId),
+      getAgentActionsForTask(taskId),
     ]);
     setTask(t);
     setComments(c);
     setAttachments(a);
     setActivity(act);
     setSubtasks(st);
+    setAgentActions(aa as Record<string, unknown>[]);
     if (t) setTitleValue(t.title);
     setLoading(false);
   }, [taskId]);
@@ -171,9 +178,15 @@ export function TaskDetailSheet({
   };
 
   const handleSubtaskToggle = async (subtask: TaskWithRelations) => {
-    const newStatus = subtask.status === "done" ? "open" : "done";
+    const newStatus = subtask.status === "done" ? "queue" : "done";
     const result = await updateTask(subtask.id, { status: newStatus as TaskStatus });
     if (result.success) loadData();
+  };
+
+  const handleBoolToggle = async (field: "is_blocked" | "is_waiting_approval", current: boolean) => {
+    const result = await updateTask(taskId, { [field]: !current });
+    if (result.success) loadData();
+    else toast.error(result.error || "Güncelleme başarısız");
   };
 
   const formatDate = (d: string) =>
@@ -307,6 +320,32 @@ export function TaskDetailSheet({
                 />
               </div>
 
+              {/* Flag toggles */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleBoolToggle("is_blocked", task.is_blocked)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    task.is_blocked
+                      ? "border-red-300 bg-red-50 text-red-700"
+                      : "border-gray-200 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <ShieldAlert className="h-3 w-3" />
+                  Engellendi
+                </button>
+                <button
+                  onClick={() => handleBoolToggle("is_waiting_approval", task.is_waiting_approval)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    task.is_waiting_approval
+                      ? "border-purple-300 bg-purple-50 text-purple-700"
+                      : "border-gray-200 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Clock className="h-3 w-3" />
+                  Onay Bekliyor
+                </button>
+              </div>
+
               {/* Source badge */}
               {task.source_type !== "manual" && (
                 <Badge variant="outline" className="text-xs">
@@ -341,6 +380,10 @@ export function TaskDetailSheet({
               <TabsTrigger value="subtasks" className="flex-1 text-xs">
                 <ListChecks className="mr-1 h-3 w-3" />
                 Alt ({subtasks.length})
+              </TabsTrigger>
+              <TabsTrigger value="work-log" className="flex-1 text-xs">
+                <Cpu className="mr-1 h-3 w-3" />
+                Günlük
               </TabsTrigger>
             </TabsList>
 
@@ -550,6 +593,71 @@ export function TaskDetailSheet({
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+            </TabsContent>
+
+            {/* Work Log Tab */}
+            <TabsContent value="work-log" className="flex-1 overflow-hidden mt-2">
+              <ScrollArea className="h-full">
+                <div className="space-y-2 pr-3">
+                  {agentActions.length === 0 ? (
+                    <p className="text-center text-sm text-muted-foreground py-8">
+                      Henüz çalışma kaydı yok
+                    </p>
+                  ) : (
+                    <>
+                      {/* Summary */}
+                      <div className="mb-3 grid grid-cols-3 gap-2">
+                        <div className="rounded border p-2 text-center">
+                          <p className="text-lg font-bold">
+                            {agentActions.reduce((s, a) => s + ((a.tokens_used as number) ?? 0), 0).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Toplam Token</p>
+                        </div>
+                        <div className="rounded border p-2 text-center">
+                          <p className="text-lg font-bold">
+                            ${agentActions.reduce((s, a) => s + ((a.cost_estimate as number) ?? 0), 0).toFixed(4)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Toplam Maliyet</p>
+                        </div>
+                        <div className="rounded border p-2 text-center">
+                          <p className="text-lg font-bold">{agentActions.length}</p>
+                          <p className="text-[10px] text-muted-foreground">İşlem</p>
+                        </div>
+                      </div>
+
+                      {/* Action list */}
+                      {agentActions.map((a, i) => (
+                        <div key={i} className="rounded border p-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{(a.action_type as string) ?? "-"}</span>
+                            <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              (a.result as string) === "success"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : (a.result as string) === "error"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-gray-100 text-gray-600"
+                            }`}>
+                              {(a.result as string) ?? "-"}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex gap-3 text-muted-foreground">
+                            <span>{((a.tokens_used as number) ?? 0)} token</span>
+                            <span>${((a.cost_estimate as number) ?? 0).toFixed(6)}</span>
+                            {a.duration_ms != null && (
+                              <span>{((a.duration_ms as number) / 1000).toFixed(1)}s</span>
+                            )}
+                          </div>
+                          {a.created_at != null && (
+                            <p className="mt-0.5 text-muted-foreground">
+                              {formatDate(a.created_at as string)}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </ScrollArea>
             </TabsContent>
           </Tabs>
         )}

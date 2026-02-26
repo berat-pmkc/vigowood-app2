@@ -748,7 +748,7 @@ export const taskCreateSchema = z.object({
     .max(5000, "Açıklama en fazla 5000 karakter olabilir")
     .nullable()
     .optional(),
-  status: z.enum(TASK_STATUSES).default("open"),
+  status: z.enum(TASK_STATUSES).default("queue"),
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   assigned_to: z.string().nullable().optional(),
   department: z.enum(TASK_DEPARTMENTS).default("genel"),
@@ -776,6 +776,8 @@ export const taskUpdateSchema = z.object({
   assigned_to: z.string().nullable().optional(),
   department: z.enum(TASK_DEPARTMENTS).optional(),
   due_date: z.string().nullable().optional(),
+  is_blocked: z.boolean().optional(),
+  is_waiting_approval: z.boolean().optional(),
 });
 
 export type TaskUpdateData = z.infer<typeof taskUpdateSchema>;
@@ -789,3 +791,46 @@ export const taskCommentSchema = z.object({
 });
 
 export type TaskCommentData = z.infer<typeof taskCommentSchema>;
+
+/** Görev şablonu oluşturma/güncelleme */
+export const taskTemplateSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Şablon başlığı gereklidir")
+    .max(300, "Başlık en fazla 300 karakter olabilir"),
+  description: z
+    .string()
+    .max(5000, "Açıklama en fazla 5000 karakter olabilir")
+    .nullable()
+    .optional(),
+  department: z.enum(TASK_DEPARTMENTS).default("genel"),
+  priority: z.enum(TASK_PRIORITIES).default("medium"),
+  assignee_id: z.string().nullable().optional(),
+  checklist: z.array(z.object({
+    text: z.string().min(1),
+    done: z.boolean().default(false),
+  })).default([]),
+});
+
+export type TaskTemplateData = z.infer<typeof taskTemplateSchema>;
+
+/** Tekrar eden görev oluşturma/güncelleme */
+export const recurringTaskSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Görev başlığı gereklidir")
+    .max(300, "Başlık en fazla 300 karakter olabilir"),
+  description: z
+    .string()
+    .max(5000, "Açıklama en fazla 5000 karakter olabilir")
+    .nullable()
+    .optional(),
+  department: z.enum(TASK_DEPARTMENTS).default("genel"),
+  priority: z.enum(TASK_PRIORITIES).default("medium"),
+  assignee_id: z.string().nullable().optional(),
+  cron_schedule: z.string().min(1, "Zamanlama gereklidir"),
+  is_active: z.boolean().default(true),
+  template_id: z.string().uuid().nullable().optional(),
+});
+
+export type RecurringTaskData = z.infer<typeof recurringTaskSchema>;

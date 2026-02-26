@@ -2046,6 +2046,75 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_tasks: {
+        Row: {
+          assignee_id: string | null
+          created_at: string | null
+          created_by: string | null
+          cron_schedule: string
+          department: Database["public"]["Enums"]["task_department"] | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          last_run_at: string | null
+          next_run_at: string | null
+          priority: Database["public"]["Enums"]["task_priority"] | null
+          run_count: number | null
+          template_id: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          cron_schedule?: string
+          department?: Database["public"]["Enums"]["task_department"] | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          next_run_at?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"] | null
+          run_count?: number | null
+          template_id?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          cron_schedule?: string
+          department?: Database["public"]["Enums"]["task_department"] | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_run_at?: string | null
+          next_run_at?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"] | null
+          run_count?: number | null
+          template_id?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "recurring_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       satis_giris: {
         Row: {
           aktarim_tarihi: string | null
@@ -2870,6 +2939,101 @@ export type Database = {
           },
         ]
       }
+      task_runs: {
+        Row: {
+          completed_at: string | null
+          id: string
+          recurring_task_id: string
+          run_code: string | null
+          run_number: number
+          started_at: string | null
+          status: string | null
+          task_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          recurring_task_id: string
+          run_code?: string | null
+          run_number?: number
+          started_at?: string | null
+          status?: string | null
+          task_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          recurring_task_id?: string
+          run_code?: string | null
+          run_number?: number
+          started_at?: string | null
+          status?: string | null
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_runs_recurring_task_id_fkey"
+            columns: ["recurring_task_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_runs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_templates: {
+        Row: {
+          assignee_id: string | null
+          checklist: Json | null
+          created_at: string | null
+          created_by: string | null
+          department: Database["public"]["Enums"]["task_department"] | null
+          description: string | null
+          id: string
+          priority: Database["public"]["Enums"]["task_priority"] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          checklist?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: Database["public"]["Enums"]["task_department"] | null
+          description?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          checklist?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: Database["public"]["Enums"]["task_department"] | null
+          description?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -2879,6 +3043,8 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          is_blocked: boolean | null
+          is_waiting_approval: boolean | null
           parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           source_id: string | null
@@ -2895,6 +3061,8 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          is_blocked?: boolean | null
+          is_waiting_approval?: boolean | null
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           source_id?: string | null
@@ -2911,6 +3079,8 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          is_blocked?: boolean | null
+          is_waiting_approval?: boolean | null
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           source_id?: string | null
@@ -2920,13 +3090,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
           {
             foreignKeyName: "tasks_created_by_fkey"
             columns: ["created_by"]
@@ -3595,13 +3758,7 @@ export type Database = {
         | "genel"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_source_type: "manual" | "recurring_job" | "alert"
-      task_status:
-        | "backlog"
-        | "open"
-        | "in_progress"
-        | "waiting_approval"
-        | "blocked"
-        | "done"
+      task_status: "scheduled" | "queue" | "in_progress" | "done"
       user_role:
         | "Yönetici"
         | "Endüstri Mühendisi"
@@ -3830,14 +3987,7 @@ export const Constants = {
       ],
       task_priority: ["low", "medium", "high", "urgent"],
       task_source_type: ["manual", "recurring_job", "alert"],
-      task_status: [
-        "backlog",
-        "open",
-        "in_progress",
-        "waiting_approval",
-        "blocked",
-        "done",
-      ],
+      task_status: ["scheduled", "queue", "in_progress", "done"],
       user_role: [
         "Yönetici",
         "Endüstri Mühendisi",
@@ -3871,6 +4021,9 @@ export type JobDefinition = Database["public"]["Tables"]["job_definitions"]["Row
 export type JobRun = Database["public"]["Tables"]["job_runs"]["Row"];
 export type MonitorDefinition = Database["public"]["Tables"]["monitor_definitions"]["Row"];
 export type IkasOrder = Database["public"]["Tables"]["ikas_orders"]["Row"];
+export type TaskTemplate = Database["public"]["Tables"]["task_templates"]["Row"];
+export type RecurringTask = Database["public"]["Tables"]["recurring_tasks"]["Row"];
+export type TaskRun = Database["public"]["Tables"]["task_runs"]["Row"];
 
 // ─── Enum Type Aliases ───
 export type UserRole = Database["public"]["Enums"]["user_role"];
