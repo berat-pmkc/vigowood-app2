@@ -171,12 +171,15 @@ export function TemplateDialog({ open, onClose, template, users, agents }: Templ
                 <TabsTrigger value="asistanlar" className="text-xs">Asistanlar</TabsTrigger>
               </TabsList>
               <TabsContent value="calisanlar" className="mt-1">
-                <Select value={watch("assignee_id")} onValueChange={(v) => setValue("assignee_id", v)}>
+                <Select
+                  value={watch("assignee_id") || "unassigned"}
+                  onValueChange={(v) => setValue("assignee_id", v === "unassigned" ? "" : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Çalışan seç" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Atanmamış</SelectItem>
+                    <SelectItem value="unassigned">Atanmamış</SelectItem>
                     {users.map((u) => (
                       <SelectItem key={u.user_id} value={u.user_id}>
                         {u.full_name}
@@ -186,12 +189,15 @@ export function TemplateDialog({ open, onClose, template, users, agents }: Templ
                 </Select>
               </TabsContent>
               <TabsContent value="asistanlar" className="mt-1">
-                <Select value={watch("assignee_id")} onValueChange={(v) => setValue("assignee_id", v)}>
+                <Select
+                  value={watch("assignee_id") || "unassigned"}
+                  onValueChange={(v) => setValue("assignee_id", v === "unassigned" ? "" : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Asistan seç" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Atanmamış</SelectItem>
+                    <SelectItem value="unassigned">Atanmamış</SelectItem>
                     {agents.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name}

@@ -21,16 +21,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, Users } from "lucide-react";
+import { Bot, Users, RefreshCw } from "lucide-react";
 import {
   TASK_PRIORITIES,
   TASK_PRIORITY_LABELS,
   TASK_DEPARTMENTS,
   TASK_DEPARTMENT_LABELS,
+  RECURRING_FREQUENCIES,
   type TaskPriority,
   type TaskDepartment,
 } from "@/lib/constants";
-import { createTask } from "../../actions";
+import { createTask, createRecurringTask } from "../../actions";
+import { cn } from "@/lib/utils";
 
 type FormValues = {
   title: string;
@@ -42,10 +44,15 @@ type FormValues = {
   due_date: string | null;
   parent_id: string | null;
   source_type: string;
+  // Recurring fields
+  cron_schedule: string;
+  custom_cron: string;
 };
 
 type User = { user_id: string; full_name: string; role: string };
 type Agent = { id: string; name: string; code: string; department: string; status: string };
+
+type TaskMode = "single" | "recurring";
 
 interface TaskCreateDialogProps {
   open: boolean;
@@ -63,6 +70,7 @@ export function TaskCreateDialog({
   parentId,
 }: TaskCreateDialogProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [taskMode, setTaskMode] = useState<TaskMode>("single");
 
   const {
     register,
@@ -82,41 +90,109 @@ export function TaskCreateDialog({
       due_date: null,
       parent_id: parentId ?? null,
       source_type: "manual",
+      cron_schedule: "0 9 * * 1",
+      custom_cron: "",
     },
   });
 
+  const cronSchedule = watch("cron_schedule");
+
   const onSubmit = async (data: FormValues) => {
     setSubmitting(true);
-    const result = await createTask({
-      title: data.title,
-      description: data.description,
-      priority: data.priority as TaskPriority,
-      department: data.department as TaskDepartment,
-      assigned_to: data.assigned_to,
-      due_date: data.due_date,
-      parent_id: parentId ?? data.parent_id ?? null,
-    });
-    setSubmitting(false);
 
-    if (result.success) {
-      toast.success("Görev oluşturuldu");
-      reset();
-      onClose();
+    if (taskMode === "recurring") {
+      const schedule = data.cron_schedule === "custom" ? data.custom_cron : data.cron_schedule;
+      if (!schedule) {
+        toast.error("Zamanlama gereklidir");
+        setSubmitting(false);
+        return;
+      }
+      const result = await createRecurringTask({
+        title: data.title,
+        description: data.description,
+        department: data.department as TaskDepartment,
+        priority: data.priority as TaskPriority,
+        assignee_id: data.assigned_to,
+        cron_schedule: schedule,
+      });
+      setSubmitting(false);
+      if (result.success) {
+        toast.success("Tekrar eden görev oluşturuldu");
+        reset();
+        setTaskMode("single");
+        onClose();
+      } else {
+        toast.error(result.error || "Oluşturulamadı");
+      }
     } else {
-      toast.error(result.error || "Görev oluşturulamadı");
+      const result = await createTask({
+        title: data.title,
+        description: data.description,
+        priority: data.priority as TaskPriority,
+        department: data.department as TaskDepartment,
+        assigned_to: data.assigned_to,
+        due_date: data.due_date,
+        parent_id: parentId ?? data.parent_id ?? null,
+      });
+      setSubmitting(false);
+      if (result.success) {
+        toast.success("Görev oluşturuldu");
+        reset();
+        onClose();
+      } else {
+        toast.error(result.error || "Görev oluşturulamadı");
+      }
     }
   };
 
   const currentAssignee = watch("assigned_to");
 
+  const handleClose = () => {
+    setTaskMode("single");
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Yeni Görev Oluştur</DialogTitle>
+          <DialogTitle>
+            {taskMode === "recurring" ? "Yeni Tekrar Eden Görev" : "Yeni Görev Oluştur"}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Task Mode Toggle */}
+          {!parentId && (
+            <div className="flex rounded-md border">
+              <button
+                type="button"
+                onClick={() => setTaskMode("single")}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-l-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  taskMode === "single"
+                    ? "bg-vw-primary text-vw-dark"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                Tek Seferlik
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskMode("recurring")}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-r-md border-l px-3 py-1.5 text-sm font-medium transition-colors",
+                  taskMode === "recurring"
+                    ? "bg-vw-primary text-vw-dark"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Tekrar Eden
+              </button>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <Label htmlFor="title">Başlık *</Label>
@@ -185,6 +261,35 @@ export function TaskCreateDialog({
             </div>
           </div>
 
+          {/* Schedule (only for recurring) */}
+          {taskMode === "recurring" && (
+            <div>
+              <Label>Zamanlama *</Label>
+              <Select
+                value={cronSchedule}
+                onValueChange={(v) => setValue("cron_schedule", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RECURRING_FREQUENCIES.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>
+                      {f.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {cronSchedule === "custom" && (
+                <Input
+                  className="mt-2"
+                  {...register("custom_cron")}
+                  placeholder="0 9 * * 1-5 (Cron ifadesi)"
+                />
+              )}
+            </div>
+          )}
+
           {/* Assignee with Tabs (Çalışanlar / Ajanlar) */}
           <div>
             <Label>Atanan Kişi</Label>
@@ -236,7 +341,7 @@ export function TaskCreateDialog({
                       <SelectItem value="unassigned">Atanmamış</SelectItem>
                       {agents.map((a) => (
                         <SelectItem key={a.id} value={a.id}>
-                          🤖 {a.name} ({a.code})
+                          {a.name} ({a.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -246,24 +351,26 @@ export function TaskCreateDialog({
             </Tabs>
           </div>
 
-          {/* Due Date */}
-          <div>
-            <Label>Bitiş Tarihi</Label>
-            <Input
-              type="date"
-              value={watch("due_date") ?? ""}
-              onChange={(e) =>
-                setValue("due_date", e.target.value || null)
-              }
-            />
-          </div>
+          {/* Due Date (only for single) */}
+          {taskMode === "single" && (
+            <div>
+              <Label>Bitiş Tarihi</Label>
+              <Input
+                type="date"
+                value={watch("due_date") ?? ""}
+                onChange={(e) =>
+                  setValue("due_date", e.target.value || null)
+                }
+              />
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={submitting}
             >
               İptal
@@ -273,7 +380,11 @@ export function TaskCreateDialog({
               disabled={submitting}
               className="bg-vw-primary text-vw-dark hover:bg-vw-deep hover:text-white"
             >
-              {submitting ? "Oluşturuluyor..." : "Oluştur"}
+              {submitting
+                ? "Oluşturuluyor..."
+                : taskMode === "recurring"
+                  ? "Tekrar Eden Oluştur"
+                  : "Oluştur"}
             </Button>
           </div>
         </form>
