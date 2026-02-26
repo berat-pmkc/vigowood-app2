@@ -17,6 +17,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Calendar,
   MessageSquare,
   Paperclip,
@@ -31,6 +37,7 @@ import {
   ShieldAlert,
   Clock,
   Cpu,
+  Expand,
 } from "lucide-react";
 import {
   TASK_STATUSES,
@@ -95,6 +102,7 @@ export function TaskDetailSheet({
   const [titleValue, setTitleValue] = useState("");
   const [commentText, setCommentText] = useState("");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [expandedComment, setExpandedComment] = useState<TaskComment | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -418,21 +426,46 @@ export function TaskDetailSheet({
                       Henüz yorum yok
                     </p>
                   )}
-                  {comments.map((c) => (
-                    <div key={c.id} className="rounded-lg border p-3 overflow-hidden">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">
-                          {c.author_name}
-                        </span>
-                        <span>{formatDate(c.created_at)}</span>
+                  {comments.map((c) => {
+                    const isLong = c.content.length > 300 || c.content.split("\n").length > 6;
+                    return (
+                      <div key={c.id} className="rounded-lg border p-3 overflow-hidden">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {c.author_name}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span>{formatDate(c.created_at)}</span>
+                            {isLong && (
+                              <button
+                                onClick={() => setExpandedComment(c)}
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                title="Tam görünüm"
+                              >
+                                <Expand className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className={`mt-1 prose prose-sm max-w-none break-words ${isLong ? "max-h-[120px] overflow-hidden relative" : ""}`}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {c.content}
+                          </ReactMarkdown>
+                          {isLong && (
+                            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent" />
+                          )}
+                        </div>
+                        {isLong && (
+                          <button
+                            onClick={() => setExpandedComment(c)}
+                            className="mt-1 text-xs text-info hover:underline"
+                          >
+                            Devamını oku
+                          </button>
+                        )}
                       </div>
-                      <div className="mt-1 prose prose-sm max-w-none break-words">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {c.content}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
               <div className="flex gap-2 pt-3 shrink-0">
@@ -686,6 +719,25 @@ export function TaskDetailSheet({
           </Tabs>
         )}
       </SheetContent>
+
+      {/* Expanded Comment Dialog */}
+      <Dialog open={!!expandedComment} onOpenChange={(o) => !o && setExpandedComment(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-sm font-medium">
+              {expandedComment?.author_name} &middot;{" "}
+              {expandedComment && formatDate(expandedComment.created_at)}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+            <div className="prose prose-sm max-w-none break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {expandedComment?.content ?? ""}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
