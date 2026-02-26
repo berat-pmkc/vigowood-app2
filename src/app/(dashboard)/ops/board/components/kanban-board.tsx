@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -62,6 +63,7 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assigneeFilterMode, setAssigneeFilterMode] = useState<AssigneeFilterMode>("all");
 
+  const router = useRouter();
   const agentIdSet = useMemo(() => new Set(agents.map((a) => a.id)), [agents]);
 
   const sensors = useSensors(
@@ -152,6 +154,7 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
         toast.error(result.error || "Durum güncellenemedi");
       } else {
         toast.success(`Görev "${TASK_STATUS_LABELS[newStatus]}" durumuna taşındı`);
+        router.refresh();
       }
     } else {
       // Person mode: change assigned_to
@@ -170,6 +173,7 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
         toast.error(result.error || "Atama güncellenemedi");
       } else {
         toast.success("Görev atandı");
+        router.refresh();
       }
     }
   };
@@ -180,6 +184,7 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
     if (result.success) {
       toast.success("Görev oluşturuldu");
       setQuickTitle("");
+      router.refresh();
     } else {
       toast.error(result.error || "Görev oluşturulamadı");
     }
@@ -392,14 +397,14 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
           users={users}
           agents={agents}
           open={!!selectedTaskId}
-          onClose={() => setSelectedTaskId(null)}
+          onClose={() => { setSelectedTaskId(null); router.refresh(); }}
         />
       )}
 
       {/* Create Dialog */}
       <TaskCreateDialog
         open={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
+        onClose={() => { setShowCreateDialog(false); router.refresh(); }}
         users={users}
         agents={agents}
       />
