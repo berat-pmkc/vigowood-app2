@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,7 @@ import {
 import { formatTRY } from "@/lib/trendyol/helpers";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import { SyncStatus } from "./sync-status";
 
 const TrendyolTrendChart = dynamic(() => import("./trendyol-trend-chart"), {
   ssr: false,
@@ -53,6 +54,7 @@ interface KpiData {
   weekCiro: number;
   monthOrderCount: number;
   monthCiro: number;
+  totalOrderCount: number;
   pendingCount: number;
   cancelledCount: number;
   totalProducts: number;
@@ -113,6 +115,17 @@ export function TrendyolDashboard({
 
   const selectedMonthLabel = months.find((m) => m.value === selectedMonth)?.label || selectedMonth;
 
+  // Auto-refresh every 5 minutes (server component re-fetch)
+  const refreshData = useCallback(() => {
+    router.refresh();
+  }, [router]);
+
+  useEffect(() => {
+    if (!isCurrentMonth) return; // Only auto-refresh for current month
+    const interval = setInterval(refreshData, 5 * 60 * 1000); // 5 minutes
+    return () => clearInterval(interval);
+  }, [isCurrentMonth, refreshData]);
+
   function handleMonthChange(value: string) {
     const params = new URLSearchParams();
     const currentMonth = months[0]?.value;
@@ -122,10 +135,6 @@ export function TrendyolDashboard({
     const qs = params.toString();
     router.push(`${pathname}${qs ? `?${qs}` : ""}`);
   }
-
-  const syncLabel = lastSyncAt
-    ? `Son sync: ${new Date(lastSyncAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
-    : "Henüz senkronize edilmedi";
 
   // ─── Top Products Date Filter ─────────────────────
   const [topFilter, setTopFilter] = useState<"ay" | "bugun" | "dun" | "bu_hafta" | "gecen_hafta" | "custom">("ay");
@@ -225,17 +234,18 @@ export function TrendyolDashboard({
 
   return (
     <div className="space-y-4">
-      {/* Header with month selector */}
+      {/* Header with month selector + sync */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-xl font-bold text-vw-dark">Trendyol Dashboard</h1>
             <p className="text-xs text-muted-foreground">
-              {selectedMonthLabel} verileri — {syncLabel}
+              {selectedMonthLabel} verileri
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <SyncStatus lastSyncAt={lastSyncAt} />
           <Select value={selectedMonth} onValueChange={handleMonthChange}>
             <SelectTrigger className="h-8 w-[160px] text-xs">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -263,7 +273,12 @@ export function TrendyolDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-orange-700">{formatTRY(kpi.monthCiro)}</div>
-            <p className="text-xs text-muted-foreground">{kpi.monthOrderCount} sipariş</p>
+            <p className="text-xs text-muted-foreground">
+              {kpi.monthOrderCount} sipariş
+              {kpi.cancelledCount > 0 && (
+                <span className="text-red-400 ml-1">({kpi.cancelledCount} iptal/iade hariç)</span>
+              )}
+            </p>
           </CardContent>
         </Card>
 

@@ -36,11 +36,13 @@ export default async function PazaryeriGenelPage() {
   // ─── Trendyol KPIs ──────────────────────────────────────
   const tAll = trendyolOrdersAll.content;
   const tToday = trendyolOrdersToday.content;
+  const T_EXCLUDED = new Set(["Cancelled", "Returned", "UnSupplied"]);
+  const tTodayActive = tToday.filter((o) => !T_EXCLUDED.has(o.status));
 
   const trendyolKpi = {
-    todayOrderCount: tToday.length,
+    todayOrderCount: tTodayActive.length,
     pendingCount: tAll.filter((o) => o.status === "Created" || o.status === "Picking").length,
-    todayCiro: tToday.reduce((sum, o) => sum + o.totalPrice, 0),
+    todayCiro: tTodayActive.reduce((sum, o) => sum + o.totalPrice, 0),
     returnCount: tAll.filter((o) => o.status === "Returned" || o.status === "Cancelled").length,
     totalProducts: trendyolProducts.totalElements,
     outOfStockCount: trendyolProducts.content.filter((p) => p.quantity === 0).length,
@@ -49,11 +51,13 @@ export default async function PazaryeriGenelPage() {
   // ─── İkas KPIs ───────────────────────────────────────────
   const iAll = ikasOrdersAll.data;
   const iToday = ikasOrdersToday.data;
+  const I_EXCLUDED = new Set(["CANCELLED", "REFUNDED"]);
+  const iTodayActive = iToday.filter((o) => !I_EXCLUDED.has(o.status));
 
   const ikasKpi = {
-    todayOrderCount: iToday.length,
+    todayOrderCount: iTodayActive.length,
     pendingCount: iAll.filter((o) => o.orderPackageStatus === "UNFULFILLED" || o.orderPackageStatus === "FULFILLED").length,
-    todayCiro: iToday.reduce((sum, o) => sum + o.totalFinalPrice, 0),
+    todayCiro: iTodayActive.reduce((sum, o) => sum + o.totalFinalPrice, 0),
     returnCount: iAll.filter((o) => o.status === "CANCELLED" || o.status === "REFUNDED").length,
     totalProducts: ikasProducts.count,
     outOfStockCount: ikasProducts.data.filter((p) => p.totalStock === 0).length,
@@ -79,6 +83,7 @@ export default async function PazaryeriGenelPage() {
   }
 
   for (const order of tAll) {
+    if (T_EXCLUDED.has(order.status)) continue;
     const d = new Date(order.orderDate).toISOString().split("T")[0];
     const entry = trendMap.get(d);
     if (entry) {
@@ -90,6 +95,7 @@ export default async function PazaryeriGenelPage() {
   }
 
   for (const order of iAll) {
+    if (I_EXCLUDED.has(order.status)) continue;
     const d = new Date(order.orderedAt).toISOString().split("T")[0];
     const entry = trendMap.get(d);
     if (entry) {

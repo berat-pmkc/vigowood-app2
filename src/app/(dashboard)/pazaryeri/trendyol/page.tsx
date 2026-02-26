@@ -136,24 +136,29 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   const todayKey = todayKeyTR();
   const weekAgoKey = daysAgoKeyTR(7);
 
+  // ─── Revenue-eligible orders (exclude Cancelled, Returned, UnSupplied) ───
+  const EXCLUDED_STATUSES = new Set(["Cancelled", "Returned", "UnSupplied"]);
+  const activeOrders = allOrders.filter((o) => !EXCLUDED_STATUSES.has(o.status));
+
   // ─── KPIs ───────────────────────────────────────────
-  const todayOrders = allOrders.filter((o) => tsToTRDateKey(o.order_date) === todayKey);
-  const todayCiro = todayOrders.reduce((s, o) => s + o.total_price, 0);
-  const todayOrderCount = todayOrders.length;
+  const todayActiveOrders = activeOrders.filter((o) => tsToTRDateKey(o.order_date) === todayKey);
+  const todayCiro = todayActiveOrders.reduce((s, o) => s + o.total_price, 0);
+  const todayOrderCount = todayActiveOrders.length;
 
-  const weekOrders = allOrders.filter((o) => tsToTRDateKey(o.order_date) >= weekAgoKey);
-  const weekCiro = weekOrders.reduce((s, o) => s + o.total_price, 0);
-  const weekOrderCount = weekOrders.length;
+  const weekActiveOrders = activeOrders.filter((o) => tsToTRDateKey(o.order_date) >= weekAgoKey);
+  const weekCiro = weekActiveOrders.reduce((s, o) => s + o.total_price, 0);
+  const weekOrderCount = weekActiveOrders.length;
 
-  const monthCiro = allOrders.reduce((s, o) => s + o.total_price, 0);
+  const monthCiro = activeOrders.reduce((s, o) => s + o.total_price, 0);
 
   const kpi = {
     todayOrderCount,
     todayCiro,
     weekOrderCount,
     weekCiro,
-    monthOrderCount: allOrders.length,
+    monthOrderCount: activeOrders.length,
     monthCiro,
+    totalOrderCount: allOrders.length,
     pendingCount: allOrders.filter(
       (o) => o.status === "Created" || o.status === "Picking" || o.status === "Invoiced"
     ).length,
@@ -177,7 +182,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
     const dayLabel = `${String(day).padStart(2, "0")}.${String(selMonth).padStart(2, "0")}`;
     trendMap.set(key, { date: dayLabel, orders: 0, ciro: 0 });
   }
-  for (const order of allOrders) {
+  for (const order of activeOrders) {
     const key = tsToTRDateKey(order.order_date);
     const entry = trendMap.get(key);
     if (entry) {
@@ -196,9 +201,12 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   // ─── Top selling products (barcode aggregation) ─────
   // Build a map from orderId to order for fast lookup
   const orderMap = new Map(allOrders.map((o) => [o.id, o]));
+  // Only include lines from active (non-cancelled/returned) orders
+  const activeOrderIds = new Set(activeOrders.map((o) => o.id));
+  const activeLines = allLines.filter((l) => activeOrderIds.has(l.order_id));
   const barcodeMap = new Map<string, { barcode: string; name: string; quantity: number; revenue: number }>();
 
-  for (const line of allLines) {
+  for (const line of activeLines) {
     const barcode = line.barcode || "N/A";
     const existing = barcodeMap.get(barcode) || { barcode, name: line.product_name, quantity: 0, revenue: 0 };
     existing.quantity += line.quantity;
@@ -214,7 +222,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   const allDailyMap = new Map<string, { orders: number; revenue: number }>();
   const barcodeDailyMap = new Map<string, Map<string, { orders: number; revenue: number }>>();
 
-  for (const line of allLines) {
+  for (const line of activeLines) {
     const order = orderMap.get(line.order_id);
     if (!order) continue;
     const dayKey = tsToTRDateKey(order.order_date);
