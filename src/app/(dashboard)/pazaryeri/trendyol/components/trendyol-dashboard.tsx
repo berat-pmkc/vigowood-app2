@@ -458,6 +458,21 @@ export function TrendyolDashboard({
                 })
               )}
             </TableBody>
+            {filteredTopProducts.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-border bg-muted/50">
+                  <td className="pl-4 py-2 text-xs font-bold" colSpan={2}>
+                    Toplam
+                  </td>
+                  <td className="py-2 text-right font-bold tabular-nums text-sm">
+                    {filteredTopProducts.reduce((s, p) => s + p.quantity, 0)}
+                  </td>
+                  <td className="py-2 pr-4 text-right font-bold text-orange-700 tabular-nums text-sm">
+                    {formatTRY(filteredTopProducts.reduce((s, p) => s + p.revenue, 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            )}
           </Table>
         </CardContent>
       </Card>
