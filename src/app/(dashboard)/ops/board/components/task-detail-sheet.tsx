@@ -54,6 +54,7 @@ import {
   getSubtasks,
   getAgentActionsForTask,
   updateTask,
+  deleteTask,
   addTaskComment,
   addTaskAttachment,
   createTask,
@@ -187,6 +188,17 @@ export function TaskDetailSheet({
     const result = await updateTask(taskId, { [field]: !current });
     if (result.success) loadData();
     else toast.error(result.error || "Güncelleme başarısız");
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Bu görevi silmek istediğinize emin misiniz?")) return;
+    const result = await deleteTask(taskId);
+    if (result.success) {
+      toast.success("Görev silindi");
+      onClose();
+    } else {
+      toast.error(result.error || "Görev silinemedi");
+    }
   };
 
   const formatDate = (d: string) =>
@@ -346,14 +358,23 @@ export function TaskDetailSheet({
                 </button>
               </div>
 
-              {/* Source badge */}
-              {task.source_type !== "manual" && (
-                <Badge variant="outline" className="text-xs">
-                  {task.source_type === "recurring_job"
-                    ? "Tekrarlayan"
-                    : "Alarm"}
-                </Badge>
-              )}
+              {/* Source badge + Delete */}
+              <div className="flex items-center gap-2">
+                {task.source_type !== "manual" && (
+                  <Badge variant="outline" className="text-xs">
+                    {task.source_type === "recurring_job"
+                      ? "Tekrarlayan"
+                      : "Alarm"}
+                  </Badge>
+                )}
+                <button
+                  onClick={handleDelete}
+                  className="ml-auto inline-flex items-center gap-1 rounded-full border border-red-200 px-2.5 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Sil
+                </button>
+              </div>
             </div>
           )}
         </SheetHeader>
