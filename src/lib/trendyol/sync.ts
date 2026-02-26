@@ -226,19 +226,28 @@ export async function syncOrders(
   let totalSynced = 0;
 
   try {
-    // Trendyol API without date filter only returns ~1800 recently-modified orders.
-    // With date range (PackageLastModifiedDate), it returns ALL orders modified in
-    // that window. We sweep the last 90 days in weekly chunks to capture everything.
+    // Incremental sync: If last successful sync was within 24h, only fetch
+    // last 2 days (fast, for frequent cron). Otherwise full 90-day sweep.
     const now = Date.now();
     const WEEK_MS = 7 * 86_400_000;
-    const TOTAL_WEEKS = 13; // ~90 days
+    const DAY_MS = 86_400_000;
+    const lastSync = await getLastSyncTime(supabase, "orders");
+    const isIncremental = lastSync && (now - lastSync < 24 * 60 * 60 * 1000);
 
     const chunks: { start: number; end: number }[] = [];
-    for (let w = 0; w < TOTAL_WEEKS; w++) {
-      chunks.push({
-        start: now - (w + 1) * WEEK_MS,
-        end: now - w * WEEK_MS,
-      });
+
+    if (isIncremental) {
+      // Recent sync exists — only fetch orders modified in last 2 days
+      chunks.push({ start: now - 2 * DAY_MS, end: now });
+    } else {
+      // No recent sync — full 90-day sweep in weekly chunks
+      const TOTAL_WEEKS = 13;
+      for (let w = 0; w < TOTAL_WEEKS; w++) {
+        chunks.push({
+          start: now - (w + 1) * WEEK_MS,
+          end: now - w * WEEK_MS,
+        });
+      }
     }
 
     let requestCount = 0;
@@ -357,8 +366,10 @@ export async function syncQuestions(
   let totalSynced = 0;
 
   try {
-    // Last 30 days of questions
-    const startDate = daysAgoTimestamp(30);
+    // Incremental: if synced within 24h, only last 2 days. Otherwise 30 days.
+    const lastSync = await getLastSyncTime(supabase, "questions");
+    const isIncremental = lastSync && (Date.now() - lastSync < 24 * 60 * 60 * 1000);
+    const startDate = isIncremental ? daysAgoTimestamp(2) : daysAgoTimestamp(30);
     const endDate = endOfTodayTimestamp();
 
     let page = 0;

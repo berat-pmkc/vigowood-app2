@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -16,7 +17,12 @@ import {
   SidebarMenuButton,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { LogOut } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { LogOut, ChevronRight } from "lucide-react";
 import { getFilteredNavGroups, type NavGroup } from "@/lib/navigation";
 import type { UserRole } from "@/lib/constants";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -43,6 +49,17 @@ export function AppSidebar({
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   }
+
+  /** Aktif sayfayı içeren grubun label'ını bul */
+  const activeGroupLabel = useMemo(() => {
+    for (const group of navGroups) {
+      if (group.items.some((item) => isActive(item.href))) {
+        return group.label;
+      }
+    }
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, navGroups]);
 
   return (
     <Sidebar collapsible="icon">
@@ -77,13 +94,17 @@ export function AppSidebar({
       </SidebarHeader>
 
       <SidebarContent className="gap-0">
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.label} className="py-1 px-2">
-            <SidebarGroupLabel className="h-6 text-[11px]">{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
+        {navGroups.map((group) => {
+          const isSingleItem = group.items.length === 1;
+          const groupIsActive = group.label === activeGroupLabel;
+
+          /* Tek item'lı gruplar (Ana Sayfa) collapsible olmaz */
+          if (isSingleItem) {
+            const item = group.items[0];
+            return (
+              <SidebarGroup key={group.label} className="py-0.5 px-2">
+                <SidebarMenu className="gap-0.5">
+                  <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive(item.href)}
@@ -95,11 +116,51 @@ export function AppSidebar({
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            );
+          }
+
+          return (
+            <Collapsible
+              key={group.label}
+              defaultOpen={groupIsActive}
+              className="group/collapsible"
+            >
+              <SidebarGroup className="py-0.5 px-2">
+                <SidebarGroupLabel
+                  asChild
+                  className="h-7 text-[11px] cursor-pointer hover:text-sidebar-foreground transition-colors"
+                >
+                  <CollapsibleTrigger className="flex w-full items-center">
+                    <span className="flex-1 text-left">{group.label}</span>
+                    <ChevronRight className="ml-auto size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </CollapsibleTrigger>
+                </SidebarGroupLabel>
+                <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                  <SidebarGroupContent>
+                    <SidebarMenu className="gap-0.5">
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={item.href}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={isActive(item.href)}
+                            tooltip={item.title}
+                          >
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span>{item.title}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </CollapsibleContent>
+              </SidebarGroup>
+            </Collapsible>
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter>
