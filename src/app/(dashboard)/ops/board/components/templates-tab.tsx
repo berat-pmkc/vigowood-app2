@@ -110,7 +110,7 @@ export function TemplatesTab({ templates, users, agents }: TemplatesTabProps) {
             return (
               <div
                 key={t.id}
-                className="rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+                className="rounded-lg border border-l-4 border-l-teal-400 bg-teal-50/40 p-4 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
                   <h3 className="font-medium text-sm leading-tight">{t.title}</h3>

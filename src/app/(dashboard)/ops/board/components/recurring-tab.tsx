@@ -102,7 +102,7 @@ export function RecurringTab({ recurringTasks, templates, users, agents }: Recur
             return (
               <div
                 key={r.id}
-                className={`rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md ${
+                className={`rounded-lg border border-l-4 border-l-indigo-400 bg-indigo-50/40 p-4 shadow-sm transition-shadow hover:shadow-md ${
                   !r.is_active ? "opacity-60" : ""
                 }`}
               >
