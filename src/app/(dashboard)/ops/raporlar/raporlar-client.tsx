@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,14 +14,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   FileText,
   Download,
-  Table,
+  TableIcon,
   Image,
   File,
   Bot,
   Trash2,
   ExternalLink,
+  Search,
+  FileBarChart,
 } from "lucide-react";
 import {
   OUTPUT_FILE_TYPES,
@@ -35,12 +46,21 @@ interface RaporlarClientProps {
 }
 
 const FILE_TYPE_ICONS: Record<string, React.ReactNode> = {
-  report: <FileText className="h-5 w-5 text-blue-600" />,
-  export: <Download className="h-5 w-5 text-emerald-600" />,
-  pdf: <FileText className="h-5 w-5 text-red-600" />,
-  csv: <Table className="h-5 w-5 text-green-600" />,
-  image: <Image className="h-5 w-5 text-purple-600" />,
-  other: <File className="h-5 w-5 text-gray-600" />,
+  report: <FileText className="h-4 w-4 text-blue-600" />,
+  export: <Download className="h-4 w-4 text-emerald-600" />,
+  pdf: <FileText className="h-4 w-4 text-red-600" />,
+  csv: <TableIcon className="h-4 w-4 text-green-600" />,
+  image: <Image className="h-4 w-4 text-purple-600" />,
+  other: <File className="h-4 w-4 text-gray-600" />,
+};
+
+const FILE_TYPE_BADGE_COLORS: Record<string, string> = {
+  report: "bg-blue-50 text-blue-700 border-blue-200",
+  export: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  pdf: "bg-red-50 text-red-700 border-red-200",
+  csv: "bg-green-50 text-green-700 border-green-200",
+  image: "bg-purple-50 text-purple-700 border-purple-200",
+  other: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
 function formatFileSize(bytes: number | null) {
@@ -50,43 +70,91 @@ function formatFileSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
+  const router = useRouter();
+  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [agentFilter, setAgentFilter] = useState<string>("all");
 
   const filtered = outputs.filter((o) => {
+    if (search) {
+      const q = search.toLowerCase();
+      const matchName = o.file_name.toLowerCase().includes(q);
+      const matchDesc = o.description?.toLowerCase().includes(q);
+      const matchCreator = o.creator_name?.toLowerCase().includes(q);
+      if (!matchName && !matchDesc && !matchCreator) return false;
+    }
     if (typeFilter !== "all" && o.file_type !== typeFilter) return false;
     if (agentFilter !== "all" && o.agent_id !== agentFilter) return false;
     return true;
   });
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, fileName: string) => {
+    if (!confirm(`"${fileName}" dosyasını silmek istediğinize emin misiniz?`)) return;
     const result = await deleteOutput(id);
     if (result.success) {
       toast.success("Çıktı silindi");
+      router.refresh();
     } else {
       toast.error(result.error || "Silme başarısız");
     }
   };
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  // Stats
+  const totalSize = outputs.reduce((sum, o) => sum + (o.file_size ?? 0), 0);
+  const typeCounts = outputs.reduce((acc, o) => {
+    acc[o.file_type] = (acc[o.file_type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
-    <>
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-lg border bg-white p-3">
+          <p className="text-xs text-muted-foreground">Toplam Dosya</p>
+          <p className="text-xl font-bold text-vw-dark">{outputs.length}</p>
+        </div>
+        <div className="rounded-lg border bg-white p-3">
+          <p className="text-xs text-muted-foreground">Toplam Boyut</p>
+          <p className="text-xl font-bold text-vw-dark">{formatFileSize(totalSize)}</p>
+        </div>
+        <div className="rounded-lg border bg-white p-3">
+          <p className="text-xs text-muted-foreground">Rapor</p>
+          <p className="text-xl font-bold text-blue-600">{typeCounts["report"] ?? 0}</p>
+        </div>
+        <div className="rounded-lg border bg-white p-3">
+          <p className="text-xs text-muted-foreground">Dışa Aktarım</p>
+          <p className="text-xl font-bold text-emerald-600">
+            {(typeCounts["export"] ?? 0) + (typeCounts["csv"] ?? 0)}
+          </p>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline" className="text-sm font-normal">
-          {filtered.length} dosya
-        </Badge>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Dosya ara..."
+            className="h-8 w-[200px] pl-8 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
 
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="h-8 w-[130px]">
+          <SelectTrigger className="h-8 w-[140px]">
             <SelectValue placeholder="Dosya Türü" />
           </SelectTrigger>
           <SelectContent>
@@ -100,7 +168,7 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
         </Select>
 
         <Select value={agentFilter} onValueChange={setAgentFilter}>
-          <SelectTrigger className="h-8 w-[140px]">
+          <SelectTrigger className="h-8 w-[150px]">
             <SelectValue placeholder="Kaynak" />
           </SelectTrigger>
           <SelectContent>
@@ -112,89 +180,143 @@ export function RaporlarClient({ outputs, agents }: RaporlarClientProps) {
             ))}
           </SelectContent>
         </Select>
+
+        <Badge variant="outline" className="text-xs">
+          {filtered.length} sonuç
+        </Badge>
       </div>
 
-      {/* Outputs List */}
+      {/* Table */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-sm text-muted-foreground">
-              Henüz çıktı oluşturulmamış
-            </p>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+          <FileBarChart className="mb-3 h-12 w-12 text-muted-foreground/40" />
+          <p className="text-sm font-medium text-muted-foreground">
+            {outputs.length === 0
+              ? "Henüz çıktı oluşturulmamış"
+              : "Filtreye uygun dosya bulunamadı"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Agent'lar görev tamamladığında raporlar burada görünecek
+          </p>
+        </div>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((output) => (
-            <Card
-              key={output.id}
-              className="transition-shadow hover:shadow-md"
-            >
-              <CardContent className="flex items-center gap-4 p-4">
-                {/* Icon */}
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 shrink-0">
-                  {FILE_TYPE_ICONS[output.file_type] ?? FILE_TYPE_ICONS.other}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium truncate">
-                    {output.file_name}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <Badge variant="outline" className="text-[10px]">
+        <div className="rounded-lg border bg-white">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]"></TableHead>
+                <TableHead>Dosya Adı</TableHead>
+                <TableHead className="hidden sm:table-cell">Tür</TableHead>
+                <TableHead className="hidden md:table-cell">Boyut</TableHead>
+                <TableHead className="hidden md:table-cell">Oluşturan</TableHead>
+                <TableHead className="hidden lg:table-cell">Tarih</TableHead>
+                <TableHead className="w-[100px] text-right">İşlem</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((output) => (
+                <TableRow key={output.id} className="group">
+                  <TableCell>
+                    <div className="flex h-8 w-8 items-center justify-center rounded bg-muted/50">
+                      {FILE_TYPE_ICONS[output.file_type] ?? FILE_TYPE_ICONS.other}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate max-w-[250px]">
+                        {output.file_name}
+                      </p>
+                      {output.description && (
+                        <p className="text-xs text-muted-foreground truncate max-w-[250px]">
+                          {output.description}
+                        </p>
+                      )}
+                      {/* Mobile-only meta */}
+                      <div className="flex flex-wrap gap-1.5 mt-1 sm:hidden">
+                        <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${FILE_TYPE_BADGE_COLORS[output.file_type] ?? FILE_TYPE_BADGE_COLORS.other}`}>
+                          {OUTPUT_FILE_TYPE_LABELS[output.file_type as OutputFileType]}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {formatFileSize(output.file_size)}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${FILE_TYPE_BADGE_COLORS[output.file_type] ?? FILE_TYPE_BADGE_COLORS.other}`}>
                       {OUTPUT_FILE_TYPE_LABELS[output.file_type as OutputFileType]}
-                    </Badge>
-                    <span>{formatFileSize(output.file_size)}</span>
-                    <span>&middot;</span>
-                    {output.agent_name ? (
-                      <span className="flex items-center gap-1">
-                        <Bot className="h-3 w-3" />
-                        {output.agent_name}
-                      </span>
-                    ) : (
-                      <span>{output.creator_name}</span>
-                    )}
-                    <span>&middot;</span>
-                    <span>{formatDate(output.created_at)}</span>
-                  </div>
-                  {output.description && (
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
-                      {output.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    asChild
-                  >
-                    <a
-                      href={output.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="mr-1 h-3 w-3" />
-                      Aç
-                    </a>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => handleDelete(output.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    </span>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                    {formatFileSize(output.file_size)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      {output.agent_name ? (
+                        <>
+                          <Bot className="h-3 w-3 shrink-0" />
+                          <span className="truncate max-w-[120px]">{output.agent_name}</span>
+                        </>
+                      ) : (
+                        <span className="truncate max-w-[120px]">{output.creator_name}</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
+                    {formatDate(output.created_at)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {output.file_url ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          asChild
+                        >
+                          <a
+                            href={output.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Yeni sekmede aç"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                      ) : null}
+                      {output.file_url ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          asChild
+                        >
+                          <a
+                            href={output.file_url}
+                            download={output.file_name}
+                            title="İndir"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(output.id, output.file_name)}
+                        title="Sil"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
-    </>
+    </div>
   );
 }
