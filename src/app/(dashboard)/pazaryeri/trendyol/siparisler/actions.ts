@@ -2,7 +2,7 @@
 
 import { getCurrentUser } from "@/lib/auth";
 import { MARKETPLACE_ACCESS_ROLES } from "@/lib/constants";
-import { updatePackageStatus, isUsingMockData } from "@/lib/trendyol";
+import { updatePackageStatus } from "@/lib/trendyol";
 import { createClient } from "@supabase/supabase-js";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -24,10 +24,6 @@ export async function updateOrderStatus(
 ): Promise<ActionResult> {
   try {
     await requireMarketplaceAccess();
-
-    if (isUsingMockData()) {
-      return { success: true };
-    }
 
     const params: {
       lines: { lineId: number; quantity: number }[];

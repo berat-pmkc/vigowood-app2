@@ -1,7 +1,7 @@
 /**
  * Trendyol API Client — Server-only
- * Basic Auth, rate limit tracking, error handling
- * Falls back to mock data when API credentials are invalid
+ * Basic Auth, rate limit tracking, error handling.
+ * No mock data — API hata verirse hata döner, sahte veri döndürmez.
  */
 import "server-only";
 
@@ -21,14 +21,9 @@ import type {
   TrendyolClaim,
   TrendyolApiError,
 } from "./types";
-import { getMockOrders, getMockProducts, getMockQuestions, getMockSettlements } from "./mock-data";
 
 // ─── Config ──────────────────────────────────────────────
 const BASE_URL = "https://apigw.trendyol.com/integration";
-
-function hasCredentials(): boolean {
-  return !!(process.env.TRENDYOL_API_KEY && process.env.TRENDYOL_API_SECRET && process.env.TRENDYOL_SELLER_ID);
-}
 
 function getConfig() {
   const apiKey = process.env.TRENDYOL_API_KEY;
@@ -156,79 +151,16 @@ export class TrendyolError extends Error {
   }
 }
 
-// ─── Use Mock Data Flag ──────────────────────────────────
-// Enabled when credentials are missing.
-// On API errors, falls back to mock data with a cooldown period (5 min)
-// so it retries the real API after the cooldown instead of being permanent.
-let useMockData = !hasCredentials();
-let mockDataCooldownUntil = 0; // timestamp (ms) until which mock mode stays active
-const MOCK_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
-
-async function tryFetchOrMock<T>(
-  fetchFn: () => Promise<T>,
-  mockFn: () => T
-): Promise<T> {
-  // If no credentials, always use mock
-  if (!hasCredentials()) return mockFn();
-
-  // If in cooldown period after a previous error, use mock
-  if (useMockData && Date.now() < mockDataCooldownUntil) {
-    return mockFn();
-  }
-
-  // Cooldown expired — retry real API
-  if (useMockData && mockDataCooldownUntil > 0) {
-    useMockData = false;
-  }
-
-  if (useMockData) return mockFn();
-
-  try {
-    return await fetchFn();
-  } catch (err) {
-    const isAuthError = err instanceof TrendyolError && (err.status === 401 || err.status === 403);
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.warn(`[Trendyol] API error${isAuthError ? " (auth)" : ""}: ${errorMsg} — falling back to mock data for ${MOCK_COOLDOWN_MS / 1000}s`);
-    useMockData = true;
-    mockDataCooldownUntil = Date.now() + MOCK_COOLDOWN_MS;
-    return mockFn();
-  }
-}
-
-/** Check if currently using mock data */
-export function isUsingMockData(): boolean {
-  if (!hasCredentials()) return true;
-  // Check if cooldown has expired
-  if (useMockData && mockDataCooldownUntil > 0 && Date.now() >= mockDataCooldownUntil) {
-    useMockData = false;
-    mockDataCooldownUntil = 0;
-  }
-  return useMockData;
-}
-
-/** Reset mock data flag — call from sync to ensure fresh API attempts */
-export function resetMockDataFlag(): void {
-  if (hasCredentials()) {
-    useMockData = false;
-    mockDataCooldownUntil = 0;
-  }
-}
-
 // ─── Orders ──────────────────────────────────────────────
 export async function getOrders(
   params?: TrendyolOrderParams
 ): Promise<TrendyolPaginatedResponse<TrendyolOrder>> {
-  return tryFetchOrMock(
-    async () => {
-      const { sellerId } = getConfig();
-      return trendyolFetch<TrendyolPaginatedResponse<TrendyolOrder>>(
-        `/order/sellers/${sellerId}/orders`,
-        {
-          params: params as Record<string, string | number | boolean | undefined>,
-        }
-      );
-    },
-    () => getMockOrders(params)
+  const { sellerId } = getConfig();
+  return trendyolFetch<TrendyolPaginatedResponse<TrendyolOrder>>(
+    `/order/sellers/${sellerId}/orders`,
+    {
+      params: params as Record<string, string | number | boolean | undefined>,
+    }
   );
 }
 
@@ -247,26 +179,18 @@ export async function updatePackageStatus(
 export async function getProducts(
   params?: TrendyolProductParams
 ): Promise<TrendyolPaginatedResponse<TrendyolProduct>> {
-  return tryFetchOrMock(
-    async () => {
-      const { sellerId } = getConfig();
-      return trendyolFetch<TrendyolPaginatedResponse<TrendyolProduct>>(
-        `/product/sellers/${sellerId}/products`,
-        {
-          params: params as Record<string, string | number | boolean | undefined>,
-        }
-      );
-    },
-    () => getMockProducts(params)
+  const { sellerId } = getConfig();
+  return trendyolFetch<TrendyolPaginatedResponse<TrendyolProduct>>(
+    `/product/sellers/${sellerId}/products`,
+    {
+      params: params as Record<string, string | number | boolean | undefined>,
+    }
   );
 }
 
 export async function updateStockAndPrice(
   items: TrendyolStockPriceItem[]
 ): Promise<{ batchRequestId: string }> {
-  if (useMockData) {
-    return { batchRequestId: `MOCK-BATCH-${Date.now()}` };
-  }
   const { sellerId } = getConfig();
   return trendyolFetch<{ batchRequestId: string }>(
     `/inventory/sellers/${sellerId}/products/price-and-inventory`,
@@ -278,20 +202,15 @@ export async function updateStockAndPrice(
 export async function getQuestions(
   params?: TrendyolQuestionParams
 ): Promise<TrendyolPaginatedResponse<TrendyolQuestion>> {
-  return tryFetchOrMock(
-    async () => {
-      const { sellerId } = getConfig();
-      return trendyolFetch<TrendyolPaginatedResponse<TrendyolQuestion>>(
-        `/qna/sellers/${sellerId}/questions/filter`,
-        {
-          params: {
-            supplierId: sellerId,
-            ...params,
-          } as Record<string, string | number | boolean | undefined>,
-        }
-      );
-    },
-    () => getMockQuestions(params)
+  const { sellerId } = getConfig();
+  return trendyolFetch<TrendyolPaginatedResponse<TrendyolQuestion>>(
+    `/qna/sellers/${sellerId}/questions/filter`,
+    {
+      params: {
+        supplierId: sellerId,
+        ...params,
+      } as Record<string, string | number | boolean | undefined>,
+    }
   );
 }
 
@@ -299,10 +218,6 @@ export async function answerQuestion(
   questionId: number,
   text: string
 ): Promise<void> {
-  if (useMockData) {
-    console.log(`[Mock] Answer question ${questionId}: ${text}`);
-    return;
-  }
   const { sellerId } = getConfig();
   await trendyolFetch(
     `/qna/sellers/${sellerId}/questions/${questionId}/answers`,
@@ -314,37 +229,28 @@ export async function answerQuestion(
 export async function getSettlements(
   params: TrendyolSettlementParams
 ): Promise<TrendyolPaginatedResponse<TrendyolSettlement>> {
-  return tryFetchOrMock(
-    async () => {
-      const { sellerId } = getConfig();
-      // Build query params — only include transactionType if explicitly provided
-      const queryParams: Record<string, string | number | boolean | undefined> = {
-        supplierId: sellerId,
-        startDate: params.startDate,
-        endDate: params.endDate,
-        page: params.page,
-        size: params.size ?? 500,
-      };
-      if (params.transactionType) {
-        queryParams.transactionType = params.transactionType;
-      }
-      return trendyolFetch<TrendyolPaginatedResponse<TrendyolSettlement>>(
-        `/finance/che/sellers/${sellerId}/settlements`,
-        { params: queryParams }
-      );
-    },
-    () => getMockSettlements(params)
+  const { sellerId } = getConfig();
+  const queryParams: Record<string, string | number | boolean | undefined> = {
+    supplierId: sellerId,
+    startDate: params.startDate,
+    endDate: params.endDate,
+    page: params.page,
+    size: params.size ?? 500,
+  };
+  if (params.transactionType) {
+    queryParams.transactionType = params.transactionType;
+  }
+  return trendyolFetch<TrendyolPaginatedResponse<TrendyolSettlement>>(
+    `/finance/che/sellers/${sellerId}/settlements`,
+    { params: queryParams }
   );
 }
 
 export async function getOtherFinancials(
   params: TrendyolSettlementParams
 ): Promise<TrendyolPaginatedResponse<TrendyolOtherFinancial>> {
-  if (useMockData) {
-    return { page: 0, size: 0, totalElements: 0, totalPages: 0, content: [] };
-  }
   const { sellerId } = getConfig();
-  const transactionType = params.transactionType || "CashAdvance,WireTransfer,IncomingTransfer,PaymentOrder";
+  const transactionType = params.transactionType || "CashAdvance,WireTransfer,IncomingTransfer,PaymentOrder,DeductionInvoices,ReturnInvoice,CommissionAgreementInvoice,FinancialItem,Stoppage";
   return trendyolFetch<TrendyolPaginatedResponse<TrendyolOtherFinancial>>(
     `/finance/che/sellers/${sellerId}/otherfinancials`,
     {
@@ -369,9 +275,6 @@ export async function getClaims(params?: {
   orderNumber?: string;
   claimItemStatus?: string;
 }): Promise<TrendyolPaginatedResponse<TrendyolClaim>> {
-  if (useMockData) {
-    return { page: 0, size: 0, totalElements: 0, totalPages: 0, content: [] };
-  }
   const { sellerId } = getConfig();
   return trendyolFetch<TrendyolPaginatedResponse<TrendyolClaim>>(
     `/order/sellers/${sellerId}/claims`,

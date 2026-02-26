@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSettlementsFromDB, getOverallLastSyncAt } from "@/lib/trendyol/queries";
+import { getSettlementsFromDB, getOverallLastSyncAt, getOtherFinancialsFromDB } from "@/lib/trendyol/queries";
 import { daysAgoTimestamp, endOfTodayTimestamp, aggregateSettlements } from "@/lib/trendyol/helpers";
 import type { TrendyolSettlement } from "@/lib/trendyol/types";
 import { FinansClient } from "./components/finans-client";
@@ -30,16 +30,16 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
     endDate = ed.getTime();
   }
 
-  const result = await getSettlementsFromDB({
-    startDate,
-    endDate,
-    size: 500,
-  });
+  // Fetch settlements and otherfinancials in parallel
+  const [settlementsResult, otherFinResult] = await Promise.all([
+    getSettlementsFromDB({ startDate, endDate, size: 500 }),
+    getOtherFinancialsFromDB({ startDate, endDate, size: 500 }),
+  ]);
 
-  const settlements = result.content;
+  const settlements = settlementsResult.content;
   const summary = aggregateSettlements(settlements);
 
-  // Monthly aggregation
+  // Monthly aggregation for settlements
   const monthlyMap = new Map<string, TrendyolSettlement[]>();
   for (const s of settlements) {
     const month = s.transactionDate.substring(0, 7); // YYYY-MM
@@ -54,6 +54,10 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
     })
     .sort((a, b) => a.month.localeCompare(b.month));
 
+  // Other financials data
+  const otherFinancials = otherFinResult.data;
+  const otherFinCount = otherFinResult.count;
+
   return (
     <FinansClient
       settlements={settlements}
@@ -62,6 +66,8 @@ export default async function TrendyolFinansPage({ searchParams }: PageProps) {
       startDate={params.startDate || ""}
       endDate={params.endDate || ""}
       lastSyncAt={lastSyncAt}
+      otherFinancials={otherFinancials}
+      otherFinCount={otherFinCount}
     />
   );
 }

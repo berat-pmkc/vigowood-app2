@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
-import { syncSettlements } from "@/lib/trendyol/sync";
+import { syncSettlements, syncOtherFinancials } from "@/lib/trendyol/sync";
 
 /**
  * Cron: Trendyol finans sync
@@ -28,9 +28,12 @@ export async function GET(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const result = await syncSettlements(supabase);
+    const [settlements, otherFinancials] = await Promise.all([
+      syncSettlements(supabase),
+      syncOtherFinancials(supabase),
+    ]);
 
-    return NextResponse.json({ success: true, settlements: result });
+    return NextResponse.json({ success: true, settlements, otherFinancials });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Unknown error" },

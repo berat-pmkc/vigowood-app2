@@ -614,3 +614,54 @@ export async function hasAnyData(): Promise<boolean> {
     .select("id", { count: "exact", head: true });
   return (count || 0) > 0;
 }
+
+// ─── Other Financials ────────────────────────────────────
+
+export interface OtherFinancialRow {
+  id: string;
+  transaction_date: string | null;
+  transaction_type: string;
+  debt: number;
+  credit: number;
+  description: string | null;
+  created_at: string;
+}
+
+export async function getOtherFinancialsFromDB(params?: {
+  startDate?: number;
+  endDate?: number;
+  transactionType?: string;
+  page?: number;
+  size?: number;
+}): Promise<{ data: OtherFinancialRow[]; count: number }> {
+  const supabase = await getUntypedClient();
+  const page = params?.page || 0;
+  const size = params?.size || 500;
+  const from = page * size;
+  const to = from + size - 1;
+
+  let query = supabase
+    .from("trendyol_other_financials")
+    .select("*", { count: "exact" });
+
+  if (params?.startDate) {
+    query = query.gte("transaction_date", String(params.startDate));
+  }
+  if (params?.endDate) {
+    query = query.lte("transaction_date", String(params.endDate));
+  }
+  if (params?.transactionType) {
+    query = query.eq("transaction_type", params.transactionType);
+  }
+
+  query = query.order("transaction_date", { ascending: false }).range(from, to);
+
+  const { data, count, error } = await query;
+
+  if (error || !data) {
+    console.error("[Trendyol DB] OtherFinancials query error:", error?.message);
+    return { data: [], count: 0 };
+  }
+
+  return { data: data as OtherFinancialRow[], count: count || 0 };
+}

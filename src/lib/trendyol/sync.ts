@@ -12,14 +12,14 @@ import type {
   TrendyolProduct,
   TrendyolQuestion,
   TrendyolSettlement,
+  TrendyolOtherFinancial,
 } from "./types";
 import {
   getOrders,
   getProducts,
   getQuestions,
   getSettlements,
-  isUsingMockData,
-  resetMockDataFlag,
+  getOtherFinancials,
 } from "./client";
 import { daysAgoTimestamp, endOfTodayTimestamp } from "./helpers";
 
@@ -222,12 +222,6 @@ function mapSettlementToRow(s: TrendyolSettlement) {
 export async function syncOrders(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
-  // Reset mock flag to give the real API a chance during manual sync
-  resetMockDataFlag();
-  if (isUsingMockData()) {
-    return { synced: 0, error: "Mock mode active — skipping sync" };
-  }
-
   const logId = await createSyncLog(supabase, "orders");
   let totalSynced = 0;
 
@@ -317,11 +311,6 @@ export async function syncOrders(
 export async function syncProducts(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
-  resetMockDataFlag();
-  if (isUsingMockData()) {
-    return { synced: 0, error: "Mock mode active — skipping sync" };
-  }
-
   const logId = await createSyncLog(supabase, "products");
   let totalSynced = 0;
 
@@ -364,11 +353,6 @@ export async function syncProducts(
 export async function syncQuestions(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
-  resetMockDataFlag();
-  if (isUsingMockData()) {
-    return { synced: 0, error: "Mock mode active — skipping sync" };
-  }
-
   const logId = await createSyncLog(supabase, "questions");
   let totalSynced = 0;
 
@@ -422,11 +406,6 @@ export async function syncQuestions(
 export async function syncSettlements(
   supabase: SupabaseClient
 ): Promise<{ synced: number; error?: string }> {
-  resetMockDataFlag();
-  if (isUsingMockData()) {
-    return { synced: 0, error: "Mock mode active — skipping sync" };
-  }
-
   const logId = await createSyncLog(supabase, "settlements");
   let totalSynced = 0;
 
@@ -474,6 +453,81 @@ export async function syncSettlements(
           .upsert(rows, { onConflict: "id" });
 
         if (err) throw new Error(`Settlement upsert failed: ${err.message}`);
+
+        totalSynced += result.content.length;
+        page++;
+        hasMore = page < result.totalPages;
+      }
+    }
+
+    await completeSyncLog(supabase, logId, totalSynced);
+    return { synced: totalSynced };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await completeSyncLog(supabase, logId, totalSynced, msg);
+    return { synced: totalSynced, error: msg };
+  }
+}
+
+// ─── Other Financials (Ödemeler, Komisyon, Platform Bedeli) ──
+
+function mapOtherFinancialToRow(s: TrendyolOtherFinancial) {
+  return {
+    id: String(s.id),
+    transaction_date: s.transactionDate ? String(s.transactionDate) : null,
+    transaction_type: s.transactionType,
+    debt: s.debt ?? 0,
+    credit: s.credit ?? 0,
+    description: s.description || null,
+  };
+}
+
+export async function syncOtherFinancials(
+  supabase: SupabaseClient
+): Promise<{ synced: number; error?: string }> {
+  const logId = await createSyncLog(supabase, "otherfinancials");
+  let totalSynced = 0;
+
+  try {
+    // Trendyol otherfinancials API: max 15-day range per request
+    // Sync last 30 days in three ~10-day chunks (safely under limit)
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 86_400_000;
+    const DAY = 86_400_000;
+
+    const chunks = [
+      { start: thirtyDaysAgo, end: thirtyDaysAgo + 10 * DAY },
+      { start: thirtyDaysAgo + 10 * DAY, end: thirtyDaysAgo + 20 * DAY },
+      { start: thirtyDaysAgo + 20 * DAY, end: now },
+    ];
+
+    let requestCount = 0;
+
+    for (const chunk of chunks) {
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        if (requestCount > 0 && requestCount % 40 === 0) {
+          await sleep(10_000);
+        }
+
+        const result = await getOtherFinancials({
+          startDate: chunk.start,
+          endDate: chunk.end,
+          page,
+          size: 500,
+        });
+        requestCount++;
+
+        if (result.content.length === 0) break;
+
+        const rows = result.content.map(mapOtherFinancialToRow);
+        const { error: err } = await supabase
+          .from("trendyol_other_financials")
+          .upsert(rows, { onConflict: "id" });
+
+        if (err) throw new Error(`OtherFinancials upsert failed: ${err.message}`);
 
         totalSynced += result.content.length;
         page++;
