@@ -6,6 +6,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import type {
   TrendyolOrder,
   TrendyolOrderLine,
@@ -426,11 +427,6 @@ export async function syncSettlements(
     const now = Date.now();
     const thirtyDaysAgo = now - 30 * 86_400_000;
 
-    // Trendyol returns Turkish transaction type names in responses
-    // (e.g., "Satış" for Sale). Don't filter by type — get everything.
-    // Each Sale row already includes commission_rate, commission_amount,
-    // seller_revenue for complete financial data.
-
     // 2 chunks of 15 days
     const chunks = [
       { start: thirtyDaysAgo, end: thirtyDaysAgo + 15 * 86_400_000 },
@@ -552,5 +548,76 @@ export async function syncOtherFinancials(
     const msg = e instanceof Error ? e.message : String(e);
     await completeSyncLog(supabase, logId, totalSynced, msg);
     return { synced: totalSynced, error: msg };
+  }
+}
+
+// ─── On-Demand Quick Sync ────────────────────────────────
+// Dashboard sayfası açıldığında çağrılır.
+// Son 5 dk içinde sync yapılmışsa tekrar yapmaz (rate limit koruması).
+// Sadece son 2 günü tarar — hızlı (1-3 sn).
+
+export async function quickSyncRecentOrders(): Promise<void> {
+  try {
+    const adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Skip if synced within last 5 minutes
+    const lastSync = await getLastSyncTime(adminSupabase, "orders");
+    if (lastSync && Date.now() - lastSync < 5 * 60 * 1000) {
+      return; // Already fresh
+    }
+
+    const now = Date.now();
+    const DAY_MS = 86_400_000;
+    const logId = await createSyncLog(adminSupabase, "orders");
+    let totalSynced = 0;
+
+    // Only fetch last 2 days
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const result = await getOrders({
+        startDate: now - 2 * DAY_MS,
+        endDate: now,
+        page,
+        size: 200,
+        orderByField: "PackageLastModifiedDate",
+        orderByDirection: "DESC",
+      });
+
+      if (result.content.length === 0) break;
+
+      // Upsert orders
+      const orderRows = result.content.map(mapOrderToRow);
+      await adminSupabase
+        .from("trendyol_orders")
+        .upsert(orderRows, { onConflict: "id" });
+
+      // Upsert order lines
+      const allLineRows: ReturnType<typeof mapOrderLineToRow>[] = [];
+      for (const order of result.content) {
+        for (const l of order.lines) {
+          allLineRows.push(mapOrderLineToRow(l, order.shipmentPackageId));
+        }
+      }
+      for (let i = 0; i < allLineRows.length; i += 500) {
+        const batch = allLineRows.slice(i, i + 500);
+        await adminSupabase
+          .from("trendyol_order_lines")
+          .upsert(batch, { onConflict: "id" });
+      }
+
+      totalSynced += result.content.length;
+      page++;
+      hasMore = page < result.totalPages;
+    }
+
+    await completeSyncLog(adminSupabase, logId, totalSynced);
+  } catch (e) {
+    // Silent fail — don't break the dashboard page
+    console.error("[Trendyol QuickSync]", e instanceof Error ? e.message : e);
   }
 }

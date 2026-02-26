@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getOverallLastSyncAt } from "@/lib/trendyol/queries";
+import { quickSyncRecentOrders } from "@/lib/trendyol/sync";
 import { TrendyolDashboard } from "./components/trendyol-dashboard";
 
 export const metadata: Metadata = { title: "Trendyol — Dashboard" };
@@ -77,6 +78,12 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   const [selYear, selMonth] = selectedMonth.split("-").map(Number);
   const startMs = monthStartMs(selYear, selMonth);
   const endMs = isCurrentMonth ? Date.now() : monthEndMs(selYear, selMonth);
+
+  // ─── On-demand sync: fetch latest orders from Trendyol API ───
+  // Runs only if last sync was >5 min ago. Fast (1-3 sec, last 2 days only).
+  if (isCurrentMonth) {
+    await quickSyncRecentOrders();
+  }
 
   // ─── Parallel data fetches ──────────────────────────
   // 1. All orders in selected month (paginated to avoid truncation)

@@ -2,24 +2,12 @@
   "regions": ["dub1"],
   "crons": [
     {
-      "path": "/api/cron/kurlar?secret=${CRON_SECRET}",
-      "schedule": "0 9 * * 1-5"
-    },
-    {
-      "path": "/api/cron/kritik-stok?secret=${CRON_SECRET}",
-      "schedule": "0 9 * * *"
-    },
-    {
       "path": "/api/cron/trendyol-orders?secret=${CRON_SECRET}",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/trendyol-products?secret=${CRON_SECRET}",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/trendyol-settlements?secret=${CRON_SECRET}",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 7 * * *"
     }
   ]
 }
