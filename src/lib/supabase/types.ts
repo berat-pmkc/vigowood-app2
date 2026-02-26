@@ -70,6 +70,44 @@ export type Database = {
           },
         ]
       }
+      agent_chats: {
+        Row: {
+          agent_id: string
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role: string
+          user_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_chats_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ops_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_memory: {
         Row: {
           agent_id: string
@@ -2927,13 +2965,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "task_comments_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["user_id"]
-          },
-          {
             foreignKeyName: "task_comments_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
@@ -4007,8 +4038,9 @@ export const Constants = {
   },
 } as const
 
-// Custom type aliases — DO NOT REMOVE
+// ─── Custom Type Aliases ─────────────────────────────────────
 export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type User = Database["public"]["Tables"]["users"]["Row"];
 export type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
 export type KesimMakinesi = Database["public"]["Tables"]["kesim_makinesi"]["Row"];
 export type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
@@ -4033,7 +4065,6 @@ export type SevkiyatFirma = Database["public"]["Tables"]["sevkiyat_firmalar"]["R
 export type SevkiyatMaliyet = Database["public"]["Tables"]["sevkiyat_maliyetler"]["Row"];
 export type SevkiyatPaletSablon = Database["public"]["Tables"]["sevkiyat_palet_sablon"]["Row"];
 export type SatisRaporu = Database["public"]["Tables"]["satis_raporlari"]["Row"];
-
 export type Kampanya = Database["public"]["Tables"]["kampanyalar"]["Row"];
 export type MontajSession = Database["public"]["Tables"]["montaj_sessions"]["Row"];
 export type KutuUretim = Database["public"]["Tables"]["kutu_uretim"]["Row"];
@@ -4071,3 +4102,4 @@ export type Station = Database["public"]["Enums"]["station"];
 export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
 export type DovizKuru = Database["public"]["Tables"]["doviz_kurlari"]["Row"];
 export type SatisSatiri = Database["public"]["Tables"]["satis_satirlari"]["Row"];
+export type AgentChat = Database["public"]["Tables"]["agent_chats"]["Row"];

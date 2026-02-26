@@ -97,6 +97,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Onaylar", href: "/ops/onaylar", icon: CheckCircle2, roles: APPROVAL_NAV_ROLES },
       { title: "Raporlar", href: "/ops/raporlar", icon: FileOutput, roles: "all" },
       { title: "Ajanlar", href: "/ops/ajanlar", icon: Bot, roles: APPROVAL_NAV_ROLES },
+      { title: "Chat", href: "/ops/chat", icon: MessageSquareText, roles: "all" },
       { title: "Kullanım", href: "/ops/kullanim", icon: Activity, roles: APPROVAL_NAV_ROLES },
     ],
   },

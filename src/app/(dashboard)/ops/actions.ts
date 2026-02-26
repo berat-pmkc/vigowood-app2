@@ -1286,6 +1286,56 @@ export async function getAgentActionsForTask(taskId: string) {
   return data ?? [];
 }
 
+// ─── Agent Chat ──────────────────────────────────────────────
+
+export type AgentChatMessage = {
+  id: string;
+  agent_id: string;
+  user_id: string | null;
+  role: "user" | "assistant";
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export async function getAgentChatHistory(agentId: string, limit = 50) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("agent_chats")
+    .select("*")
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  return (data ?? []) as AgentChatMessage[];
+}
+
+export async function sendChatMessage(agentId: string, content: string) {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from("agent_chats").insert({
+    agent_id: agentId,
+    user_id: user.user_id,
+    role: "user",
+    content,
+  });
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function clearChatHistory(agentId: string) {
+  const user = await requireUser();
+  if (user.role !== "Yönetici") return { success: false, error: "Yetkiniz yok" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("agent_chats")
+    .delete()
+    .eq("agent_id", agentId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+// ─── Usage Stats ──────────────────────────────────────────────
+
 export async function getUsageStats(period: "day" | "week" | "month" = "week") {
   const supabase = await createClient();
 
