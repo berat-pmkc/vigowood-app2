@@ -93,7 +93,7 @@ export function TaskCard({ task, agents, onClick, isDragOverlay }: TaskCardProps
       }`}
       onClick={onClick}
     >
-      {/* Drag handle + Title */}
+      {/* Drag handle + Title + Description */}
       <div className="flex items-start gap-1">
         <button
           className="mt-0.5 cursor-grab text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
@@ -101,9 +101,16 @@ export function TaskCard({ task, agents, onClick, isDragOverlay }: TaskCardProps
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <h4 className="flex-1 text-sm font-medium leading-tight">
-          {task.title}
-        </h4>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-medium leading-tight">
+            {task.title}
+          </h4>
+          {task.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+              {task.description}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Badges */}
