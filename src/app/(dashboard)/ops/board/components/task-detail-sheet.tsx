@@ -38,6 +38,8 @@ import {
   Clock,
   Cpu,
   Expand,
+  FileText,
+  ChevronDown,
 } from "lucide-react";
 import {
   TASK_STATUSES,
@@ -66,6 +68,7 @@ import {
   addTaskComment,
   addTaskAttachment,
   createTask,
+  getTaskOutput,
   type TaskWithRelations,
   type TaskComment,
   type TaskAttachment,
@@ -96,6 +99,7 @@ export function TaskDetailSheet({
   const [activity, setActivity] = useState<TaskActivityType[]>([]);
   const [subtasks, setSubtasks] = useState<TaskWithRelations[]>([]);
   const [agentActions, setAgentActions] = useState<Record<string, unknown>[]>([]);
+  const [taskOutput, setTaskOutput] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -103,16 +107,18 @@ export function TaskDetailSheet({
   const [commentText, setCommentText] = useState("");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [expandedComment, setExpandedComment] = useState<TaskComment | null>(null);
+  const [reportOpen, setReportOpen] = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [t, c, a, act, st, aa] = await Promise.all([
+    const [t, c, a, act, st, aa, out] = await Promise.all([
       getTaskById(taskId),
       getTaskComments(taskId),
       getTaskAttachments(taskId),
       getTaskActivity(taskId),
       getSubtasks(taskId),
       getAgentActionsForTask(taskId),
+      getTaskOutput(taskId),
     ]);
     setTask(t);
     setComments(c);
@@ -120,6 +126,7 @@ export function TaskDetailSheet({
     setActivity(act);
     setSubtasks(st);
     setAgentActions(aa as Record<string, unknown>[]);
+    setTaskOutput(out as Record<string, unknown> | null);
     if (t) setTitleValue(t.title);
     setLoading(false);
   }, [taskId]);
@@ -421,7 +428,37 @@ export function TaskDetailSheet({
             <TabsContent value="comments" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
               <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                 <div className="space-y-3">
-                  {comments.length === 0 && (
+                  {/* Agent Report Section */}
+                  {taskOutput && (() => {
+                    const meta = taskOutput.metadata as Record<string, unknown> | null;
+                    const fullContent = meta?.full_content as string | undefined;
+                    if (!fullContent) return null;
+                    return (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50/50">
+                        <button
+                          onClick={() => setReportOpen(!reportOpen)}
+                          className="flex w-full items-center gap-2 p-3 text-left"
+                        >
+                          <FileText className="h-4 w-4 text-blue-600 shrink-0" />
+                          <span className="flex-1 text-sm font-medium text-blue-900">
+                            {(taskOutput.file_name as string) || "Agent Raporu"}
+                          </span>
+                          <ChevronDown className={`h-4 w-4 text-blue-600 transition-transform ${reportOpen ? "" : "-rotate-90"}`} />
+                        </button>
+                        {reportOpen && (
+                          <div className="border-t border-blue-200 p-3 max-h-[300px] overflow-y-auto">
+                            <div className="prose prose-sm max-w-none break-words">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {fullContent}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {comments.length === 0 && !taskOutput && (
                     <p className="text-center text-sm text-muted-foreground py-8">
                       Henüz yorum yok
                     </p>

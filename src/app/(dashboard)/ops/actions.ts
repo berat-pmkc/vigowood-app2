@@ -861,6 +861,19 @@ export async function reviewApproval(
   return { success: true };
 }
 
+// ─── Task Output (for detail sheet) ─────────────────────────
+
+export async function getTaskOutput(taskId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ops_outputs")
+    .select("*")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  return data?.[0] ?? null;
+}
+
 // ─── Outputs ────────────────────────────────────────────────
 
 export async function getOutputs(filters?: {
