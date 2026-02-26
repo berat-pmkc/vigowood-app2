@@ -1663,6 +1663,7 @@ export type Database = {
           is_active: boolean
           last_active_at: string | null
           name: string
+          role: string
           schedule: Json | null
           stats: Json | null
           status: Database["public"]["Enums"]["agent_status"]
@@ -1683,6 +1684,7 @@ export type Database = {
           is_active?: boolean
           last_active_at?: string | null
           name: string
+          role?: string
           schedule?: Json | null
           stats?: Json | null
           status?: Database["public"]["Enums"]["agent_status"]
@@ -1703,6 +1705,7 @@ export type Database = {
           is_active?: boolean
           last_active_at?: string | null
           name?: string
+          role?: string
           schedule?: Json | null
           stats?: Json | null
           status?: Database["public"]["Enums"]["agent_status"]
@@ -4004,15 +4007,53 @@ export const Constants = {
   },
 } as const
 
-// ─── Custom Type Aliases ───
-export type Odeme = Database["public"]["Tables"]["odemeler"]["Row"];
+// Custom type aliases — DO NOT REMOVE
+export type Product = Database["public"]["Tables"]["products"]["Row"];
+export type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
+export type KesimMakinesi = Database["public"]["Tables"]["kesim_makinesi"]["Row"];
+export type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
+export type PlakaPart = Database["public"]["Tables"]["plaka_parts"]["Row"];
+export type AssemblyStep = Database["public"]["Tables"]["assembly_steps"]["Row"];
+export type StepBom = Database["public"]["Tables"]["step_bom"]["Row"];
+export type CutBatch = Database["public"]["Tables"]["cut_batches"]["Row"];
+export type CutLine = Database["public"]["Tables"]["cut_lines"]["Row"];
+export type Clean = Database["public"]["Tables"]["clean"]["Row"];
+export type PackEvent = Database["public"]["Tables"]["pack_events"]["Row"];
+export type StockMovement = Database["public"]["Tables"]["stock_movements"]["Row"];
+export type YariMamulStok = Database["public"]["Tables"]["yari_mamul_stok"]["Row"];
+export type HazirElemanAkis = Database["public"]["Tables"]["hazir_eleman_akis"]["Row"];
+export type IadeGiris = Database["public"]["Tables"]["iade_giris"]["Row"];
+export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
+export type AppNotification = Database["public"]["Tables"]["notifications"]["Row"];
+export type NotificationRead = Database["public"]["Tables"]["notification_reads"]["Row"];
+export type Sevkiyat = Database["public"]["Tables"]["sevkiyat"]["Row"];
+export type SevkiyatItem = Database["public"]["Tables"]["sevkiyat_items"]["Row"];
+export type SevkiyatFiyat = Database["public"]["Tables"]["sevkiyat_fiyatlar"]["Row"];
+export type SevkiyatFirma = Database["public"]["Tables"]["sevkiyat_firmalar"]["Row"];
+export type SevkiyatMaliyet = Database["public"]["Tables"]["sevkiyat_maliyetler"]["Row"];
+export type SevkiyatPaletSablon = Database["public"]["Tables"]["sevkiyat_palet_sablon"]["Row"];
+export type SatisRaporu = Database["public"]["Tables"]["satis_raporlari"]["Row"];
+
+export type Kampanya = Database["public"]["Tables"]["kampanyalar"]["Row"];
+export type MontajSession = Database["public"]["Tables"]["montaj_sessions"]["Row"];
+export type KutuUretim = Database["public"]["Tables"]["kutu_uretim"]["Row"];
+export type AppSetting = Database["public"]["Tables"]["app_settings"]["Row"];
 export type NakitDonem = Database["public"]["Tables"]["nakit_donemler"]["Row"];
 export type NakitGiris = Database["public"]["Tables"]["nakit_girisler"]["Row"];
 export type NakitCikis = Database["public"]["Tables"]["nakit_cikislar"]["Row"];
-export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
+export type Odeme = Database["public"]["Tables"]["odemeler"]["Row"];
+export type NakitGirisTakip = Database["public"]["Tables"]["nakit_giris_takip"]["Row"];
 export type SatisGiris = Database["public"]["Tables"]["satis_giris"]["Row"];
 export type MaliyetGiris = Database["public"]["Tables"]["maliyet_giris"]["Row"];
 export type KarlilikData = Database["public"]["Tables"]["karlilik_data"]["Row"];
+export type IkasOrder = Database["public"]["Tables"]["ikas_orders"]["Row"];
+export type Task = Database["public"]["Tables"]["tasks"]["Row"];
+export type TaskComment = Database["public"]["Tables"]["task_comments"]["Row"];
+export type TaskAttachment = Database["public"]["Tables"]["task_attachments"]["Row"];
+export type TaskActivity = Database["public"]["Tables"]["task_activity"]["Row"];
+export type OpsAgent = Database["public"]["Tables"]["ops_agents"]["Row"];
+export type OpsApproval = Database["public"]["Tables"]["ops_approvals"]["Row"];
+export type OpsOutput = Database["public"]["Tables"]["ops_outputs"]["Row"];
 export type AgentMemory = Database["public"]["Tables"]["agent_memory"]["Row"];
 export type AgentAction = Database["public"]["Tables"]["agent_actions"]["Row"];
 export type AgentMessage = Database["public"]["Tables"]["agent_messages"]["Row"];
@@ -4020,13 +4061,13 @@ export type Alert = Database["public"]["Tables"]["alerts"]["Row"];
 export type JobDefinition = Database["public"]["Tables"]["job_definitions"]["Row"];
 export type JobRun = Database["public"]["Tables"]["job_runs"]["Row"];
 export type MonitorDefinition = Database["public"]["Tables"]["monitor_definitions"]["Row"];
-export type IkasOrder = Database["public"]["Tables"]["ikas_orders"]["Row"];
 export type TaskTemplate = Database["public"]["Tables"]["task_templates"]["Row"];
 export type RecurringTask = Database["public"]["Tables"]["recurring_tasks"]["Row"];
 export type TaskRun = Database["public"]["Tables"]["task_runs"]["Row"];
-
-// ─── Enum Type Aliases ───
-export type UserRole = Database["public"]["Enums"]["user_role"];
-export type Station = Database["public"]["Enums"]["station"];
 export type PartType = Database["public"]["Enums"]["part_type"];
 export type ProductCategory = Database["public"]["Enums"]["product_category"];
+export type UserRole = Database["public"]["Enums"]["user_role"];
+export type Station = Database["public"]["Enums"]["station"];
+export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
+export type DovizKuru = Database["public"]["Tables"]["doviz_kurlari"]["Row"];
+export type SatisSatiri = Database["public"]["Tables"]["satis_satirlari"]["Row"];
