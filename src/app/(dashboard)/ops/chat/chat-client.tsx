@@ -292,6 +292,23 @@ export function ChatClient({ agents }: { agents: OpsAgent[] }) {
         return;
       }
       setWaitingReply(true);
+
+      // Fire-and-forget: trigger AI response
+      // Realtime subscription will pick up the assistant message automatically
+      fetch("/api/ops/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: selectedAgent.id }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast.error(data.error ?? "Asistan yanıt veremedi");
+          setWaitingReply(false);
+        }
+      }).catch(() => {
+        toast.error("Asistan yanıt veremedi");
+        setWaitingReply(false);
+      });
     } catch {
       toast.error("Mesaj gönderilemedi");
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
