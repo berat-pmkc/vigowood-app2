@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,6 +126,102 @@ export function TrendyolDashboard({
   const syncLabel = lastSyncAt
     ? `Son sync: ${new Date(lastSyncAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
     : "Henüz senkronize edilmedi";
+
+  // ─── Top Products Date Filter ─────────────────────
+  const [topFilter, setTopFilter] = useState<"ay" | "bugun" | "dun" | "bu_hafta" | "gecen_hafta" | "custom">("ay");
+  const [customDate, setCustomDate] = useState("");
+
+  const filteredTopProducts = useMemo(() => {
+    if (topFilter === "ay") return topProducts;
+
+    const now = new Date();
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const trMs = utcMs + 3 * 60 * 60 * 1000;
+    const tr = new Date(trMs);
+    const today = new Date(tr.getFullYear(), tr.getMonth(), tr.getDate());
+
+    let startDate: Date;
+    let endDate: Date;
+
+    switch (topFilter) {
+      case "bugun":
+        startDate = endDate = today;
+        break;
+      case "dun": {
+        const y = new Date(today);
+        y.setDate(y.getDate() - 1);
+        startDate = endDate = y;
+        break;
+      }
+      case "bu_hafta": {
+        const dow = today.getDay();
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+        endDate = today;
+        break;
+      }
+      case "gecen_hafta": {
+        const dow = today.getDay();
+        const thisMonday = new Date(today);
+        thisMonday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+        endDate = new Date(thisMonday);
+        endDate.setDate(thisMonday.getDate() - 1);
+        startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 6);
+        break;
+      }
+      case "custom": {
+        if (!customDate) return topProducts;
+        const d = new Date(customDate + "T00:00:00");
+        startDate = endDate = d;
+        break;
+      }
+      default:
+        return topProducts;
+    }
+
+    const [year, month] = selectedMonth.split("-").map(Number);
+    const nameMap = new Map(availableBarcodes.map((b) => [b.barcode, b.name]));
+    const agg = new Map<string, { barcode: string; name: string; quantity: number; revenue: number }>();
+
+    for (const [barcode, entries] of Object.entries(barcodeDailyData)) {
+      if (barcode === "TÜMÜ") continue;
+      for (const entry of entries) {
+        const [day] = entry.date.split(".").map(Number);
+        const entryDate = new Date(year, month - 1, day);
+        if (entryDate >= startDate && entryDate <= endDate) {
+          const existing = agg.get(barcode) || {
+            barcode,
+            name: nameMap.get(barcode) || barcode,
+            quantity: 0,
+            revenue: 0,
+          };
+          existing.quantity += entry.orders;
+          existing.revenue += entry.revenue;
+          agg.set(barcode, existing);
+        }
+      }
+    }
+
+    return Array.from(agg.values())
+      .filter((item) => item.quantity > 0 || item.revenue > 0)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+  }, [topFilter, customDate, barcodeDailyData, availableBarcodes, selectedMonth, topProducts]);
+
+  const topFilterLabel =
+    topFilter === "ay" ? selectedMonthLabel
+    : topFilter === "bugun" ? "Bugün"
+    : topFilter === "dun" ? "Dün"
+    : topFilter === "bu_hafta" ? "Bu Hafta"
+    : topFilter === "gecen_hafta" ? "Geçen Hafta"
+    : topFilter === "custom" && customDate
+      ? new Date(customDate + "T00:00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
+      : selectedMonthLabel;
+
+  const [selYr, selMo] = selectedMonth.split("-").map(Number);
+  const monthMinDate = `${selectedMonth}-01`;
+  const monthMaxDate = `${selectedMonth}-${String(new Date(selYr, selMo, 0).getDate()).padStart(2, "0")}`;
 
   return (
     <div className="space-y-4">
@@ -254,12 +351,12 @@ export function TrendyolDashboard({
         </CardContent>
       </Card>
 
-      {/* Top Selling Products — compact table */}
+      {/* Top Selling Products — compact table with date filters */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">
-              En Çok Satan Ürünler — {selectedMonthLabel}
+              En Çok Satan Ürünler — {topFilterLabel}
             </CardTitle>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span><Package className="inline h-3 w-3 mr-0.5" />{kpi.totalProducts} ürün</span>
@@ -274,6 +371,42 @@ export function TrendyolDashboard({
               )}
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-1.5 pt-2">
+            {([
+              { value: "ay", label: "Tüm Ay" },
+              { value: "bugun", label: "Bugün" },
+              { value: "dun", label: "Dün" },
+              { value: "bu_hafta", label: "Bu Hafta" },
+              { value: "gecen_hafta", label: "Geçen Hafta" },
+            ] as const).map((f) => (
+              <button
+                key={f.value}
+                onClick={() => { setTopFilter(f.value); setCustomDate(""); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                  topFilter === f.value
+                    ? "bg-vw-dark text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+            <input
+              type="date"
+              value={customDate}
+              min={monthMinDate}
+              max={monthMaxDate}
+              onChange={(e) => {
+                setCustomDate(e.target.value);
+                if (e.target.value) setTopFilter("custom");
+              }}
+              className={`h-7 px-2 rounded-full text-xs border transition-colors cursor-pointer ${
+                topFilter === "custom"
+                  ? "bg-vw-dark text-white border-vw-dark [color-scheme:dark]"
+                  : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+              }`}
+            />
+          </div>
         </CardHeader>
         <CardContent className="px-0 pb-2">
           <Table>
@@ -286,14 +419,14 @@ export function TrendyolDashboard({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topProducts.length === 0 ? (
+              {filteredTopProducts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="h-16 text-center text-muted-foreground">
-                    Veri bulunamadı.
+                    Bu dönemde veri bulunamadı.
                   </TableCell>
                 </TableRow>
               ) : (
-                topProducts.map((p, i) => {
+                filteredTopProducts.map((p, i) => {
                   const skuStyle = getSkuBadgeStyle(p.barcode);
                   return (
                     <TableRow key={p.barcode}>
