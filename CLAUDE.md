@@ -482,6 +482,9 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Tekrar eden görev CRUD: recurring-dialog, recurring-tab (cron schedule, aktif/pasif toggle, çalışma geçmişi)
 - [x] /ops/kullanim: Agent kullanım istatistikleri — 3 KPI, dönem filtresi, agent bazlı tablo
 - [x] Kanban board: Durum/Kişi görünüm toggle, Tümü/Çalışanlar/Asistanlar atama filtresi
+- [x] 3 görünüm modu: Pano (Kanban) | Liste (tablo, gruplama, sıralama) | Takvim (aylık grid, chip'ler)
+- [x] Liste: durum bazlı collapsible gruplar, sıralanabilir kolonlar, filtreler
+- [x] Takvim: ay navigasyonu, bugün vurgusu, durum renkli chip'ler, tarihi belirsiz bölümü
 - [x] Build: 87 route, sıfır TypeScript hatası
 
 ### KATMAN 29: Test & Güvenlik Denetimi ✅
