@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { toast } from "sonner";
-import { Plus, LayoutGrid, Users } from "lucide-react";
+import { Plus, LayoutGrid, Users, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TASK_STATUSES,
@@ -62,6 +62,7 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assigneeFilterMode, setAssigneeFilterMode] = useState<AssigneeFilterMode>("all");
+  const [showOlderDone, setShowOlderDone] = useState(false);
 
   const router = useRouter();
   const agentIdSet = useMemo(() => new Set(agents.map((a) => a.id)), [agents]);
@@ -87,6 +88,20 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
     (status: TaskStatus) => filteredTasks.filter((t) => t.status === status),
     [filteredTasks]
   );
+
+  // Done column: split into recent (last 7 days) and older
+  const oneWeekAgo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString();
+  }, []);
+
+  const { recentDone, olderDoneCount } = useMemo(() => {
+    const doneTasks = getTasksByStatus("done");
+    const recent = doneTasks.filter((t) => t.updated_at >= oneWeekAgo);
+    const olderCount = doneTasks.length - recent.length;
+    return { recentDone: recent, olderDoneCount: olderCount };
+  }, [getTasksByStatus, oneWeekAgo]);
 
   // Person-based grouping
   const personColumns = useMemo(() => {
@@ -327,20 +342,23 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
         <div className="flex gap-3 overflow-x-auto pb-4">
           {viewMode === "durum"
             ? TASK_STATUSES.map((status) => {
-                const columnTasks = getTasksByStatus(status);
+                const allColumnTasks = getTasksByStatus(status);
+                const isDone = status === "done";
+                const visibleTasks = isDone && !showOlderDone ? recentDone : allColumnTasks;
+
                 return (
                   <KanbanColumn
                     key={status}
                     status={status}
                     label={TASK_STATUS_LABELS[status]}
                     colors={TASK_STATUS_COLORS[status]}
-                    count={columnTasks.length}
+                    count={allColumnTasks.length}
                   >
                     <SortableContext
-                      items={columnTasks.map((t) => t.id)}
+                      items={visibleTasks.map((t) => t.id)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {columnTasks.map((task) => (
+                      {visibleTasks.map((task) => (
                         <TaskCard
                           key={task.id}
                           task={task}
@@ -349,6 +367,23 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
                         />
                       ))}
                     </SortableContext>
+                    {isDone && olderDoneCount > 0 && !showOlderDone && (
+                      <button
+                        onClick={() => setShowOlderDone(true)}
+                        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-2 text-xs text-muted-foreground hover:bg-muted/50 hover:text-vw-dark transition-colors mt-1"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                        {olderDoneCount} eski görev daha
+                      </button>
+                    )}
+                    {isDone && showOlderDone && olderDoneCount > 0 && (
+                      <button
+                        onClick={() => setShowOlderDone(false)}
+                        className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed py-2 text-xs text-muted-foreground hover:bg-muted/50 hover:text-vw-dark transition-colors mt-1"
+                      >
+                        Sadece bu haftayı göster
+                      </button>
+                    )}
                   </KanbanColumn>
                 );
               })
