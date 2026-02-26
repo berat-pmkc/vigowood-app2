@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Calendar,
   MessageSquare,
@@ -410,8 +409,8 @@ export function TaskDetailSheet({
 
             {/* Comments Tab */}
             <TabsContent value="comments" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
-              <ScrollArea className="flex-1">
-                <div className="space-y-3 pr-3">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="space-y-3">
                   {comments.length === 0 && (
                     <p className="text-center text-sm text-muted-foreground py-8">
                       Henüz yorum yok
@@ -425,13 +424,13 @@ export function TaskDetailSheet({
                         </span>
                         <span>{formatDate(c.created_at)}</span>
                       </div>
-                      <p className="mt-1 text-sm whitespace-pre-wrap break-words overflow-hidden">
+                      <p className="mt-1 text-sm whitespace-pre-wrap break-words">
                         {c.content}
                       </p>
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
               <div className="flex gap-2 pt-3 shrink-0">
                 <Textarea
                   placeholder="Yorum yazın..."
@@ -458,8 +457,8 @@ export function TaskDetailSheet({
 
             {/* Files Tab */}
             <TabsContent value="files" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
-              <ScrollArea className="flex-1">
-                <div className="space-y-2 pr-3">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="space-y-2">
                   {attachments.length === 0 && (
                     <p className="text-center text-sm text-muted-foreground py-8">
                       Henüz dosya yok
@@ -489,7 +488,7 @@ export function TaskDetailSheet({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
               <div className="pt-3 shrink-0">
                 <label className="cursor-pointer">
                   <input
@@ -509,8 +508,8 @@ export function TaskDetailSheet({
 
             {/* Activity Tab */}
             <TabsContent value="activity" className="flex-1 min-h-0 overflow-hidden mt-2">
-              <ScrollArea className="h-full">
-                <div className="space-y-2 pr-3">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1 h-full">
+                <div className="space-y-2">
                   {activity.length === 0 && (
                     <p className="text-center text-sm text-muted-foreground py-8">
                       Henüz aktivite yok
@@ -545,7 +544,7 @@ export function TaskDetailSheet({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </TabsContent>
 
             {/* Subtasks Tab */}
@@ -564,8 +563,8 @@ export function TaskDetailSheet({
                   </div>
                 </div>
               )}
-              <ScrollArea className="flex-1">
-                <div className="space-y-1 pr-3">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+                <div className="space-y-1">
                   {subtasks.map((st) => (
                     <div
                       key={st.id}
@@ -590,7 +589,7 @@ export function TaskDetailSheet({
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
               <div className="flex gap-2 pt-3 shrink-0">
                 <Input
                   placeholder="Alt görev ekle..."
@@ -618,8 +617,8 @@ export function TaskDetailSheet({
 
             {/* Work Log Tab */}
             <TabsContent value="work-log" className="flex-1 min-h-0 overflow-hidden mt-2">
-              <ScrollArea className="h-full">
-                <div className="space-y-2 pr-3">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1 h-full">
+                <div className="space-y-2">
                   {agentActions.length === 0 ? (
                     <p className="text-center text-sm text-muted-foreground py-8">
                       Henüz çalışma kaydı yok
@@ -678,7 +677,7 @@ export function TaskDetailSheet({
                     </>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
             </TabsContent>
           </Tabs>
         )}
