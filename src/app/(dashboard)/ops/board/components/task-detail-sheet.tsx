@@ -418,14 +418,14 @@ export function TaskDetailSheet({
                     </p>
                   )}
                   {comments.map((c) => (
-                    <div key={c.id} className="rounded-lg border p-3">
+                    <div key={c.id} className="rounded-lg border p-3 overflow-hidden">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">
                           {c.author_name}
                         </span>
                         <span>{formatDate(c.created_at)}</span>
                       </div>
-                      <p className="mt-1 text-sm whitespace-pre-wrap">
+                      <p className="mt-1 text-sm whitespace-pre-wrap break-words overflow-hidden">
                         {c.content}
                       </p>
                     </div>
