@@ -220,7 +220,7 @@ export function TaskDetailSheet({
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-lg overflow-hidden flex flex-col">
-        <SheetHeader className="shrink-0">
+        <SheetHeader className="shrink-0 max-h-[40vh] overflow-y-auto">
           <SheetTitle className="sr-only">Görev Detayı</SheetTitle>
           {/* Title */}
           {task && (
@@ -384,7 +384,7 @@ export function TaskDetailSheet({
             <p className="text-sm text-muted-foreground">Yükleniyor...</p>
           </div>
         ) : (
-          <Tabs defaultValue="comments" className="flex-1 overflow-hidden flex flex-col mt-4">
+          <Tabs defaultValue="comments" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-4">
             <TabsList className="w-full shrink-0">
               <TabsTrigger value="comments" className="flex-1 text-xs">
                 <MessageSquare className="mr-1 h-3 w-3" />
@@ -409,7 +409,7 @@ export function TaskDetailSheet({
             </TabsList>
 
             {/* Comments Tab */}
-            <TabsContent value="comments" className="flex-1 overflow-hidden flex flex-col mt-2">
+            <TabsContent value="comments" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
               <ScrollArea className="flex-1">
                 <div className="space-y-3 pr-3">
                   {comments.length === 0 && (
@@ -457,7 +457,7 @@ export function TaskDetailSheet({
             </TabsContent>
 
             {/* Files Tab */}
-            <TabsContent value="files" className="flex-1 overflow-hidden flex flex-col mt-2">
+            <TabsContent value="files" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
               <ScrollArea className="flex-1">
                 <div className="space-y-2 pr-3">
                   {attachments.length === 0 && (
@@ -508,7 +508,7 @@ export function TaskDetailSheet({
             </TabsContent>
 
             {/* Activity Tab */}
-            <TabsContent value="activity" className="flex-1 overflow-hidden mt-2">
+            <TabsContent value="activity" className="flex-1 min-h-0 overflow-hidden mt-2">
               <ScrollArea className="h-full">
                 <div className="space-y-2 pr-3">
                   {activity.length === 0 && (
@@ -549,7 +549,7 @@ export function TaskDetailSheet({
             </TabsContent>
 
             {/* Subtasks Tab */}
-            <TabsContent value="subtasks" className="flex-1 overflow-hidden flex flex-col mt-2">
+            <TabsContent value="subtasks" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
               {subtasks.length > 0 && (
                 <div className="mb-2 shrink-0">
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
@@ -617,7 +617,7 @@ export function TaskDetailSheet({
             </TabsContent>
 
             {/* Work Log Tab */}
-            <TabsContent value="work-log" className="flex-1 overflow-hidden mt-2">
+            <TabsContent value="work-log" className="flex-1 min-h-0 overflow-hidden mt-2">
               <ScrollArea className="h-full">
                 <div className="space-y-2 pr-3">
                   {agentActions.length === 0 ? (
