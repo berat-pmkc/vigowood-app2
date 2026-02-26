@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Sheet,
   SheetContent,
@@ -424,9 +426,11 @@ export function TaskDetailSheet({
                         </span>
                         <span>{formatDate(c.created_at)}</span>
                       </div>
-                      <p className="mt-1 text-sm whitespace-pre-wrap break-words">
-                        {c.content}
-                      </p>
+                      <div className="mt-1 prose prose-sm max-w-none break-words">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {c.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   ))}
                 </div>
