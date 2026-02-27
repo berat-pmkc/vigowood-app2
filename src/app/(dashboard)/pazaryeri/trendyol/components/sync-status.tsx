@@ -4,11 +4,13 @@ import { useState } from "react";
 import { RefreshCw, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 interface SyncStatusProps {
   lastSyncAt: string | null;
   entityType?: string;
+  lastSyncError?: string | null;
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -35,9 +37,9 @@ function getSyncStatusColor(lastSyncAt: string | null): "green" | "yellow" | "re
   return "red";
 }
 
-export function SyncStatus({ lastSyncAt, entityType }: SyncStatusProps) {
+export function SyncStatus({ lastSyncAt, entityType, lastSyncError }: SyncStatusProps) {
   const [syncing, setSyncing] = useState(false);
-  const color = getSyncStatusColor(lastSyncAt);
+  const color = lastSyncError ? "red" : getSyncStatusColor(lastSyncAt);
 
   const dotColor = {
     green: "bg-emerald-500",
@@ -90,17 +92,36 @@ export function SyncStatus({ lastSyncAt, entityType }: SyncStatusProps) {
     );
   }
 
+  const syncInfo = (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {color === "green" ? (
+        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+      ) : (
+        <span className={`inline-block h-2 w-2 rounded-full ${dotColor}`} />
+      )}
+      <Clock className="h-3 w-3" />
+      <span>Son sync: {formatRelativeTime(lastSyncAt)}</span>
+      {lastSyncError && (
+        <AlertCircle className="h-3 w-3 text-red-500" />
+      )}
+    </div>
+  );
+
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        {color === "green" ? (
-          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-        ) : (
-          <span className={`inline-block h-2 w-2 rounded-full ${dotColor}`} />
-        )}
-        <Clock className="h-3 w-3" />
-        <span>Son sync: {formatRelativeTime(lastSyncAt)}</span>
-      </div>
+      {lastSyncError ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="cursor-help">{syncInfo}</div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs text-xs">
+            <p className="font-semibold text-red-600 mb-1">Sync hatası:</p>
+            <p className="text-muted-foreground break-words">{lastSyncError}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        syncInfo
+      )}
       <Button
         variant="ghost"
         size="sm"

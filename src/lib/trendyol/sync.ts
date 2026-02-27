@@ -233,7 +233,10 @@ export async function syncOrders(
     const WEEK_MS = 7 * 86_400_000;
     const DAY_MS = 86_400_000;
     const lastSync = await getLastSyncTime(supabase, "orders");
-    const isIncremental = lastSync && (now - lastSync < 24 * 60 * 60 * 1000);
+    // 7 günlük threshold: son sync 7 günden yeniyse incremental (son 2 gün).
+    // 24 saatlik threshold Vercel'in 120s limitinde timeout'a yol açıyordu
+    // çünkü 24h geçince tam 90 günlük tarama başlıyordu.
+    const isIncremental = lastSync && (now - lastSync < 7 * 24 * 60 * 60 * 1000);
 
     const chunks: { start: number; end: number }[] = [];
 
@@ -557,23 +560,23 @@ export async function syncOtherFinancials(
 // Sadece son 2 günü tarar — hızlı (1-3 sn).
 
 export async function quickSyncRecentOrders(): Promise<void> {
+  const adminSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  // Skip if synced within last 5 minutes
+  const lastSync = await getLastSyncTime(adminSupabase, "orders");
+  if (lastSync && Date.now() - lastSync < 5 * 60 * 1000) {
+    return; // Already fresh
+  }
+
+  const now = Date.now();
+  const DAY_MS = 86_400_000;
+  const logId = await createSyncLog(adminSupabase, "orders");
+  let totalSynced = 0;
+
   try {
-    const adminSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    // Skip if synced within last 5 minutes
-    const lastSync = await getLastSyncTime(adminSupabase, "orders");
-    if (lastSync && Date.now() - lastSync < 5 * 60 * 1000) {
-      return; // Already fresh
-    }
-
-    const now = Date.now();
-    const DAY_MS = 86_400_000;
-    const logId = await createSyncLog(adminSupabase, "orders");
-    let totalSynced = 0;
-
     // Only fetch last 2 days
     let page = 0;
     let hasMore = true;
@@ -617,7 +620,13 @@ export async function quickSyncRecentOrders(): Promise<void> {
 
     await completeSyncLog(adminSupabase, logId, totalSynced);
   } catch (e) {
-    // Silent fail — don't break the dashboard page
-    console.error("[Trendyol QuickSync]", e instanceof Error ? e.message : e);
+    // Hata mesajını sync_log'a kaydet — UI'da görünür hale getir
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[Trendyol QuickSync]", msg);
+    try {
+      await completeSyncLog(adminSupabase, logId, totalSynced, msg);
+    } catch {
+      // DB write de başarısız — yapacak bir şey yok
+    }
   }
 }

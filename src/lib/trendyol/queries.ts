@@ -606,6 +606,47 @@ export async function getOverallLastSyncAt(): Promise<string | null> {
   return data?.completed_at || null;
 }
 
+/** Get last sync info including error message if failed */
+export async function getLastSyncInfo(): Promise<{
+  lastSuccessAt: string | null;
+  lastErrorMsg: string | null;
+  lastErrorAt: string | null;
+}> {
+  const supabase = await getUntypedClient();
+
+  const [successRes, errorRes] = await Promise.all([
+    supabase
+      .from("trendyol_sync_log")
+      .select("completed_at")
+      .eq("status", "success")
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("trendyol_sync_log")
+      .select("completed_at, error_message, entity_type")
+      .eq("status", "error")
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const lastSuccessAt = successRes.data?.completed_at || null;
+  const lastErrorMsg = errorRes.data?.error_message || null;
+  const lastErrorAt = errorRes.data?.completed_at || null;
+
+  // Only surface the error if it happened AFTER the last success
+  const errorIsRecent =
+    lastErrorAt &&
+    (!lastSuccessAt || new Date(lastErrorAt) > new Date(lastSuccessAt));
+
+  return {
+    lastSuccessAt,
+    lastErrorMsg: errorIsRecent ? lastErrorMsg : null,
+    lastErrorAt: errorIsRecent ? lastErrorAt : null,
+  };
+}
+
 /** Check if DB has any data (at least 1 order synced) */
 export async function hasAnyData(): Promise<boolean> {
   const supabase = await getUntypedClient();

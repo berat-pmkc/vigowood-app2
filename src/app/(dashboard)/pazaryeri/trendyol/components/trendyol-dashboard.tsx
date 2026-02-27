@@ -96,6 +96,7 @@ interface Props {
   months: MonthOption[];
   isCurrentMonth: boolean;
   lastSyncAt: string | null;
+  lastSyncError?: string | null;
 }
 
 export function TrendyolDashboard({
@@ -109,6 +110,7 @@ export function TrendyolDashboard({
   months,
   isCurrentMonth,
   lastSyncAt,
+  lastSyncError,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -245,7 +247,7 @@ export function TrendyolDashboard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <SyncStatus lastSyncAt={lastSyncAt} />
+          <SyncStatus lastSyncAt={lastSyncAt} lastSyncError={lastSyncError} />
           <Select value={selectedMonth} onValueChange={handleMonthChange}>
             <SelectTrigger className="h-8 w-[160px] text-xs">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />

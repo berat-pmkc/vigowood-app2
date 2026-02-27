@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getOverallLastSyncAt } from "@/lib/trendyol/queries";
+import { getLastSyncInfo } from "@/lib/trendyol/queries";
 import { quickSyncRecentOrders } from "@/lib/trendyol/sync";
 import { TrendyolDashboard } from "./components/trendyol-dashboard";
 
@@ -123,7 +123,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   }
 
   // 3. Products count + questions count + last sync
-  const [productsResult, questionsResult, lastSyncAt] = await Promise.all([
+  const [productsResult, questionsResult, syncInfo] = await Promise.all([
     supabase
       .from("trendyol_products")
       .select("id, quantity", { count: "exact" }),
@@ -131,13 +131,15 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
       .from("trendyol_questions")
       .select("id", { count: "exact" })
       .eq("status", "WAITING_FOR_ANSWER"),
-    getOverallLastSyncAt(),
+    getLastSyncInfo(),
   ]);
 
   const totalProducts = productsResult.count || 0;
   const productRows = (productsResult.data || []) as { id: string; quantity: number }[];
   const outOfStockCount = productRows.filter((p) => p.quantity === 0).length;
   const pendingQuestions = questionsResult.count || 0;
+  const lastSyncAt = syncInfo.lastSuccessAt;
+  const lastSyncError = syncInfo.lastErrorMsg;
 
   // ─── Turkey-aware date keys ──────────────────────────
   const todayKey = todayKeyTR();
@@ -306,6 +308,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
       months={months}
       isCurrentMonth={isCurrentMonth}
       lastSyncAt={lastSyncAt}
+      lastSyncError={lastSyncError}
     />
   );
 }
