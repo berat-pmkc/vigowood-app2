@@ -18,6 +18,9 @@ const csp = [
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   experimental: {
+    serverActions: {
+      bodySizeLimit: "3mb",
+    },
     staleTimes: {
       dynamic: 30,
       static: 180,
