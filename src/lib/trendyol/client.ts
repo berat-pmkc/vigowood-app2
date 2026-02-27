@@ -18,6 +18,7 @@ import type {
   TrendyolOtherFinancial,
   TrendyolStockPriceItem,
   TrendyolUpdatePackageParams,
+  TrendyolUpdateTrackingParams,
   TrendyolClaim,
   TrendyolApiError,
 } from "./types";
@@ -26,9 +27,9 @@ import type {
 const BASE_URL = "https://apigw.trendyol.com/integration";
 
 function getConfig() {
-  const apiKey = process.env.TRENDYOL_API_KEY;
-  const apiSecret = process.env.TRENDYOL_API_SECRET;
-  const sellerId = process.env.TRENDYOL_SELLER_ID;
+  const apiKey = process.env.TRENDYOL_API_KEY?.trim().replace(/^"|"$/g, "");
+  const apiSecret = process.env.TRENDYOL_API_SECRET?.trim().replace(/^"|"$/g, "");
+  const sellerId = process.env.TRENDYOL_SELLER_ID?.trim().replace(/^"|"$/g, "");
 
   if (!apiKey || !apiSecret || !sellerId) {
     throw new Error("Trendyol API credentials not configured. Check TRENDYOL_API_KEY, TRENDYOL_API_SECRET, TRENDYOL_SELLER_ID in .env.local");
@@ -49,13 +50,14 @@ function getUserAgent() {
 }
 
 // ─── Rate Limiting ───────────────────────────────────────
-// Trendyol: max 50 requests per endpoint within 10 seconds
+// Trendyol: max 1000 requests per minute (docs 2025)
+// We cap at 80/10s = 480/min — well under the limit
 const requestTimestamps: Map<string, number[]> = new Map();
 
 function checkRateLimit(endpoint: string): boolean {
   const now = Date.now();
   const windowMs = 10_000; // 10 seconds
-  const maxRequests = 45; // stay under 50
+  const maxRequests = 80; // stay under 1000/min (= 166/10s)
 
   const timestamps = requestTimestamps.get(endpoint) ?? [];
   const recent = timestamps.filter((t) => now - t < windowMs);
@@ -173,6 +175,37 @@ export async function updatePackageStatus(
     `/order/sellers/${sellerId}/shipment-packages/${packageId}`,
     { method: "PUT", body }
   );
+}
+
+/**
+ * Kargo takip numarası güncelle.
+ * Trendyol müşteriye tracking link gönderir.
+ * Sadece Created/Picking/Invoiced durumdaki paketler için geçerlidir.
+ * Ref: PUT /integration/order/sellers/{sellerId}/shipment-packages/{packageId}/tracking-details
+ */
+export async function updateTrackingNumber(
+  packageId: number,
+  body: TrendyolUpdateTrackingParams
+): Promise<void> {
+  const { sellerId } = getConfig();
+  await trendyolFetch(
+    `/order/sellers/${sellerId}/shipment-packages/${packageId}/tracking-details`,
+    { method: "PUT", body }
+  );
+}
+
+/**
+ * Tek sipariş getir (sipariş numarasına göre).
+ */
+export async function getOrderByNumber(
+  orderNumber: string
+): Promise<TrendyolOrder | null> {
+  const { sellerId } = getConfig();
+  const result = await trendyolFetch<TrendyolPaginatedResponse<TrendyolOrder>>(
+    `/order/sellers/${sellerId}/orders`,
+    { params: { orderNumber, size: 1 } }
+  );
+  return result.content[0] ?? null;
 }
 
 // ─── Products ────────────────────────────────────────────

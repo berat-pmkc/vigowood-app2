@@ -135,7 +135,10 @@ function mapOrderLineToRow(line: TrendyolOrderLine, orderId: number) {
     vat_rate: line.vatRate || null,
     price: line.price,
     status_name: line.orderLineItemStatusName,
-    commission: line.commission || null,
+    // commission: rate (0-1) veya percentage (0-100) — API'den gelen değer
+    commission: line.commission ?? null,
+    // commission_amount: Trendyol'un hesapladığı gerçek komisyon tutarı (varsa)
+    commission_amount: line.commissionAmount ?? null,
     product_size: line.productSize || null,
     product_color: line.productColor || null,
     image_url: line.imageUrl || null,

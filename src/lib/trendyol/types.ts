@@ -32,18 +32,23 @@ export interface TrendyolAddress {
   address1: string;
   address2?: string;
   city: string;
-  cityCode: number;
+  cityCode?: number;
   district: string;
   districtId?: number;
+  countyId?: number;
+  countyName?: string;
   postalCode: string;
   countryCode: string;
   neighborhoodId?: number;
+  neighborhood?: string;
   fullName?: string;
   fullAddress: string;
   phone?: string;
   email?: string;
   taxOffice?: string;
   taxNumber?: string;
+  latitude?: string;
+  longitude?: string;
   eInvoiceAvailable?: boolean;
 }
 
@@ -56,20 +61,40 @@ export interface TrendyolOrderLine {
   sku?: string;
   stockCode?: string;
   productName: string;
+  productCode?: number;
   barcode: string;
+  /** Net amount after discounts (what customer pays) */
   amount: number;
+  /** Gross amount before discounts */
+  lineGrossAmount?: number;
+  lineUnitPrice?: number;
   discount: number;
+  /** Total discount on this line */
+  lineTotalDiscount?: number;
+  /** Seller-funded discount */
+  lineSellerDiscount?: number;
+  /** Trendyol-funded discount */
+  tyDiscount?: number;
   currencyCode: string;
   vatBaseAmount: number;
   vatRate?: number;
   price: number;
   orderLineItemStatusName: string;
   productCategoryId?: number;
+  /** Commission rate (0–1 range, e.g. 0.15 = 15%) */
   commission?: number;
+  /** Actual commission amount in currency */
+  commissionAmount?: number;
   productSize?: string;
   productColor?: string;
+  productOrigin?: string;
+  contentId?: number;
   merchantId?: number;
   imageUrl?: string;
+  cancelReason?: string;
+  cancelReasonCode?: string;
+  cancelledBy?: string;
+  fastDeliveryOptions?: string[];
 }
 
 export interface TrendyolPackageHistory {
@@ -355,6 +380,20 @@ export interface TrendyolUpdatePackageParams {
   lines: { lineId: number; quantity: number }[];
   params?: Record<string, string>;
   status: "Picking" | "Invoiced";
+}
+
+/**
+ * Kargo takip numarası güncelleme parametreleri.
+ * PUT /integration/order/sellers/{sellerId}/shipment-packages/{packageId}/tracking-details
+ * Trendyol bu numarayı müşteriye SMS/email ile gönderir.
+ */
+export interface TrendyolUpdateTrackingParams {
+  /** Kargo firmasının verdiği takip/gönderi numarası */
+  cargoSenderNumber: string;
+  /** Kargo firması kodu (ör. "YURTICI", "MNG", "ARAS", "PTT", "DHLMP") */
+  providerCode: string;
+  /** İade kargo takip numarası (opsiyonel) */
+  returnTrackingNumber?: string;
 }
 
 // ─── API Error ───────────────────────────────────────────
