@@ -130,9 +130,10 @@ export function AppSidebar({
               <SidebarGroup className="py-0.5 px-2">
                 <SidebarGroupLabel
                   asChild
-                  className="h-7 text-[11px] cursor-pointer hover:text-sidebar-foreground transition-colors"
+                  className="h-7 text-[11px] font-semibold tracking-wide uppercase cursor-pointer hover:text-sidebar-foreground transition-colors"
                 >
-                  <CollapsibleTrigger className="flex w-full items-center">
+                  <CollapsibleTrigger className="flex w-full items-center gap-2">
+                    <span className="w-[3px] h-3.5 rounded-full bg-vw-primary/70 shrink-0" />
                     <span className="flex-1 text-left">{group.label}</span>
                     <ChevronRight className="ml-auto size-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   </CollapsibleTrigger>
