@@ -29,8 +29,6 @@ import {
   CheckCircle2,
   Circle,
   Plus,
-  ShieldAlert,
-  Clock,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -106,16 +104,27 @@ function getAgentColor(agentId: string) {
   return AGENT_COLORS[Math.abs(hash) % AGENT_COLORS.length];
 }
 
+const ALL_STATUS_OPTIONS = [
+  ...TASK_STATUSES.map((s) => ({ value: s, label: TASK_STATUS_LABELS[s] })),
+  { value: "blocked", label: "🚫 Engellendi" },
+  { value: "waiting_approval", label: "⏳ Onay Bekliyor" },
+];
+
 // ─── Markdown Renderer ───────────────────────────────────────
 
 function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="prose prose-sm max-w-none break-words
+    <div className="
+      prose prose-sm max-w-none break-words
       prose-headings:font-semibold prose-headings:text-vw-dark
       prose-h1:text-xl prose-h2:text-lg prose-h3:text-base
-      prose-table:text-xs prose-td:py-1 prose-th:py-1
       prose-code:bg-muted prose-code:px-1 prose-code:rounded prose-code:text-xs
-      prose-pre:bg-muted prose-pre:text-xs">
+      prose-pre:bg-muted prose-pre:text-xs
+      [&_table]:border-collapse [&_table]:w-full [&_table]:text-xs [&_table]:my-3
+      [&_th]:bg-muted/70 [&_th]:font-semibold [&_th]:border [&_th]:border-border [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left
+      [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-1.5
+      [&_tbody_tr:nth-child(even)]:bg-muted/20
+    ">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   );
@@ -268,11 +277,19 @@ export function TaskDetailSheet({
     if (result.success) loadData();
   };
 
-  const handleBoolToggle = async (
-    field: "is_blocked" | "is_waiting_approval",
-    current: boolean
-  ) => {
-    const result = await updateTask(taskId, { [field]: !current });
+  const handleStatusChange = async (v: string) => {
+    let result;
+    if (v === "blocked") {
+      result = await updateTask(taskId, { is_blocked: true, is_waiting_approval: false });
+    } else if (v === "waiting_approval") {
+      result = await updateTask(taskId, { is_waiting_approval: true, is_blocked: false });
+    } else {
+      result = await updateTask(taskId, {
+        status: v as TaskStatus,
+        is_blocked: false,
+        is_waiting_approval: false,
+      });
+    }
     if (result.success) loadData();
     else toast.error(result.error || "Güncelleme başarısız");
   };
@@ -312,6 +329,12 @@ export function TaskDetailSheet({
   };
 
   // ─── Derived Data ────────────────────────────────────────────
+
+  const computedStatus = task?.is_blocked
+    ? "blocked"
+    : task?.is_waiting_approval
+      ? "waiting_approval"
+      : (task?.status ?? "queue");
 
   const isAgentTask = !!assignedAgent;
 
@@ -441,20 +464,20 @@ export function TaskDetailSheet({
                 </div>
               </div>
 
-              {/* Property badges row */}
+              {/* Property badges row — primary */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Status */}
+                {/* Status — includes blocked + waiting_approval as virtual states */}
                 <Select
-                  value={task.status}
-                  onValueChange={(v) => handleFieldUpdate("status", v)}
+                  value={computedStatus}
+                  onValueChange={handleStatusChange}
                 >
                   <SelectTrigger className="h-7 w-auto text-xs border-0 bg-muted px-2 rounded-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {TASK_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {TASK_STATUS_LABELS[s]}
+                    {ALL_STATUS_OPTIONS.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -485,9 +508,7 @@ export function TaskDetailSheet({
                   }
                 >
                   <SelectTrigger className="h-7 w-auto text-xs border-0 bg-muted px-2 rounded-full">
-                    <SelectValue
-                      placeholder="Atanmamış"
-                    >
+                    <SelectValue placeholder="Atanmamış">
                       {isAgentTask ? (
                         <span className="flex items-center gap-1">
                           <span>🤖</span>
@@ -516,23 +537,6 @@ export function TaskDetailSheet({
                   </SelectContent>
                 </Select>
 
-                {/* Department */}
-                <Select
-                  value={task.department}
-                  onValueChange={(v) => handleFieldUpdate("department", v)}
-                >
-                  <SelectTrigger className="h-7 w-auto text-xs border-0 bg-muted px-2 rounded-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TASK_DEPARTMENTS.map((d) => (
-                      <SelectItem key={d} value={d}>
-                        {TASK_DEPARTMENT_LABELS[d]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
                 {/* Due date */}
                 <div className="relative flex items-center h-7 bg-muted rounded-full px-2 gap-1">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
@@ -546,52 +550,45 @@ export function TaskDetailSheet({
                   />
                 </div>
 
-                {/* Flag badges */}
-                <button
-                  onClick={() => handleBoolToggle("is_blocked", task.is_blocked)}
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                    task.is_blocked
-                      ? "bg-red-100 text-red-700"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <ShieldAlert className="h-3 w-3" />
-                  Engellendi
-                </button>
-                <button
-                  onClick={() =>
-                    handleBoolToggle("is_waiting_approval", task.is_waiting_approval)
-                  }
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                    task.is_waiting_approval
-                      ? "bg-purple-100 text-purple-700"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Clock className="h-3 w-3" />
-                  Onay Bekliyor
-                </button>
-
                 {task.source_type !== "manual" && (
                   <Badge variant="outline" className="h-7 text-xs rounded-full">
                     {task.source_type === "recurring_job" ? "Tekrarlayan" : "Alarm"}
                   </Badge>
                 )}
               </div>
+
+              {/* Property badges row — secondary */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={task.department}
+                  onValueChange={(v) => handleFieldUpdate("department", v)}
+                >
+                  <SelectTrigger className="h-6 w-auto text-[11px] border border-border/60 bg-transparent px-2 rounded-full text-muted-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TASK_DEPARTMENTS.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {TASK_DEPARTMENT_LABELS[d]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </SheetHeader>
 
             {/* ── SCROLLABLE CONTENT ─────────────────────────── */}
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <div className="px-6 py-5 space-y-8">
+              <div className="divide-y divide-border">
 
                 {/* ── SECTION 1: ANA İÇERİK ─────────────────── */}
                 {isAgentTask ? (
                   /* Agent Görevi — Rapor */
-                  <section>
+                  <section className="px-6 py-5">
                     {/* Agent info bar */}
                     {agentColor && assignedAgent && (
                       <div
-                        className="flex items-center justify-between mb-3 px-3 py-2 rounded-lg text-xs"
+                        className="flex items-center justify-between mb-4 px-3 py-2 rounded-lg text-xs"
                         style={{ backgroundColor: agentColor.bg, color: agentColor.text }}
                       >
                         <span className="flex items-center gap-1.5 font-medium">
@@ -632,7 +629,9 @@ export function TaskDetailSheet({
                     )}
 
                     {reportContent ? (
-                      <MarkdownContent content={reportContent} />
+                      <div className="rounded-lg bg-muted/20 px-4 py-4 border border-border/40">
+                        <MarkdownContent content={reportContent} />
+                      </div>
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-muted-foreground/20 py-10 text-center text-muted-foreground">
                         <span className="text-2xl mb-2 block">
@@ -655,7 +654,7 @@ export function TaskDetailSheet({
                   </section>
                 ) : (
                   /* İnsan Görevi — Açıklama + Alt Görevler */
-                  <section className="space-y-6">
+                  <section className="px-6 py-5 space-y-6">
                     {/* Description */}
                     <div>
                       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -752,9 +751,9 @@ export function TaskDetailSheet({
 
                 {/* ── SECTION 2: DOSYALAR ─────────────────────── */}
                 {filesWithUrl.length > 0 && (
-                  <section>
+                  <section className="px-6 py-5">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Dosyalar
+                      📎 Dosyalar
                     </h3>
                     <div className="space-y-2">
                       {filesWithUrl.map((f) => (
@@ -797,7 +796,7 @@ export function TaskDetailSheet({
 
                 {/* If no files yet, still show upload for human tasks */}
                 {filesWithUrl.length === 0 && !isAgentTask && (
-                  <section>
+                  <section className="px-6 py-3">
                     <label className="cursor-pointer">
                       <input type="file" className="hidden" onChange={handleFileUpload} />
                       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -809,10 +808,20 @@ export function TaskDetailSheet({
                 )}
 
                 {/* ── SECTION 3: YORUMLAR / SOHBET ─────────────── */}
-                <section>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                    Yorumlar {comments.length > 0 && `(${comments.length})`}
-                  </h3>
+                <section className="px-6 py-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      💬 Yorumlar
+                    </h3>
+                    {comments.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs rounded-full h-5 min-w-[20px] flex items-center justify-center px-1.5"
+                      >
+                        {comments.length}
+                      </Badge>
+                    )}
+                  </div>
 
                   {/* Comment list */}
                   <div className="space-y-4">
@@ -960,7 +969,7 @@ export function TaskDetailSheet({
                 </section>
 
                 {/* ── SECTION 4: AKTİVİTE (collapsible) ───────── */}
-                <section className="pb-8">
+                <section className="px-6 py-5 pb-10">
                   <button
                     onClick={() => setActivityOpen((prev) => !prev)}
                     className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors w-full text-left"
@@ -969,6 +978,11 @@ export function TaskDetailSheet({
                     {activity.length > 0 && (
                       <span className="normal-case font-normal text-xs">
                         ({activity.length})
+                      </span>
+                    )}
+                    {isAgentTask && agentActions.length > 0 && (
+                      <span className="normal-case font-normal text-xs text-muted-foreground">
+                        · 🤖 {totalTokens.toLocaleString("tr-TR")} token · ${totalCost.toFixed(2)} · {agentActions.length} işlem · {(totalDurationMs / 1000).toFixed(0)}s
                       </span>
                     )}
                     {activityOpen ? (
@@ -980,38 +994,6 @@ export function TaskDetailSheet({
 
                   {activityOpen && (
                     <div className="mt-4 space-y-4">
-                      {/* Agent summary card (only if agent task & has actions) */}
-                      {isAgentTask && agentActions.length > 0 && (
-                        <div className="rounded-lg border p-3">
-                          <p className="text-xs font-semibold text-muted-foreground mb-2">
-                            🤖 Agent Çalışma Özeti
-                          </p>
-                          <div className="grid grid-cols-4 gap-2 text-center">
-                            <div>
-                              <p className="text-sm font-bold">
-                                {totalTokens.toLocaleString("tr-TR")}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">Token</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold">
-                                ${totalCost.toFixed(4)}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">Maliyet</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold">{agentActions.length}</p>
-                              <p className="text-[10px] text-muted-foreground">İşlem</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold">
-                                {(totalDurationMs / 1000).toFixed(0)}s
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">Süre</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                       {/* Activity log */}
                       {activity.length === 0 ? (
