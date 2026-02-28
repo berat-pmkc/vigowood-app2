@@ -230,16 +230,17 @@ export async function syncOrders(
   let totalSynced = 0;
 
   try {
-    // Incremental sync: If last successful sync was within 24h, only fetch
-    // last 2 days (fast, for frequent cron). Otherwise full 90-day sweep.
     const now = Date.now();
     const WEEK_MS = 7 * 86_400_000;
     const DAY_MS = 86_400_000;
     const lastSync = await getLastSyncTime(supabase, "orders");
     // 7 günlük threshold: son sync 7 günden yeniyse incremental (son 2 gün).
-    // 24 saatlik threshold Vercel'in 120s limitinde timeout'a yol açıyordu
-    // çünkü 24h geçince tam 90 günlük tarama başlıyordu.
     const isIncremental = lastSync && (now - lastSync < 7 * 24 * 60 * 60 * 1000);
+
+    // dateQueryType stratejisi:
+    // - Incremental (son 2 gün): LAST_MODIFIED_DATE — durum değişikliklerini (teslim, iptal, iade) yakalar
+    // - Full sweep (90 gün): CREATED_DATE — sipariş oluşturma tarihine göre, panel sayımıyla eşleşir
+    const dateQueryType = isIncremental ? "LAST_MODIFIED_DATE" : "CREATED_DATE";
 
     const chunks: { start: number; end: number }[] = [];
 
@@ -276,6 +277,7 @@ export async function syncOrders(
           size: 200,
           orderByField: "PackageLastModifiedDate",
           orderByDirection: "DESC",
+          dateQueryType,
         });
         requestCount++;
 

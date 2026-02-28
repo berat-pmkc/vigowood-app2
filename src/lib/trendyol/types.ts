@@ -328,9 +328,16 @@ export interface TrendyolOrderParams {
   size?: number;
   status?: TrendyolOrderStatus;
   orderNumber?: string;
-  orderByField?: "PackageLastModifiedDate";
+  orderByField?: "PackageLastModifiedDate" | "CreatedDate";
   orderByDirection?: "ASC" | "DESC";
   shipmentPackageIds?: number;
+  /**
+   * Hangi tarihe göre filtreleme yapılacağını belirler.
+   * CREATED_DATE: orderDate bazlı (panel ile aynı sayım — tercih edilen)
+   * LAST_MODIFIED_DATE: PackageLastModifiedDate bazlı (durum güncellemelerini yakalar)
+   * Belirtilmezse API varsayılan olarak LAST_MODIFIED_DATE kullanır.
+   */
+  dateQueryType?: "CREATED_DATE" | "LAST_MODIFIED_DATE";
 }
 
 export interface TrendyolProductParams {
