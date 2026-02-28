@@ -55,6 +55,7 @@ export type TaskComment = {
   author_id: string;
   content: string;
   created_at: string;
+  is_agent?: boolean;
   author_name?: string;
 };
 
@@ -379,16 +380,25 @@ export async function getTaskComments(taskId: string) {
   if (error) return [];
 
   const authorIds = [...new Set(comments.map((c) => c.author_id))];
-  const { data: users } = await supabase
-    .from("users")
-    .select("user_id, full_name")
-    .in("user_id", authorIds);
+
+  const [{ data: users }, { data: agents }] = await Promise.all([
+    supabase
+      .from("users")
+      .select("user_id, full_name")
+      .in("user_id", authorIds),
+    supabase
+      .from("ops_agents")
+      .select("id, name")
+      .in("id", authorIds),
+  ]);
 
   const userMap = new Map(users?.map((u) => [u.user_id, u.full_name]) ?? []);
+  const agentMap = new Map(agents?.map((a) => [a.id, a.name]) ?? []);
 
   return comments.map((c) => ({
     ...c,
-    author_name: userMap.get(c.author_id) ?? "Bilinmeyen",
+    author_name: userMap.get(c.author_id) ?? agentMap.get(c.author_id) ?? "Sistem",
+    is_agent: agentMap.has(c.author_id),
   })) as TaskComment[];
 }
 
@@ -859,6 +869,19 @@ export async function reviewApproval(
   revalidatePath("/ops/onaylar");
   revalidatePath("/ops");
   return { success: true };
+}
+
+// ─── Agent Info (for detail sheet — checks if UUID belongs to an agent) ─────
+
+export async function getAgentInfo(agentId: string | null) {
+  if (!agentId) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ops_agents")
+    .select("id, name, code, department")
+    .eq("id", agentId)
+    .single();
+  return data ?? null;
 }
 
 // ─── Task Output (for detail sheet) ─────────────────────────
