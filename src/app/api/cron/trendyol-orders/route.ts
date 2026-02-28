@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
-import { syncOrders, syncQuestions } from "@/lib/trendyol/sync";
+import { syncOrders, syncQuestions, syncClaims } from "@/lib/trendyol/sync";
 
 /**
  * Cron: Trendyol siparişler + sorular sync
@@ -28,15 +28,17 @@ export async function GET(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const [ordersResult, questionsResult] = await Promise.all([
+    const [ordersResult, questionsResult, claimsResult] = await Promise.all([
       syncOrders(supabase),
       syncQuestions(supabase),
+      syncClaims(supabase),
     ]);
 
     return NextResponse.json({
       success: true,
       orders: ordersResult,
       questions: questionsResult,
+      claims: claimsResult,
     });
   } catch (e) {
     return NextResponse.json(

@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getCurrentUser } from "@/lib/auth";
 import { MARKETPLACE_ACCESS_ROLES } from "@/lib/constants";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
-import { syncOrders, syncProducts, syncQuestions, syncSettlements, syncOtherFinancials } from "@/lib/trendyol/sync";
+import { syncOrders, syncProducts, syncQuestions, syncSettlements, syncOtherFinancials, syncClaims } from "@/lib/trendyol/sync";
 
 /**
  * Manuel sync endpoint — Kullanıcı tarafından tetiklenir.
@@ -50,6 +50,9 @@ export async function POST(request: Request) {
     }
     if (entity === "all" || entity === "otherfinancials") {
       results.otherfinancials = await syncOtherFinancials(supabase);
+    }
+    if (entity === "all" || entity === "claims") {
+      results.claims = await syncClaims(supabase);
     }
 
     return NextResponse.json({ success: true, results });

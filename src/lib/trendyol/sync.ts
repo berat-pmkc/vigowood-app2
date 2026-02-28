@@ -14,6 +14,7 @@ import type {
   TrendyolQuestion,
   TrendyolSettlement,
   TrendyolOtherFinancial,
+  TrendyolClaim,
 } from "./types";
 import {
   getOrders,
@@ -21,6 +22,7 @@ import {
   getQuestions,
   getSettlements,
   getOtherFinancials,
+  getClaims,
 } from "./client";
 import { daysAgoTimestamp, endOfTodayTimestamp } from "./helpers";
 
@@ -543,6 +545,95 @@ export async function syncOtherFinancials(
           .upsert(rows, { onConflict: "id" });
 
         if (err) throw new Error(`OtherFinancials upsert failed: ${err.message}`);
+
+        totalSynced += result.content.length;
+        page++;
+        hasMore = page < result.totalPages;
+      }
+    }
+
+    await completeSyncLog(supabase, logId, totalSynced);
+    return { synced: totalSynced };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await completeSyncLog(supabase, logId, totalSynced, msg);
+    return { synced: totalSynced, error: msg };
+  }
+}
+
+// ─── Claims Mapper ────────────────────────────────────────
+
+function mapClaimToRow(c: TrendyolClaim) {
+  return {
+    id: c.id,
+    order_number: c.orderNumber,
+    status: c.status,
+    claim_date: c.claimDate,
+    shipment_package_id: c.shipmentPackageId ?? null,
+    cargo_tracking_number: c.cargoTrackingNumber ?? null,
+    items: c.items || [],
+  };
+}
+
+// ─── Claims Sync ──────────────────────────────────────────
+
+export async function syncClaims(
+  supabase: SupabaseClient
+): Promise<{ synced: number; error?: string }> {
+  const logId = await createSyncLog(supabase, "claims");
+  let totalSynced = 0;
+
+  try {
+    const now = Date.now();
+    const DAY_MS = 86_400_000;
+    const lastSync = await getLastSyncTime(supabase, "claims");
+    // Incremental: son sync 7 günden yeniyse sadece son 7 günü çek
+    const isIncremental = lastSync && (now - lastSync < 7 * 24 * 60 * 60 * 1000);
+
+    const chunks: { start: number; end: number }[] = [];
+
+    if (isIncremental) {
+      // Son 7 gün — durum değişikliklerini (Accepted, Rejected, Cancelled) yakalar
+      chunks.push({ start: now - 7 * DAY_MS, end: now });
+    } else {
+      // Full sweep: 90 gün, 30'ar günlük parçalar
+      const CHUNKS = 3;
+      const CHUNK_MS = 30 * DAY_MS;
+      for (let i = 0; i < CHUNKS; i++) {
+        chunks.push({
+          start: now - (i + 1) * CHUNK_MS,
+          end: now - i * CHUNK_MS,
+        });
+      }
+    }
+
+    let requestCount = 0;
+
+    for (const chunk of chunks) {
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        if (requestCount > 0 && requestCount % 40 === 0) {
+          await sleep(10_000);
+        }
+
+        const result = await getClaims({
+          startDate: chunk.start,
+          endDate: chunk.end,
+          page,
+          size: 200,
+        });
+        requestCount++;
+
+        if (result.content.length === 0) break;
+
+        const rows = result.content.map(mapClaimToRow);
+        const { error: err } = await supabase
+          .from("trendyol_claims")
+          .upsert(rows, { onConflict: "id" });
+
+        if (err) throw new Error(`Claims upsert failed: ${err.message}`);
 
         totalSynced += result.content.length;
         page++;

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ShoppingCart, Package, MessageSquareText, DollarSign } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, MessageSquareText, DollarSign, RotateCcw } from "lucide-react";
 
 const tabs = [
   { title: "Dashboard", href: "/pazaryeri/trendyol", icon: LayoutDashboard, exact: true },
   { title: "Siparişler", href: "/pazaryeri/trendyol/siparisler", icon: ShoppingCart },
+  { title: "İadeler", href: "/pazaryeri/trendyol/iadeler", icon: RotateCcw },
   { title: "Ürünler", href: "/pazaryeri/trendyol/urunler", icon: Package },
   { title: "Sorular", href: "/pazaryeri/trendyol/sorular", icon: MessageSquareText },
   { title: "Finans", href: "/pazaryeri/trendyol/finans", icon: DollarSign },

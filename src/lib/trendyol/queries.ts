@@ -23,6 +23,9 @@ import type {
   TrendyolPaginatedResponse,
   TrendyolOrderStatus,
   TrendyolQuestionStatus,
+  TrendyolClaim,
+  TrendyolClaimStatus,
+  TrendyolClaimItem,
 } from "./types";
 
 // ─── Row Types (DB snake_case) ───────────────────────────
@@ -654,6 +657,98 @@ export async function hasAnyData(): Promise<boolean> {
     .from("trendyol_orders")
     .select("id", { count: "exact", head: true });
   return (count || 0) > 0;
+}
+
+// ─── Claims ───────────────────────────────────────────────
+
+interface ClaimRow {
+  id: string;
+  order_number: string;
+  status: string;
+  claim_date: number;
+  shipment_package_id: number | null;
+  cargo_tracking_number: string | null;
+  items: TrendyolClaimItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+function mapClaimRow(row: ClaimRow): TrendyolClaim {
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    status: row.status as TrendyolClaimStatus,
+    claimDate: row.claim_date,
+    shipmentPackageId: row.shipment_package_id ?? undefined,
+    cargoTrackingNumber: row.cargo_tracking_number ?? undefined,
+    items: row.items || [],
+  };
+}
+
+interface ClaimQueryParams {
+  startDate?: number;
+  endDate?: number;
+  status?: TrendyolClaimStatus | "all";
+  search?: string;
+  page?: number;
+  size?: number;
+}
+
+export async function getClaimsFromDB(
+  params: ClaimQueryParams = {}
+): Promise<TrendyolPaginatedResponse<TrendyolClaim>> {
+  const supabase = await getUntypedClient();
+  const page = params.page || 0;
+  const size = params.size || 50;
+  const from = page * size;
+  const to = from + size - 1;
+
+  let query = supabase
+    .from("trendyol_claims")
+    .select("*", { count: "exact" });
+
+  if (params.startDate) {
+    query = query.gte("claim_date", params.startDate);
+  }
+  if (params.endDate) {
+    query = query.lte("claim_date", params.endDate);
+  }
+  if (params.status && params.status !== "all") {
+    query = query.eq("status", params.status);
+  }
+  if (params.search) {
+    query = query.or(`order_number.ilike.%${params.search}%,id.ilike.%${params.search}%`);
+  }
+
+  query = query.order("claim_date", { ascending: false }).range(from, to);
+
+  const { data, count, error } = await query;
+
+  if (error || !data) {
+    console.error("[Trendyol DB] Claims query error:", error?.message);
+    return { page, size, totalElements: 0, totalPages: 0, content: [] };
+  }
+
+  const claims = (data as ClaimRow[]).map(mapClaimRow);
+  const totalElements = count || 0;
+
+  return {
+    page,
+    size,
+    totalElements,
+    totalPages: Math.ceil(totalElements / size),
+    content: claims,
+  };
+}
+
+/** Aktif (reddedilmemiş, iptal edilmemiş) claim sayısını döner — dashboard KPI için */
+export async function getActiveClaimsCount(): Promise<number> {
+  const supabase = await getUntypedClient();
+  const { count } = await supabase
+    .from("trendyol_claims")
+    .select("id", { count: "exact", head: true })
+    .not("status", "in", '("Rejected","Cancelled")');
+  return count || 0;
 }
 
 // ─── Other Financials ────────────────────────────────────

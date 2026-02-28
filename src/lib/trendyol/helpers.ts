@@ -2,7 +2,7 @@
  * Trendyol API Helper Functions
  * Status mapping, date conversion, price calculations
  */
-import type { TrendyolOrderStatus, TrendyolQuestionStatus, TrendyolOrder, TrendyolSettlement } from "./types";
+import type { TrendyolOrderStatus, TrendyolQuestionStatus, TrendyolOrder, TrendyolSettlement, TrendyolClaimStatus } from "./types";
 
 // ─── Order Status Mapping ────────────────────────────────
 export const ORDER_STATUS_LABELS: Record<TrendyolOrderStatus, string> = {
@@ -61,6 +61,39 @@ export const QUESTION_STATUS_COLORS: Record<TrendyolQuestionStatus, { bg: string
   REPORTED: { bg: "bg-orange-100", text: "text-orange-800" },
   REJECTED: { bg: "bg-red-100", text: "text-red-800" },
 };
+
+// ─── Claim Status Mapping ────────────────────────────────
+export const CLAIM_STATUS_LABELS: Record<TrendyolClaimStatus, string> = {
+  Created: "Oluşturuldu",
+  WaitingInAction: "İşlem Bekleniyor",
+  WaitingFraudCheck: "Dolandırıcılık Kontrolü",
+  Accepted: "Kabul Edildi",
+  Rejected: "Reddedildi",
+  Unresolved: "Çözüme Kavuşturulmadı",
+  Cancelled: "İptal Edildi",
+  InAnalysis: "İnceleniyor",
+};
+
+export const CLAIM_STATUS_COLORS: Record<TrendyolClaimStatus, { bg: string; text: string }> = {
+  Created: { bg: "bg-blue-100", text: "text-blue-800" },
+  WaitingInAction: { bg: "bg-amber-100", text: "text-amber-800" },
+  WaitingFraudCheck: { bg: "bg-orange-100", text: "text-orange-800" },
+  Accepted: { bg: "bg-emerald-100", text: "text-emerald-800" },
+  Rejected: { bg: "bg-slate-100", text: "text-slate-600" },
+  Unresolved: { bg: "bg-red-100", text: "text-red-800" },
+  Cancelled: { bg: "bg-gray-100", text: "text-gray-600" },
+  InAnalysis: { bg: "bg-purple-100", text: "text-purple-800" },
+};
+
+export const CLAIM_TAB_FILTERS: { label: string; status: TrendyolClaimStatus | "all" | "active" }[] = [
+  { label: "Tümü", status: "all" },
+  { label: "Aktif", status: "active" },
+  { label: "Oluşturuldu", status: "Created" },
+  { label: "İşlem Bekleniyor", status: "WaitingInAction" },
+  { label: "Kabul Edildi", status: "Accepted" },
+  { label: "Reddedildi", status: "Rejected" },
+  { label: "İptal", status: "Cancelled" },
+];
 
 // ─── Date Helpers ────────────────────────────────────────
 /** Trendyol timestamp (ms, GMT+3) → JS Date */

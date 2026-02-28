@@ -28,6 +28,7 @@ import {
   Package,
   MessageSquareText,
   CalendarDays,
+  RotateCcw,
 } from "lucide-react";
 import { formatTRY } from "@/lib/trendyol/helpers";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
@@ -60,6 +61,7 @@ interface KpiData {
   totalProducts: number;
   outOfStockCount: number;
   pendingQuestions: number;
+  activeClaimsCount: number;
 }
 
 interface TopProduct {
@@ -313,17 +315,19 @@ export function TrendyolDashboard({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground">
-              Bekleyen / İptal
+              Bekleyen / İptal / İade
             </CardTitle>
             <Clock className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-1.5">
               <span className="text-lg font-bold text-amber-600">{kpi.pendingCount}</span>
               <span className="text-xs text-muted-foreground">/</span>
               <span className="text-lg font-bold text-red-500">{kpi.cancelledCount}</span>
+              <span className="text-xs text-muted-foreground">/</span>
+              <span className="text-lg font-bold text-rose-600">{kpi.activeClaimsCount}</span>
             </div>
-            <p className="text-xs text-muted-foreground">bekleyen / iptal-iade</p>
+            <p className="text-xs text-muted-foreground">bekleyen / iptal / aktif iade talebi</p>
           </CardContent>
         </Card>
       </div>

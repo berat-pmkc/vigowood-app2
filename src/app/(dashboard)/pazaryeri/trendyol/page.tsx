@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getLastSyncInfo } from "@/lib/trendyol/queries";
+import { getLastSyncInfo, getActiveClaimsCount } from "@/lib/trendyol/queries";
 import { quickSyncRecentOrders } from "@/lib/trendyol/sync";
 import { TrendyolDashboard } from "./components/trendyol-dashboard";
 
@@ -122,8 +122,8 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
     }
   }
 
-  // 3. Products count + questions count + last sync
-  const [productsResult, questionsResult, syncInfo] = await Promise.all([
+  // 3. Products count + questions count + claims count + last sync
+  const [productsResult, questionsResult, syncInfo, activeClaimsCount] = await Promise.all([
     supabase
       .from("trendyol_products")
       .select("id, quantity", { count: "exact" }),
@@ -132,6 +132,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
       .select("id", { count: "exact" })
       .eq("status", "WAITING_FOR_ANSWER"),
     getLastSyncInfo(),
+    getActiveClaimsCount(),
   ]);
 
   const totalProducts = productsResult.count || 0;
@@ -177,6 +178,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
     totalProducts,
     outOfStockCount,
     pendingQuestions,
+    activeClaimsCount,
   };
 
   // ─── Monthly trend (day by day) ─────────────────────
