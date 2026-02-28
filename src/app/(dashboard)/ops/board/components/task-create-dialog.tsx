@@ -72,6 +72,8 @@ export function TaskCreateDialog({
   const [submitting, setSubmitting] = useState(false);
   const [taskMode, setTaskMode] = useState<TaskMode>("single");
 
+  const todayStr = new Date().toISOString().split("T")[0];
+
   const {
     register,
     handleSubmit,
@@ -87,7 +89,7 @@ export function TaskCreateDialog({
       priority: "medium",
       assigned_to: null,
       department: "genel",
-      due_date: null,
+      due_date: todayStr,
       parent_id: parentId ?? null,
       source_type: "manual",
       cron_schedule: "0 9 * * 1",
@@ -355,13 +357,30 @@ export function TaskCreateDialog({
           {taskMode === "single" && (
             <div>
               <Label>Bitiş Tarihi</Label>
-              <Input
-                type="date"
-                value={watch("due_date") ?? ""}
-                onChange={(e) =>
-                  setValue("due_date", e.target.value || null)
-                }
-              />
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  type="date"
+                  value={watch("due_date") ?? ""}
+                  onChange={(e) =>
+                    setValue("due_date", e.target.value || null)
+                  }
+                  className="flex-1"
+                />
+                {[1, 2, 3].map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + days);
+                      setValue("due_date", d.toISOString().split("T")[0]);
+                    }}
+                    className="shrink-0 rounded border border-input bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  >
+                    +{days}G
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

@@ -50,6 +50,7 @@ export function UserEditSheet({
 }: UserEditSheetProps) {
   const [isPending, startTransition] = useTransition();
   const [isActive, setIsActive] = useState(true);
+  const [canBeOpsAssignee, setCanBeOpsAssignee] = useState(false);
   const [password, setPassword] = useState("");
   const isCreate = mode === "create";
 
@@ -89,6 +90,7 @@ export function UserEditSheet({
         station: user.station as UserCreateData["station"],
       });
       setIsActive(user.is_active);
+      setCanBeOpsAssignee(user.can_be_ops_assignee ?? false);
       setPassword(user.password_plain || "");
     }
   }, [user, isCreate, reset, open]);
@@ -120,6 +122,7 @@ export function UserEditSheet({
           station: data.station,
           is_active: isActive,
           password_plain: password || null,
+          can_be_ops_assignee: canBeOpsAssignee,
         });
         if (result.success) {
           toast.success("Kullanıcı güncellendi");
@@ -283,19 +286,33 @@ export function UserEditSheet({
               )}
             </div>
 
-            {/* is_active — only in edit mode */}
+            {/* is_active & ops — only in edit mode */}
             {!isCreate && user && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is_active"
-                  checked={isActive}
-                  onCheckedChange={(checked) => {
-                    setIsActive(checked === true);
-                  }}
-                />
-                <Label htmlFor="is_active" className="cursor-pointer">
-                  Aktif kullanıcı
-                </Label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="is_active"
+                    checked={isActive}
+                    onCheckedChange={(checked) => {
+                      setIsActive(checked === true);
+                    }}
+                  />
+                  <Label htmlFor="is_active" className="cursor-pointer">
+                    Aktif kullanıcı
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="can_be_ops_assignee"
+                    checked={canBeOpsAssignee}
+                    onCheckedChange={(checked) => {
+                      setCanBeOpsAssignee(checked === true);
+                    }}
+                  />
+                  <Label htmlFor="can_be_ops_assignee" className="cursor-pointer">
+                    OPS Center&apos;da görev atanabilir
+                  </Label>
+                </div>
               </div>
             )}
           </div>

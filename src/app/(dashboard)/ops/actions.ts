@@ -605,7 +605,7 @@ export async function getAssignableUsers() {
     .from("users")
     .select("user_id, full_name, role")
     .eq("is_active", true)
-    .not("role", "in", '("Üretim","Hat")')
+    .eq("can_be_ops_assignee", true)
     .order("full_name");
 
   if (error) return [];

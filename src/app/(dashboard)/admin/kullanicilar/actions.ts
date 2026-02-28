@@ -115,6 +115,7 @@ export async function updateUser(
     station: string;
     is_active: boolean;
     password_plain?: string | null;
+    can_be_ops_assignee?: boolean;
   }
 ): Promise<ActionResult> {
   try {
@@ -156,6 +157,9 @@ export async function updateUser(
         station: parsed.data.station,
         is_active: parsed.data.is_active,
         password_plain: formData.password_plain ?? null,
+        ...(formData.can_be_ops_assignee !== undefined
+          ? { can_be_ops_assignee: formData.can_be_ops_assignee }
+          : {}),
       })
       .eq("user_id", userId);
 

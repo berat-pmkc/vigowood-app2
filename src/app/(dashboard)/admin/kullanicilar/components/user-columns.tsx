@@ -254,6 +254,22 @@ export function getUserColumns({
       size: 80,
     },
     {
+      accessorKey: "can_be_ops_assignee",
+      header: "OPS Atama",
+      cell: ({ row }) => {
+        const val = row.getValue("can_be_ops_assignee") as boolean;
+        return val ? (
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs hover:bg-blue-100">
+            Evet
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        );
+      },
+      size: 90,
+      meta: { className: "hidden lg:table-cell" },
+    },
+    {
       accessorKey: "last_sign_in_at",
       header: "Son Giriş",
       cell: ({ row }) => {

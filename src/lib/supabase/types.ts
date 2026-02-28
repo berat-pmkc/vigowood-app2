@@ -3605,6 +3605,7 @@ export type Database = {
         Row: {
           auth_id: string | null
           avatar_url: string | null
+          can_be_ops_assignee: boolean
           created_at: string
           email: string | null
           full_name: string
@@ -3618,6 +3619,7 @@ export type Database = {
         Insert: {
           auth_id?: string | null
           avatar_url?: string | null
+          can_be_ops_assignee?: boolean
           created_at?: string
           email?: string | null
           full_name: string
@@ -3631,6 +3633,7 @@ export type Database = {
         Update: {
           auth_id?: string | null
           avatar_url?: string | null
+          can_be_ops_assignee?: boolean
           created_at?: string
           email?: string | null
           full_name?: string

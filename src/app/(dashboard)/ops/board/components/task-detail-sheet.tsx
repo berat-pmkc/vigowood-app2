@@ -39,7 +39,6 @@ import {
   Cpu,
   Expand,
   FileText,
-  ChevronDown,
 } from "lucide-react";
 import {
   TASK_STATUSES,
@@ -429,50 +428,7 @@ export function TaskDetailSheet({
             <TabsContent value="comments" className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
               <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                 <div className="space-y-3">
-                  {/* Agent Report Section */}
-                  {taskOutput && (() => {
-                    const meta = taskOutput.metadata as Record<string, unknown> | null;
-                    const fullContent = meta?.full_content as string | undefined;
-                    if (!fullContent) return null;
-                    return (
-                      <div className="rounded-lg border border-blue-200 bg-blue-50/50">
-                        <div className="flex w-full items-center gap-2 p-3">
-                          <FileText className="h-4 w-4 text-blue-600 shrink-0" />
-                          <button
-                            onClick={() => setReportFullscreen(true)}
-                            className="flex-1 text-sm font-medium text-blue-900 hover:underline text-left truncate"
-                            title="Tam ekran aç"
-                          >
-                            {(taskOutput.file_name as string) || "Agent Raporu"}
-                          </button>
-                          <button
-                            onClick={() => setReportFullscreen(true)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors shrink-0"
-                            title="Tam ekran aç"
-                          >
-                            <Expand className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setReportOpen(!reportOpen)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors shrink-0"
-                          >
-                            <ChevronDown className={`h-4 w-4 transition-transform ${reportOpen ? "" : "-rotate-90"}`} />
-                          </button>
-                        </div>
-                        {reportOpen && (
-                          <div className="border-t border-blue-200 p-3 max-h-[300px] overflow-y-auto">
-                            <div className="prose prose-sm max-w-none break-words">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {fullContent}
-                              </ReactMarkdown>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {comments.length === 0 && !taskOutput && (
+                  {comments.length === 0 && (
                     <p className="text-center text-sm text-muted-foreground py-8">
                       Henüz yorum yok
                     </p>
@@ -792,7 +748,7 @@ export function TaskDetailSheet({
 
       {/* Fullscreen Report Dialog */}
       <Dialog open={reportFullscreen} onOpenChange={setReportFullscreen}>
-        <DialogContent className="max-w-3xl w-[90vw] h-[85vh] flex flex-col">
+        <DialogContent className="max-w-6xl w-[92vw] h-[90vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base">
               <FileText className="h-5 w-5 text-blue-600" />

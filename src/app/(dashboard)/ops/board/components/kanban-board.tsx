@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, Fragment } from "react";
+import { useState, useCallback, useMemo, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -51,6 +51,11 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
   const [tasks, setTasks] = useState(initialTasks);
+
+  // Sunucudan gelen yeni initialTasks ile senkronize et (router.refresh() sonrası)
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
   const [activeTask, setActiveTask] = useState<TaskWithRelations | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
