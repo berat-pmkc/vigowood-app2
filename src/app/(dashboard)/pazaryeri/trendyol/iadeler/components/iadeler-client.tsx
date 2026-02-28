@@ -146,12 +146,17 @@ export function IadelerClient({
         if (items.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
         return (
           <div className="space-y-0.5 max-w-[200px]">
-            {items.slice(0, 2).map((item, i) => (
-              <div key={i} className="text-xs text-muted-foreground truncate" title={item.productName}>
-                {item.productName || item.barcode || item.id}
-                {item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : ""}
-              </div>
-            ))}
+            {items.slice(0, 2).map((item, i) => {
+              // Gerçek API yapısı: items[].orderLine.productName
+              const name = item.orderLine?.productName || item.orderLine?.barcode || item.orderLine?.merchantSku || `Ürün ${i + 1}`;
+              const qty = item.claimItems?.length;
+              return (
+                <div key={i} className="text-xs text-muted-foreground truncate" title={name}>
+                  {name}
+                  {qty && qty > 1 ? ` ×${qty}` : ""}
+                </div>
+              );
+            })}
             {items.length > 2 && (
               <span className="text-xs text-muted-foreground">+{items.length - 2} daha</span>
             )}

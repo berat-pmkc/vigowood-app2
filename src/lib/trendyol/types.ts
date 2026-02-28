@@ -298,24 +298,44 @@ export type TrendyolClaimStatus =
   | "Cancelled"
   | "InAnalysis";
 
-export interface TrendyolClaimItem {
+/**
+ * Trendyol Claims API gerçek yapısı:
+ * items[] → her biri { orderLine: {...}, claimItems: [{claimItemStatus: {name: "..."}, ...}] }
+ */
+export interface TrendyolClaimItemEntry {
   id: string;
-  orderLineId?: number;
-  claimItemReasonId?: number;
-  claimItemReasonText?: string;
-  barcode?: string;
-  productName?: string;
-  quantity?: number;
+  note?: string;
+  resolved?: boolean;
+  acceptDetail?: string | null;
+  autoAccepted?: boolean | null;
   customerNote?: string;
-  // Item seviyesinde durum — API bunu "claimItemStatus" veya "status" olarak döner
-  claimItemStatus?: string;
-  status?: string;
+  autoApproveDate?: number;
+  claimItemStatus?: { name: string };
+  orderLineItemId?: number;
+  acceptedBySeller?: boolean | null;
+  customerClaimItemReason?: { id: number; code: string; name: string };
+  trendyolClaimItemReason?: { id: number; code: string; name: string };
+}
+
+export interface TrendyolClaimItem {
+  orderLine?: {
+    id: number;
+    price?: number;
+    barcode?: string;
+    vatRate?: number;
+    merchantSku?: string;
+    productName?: string;
+    productSize?: string;
+    productColor?: string;
+    productCategory?: string;
+  };
+  claimItems?: TrendyolClaimItemEntry[];
 }
 
 export interface TrendyolClaim {
   id: string;
   orderNumber: string;
-  // Bazı API versiyonlarında claim seviyesinde status olmayabilir; item'lardan türetilir
+  // Claim seviyesinde status yok; items[].claimItems[].claimItemStatus.name'den türetilir
   status?: TrendyolClaimStatus;
   claimDate: number;
   items: TrendyolClaimItem[];

@@ -37,8 +37,8 @@ export default async function TrendyolIadelerPage({ searchParams }: PageProps) {
     endDate = ed.getTime();
   }
 
-  // "active" filtresi: Rejected ve Cancelled hariç tümü
-  const INACTIVE_STATUSES: TrendyolClaimStatus[] = ["Rejected", "Cancelled"];
+  // "active" filtresi: işlem bekleyen (Accepted=tamamlandı, Rejected, Cancelled hariç)
+  const INACTIVE_STATUSES: TrendyolClaimStatus[] = ["Accepted", "Rejected", "Cancelled"];
   const activeStatuses: TrendyolClaimStatus[] = [
     "Created", "WaitingInAction", "WaitingFraudCheck", "Accepted", "Unresolved", "InAnalysis"
   ];

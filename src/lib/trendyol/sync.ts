@@ -563,16 +563,26 @@ export async function syncOtherFinancials(
 
 // ─── Claims Mapper ────────────────────────────────────────
 
-/** Claim item'larından en temsili durumu türetir */
+/**
+ * Claim status'unu türetir.
+ * Gerçek API yapısı: items[].claimItems[].claimItemStatus.name
+ * Öncelik: en kritik / bekleyen durum kazanır
+ */
 function deriveClaimStatus(c: TrendyolClaim): string {
-  // Önce claim seviyesinde status kontrol et
   if (c.status) return c.status;
 
-  // Yoksa item'lardan türet (claimItemStatus veya status alanı)
-  const items = c.items || [];
-  if (items.length === 0) return "Created";
+  // items[].claimItems[].claimItemStatus.name path'inden tüm status'ları topla
+  const allStatuses: string[] = [];
+  for (const item of c.items || []) {
+    for (const ci of item.claimItems || []) {
+      const name = ci.claimItemStatus?.name;
+      if (name) allStatuses.push(name);
+    }
+  }
 
-  // Öncelik sırası: en kritik durum kazanır
+  if (allStatuses.length === 0) return "Created";
+
+  // En kritik / bekleyen durum önce
   const PRIORITY: string[] = [
     "WaitingInAction",
     "WaitingFraudCheck",
@@ -584,16 +594,10 @@ function deriveClaimStatus(c: TrendyolClaim): string {
     "Cancelled",
   ];
 
-  const statuses = items
-    .map((it) => it.claimItemStatus || it.status || "")
-    .filter(Boolean);
-
-  if (statuses.length === 0) return "Created";
-
   for (const p of PRIORITY) {
-    if (statuses.includes(p)) return p;
+    if (allStatuses.includes(p)) return p;
   }
-  return statuses[0];
+  return allStatuses[0];
 }
 
 function mapClaimToRow(c: TrendyolClaim) {

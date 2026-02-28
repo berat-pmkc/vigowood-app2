@@ -741,13 +741,17 @@ export async function getClaimsFromDB(
   };
 }
 
-/** Aktif (reddedilmemiş, iptal edilmemiş) claim sayısını döner — dashboard KPI için */
+/**
+ * İşlem bekleyen claim sayısını döner — dashboard KPI için.
+ * Accepted (tamamlandı), Rejected (reddedildi), Cancelled (iptal) hariç.
+ * Yani: Created + WaitingInAction + WaitingFraudCheck + InAnalysis + Unresolved
+ */
 export async function getActiveClaimsCount(): Promise<number> {
   const supabase = await getUntypedClient();
   const { count } = await supabase
     .from("trendyol_claims")
     .select("id", { count: "exact", head: true })
-    .not("status", "in", '("Rejected","Cancelled")');
+    .not("status", "in", '("Accepted","Rejected","Cancelled")');
   return count || 0;
 }
 
