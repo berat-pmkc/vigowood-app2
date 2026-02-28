@@ -300,20 +300,23 @@ export type TrendyolClaimStatus =
 
 export interface TrendyolClaimItem {
   id: string;
-  orderLineId: number;
+  orderLineId?: number;
   claimItemReasonId?: number;
   claimItemReasonText?: string;
   barcode?: string;
   productName?: string;
   quantity?: number;
   customerNote?: string;
+  // Item seviyesinde durum — API bunu "claimItemStatus" veya "status" olarak döner
+  claimItemStatus?: string;
   status?: string;
 }
 
 export interface TrendyolClaim {
   id: string;
   orderNumber: string;
-  status: TrendyolClaimStatus;
+  // Bazı API versiyonlarında claim seviyesinde status olmayabilir; item'lardan türetilir
+  status?: TrendyolClaimStatus;
   claimDate: number;
   items: TrendyolClaimItem[];
   shipmentPackageId?: number;

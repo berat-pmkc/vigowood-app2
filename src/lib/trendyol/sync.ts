@@ -563,11 +563,44 @@ export async function syncOtherFinancials(
 
 // ─── Claims Mapper ────────────────────────────────────────
 
+/** Claim item'larından en temsili durumu türetir */
+function deriveClaimStatus(c: TrendyolClaim): string {
+  // Önce claim seviyesinde status kontrol et
+  if (c.status) return c.status;
+
+  // Yoksa item'lardan türet (claimItemStatus veya status alanı)
+  const items = c.items || [];
+  if (items.length === 0) return "Created";
+
+  // Öncelik sırası: en kritik durum kazanır
+  const PRIORITY: string[] = [
+    "WaitingInAction",
+    "WaitingFraudCheck",
+    "InAnalysis",
+    "Unresolved",
+    "Created",
+    "Accepted",
+    "Rejected",
+    "Cancelled",
+  ];
+
+  const statuses = items
+    .map((it) => it.claimItemStatus || it.status || "")
+    .filter(Boolean);
+
+  if (statuses.length === 0) return "Created";
+
+  for (const p of PRIORITY) {
+    if (statuses.includes(p)) return p;
+  }
+  return statuses[0];
+}
+
 function mapClaimToRow(c: TrendyolClaim) {
   return {
     id: c.id,
     order_number: c.orderNumber,
-    status: c.status,
+    status: deriveClaimStatus(c),
     claim_date: c.claimDate,
     shipment_package_id: c.shipmentPackageId ?? null,
     cargo_tracking_number: c.cargoTrackingNumber ?? null,
@@ -625,6 +658,12 @@ export async function syncClaims(
           size: 200,
         });
         requestCount++;
+
+        // Debug: ilk sayfada ilk claim'in yapısını logla
+        if (page === 0 && result.content.length > 0) {
+          const sample = result.content[0];
+          console.log("[Trendyol Claims] API sample:", JSON.stringify(sample, null, 2));
+        }
 
         if (result.content.length === 0) break;
 

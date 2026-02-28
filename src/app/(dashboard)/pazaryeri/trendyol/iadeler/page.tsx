@@ -60,7 +60,7 @@ export default async function TrendyolIadelerPage({ searchParams }: PageProps) {
   // Client-side "active" filtresi uygula
   let claims = result.content;
   if (status === "active") {
-    claims = claims.filter((c) => !INACTIVE_STATUSES.includes(c.status));
+    claims = claims.filter((c) => !INACTIVE_STATUSES.includes(c.status as TrendyolClaimStatus));
   }
 
   return (
