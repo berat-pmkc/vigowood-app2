@@ -4,6 +4,7 @@ import {
   getAssignableAgents,
   getTaskTemplates,
   getRecurringTasks,
+  getBoardStats,
 } from "../actions";
 import { KanbanBoard } from "./components/kanban-board";
 import { BoardTabs } from "./components/board-tabs";
@@ -22,12 +23,13 @@ export default async function OpsBoardPage({
   const activeTab = params.tab ?? "gorevler";
   const activeView = (params.view ?? "pano") as BoardView;
 
-  const [tasks, users, agents, templates, recurringTasks] = await Promise.all([
+  const [tasks, users, agents, templates, recurringTasks, stats] = await Promise.all([
     getTasks(),
     getAssignableUsers(),
     getAssignableAgents(),
     getTaskTemplates(),
     getRecurringTasks(),
+    getBoardStats(),
   ]);
 
   return (
@@ -53,6 +55,7 @@ export default async function OpsBoardPage({
           initialTasks={tasks}
           users={users}
           agents={agents}
+          stats={stats}
         />
       )}
 
@@ -61,6 +64,7 @@ export default async function OpsBoardPage({
           tasks={tasks.filter((t) => !t.parent_id)}
           users={users}
           agents={agents}
+          stats={stats}
         />
       )}
 
@@ -69,6 +73,7 @@ export default async function OpsBoardPage({
           tasks={tasks.filter((t) => !t.parent_id)}
           users={users}
           agents={agents}
+          stats={stats}
         />
       )}
 

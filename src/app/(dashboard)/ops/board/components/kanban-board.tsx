@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { toast } from "sonner";
-import { Plus, LayoutGrid, Users, ChevronDown } from "lucide-react";
+import { Plus, LayoutGrid, Users, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   TASK_STATUSES,
@@ -28,11 +28,12 @@ import {
   TASK_PRIORITY_LABELS,
   type TaskStatus,
 } from "@/lib/constants";
-import { updateTask, createTask, type TaskWithRelations } from "../../actions";
+import { updateTask, createTask, type TaskWithRelations, type BoardStats } from "../../actions";
 import { KanbanColumn } from "./kanban-column";
 import { TaskCard } from "./task-card";
 import { TaskDetailSheet } from "./task-detail-sheet";
 import { TaskCreateDialog } from "./task-create-dialog";
+import { BoardStatsBar, type QuickFilter } from "./board-stats-bar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -47,9 +48,10 @@ interface KanbanBoardProps {
   initialTasks: TaskWithRelations[];
   users: User[];
   agents: Agent[];
+  stats: BoardStats;
 }
 
-export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
+export function KanbanBoard({ initialTasks, users, agents, stats }: KanbanBoardProps) {
   const [tasks, setTasks] = useState(initialTasks);
 
   // Sunucudan gelen yeni initialTasks ile senkronize et (router.refresh() sonrası)
@@ -68,6 +70,8 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assigneeFilterMode, setAssigneeFilterMode] = useState<AssigneeFilterMode>("all");
   const [showOlderDone, setShowOlderDone] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
   const router = useRouter();
   const agentIdSet = useMemo(() => new Set(agents.map((a) => a.id)), [agents]);
@@ -77,7 +81,10 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
     useSensor(KeyboardSensor)
   );
 
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
+
   const filteredTasks = useMemo(() => {
+    const q = searchQuery.toLocaleLowerCase("tr");
     return tasks.filter((t) => {
       if (t.parent_id) return false; // Exclude subtasks
       if (deptFilter !== "all" && t.department !== deptFilter) return false;
@@ -85,9 +92,15 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (assigneeFilterMode === "users" && t.assigned_to && agentIdSet.has(t.assigned_to)) return false;
       if (assigneeFilterMode === "agents" && t.assigned_to && !agentIdSet.has(t.assigned_to)) return false;
+      // Text search
+      if (q && !t.title.toLocaleLowerCase("tr").includes(q)) return false;
+      // Quick filters
+      if (quickFilter === "overdue" && !(t.due_date && t.due_date < today && t.status !== "done")) return false;
+      if (quickFilter === "blocked" && !t.is_blocked) return false;
+      if (quickFilter === "due_today" && t.due_date !== today) return false;
       return true;
     });
-  }, [tasks, deptFilter, assigneeFilter, priorityFilter, assigneeFilterMode, agentIdSet]);
+  }, [tasks, deptFilter, assigneeFilter, priorityFilter, assigneeFilterMode, agentIdSet, searchQuery, quickFilter, today]);
 
   const getTasksByStatus = useCallback(
     (status: TaskStatus) => filteredTasks.filter((t) => t.status === status),
@@ -212,9 +225,23 @@ export function KanbanBoard({ initialTasks, users, agents }: KanbanBoardProps) {
 
   return (
     <>
+      {/* Stats Bar */}
+      <BoardStatsBar stats={stats} activeFilter={quickFilter} onFilterChange={setQuickFilter} />
+
       {/* Filters + Controls */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 w-[160px] pl-8"
+              placeholder="Görev ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
           {/* View toggle */}
           <div className="flex rounded-md border">
             <button

@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Clock,
   Calendar,
+  Search,
 } from "lucide-react";
 import {
   Select,
@@ -34,8 +35,10 @@ import {
   type TaskDepartment,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { TaskWithRelations } from "../../actions";
+import { Input } from "@/components/ui/input";
+import type { TaskWithRelations, BoardStats } from "../../actions";
 import { TaskDetailSheet } from "./task-detail-sheet";
+import { BoardStatsBar, type QuickFilter } from "./board-stats-bar";
 
 type User = { user_id: string; full_name: string; role: string };
 type Agent = { id: string; name: string; code: string; department: string; status: string };
@@ -55,9 +58,10 @@ interface ListViewProps {
   tasks: TaskWithRelations[];
   users: User[];
   agents: Agent[];
+  stats: BoardStats;
 }
 
-export function ListView({ tasks, users, agents }: ListViewProps) {
+export function ListView({ tasks, users, agents, stats }: ListViewProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("due_date");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -68,19 +72,27 @@ export function ListView({ tasks, users, agents }: ListViewProps) {
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assigneeFilterMode, setAssigneeFilterMode] = useState<AssigneeFilterMode>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
 
   const agentIdSet = useMemo(() => new Set(agents.map((a) => a.id)), [agents]);
+  const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const filteredTasks = useMemo(() => {
+    const q = searchQuery.toLocaleLowerCase("tr");
     return tasks.filter((t) => {
       if (deptFilter !== "all" && t.department !== deptFilter) return false;
       if (assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
       if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
       if (assigneeFilterMode === "users" && t.assigned_to && agentIdSet.has(t.assigned_to)) return false;
       if (assigneeFilterMode === "agents" && t.assigned_to && !agentIdSet.has(t.assigned_to)) return false;
+      if (q && !t.title.toLocaleLowerCase("tr").includes(q)) return false;
+      if (quickFilter === "overdue" && !(t.due_date && t.due_date < today && t.status !== "done")) return false;
+      if (quickFilter === "blocked" && !t.is_blocked) return false;
+      if (quickFilter === "due_today" && t.due_date !== today) return false;
       return true;
     });
-  }, [tasks, deptFilter, assigneeFilter, priorityFilter, assigneeFilterMode, agentIdSet]);
+  }, [tasks, deptFilter, assigneeFilter, priorityFilter, assigneeFilterMode, agentIdSet, searchQuery, quickFilter, today]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -182,8 +194,22 @@ export function ListView({ tasks, users, agents }: ListViewProps) {
 
   return (
     <>
+      {/* Stats Bar */}
+      <BoardStatsBar stats={stats} activeFilter={quickFilter} onFilterChange={setQuickFilter} />
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-8 w-[160px] pl-8"
+            placeholder="Görev ara..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
         <Select value={deptFilter} onValueChange={setDeptFilter}>
           <SelectTrigger className="h-8 w-[140px]">
             <SelectValue placeholder="Departman" />

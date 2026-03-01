@@ -91,7 +91,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Ops Center",
     items: [
-      { title: "Genel Bakış", href: "/ops", icon: BarChart3, roles: "all" },
       { title: "Board", href: "/ops/board", icon: Kanban, roles: "all" },
       { title: "Görevlerim", href: "/ops/gorevlerim", icon: Inbox, roles: "all" },
       { title: "Onaylar", href: "/ops/onaylar", icon: CheckCircle2, roles: APPROVAL_NAV_ROLES },

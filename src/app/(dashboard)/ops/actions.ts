@@ -255,7 +255,6 @@ export async function createTask(data: {
     new_value: data.title,
   });
 
-  revalidatePath("/ops");
   revalidatePath("/ops/board");
   revalidatePath("/ops/gorevlerim");
 
@@ -340,7 +339,6 @@ export async function updateTask(
     await supabase.from("task_activity").insert(activities);
   }
 
-  revalidatePath("/ops");
   revalidatePath("/ops/board");
   revalidatePath("/ops/gorevlerim");
 
@@ -359,7 +357,6 @@ export async function deleteTask(taskId: string) {
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/ops");
   revalidatePath("/ops/board");
   revalidatePath("/ops/gorevlerim");
 
@@ -422,7 +419,7 @@ export async function addTaskComment(taskId: string, content: string) {
     new_value: content.slice(0, 100),
   });
 
-  revalidatePath("/ops");
+  revalidatePath("/ops/board");
   return { success: true };
 }
 
@@ -491,7 +488,7 @@ export async function addTaskAttachment(taskId: string, formData: FormData) {
     new_value: file.name,
   });
 
-  revalidatePath("/ops");
+  revalidatePath("/ops/board");
   return { success: true };
 }
 
@@ -509,7 +506,7 @@ export async function deleteTaskAttachment(attachmentId: string) {
 
   if (error) return { success: false, error: error.message };
 
-  revalidatePath("/ops");
+  revalidatePath("/ops/board");
   return { success: true };
 }
 
@@ -540,34 +537,6 @@ export async function getTaskActivity(taskId: string) {
   })) as TaskActivity[];
 }
 
-export async function getRecentActivity(limit = 20) {
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from("task_activity")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) return [];
-
-  const actorIds = [...new Set(data.map((a) => a.actor_id))];
-  const taskIds = [...new Set(data.map((a) => a.task_id))];
-
-  const [{ data: users }, { data: tasks }] = await Promise.all([
-    supabase.from("users").select("user_id, full_name").in("user_id", actorIds),
-    supabase.from("tasks").select("id, title").in("id", taskIds),
-  ]);
-
-  const userMap = new Map(users?.map((u) => [u.user_id, u.full_name]) ?? []);
-  const taskMap = new Map(tasks?.map((t) => [t.id, t.title]) ?? []);
-
-  return data.map((a) => ({
-    ...a,
-    actor_name: userMap.get(a.actor_id) ?? "Bilinmeyen",
-    task_title: taskMap.get(a.task_id) ?? "Silinmiş görev",
-  }));
-}
 
 // ─── Subtasks ────────────────────────────────────────────────
 
@@ -622,7 +591,53 @@ export async function getAssignableUsers() {
   return data;
 }
 
-// ─── Dashboard Stats ─────────────────────────────────────────
+// ─── Board Stats (lightweight) ───────────────────────────────
+
+export type BoardStats = {
+  openCount: number;
+  dueTodayCount: number;
+  overdueCount: number;
+  blockedCount: number;
+};
+
+export async function getBoardStats(): Promise<BoardStats> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const [
+    { count: openCount },
+    { count: dueTodayCount },
+    { count: overdueCount },
+    { count: blockedCount },
+  ] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .not("status", "eq", "done"),
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("due_date", today)
+      .not("status", "eq", "done"),
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .lt("due_date", today)
+      .not("status", "eq", "done"),
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("is_blocked", true)
+      .not("status", "eq", "done"),
+  ]);
+
+  return {
+    openCount: openCount ?? 0,
+    dueTodayCount: dueTodayCount ?? 0,
+    overdueCount: overdueCount ?? 0,
+    blockedCount: blockedCount ?? 0,
+  };
+}
 
 // ─── Agent Types ────────────────────────────────────────────
 
@@ -746,7 +761,7 @@ export async function updateAgent(
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/ops/ajanlar");
-  revalidatePath("/ops");
+  revalidatePath("/ops/board");
   return { success: true };
 }
 
@@ -842,7 +857,7 @@ export async function createApproval(data: {
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/ops/onaylar");
-  revalidatePath("/ops");
+  revalidatePath("/ops/board");
   return { success: true };
 }
 
@@ -867,7 +882,7 @@ export async function reviewApproval(
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/ops/onaylar");
-  revalidatePath("/ops");
+  revalidatePath("/ops/board");
   return { success: true };
 }
 
@@ -982,109 +997,6 @@ export async function getAssignableAgents() {
   return data;
 }
 
-// ─── Dashboard Stats (Updated) ──────────────────────────────
-
-export async function getOpsStats() {
-  const supabase = await createClient();
-  const today = new Date().toISOString().split("T")[0];
-
-  const [
-    { count: openCount },
-    { count: dueTodayCount },
-    { count: waitingApprovalCount },
-    { count: blockedCount },
-    { data: overdueTasks },
-    { data: todayDoneTasks },
-  ] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("*", { count: "exact", head: true })
-      .not("status", "eq", "done"),
-    supabase
-      .from("tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("due_date", today)
-      .not("status", "eq", "done"),
-    supabase
-      .from("tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("is_waiting_approval", true),
-    supabase
-      .from("tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("is_blocked", true),
-    supabase
-      .from("tasks")
-      .select("id, title, assigned_to, due_date, priority, department")
-      .lt("due_date", today)
-      .not("status", "eq", "done")
-      .order("due_date", { ascending: true })
-      .limit(20),
-    supabase
-      .from("tasks")
-      .select("id, title")
-      .eq("status", "done")
-      .gte("updated_at", `${today}T00:00:00`)
-      .limit(20),
-  ]);
-
-  // Get user names for overdue
-  if (overdueTasks && overdueTasks.length > 0) {
-    const userIds = [...new Set(overdueTasks.map((t) => t.assigned_to).filter((x): x is string => !!x))];
-    if (userIds.length > 0) {
-      const { data: users } = await supabase
-        .from("users")
-        .select("user_id, full_name")
-        .in("user_id", userIds);
-      const userMap = new Map(users?.map((u) => [u.user_id, u.full_name]) ?? []);
-      for (const t of overdueTasks) {
-        (t as Record<string, unknown>).assignee_name = t.assigned_to
-          ? userMap.get(t.assigned_to) ?? null
-          : null;
-      }
-    }
-  }
-
-  // V2: Approval, agent, output stats
-  const [
-    { count: pendingApprovalsCount },
-    { count: activeAgentsCount },
-    { count: recentOutputsCount },
-    { data: pendingApprovals },
-  ] = await Promise.all([
-    supabase
-      .from("ops_approvals")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "pending"),
-    supabase
-      .from("ops_agents")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "active"),
-    supabase
-      .from("ops_outputs")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", `${today}T00:00:00`),
-    supabase
-      .from("ops_approvals")
-      .select("id, title, action_type, risk_level, requested_by, requested_at")
-      .eq("status", "pending")
-      .order("requested_at", { ascending: false })
-      .limit(5),
-  ]);
-
-  return {
-    openCount: openCount ?? 0,
-    dueTodayCount: dueTodayCount ?? 0,
-    waitingApprovalCount: waitingApprovalCount ?? 0,
-    blockedCount: blockedCount ?? 0,
-    overdueTasks: overdueTasks ?? [],
-    todayDoneTasks: todayDoneTasks ?? [],
-    pendingApprovalsCount: pendingApprovalsCount ?? 0,
-    activeAgentsCount: activeAgentsCount ?? 0,
-    recentOutputsCount: recentOutputsCount ?? 0,
-    pendingApprovals: pendingApprovals ?? [],
-  };
-}
 
 // ─── Task Templates ──────────────────────────────────────────
 
