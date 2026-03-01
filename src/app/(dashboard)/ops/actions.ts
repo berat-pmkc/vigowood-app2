@@ -19,6 +19,29 @@ async function requireUser() {
   return user;
 }
 
+// Agent code aliases — eski kayıtlarla geriye uyumluluk
+const AGENT_CODE_ALIASES: Record<string, string[]> = {
+  "pazaryeri-asistan": ["vigowood-com-asistan"],
+};
+
+// Reverse map: eski code → güncel code
+const AGENT_CODE_REVERSE: Record<string, string> = {};
+for (const [current, aliases] of Object.entries(AGENT_CODE_ALIASES)) {
+  for (const alias of aliases) {
+    AGENT_CODE_REVERSE[alias] = current;
+  }
+}
+
+/** Bir agent code için tüm bilinen code'ları döndürür (mevcut + eski) */
+function getAgentCodes(code: string): string[] {
+  return [code, ...(AGENT_CODE_ALIASES[code] ?? [])];
+}
+
+/** Eski code'u güncel code'a normalize eder */
+function normalizeAgentCode(code: string): string {
+  return AGENT_CODE_REVERSE[code] ?? code;
+}
+
 // ─── Task Types ─────────────────────────────────────────────
 
 export type TaskWithRelations = {
@@ -1112,7 +1135,8 @@ export async function getUsageStats(period: "day" | "week" | "month" = "week") {
 
   for (const a of actions ?? []) {
     totalCost += (a.cost_estimate ?? 0);
-    const id = a.agent_id ?? "unknown";
+    // Eski code'ları güncel code'a normalize et (birleştir)
+    const id = normalizeAgentCode(a.agent_id ?? "unknown");
     const existing = agentStats.get(id) ?? {
       agent_id: id,
       total_tokens: 0,
@@ -1171,7 +1195,7 @@ export async function getAgentMemories(agentCode: string) {
   const { data, error } = await supabase
     .from("agent_memory")
     .select("*")
-    .eq("agent_id", agentCode)
+    .in("agent_id", getAgentCodes(agentCode))
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
@@ -1207,11 +1231,12 @@ export type AgentPerformance = {
 export async function getAgentPerformance(agentCode: string): Promise<AgentPerformance> {
   const supabase = await createClient();
 
-  // Tasks assigned to this agent
+  // Tasks assigned to this agent (eski + yeni code)
+  const codes = getAgentCodes(agentCode);
   const { data: doneTasks } = await supabase
     .from("tasks")
     .select("created_at, updated_at")
-    .eq("assigned_to", agentCode)
+    .in("assigned_to", codes)
     .eq("status", "done");
 
   const totalCompletedTasks = doneTasks?.length ?? 0;
@@ -1231,7 +1256,7 @@ export async function getAgentPerformance(agentCode: string): Promise<AgentPerfo
   const { data: actions } = await supabase
     .from("agent_actions")
     .select("tokens_used")
-    .eq("agent_id", agentCode);
+    .in("agent_id", codes);
 
   const totalTokensUsed = actions?.reduce((sum, a) => sum + (a.tokens_used ?? 0), 0) ?? 0;
 
@@ -1242,7 +1267,7 @@ export async function getAgentPerformance(agentCode: string): Promise<AgentPerfo
   const { data: recentTasks } = await supabase
     .from("tasks")
     .select("updated_at")
-    .eq("assigned_to", agentCode)
+    .in("assigned_to", codes)
     .eq("status", "done")
     .gte("updated_at", sevenDaysAgo.toISOString());
 
@@ -1284,7 +1309,7 @@ export async function getAgentCosts(agentCode: string): Promise<AgentCosts> {
   const { data: allActions } = await supabase
     .from("agent_actions")
     .select("tokens_used, cost_estimate, created_at, metadata")
-    .eq("agent_id", agentCode)
+    .in("agent_id", getAgentCodes(agentCode))
     .order("created_at", { ascending: false });
 
   let totalCost = 0;
@@ -1345,7 +1370,7 @@ export async function getAgentTasks(agentCode: string): Promise<AgentTaskItem[]>
   const { data, error } = await supabase
     .from("tasks")
     .select("id, title, status, created_at, updated_at")
-    .eq("assigned_to", agentCode)
+    .in("assigned_to", getAgentCodes(agentCode))
     .order("created_at", { ascending: false })
     .limit(20);
 
