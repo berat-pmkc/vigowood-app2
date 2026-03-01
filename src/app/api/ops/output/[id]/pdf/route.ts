@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { renderToBuffer } from "@react-pdf/renderer";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
-import { OutputRaporDocument } from "@/lib/pdf/output-rapor-template";
-import React from "react";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -42,38 +39,30 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
-    const metadata = (output.metadata ?? {}) as Record<string, unknown>;
-    const fullContent = metadata.full_content as string | undefined;
-
-    if (!fullContent) {
+    if (!output.file_url) {
       return NextResponse.json(
-        { error: "Bu çıktının markdown içeriği bulunamadı" },
-        { status: 400 }
+        { error: "Bu çıktının dosya URL'i bulunamadı" },
+        { status: 404 }
       );
     }
 
-    const title = output.description || output.file_name;
-    const fileCode = output.file_name;
-    const date = new Date(output.created_at).toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    // Supabase Storage'dan dosyayı proxy olarak çek
+    const fileResponse = await fetch(output.file_url);
 
-    const pdfBuffer = await renderToBuffer(
-      React.createElement(OutputRaporDocument, {
-        title,
-        fileCode,
-        date,
-        markdown: fullContent,
-      })
-    );
+    if (!fileResponse.ok) {
+      return NextResponse.json(
+        { error: "Dosya indirilemedi" },
+        { status: 502 }
+      );
+    }
+
+    const fileBuffer = await fileResponse.arrayBuffer();
 
     const safeName = output.file_name
       .replace(/\.[^.]+$/, "")
       .replace(/[^a-zA-Z0-9\u00C0-\u024F\u0130\u0131_-]/g, "_");
 
-    return new NextResponse(new Uint8Array(pdfBuffer), {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
@@ -82,9 +71,9 @@ export async function GET(request: Request, { params }: RouteParams) {
       },
     });
   } catch (err) {
-    console.error("Output PDF generation error:", err);
+    console.error("Output PDF proxy error:", err);
     return NextResponse.json(
-      { error: "PDF oluşturulurken hata oluştu" },
+      { error: "PDF indirilemedi" },
       { status: 500 }
     );
   }
