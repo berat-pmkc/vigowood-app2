@@ -53,8 +53,7 @@ export function OutputViewerDialog({
 
   const fullContent = output.metadata?.full_content as string | undefined;
   const hasContent = !!fullContent;
-  const displayTitle =
-    output.description || output.file_name;
+  const displayTitle = output.file_name;
 
   const handlePdfDownload = async () => {
     setPdfLoading(true);
