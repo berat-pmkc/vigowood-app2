@@ -9,9 +9,6 @@ import type {
   TaskDepartment,
   TaskSourceType,
   TaskActivityAction,
-  ApprovalActionType,
-  ApprovalRiskLevel,
-  ApprovalStatus,
   OutputFileType,
   AgentStatus,
 } from "@/lib/constants";
@@ -256,7 +253,7 @@ export async function createTask(data: {
   });
 
   revalidatePath("/ops/board");
-  revalidatePath("/ops/gorevlerim");
+
 
   return { success: true, taskId: task.id };
 }
@@ -340,7 +337,7 @@ export async function updateTask(
   }
 
   revalidatePath("/ops/board");
-  revalidatePath("/ops/gorevlerim");
+
 
   return { success: true };
 }
@@ -358,7 +355,7 @@ export async function deleteTask(taskId: string) {
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/ops/board");
-  revalidatePath("/ops/gorevlerim");
+
 
   return { success: true };
 }
@@ -660,28 +657,6 @@ export type OpsAgent = {
   updated_at: string;
 };
 
-export type OpsApproval = {
-  id: string;
-  task_id: string | null;
-  agent_id: string | null;
-  action_type: ApprovalActionType;
-  risk_level: ApprovalRiskLevel;
-  status: ApprovalStatus;
-  title: string;
-  description: string | null;
-  requested_by: string;
-  reviewer_id: string | null;
-  payload: Record<string, unknown>;
-  old_payload: Record<string, unknown>;
-  review_note: string | null;
-  requested_at: string;
-  reviewed_at: string | null;
-  created_at: string;
-  requester_name?: string;
-  reviewer_name?: string;
-  agent_name?: string;
-};
-
 export type OpsOutput = {
   id: string;
   task_id: string | null;
@@ -761,127 +736,6 @@ export async function updateAgent(
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/ops/ajanlar");
-  revalidatePath("/ops/board");
-  return { success: true };
-}
-
-// ─── Approvals ──────────────────────────────────────────────
-
-export async function getApprovals(filters?: {
-  status?: string;
-  action_type?: string;
-  risk_level?: string;
-}) {
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("ops_approvals")
-    .select("*")
-    .order("requested_at", { ascending: false });
-
-  if (filters?.status && filters.status !== "all") {
-    query = query.eq("status", filters.status as ApprovalStatus);
-  }
-  if (filters?.action_type && filters.action_type !== "all") {
-    query = query.eq("action_type", filters.action_type as ApprovalActionType);
-  }
-  if (filters?.risk_level && filters.risk_level !== "all") {
-    query = query.eq("risk_level", filters.risk_level as ApprovalRiskLevel);
-  }
-
-  const { data, error } = await query;
-  if (error) return [];
-
-  if (!data || data.length === 0) return [];
-
-  // Resolve names
-  const userIds = new Set<string>();
-  const agentIds = new Set<string>();
-
-  for (const a of data) {
-    if (a.requested_by) userIds.add(a.requested_by);
-    if (a.reviewer_id) userIds.add(a.reviewer_id);
-    if (a.agent_id) agentIds.add(a.agent_id);
-  }
-
-  const [{ data: users }, { data: agents }] = await Promise.all([
-    supabase.from("users").select("user_id, full_name").in("user_id", Array.from(userIds)),
-    agentIds.size > 0
-      ? supabase.from("ops_agents").select("id, name").in("id", Array.from(agentIds))
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-  ]);
-
-  const userMap = new Map(users?.map((u) => [u.user_id, u.full_name]) ?? []);
-  const agentMap = new Map(agents?.map((a) => [a.id, a.name]) ?? []);
-
-  return data.map((a) => ({
-    ...a,
-    payload: (a.payload ?? {}) as Record<string, unknown>,
-    old_payload: (a.old_payload ?? {}) as Record<string, unknown>,
-    requester_name: userMap.get(a.requested_by) ?? agentMap.get(a.requested_by) ?? a.requested_by,
-    reviewer_name: a.reviewer_id ? userMap.get(a.reviewer_id) ?? null : null,
-    agent_name: a.agent_id ? agentMap.get(a.agent_id) ?? null : null,
-  })) as OpsApproval[];
-}
-
-export async function createApproval(data: {
-  task_id?: string | null;
-  agent_id?: string | null;
-  action_type: ApprovalActionType;
-  risk_level?: ApprovalRiskLevel;
-  title: string;
-  description?: string | null;
-  payload?: Record<string, unknown>;
-  old_payload?: Record<string, unknown>;
-}) {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const insertData = {
-    task_id: data.task_id ?? null,
-    agent_id: data.agent_id ?? null,
-    action_type: data.action_type,
-    risk_level: data.risk_level ?? ("medium" as ApprovalRiskLevel),
-    title: data.title,
-    description: data.description ?? null,
-    requested_by: user.user_id,
-    payload: data.payload ?? {},
-    old_payload: data.old_payload ?? {},
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await supabase
-    .from("ops_approvals")
-    .insert(insertData as any);
-
-  if (error) return { success: false, error: error.message };
-
-  revalidatePath("/ops/onaylar");
-  revalidatePath("/ops/board");
-  return { success: true };
-}
-
-export async function reviewApproval(
-  approvalId: string,
-  decision: "approved" | "rejected" | "revision_requested",
-  reviewNote?: string
-) {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("ops_approvals")
-    .update({
-      status: decision as ApprovalStatus,
-      reviewer_id: user.user_id,
-      review_note: reviewNote ?? null,
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", approvalId);
-
-  if (error) return { success: false, error: error.message };
-
-  revalidatePath("/ops/onaylar");
   revalidatePath("/ops/board");
   return { success: true };
 }
@@ -1219,54 +1073,6 @@ export async function getAgentActionsForTask(taskId: string) {
 
   if (error) return [];
   return data ?? [];
-}
-
-// ─── Agent Chat ──────────────────────────────────────────────
-
-export type AgentChatMessage = {
-  id: string;
-  agent_id: string;
-  user_id: string | null;
-  role: "user" | "assistant";
-  content: string;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-};
-
-export async function getAgentChatHistory(agentId: string, limit = 50) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("agent_chats")
-    .select("*")
-    .eq("agent_id", agentId)
-    .order("created_at", { ascending: true })
-    .limit(limit);
-  return (data ?? []) as AgentChatMessage[];
-}
-
-export async function sendChatMessage(agentId: string, content: string) {
-  const user = await requireUser();
-  const supabase = await createClient();
-  const { error } = await supabase.from("agent_chats").insert({
-    agent_id: agentId,
-    user_id: user.user_id,
-    role: "user",
-    content,
-  });
-  if (error) return { success: false, error: error.message };
-  return { success: true };
-}
-
-export async function clearChatHistory(agentId: string) {
-  const user = await requireUser();
-  if (user.role !== "Yönetici") return { success: false, error: "Yetkiniz yok" };
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("agent_chats")
-    .delete()
-    .eq("agent_id", agentId);
-  if (error) return { success: false, error: error.message };
-  return { success: true };
 }
 
 // ─── Usage Stats ──────────────────────────────────────────────

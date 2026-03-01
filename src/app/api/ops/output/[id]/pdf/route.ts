@@ -71,7 +71,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const safeName = output.file_name
       .replace(/\.[^.]+$/, "")
-      .replace(/[^a-zA-Z0-9_-]/g, "_");
+      .replace(/[^a-zA-Z0-9\u00C0-\u024F\u0130\u0131_-]/g, "_");
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
       status: 200,

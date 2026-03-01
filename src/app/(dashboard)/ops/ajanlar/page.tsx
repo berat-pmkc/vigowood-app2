@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { APPROVAL_ROLES } from "@/lib/constants";
-import { getAgents } from "../actions";
+import { getAgents, getUsageStats } from "../actions";
 import { AjanlarClient } from "./ajanlar-client";
 
 export default async function AjanlarPage() {
@@ -12,7 +12,10 @@ export default async function AjanlarPage() {
     redirect("/ops");
   }
 
-  const agents = await getAgents();
+  const [agents, usageStats] = await Promise.all([
+    getAgents(),
+    getUsageStats("month"),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -22,7 +25,7 @@ export default async function AjanlarPage() {
           Sanal ajan profilleri ve durumları
         </p>
       </div>
-      <AjanlarClient agents={agents} />
+      <AjanlarClient agents={agents} usageStats={usageStats} />
     </div>
   );
 }

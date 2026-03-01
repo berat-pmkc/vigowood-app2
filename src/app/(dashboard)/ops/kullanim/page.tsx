@@ -1,4 +1,4 @@
-import { getUsageStats } from "../actions";
+import { getUsageStats, getAgents } from "../actions";
 import { KullanimClient } from "./components/kullanim-client";
 
 export default async function KullanimPage({
@@ -8,7 +8,10 @@ export default async function KullanimPage({
 }) {
   const params = await searchParams;
   const period = (params.period as "day" | "week" | "month") ?? "week";
-  const stats = await getUsageStats(period);
+  const [stats, agents] = await Promise.all([
+    getUsageStats(period),
+    getAgents(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -18,7 +21,7 @@ export default async function KullanimPage({
           Asistan kullanım istatistikleri ve maliyet takibi
         </p>
       </div>
-      <KullanimClient stats={stats} currentPeriod={period} />
+      <KullanimClient stats={stats} agents={agents} currentPeriod={period} />
     </div>
   );
 }

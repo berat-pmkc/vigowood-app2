@@ -34,6 +34,7 @@ import { TaskCard } from "./task-card";
 import { TaskDetailSheet } from "./task-detail-sheet";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { BoardStatsBar, type QuickFilter } from "./board-stats-bar";
+import { useTasksRealtime } from "@/hooks/use-tasks-realtime";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,9 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ initialTasks, users, agents, stats }: KanbanBoardProps) {
   const [tasks, setTasks] = useState(initialTasks);
+
+  // Realtime: AI agent veya başka kullanıcı task değiştirdiğinde board otomatik güncellenir
+  useTasksRealtime();
 
   // Sunucudan gelen yeni initialTasks ile senkronize et (router.refresh() sonrası)
   useEffect(() => {

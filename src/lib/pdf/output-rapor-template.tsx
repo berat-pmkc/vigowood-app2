@@ -108,7 +108,8 @@ const s = StyleSheet.create({
   paragraph: { fontSize: 10, lineHeight: 1.6, marginBottom: 5 },
   // Lists
   bulletRow: { flexDirection: "row" as const, marginBottom: 3 },
-  bulletDot: { width: 14, fontSize: 10, color: C.side },
+  bulletDot: { width: 12, fontSize: 10, color: C.side },
+  checkboxDot: { width: 24, fontSize: 9, color: C.side },
   bulletText: { flex: 1, fontSize: 10, lineHeight: 1.5 },
   orderedNum: {
     width: 18,
@@ -472,6 +473,18 @@ function InlineText({ text }: { text: string }): React.ReactElement {
 
 // ─── Table Renderer ─────────────────────────────────
 
+function getColumnWidths(headers: string[], rows: string[][]): number[] {
+  return headers.map((h, i) => {
+    const maxLen = Math.max(
+      h.length,
+      ...rows.map((r) => (r[i] || "").length)
+    );
+    if (maxLen <= 8) return 1;
+    if (maxLen <= 20) return 2;
+    return 3;
+  });
+}
+
 function TableBlock({
   headers,
   aligns,
@@ -482,6 +495,7 @@ function TableBlock({
   rows: string[][];
 }): React.ReactElement {
   const colCount = headers.length;
+  const colWidths = getColumnWidths(headers, rows);
 
   const alignMap: Record<Align, "left" | "center" | "right"> = {
     left: "left",
@@ -506,7 +520,7 @@ function TableBlock({
     const align = alignMap[aligns[colIdx] || "left"];
 
     return (
-      <View key={colIdx} style={[cellStyle, { flex: 1 }]}>
+      <View key={colIdx} style={[cellStyle, { flex: colWidths[colIdx] }]}>
         <Text style={[textStyle, { textAlign: align }]}>
           <InlineText text={content} />
         </Text>
@@ -546,7 +560,7 @@ function CodeBlock({
   lines: string[];
 }): React.ReactElement {
   return (
-    <View style={s.codeBlock} wrap={false}>
+    <View style={s.codeBlock} wrap={true}>
       {lang ? <Text style={s.codeBlockLang}>{lang}</Text> : null}
       {lines.map((line, i) => (
         <Text key={i} style={s.codeLine}>
@@ -638,21 +652,21 @@ export function OutputRaporDocument({
 
             case "bullet": {
               const pl = block.indent * 12;
-              const dot =
-                block.checked === true
-                  ? "\u2611 "
-                  : block.checked === false
-                    ? "\u2610 "
-                    : "\u2022 ";
-              const dotStyle =
-                block.checked === true
-                  ? s.checkboxOn
-                  : block.checked === false
-                    ? s.checkboxOff
-                    : s.bulletDot;
+              const isCheckbox = block.checked !== null && block.checked !== undefined;
+              const dot = block.checked === true
+                ? "[x] "
+                : block.checked === false
+                  ? "[ ] "
+                  : "- ";
+              const dotStyle = block.checked === true
+                ? s.checkboxOn
+                : block.checked === false
+                  ? s.checkboxOff
+                  : s.bulletDot;
+              const dotWidthStyle = isCheckbox ? s.checkboxDot : s.bulletDot;
               return (
                 <View key={idx} style={[s.bulletRow, { paddingLeft: pl }]}>
-                  <Text style={[s.bulletDot, dotStyle]}>{dot}</Text>
+                  <Text style={[dotWidthStyle, dotStyle]}>{dot}</Text>
                   <Text style={s.bulletText}>
                     <InlineText text={block.text} />
                   </Text>
