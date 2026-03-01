@@ -24,7 +24,20 @@ Mevcut sistemdeki tüm veriler `/data/` klasöründe:
 │                                    iadeGiris, Attendance, Notifications, HomeMenu,
 │                                    StokMenu, AnalizMenu, SatisMenu, UretimMenu
 ├── StockMovements_-_StockMovements.csv   # Mamül stok hareketleri (20.752 satır)
-└── YarıMamulStok3_-_YarıMamulStok.csv   # Yarı mamül stok (234.141 satır)
+├── YarıMamulStok3_-_YarıMamulStok.csv   # Yarı mamül stok (234.141 satır)
+│
+│   ## Muhasebe ve Finans Verileri
+├── HASMOB HAFTALIK VARLIK VE BORÇ TAKİP TABLOSU.xlsx
+│       # 8 sheet: Dashboard, Açıklamalar, VERİLER (3 dönem), Dashboard_Data,
+│       # Nakit Giriş(+) 13 kanal, Nakit Çıkışı(-) 27 kategori,
+│       # Ödemeler (293 kayıt, 2028'e kadar), Nakit Giriş Takip (7 kayıt)
+├── FALİYET HESAPLARI.xlsx
+│       # 5 sheet: SATIŞLAR GİRİŞ (20 pazaryeri), MALİYETLER GİRİŞ (72 satır, 12 kategori),
+│       # SATIŞDATA (hesaplanmış), MALİYETDATA (ORTAK dağıtımlı),
+│       # KÂRLILIK DATA (80 satır P&L: GENEL/VIGO WOOD/HAS-MOB)
+├── 20022026.xls                          # Günlük satış fatura listesi (353 satır)
+├── MuhasebeveFinansKod.txt               # Nakit akış rapor scripti (Apps Script)
+└── FaaliyetHesapKod.txt                  # Faaliyet hesap scripti (satış/maliyet/kârlılık)
 ```
 
 Veritabanı yapısını, kolon isimlerini, ilişkileri ve veri tiplerini bu dosyalardan çıkar. Migration ve form tasarımında gerçek veriyi referans al.
@@ -57,16 +70,20 @@ vigowood-app/
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/login/
+│   │   ├── (auth)/select-operator/
 │   │   ├── (dashboard)/
 │   │   │   ├── layout.tsx       # Responsive shell
 │   │   │   ├── page.tsx         # Ana dashboard
 │   │   │   ├── uretim/          # Kesim, Temizlik, Montaj, Paketleme, Kutu-Koli
-│   │   │   ├── stok/            # Ürün, Yarı mamül, Hazır eleman, İade
-│   │   │   ├── satis/
-│   │   │   ├── sevkiyat/
-│   │   │   ├── analiz/
-│   │   │   ├── personel/
-│   │   │   ├── admin/           # Ürün, Plaka, Parça, BOM, Kullanıcı yönetimi
+│   │   │   ├── stok/            # Mamül, Yarı mamül, Hazır eleman, İade + grafik
+│   │   │   ├── satis/           # Dashboard, Raporlar, Kampanyalar, Pazarlama
+│   │   │   ├── sevkiyat/        # Liste, [id] Planlama, Ayarlar, Fiyatlar, Kurlar, Şablonlar
+│   │   │   ├── analiz/          # 4 sekmeli dashboard (Genel, Üretim, Satış, Stok)
+│   │   │   ├── personel/        # Yoklama giriş/liste
+│   │   │   ├── muhasebe/        # Nakit Akış, Ödemeler, Faaliyet Hesapları, Kârlılık
+│   │   │   ├── pazaryeri/       # Genel dashboard, Trendyol (5 sayfa), vigowood.com (3 sayfa)
+│   │   │   ├── ops/             # Board (Kanban/Liste/Takvim), Ajanlar, Raporlar, Kullanım
+│   │   │   ├── admin/           # Ürün, Plaka, Parça, BOM, Kullanıcı, Firmalar, SKU Eşleştirme, Ayarlar
 │   │   │   └── bildirimler/
 │   │   └── api/
 │   ├── components/
@@ -75,6 +92,8 @@ vigowood-app/
 │   │   └── shared/
 │   ├── lib/
 │   │   ├── supabase/            # client.ts, server.ts, admin.ts, types.ts
+│   │   ├── trendyol/            # client.ts, types.ts, helpers.ts, mock-data.ts
+│   │   ├── ikas/                # client.ts, types.ts, queries.ts, helpers.ts, mock-data.ts
 │   │   ├── utils.ts
 │   │   ├── constants.ts
 │   │   └── validations.ts
@@ -125,6 +144,71 @@ MDF Plaka → KESİM (lazer) → TEMİZLİK → MONTAJ (1-16 adım) → PAKETLEM
 
 ### BOM Yapısı — Önemli
 Montaj adımlarında bir adımın çıktısı başka adımın girdisi olabiliyor (427 kayıt). `step_bom.part_id` bazen `ASM-XXXX` formatında — bu önceki adıma referans. DAG (Directed Acyclic Graph) yapısı, basit liste değil. BOM editörü ve montaj modülü tasarlarken buna dikkat.
+
+---
+
+## MUHASEBE VE FİNANS MODÜLÜ
+
+İki bağımsız ama birbiriyle ilişkili alt sistem. **Nakit Akış** (gerçek para hareketleri) ve **Faaliyet Hesapları** (gelir tablosu / P&L) ayrı tutuluyor.
+
+### Erişim
+Yönetici (4) + Muhasebe (1) + E-Ticaret Müdürü (1) = 6 kişi erişebilir.
+
+### Alt Sistem A: Nakit Akış Yönetimi (HASMOB Haftalık Varlık ve Borç Takip)
+
+```
+DÖNEM (15 günlük)  →  NAKİT GİRİŞ (+)  →  TOPLAM VARLIK
+    2026-1-D1          13 kanal (TL+USD)      TL + USD + Yatırım
+    2026-1-D2      →  NAKİT ÇIKIŞ (-)    →  TOPLAM BORÇ
+    2026-2-D1          27 kategori (TL+USD)    Piyasa + KK + Finansal
+                   →  ÖDEMELER              →  NET POZİSYON
+                       Bireysel ödeme kayıtları  Varlık - Borç
+```
+
+**Dönem sistemi:** Her ay 2 dönem — D1 (1-14), D2 (15-son gün). Dönem kodu: `YYYY-M-D#` (ör. `2026-2-D1`)
+
+**Nakit Giriş Kanalları (13):** vigowood.com, Trendyol, Hepsiburada, Amazon TR, Diğer Pazaryeri, HAS-MOB, Döviz Satışı, Nakit Kredi + TL/USD toplamları
+
+**Nakit Çıkış Kategorileri (27):** TL (22): Maaş, SGK, Hammadde, Akaryakıt, Araç Bakım, Demirbaş, Elektrik, Su, Pazaryeri, Telekom, Makine Bakım, Nakliye, Vergi, Mutfak, Hukuk, Muhasebe, Kredi Kartı, Kredi, Masraf/Komisyon, Diğer, Faaliyet Dışı + USD (5): Gümrük, Navlun, Diğer, Döviz Bozdurma, Toplam
+
+**Ödemeler:** 13 tür (PİYASA, KREDİ, KREDİ KARTI, MAAŞ, FAİZ, SGK, VERGİ, HAMMADDE, PERSONEL, ELEKTRİK, BANKA, GENEL, DİĞER). Durum: TAMAMLANDI / BEKLİYOR. 2028'e kadar kredi taksitleri takibi.
+
+**Ödeme Kategori Renkleri:**
+| Kategori | Arka Plan | Yazı |
+|----------|-----------|------|
+| PİYASA | #e8eaf6 | #283593 |
+| KREDİ | #fce4ec | #b71c1c |
+| KREDİ KARTI | #fff3e0 | #e65100 |
+| MAAŞ | #e0f2f1 | #00695c |
+| PERSONEL | #e8f5e9 | #2e7d32 |
+| ELEKTRİK | #fff9c4 | #f57f17 |
+| SGK | #f3e5f5 | #7b1fa2 |
+| VERGİ | #ffebee | #c62828 |
+| HAMMADDE | #e1f5fe | #0277bd |
+| BANKA | #efebe9 | #4e342e |
+| FAİZ | #fbe9e7 | #d84315 |
+| GENEL | #eceff1 | #546e7a |
+| DİĞER | #f5f5f5 | #616161 |
+
+### Alt Sistem B: Faaliyet Hesapları (Gelir Tablosu / P&L)
+
+```
+SATIŞ GİRİŞ (aylık)     →  SATIŞDATA (hesaplanmış)
+  20 pazaryeri/kanal            Dönem metadata + TL/USD
+  Marka: VW / HAS-MOB          Kur çevrimi
+                            ↘
+                              KÂRLILIK DATA (otomatik)
+                            ↗   GENEL / VIGO WOOD / HAS-MOB
+MALİYET GİRİŞ (aylık)   →  MALİYETDATA (hesaplanmış)     FAVÖK + Net Kâr + Marjlar
+  12 kategori                   ORTAK dağıtım uygulanmış
+  3 grup: VW/HM/ORTAK          Audit trail
+```
+
+**Marka yapısı:** VIGO WOOD (ana), HAS-MOB (kardeş firma), GENEL (konsolide)
+
+**12 Maliyet Kategorisi:** 1. Personel & SGK | 2. Üretim & Hammadde | 3. Operasyon & Bakım | 4. Enerji | 5. Satış | 6. Pazarlama | 7. Vergi | 8. Nakliye | 9. Genel Yönetim | 10. Faiz & Komisyon (FD) | 11. Faaliyet Dışı (FD) | 12. Yatırım (FD)
+
+**Kârlılık yapısı (P&L):** GELİR → TOPLAM FAALİYET GELİRİ → GİDER → TOPLAM FAALİYET GİDERİ → FAALİYET KARI (FAVÖK) → Marj % → FD Gelir → FD Gider → GENEL KAR → Marj %
 
 ---
 
@@ -425,14 +509,17 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] lib/trendyol/ altyapı: client.ts (Basic Auth, rate limiting, mock data fallback), types.ts, helpers.ts, mock-data.ts
 - [x] .env.local: TRENDYOL_API_KEY, TRENDYOL_API_SECRET, TRENDYOL_SELLER_ID
 - [x] Sidebar: Pazaryeri menü grubu (E-Ticaret Müdürü, Dış Ticaret Müdürü, Yönetici, Pazaryeri Sorumlusu)
-- [x] /pazaryeri/genel: KPI kartları (sipariş, ciro, iade, stok), kanal kartları, 7 gün trend (Recharts)
+- [x] /pazaryeri/trendyol: Dashboard — KPI (bugün/hafta/ay), günlük trend chart, ürün dağılımı, top 10 ürün, barkod filtre
 - [x] /pazaryeri/trendyol/siparisler: TanStack Table, tab filtreleri, tarih aralığı, arama, sipariş detay Sheet, kargo gönderme
 - [x] /pazaryeri/trendyol/urunler: Ürün listesi, stok/fiyat güncelleme, filtreler (satışta/beklemede/stok yok)
+- [x] /pazaryeri/trendyol/iadeler: İade takibi (claims), durum filtreleri
 - [x] /pazaryeri/trendyol/sorular: Müşteri soruları, cevap yazma, durum filtreleri
 - [x] /pazaryeri/trendyol/finans: Satış/komisyon/iade/net ödeme KPI, aylık özet tablo, işlem geçmişi, bar chart
 - [x] Trendyol tab navigasyonu (layout.tsx + TrendyolNav)
 - [x] Auth guard: MARKETPLACE_ACCESS_ROLES, tüm sayfalar ve server action'larda kontrol
 - [x] Mock data: API credentials invalid olduğunda otomatik mock data fallback (gerçekçi VigoWood ürünleri)
+- [x] DB: trendyol_orders, trendyol_order_lines, trendyol_products, trendyol_questions, trendyol_claims
+- [x] Sync: quickSyncRecentOrders() (son 2 gün on-demand), komisyon NUMERIC(10,2)
 
 ### KATMAN 28B: Pazaryeri Entegrasyonu — İkas (vigowood.com) ✅
 - [x] lib/ikas/ altyapı: client.ts (OAuth2 GraphQL, token caching, mock fallback), types.ts, queries.ts, helpers.ts, mock-data.ts
@@ -453,6 +540,14 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Indexes: ikas_id (unique), order_number, ikas_created_at DESC, status
 - [x] Types: IkasOrder alias
 
+### KATMAN 28D: Pazaryeri Genel Dashboard ✅
+- [x] /pazaryeri/genel: Çoklu kanal birleşik dashboard (Trendyol + İkas + vigowood.com)
+- [x] Paralel veri çekimi: Tüm kanallardan eşzamanlı fetch
+- [x] Birleşik KPI: Toplam sipariş, ciro, bekleyen, iade, toplam ürün, stoksuz ürün
+- [x] Kanal kartları: Her kanal ayrı KPI kartı + 7 günlük stacked bar trend chart (Recharts)
+- [x] DB: daily_summary, weekly_sku_summary, monthly_sku_summary tabloları (kanal bazlı)
+- [x] Son sync zamanı gösterimi + mock data indicator
+
 ### KATMAN 28+: İleri Özellikler
 - [ ] Amazon SP-API, Hepsiburada API
 - [ ] Trendyol API gerçek credentials bağlantısı (mevcut: 401 auth hatası, mock data aktif)
@@ -471,10 +566,10 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] /ops/gorevlerim: Inbox, filtre + sıralama, is_blocked/is_waiting_approval badge
 - [x] Supabase Storage bucket: task-attachments
 - [x] **Aşama 2**: DB: ops_agents, ops_approvals, ops_outputs tabloları + 5 enum + RLS + realtime
-- [x] 6 sanal ajan seed: Elif(stok), Kerem(üretim), Zeynep(pazaryeri), Burak(sevkiyat), Derya(muhasebe), Can(genel)
+- [x] 6 fonksiyonel ajan: vigowood.com, Stok, Üretim, Sevkiyat, Muhasebe (specialist) + Genel (orchestrator)
 - [x] /ops/onaylar: Approval sistemi — aksiyon türü, risk seviyesi, payload karşılaştırma, onayla/reddet/revizyon
 - [x] /ops/raporlar: Çıktılar sayfası — dosya listesi, tür+ajan filtre, indir/aç/sil
-- [x] /ops/ajanlar: Ajan profilleri — kart listesi, detay sheet, yetenekler, çalışma planı, durum kontrolleri
+- [x] /ops/ajanlar: Ajan profilleri — kart listesi, /ops/ajanlar/[id] detay sayfası, yetenekler, çalışma planı, durum kontrolleri
 - [x] **Aşama 3 (V3)**: DB: task_templates, recurring_tasks, task_runs tabloları + enum swap (6→4 status) + is_blocked/is_waiting_approval boolean'lar
 - [x] Enum swap: backlog→scheduled, open→queue, waiting_approval→in_progress+flag, blocked→in_progress+flag
 - [x] /ops/board tab sistemi: Görevler | Şablonlar | Tekrar Eden
@@ -485,7 +580,18 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] 3 görünüm modu: Pano (Kanban) | Liste (tablo, gruplama, sıralama) | Takvim (aylık grid, chip'ler)
 - [x] Liste: durum bazlı collapsible gruplar, sıralanabilir kolonlar, filtreler
 - [x] Takvim: ay navigasyonu, bugün vurgusu, durum renkli chip'ler, tarihi belirsiz bölümü
-- [x] Build: 87 route, sıfır TypeScript hatası
+- [x] **Agent System**: DB: agent_memory, agent_actions, agent_messages, agent_chats, job_definitions, job_runs, monitor_definitions, alerts
+- [x] Agent chats: Ajan-kullanıcı mesajlaşma sistemi
+- [x] User avatars: user_avatars tablosu (profil resimleri)
+
+### KATMAN 31: SKU Eşleştirme & Çok Kanallı Özet ✅
+- [x] DB: sku_mappings tablosu (master_sku, channel, channel_sku, channel_barcode, channel_product_code, channel_product_name, match_method, match_status, is_active)
+- [x] UNIQUE constraint: (channel, channel_barcode) — kanal başına tekil barkod
+- [x] RLS: SELECT authenticated, INSERT/UPDATE/DELETE admin/engineer only
+- [x] /admin/sku-eslestirme: SKU eşleştirme yönetim sayfası
+- [x] Multi-channel summary: daily_summary, weekly_sku_summary, monthly_sku_summary tablolarına channel + master_sku eklendi
+- [x] Mevcut veriler: İkas channel default, sku_mappings'den master_sku otomatik eşleşme
+- [x] Indexler: channel, master_sku, match_status
 
 ### KATMAN 29: Test & Güvenlik Denetimi ✅
 - [x] Güvenlik: 38/38 server action + 9/9 API route auth guard doğrulandı
@@ -496,4 +602,4 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Güvenlik: .env.example'a CRON_SECRET eklendi
 - [x] Performans: 17 chart component'e Recharts lazy loading (next/dynamic + ssr:false + ChartSkeleton)
 - [x] Performans: personel inline chart → ayrı PersonelCharts component'e çıkarıldı
-- [x] Build: 59 route, sıfır TypeScript hatası
+- [x] Build: 87+ route, sıfır TypeScript hatası

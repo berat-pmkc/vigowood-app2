@@ -204,7 +204,59 @@ export async function createCutBatch(formData: {
       if (linesError) return { success: false, error: linesError.message };
     }
 
+    // MDF stok düşümü: plaka tipi+renk ile eşleşen MDF hazır elemanın stoğunu düş
+    if (parsed.data.plaka_id) {
+      const { data: plakaData } = await supabase
+        .from("plakalar")
+        .select("tipi, renk")
+        .eq("plaka_id", parsed.data.plaka_id)
+        .limit(1)
+        .single();
+
+      if (plakaData?.tipi && plakaData?.renk) {
+        const { data: mdfPart } = await supabase
+          .from("all_parts")
+          .select("part_id, part_adi, hazir_eleman_aktif_stok")
+          .eq("mdf_tipi", plakaData.tipi)
+          .eq("mdf_renk", plakaData.renk)
+          .limit(1)
+          .single();
+
+        if (mdfPart) {
+          const newStok = mdfPart.hazir_eleman_aktif_stok - parsed.data.adet;
+          await supabase
+            .from("all_parts")
+            .update({ hazir_eleman_aktif_stok: newStok })
+            .eq("part_id", mdfPart.part_id);
+
+          // Hareket kaydı (hazir_eleman_akis)
+          const hakisNow = new Date();
+          const hakisId = `HA-${hakisNow.getFullYear()}${String(hakisNow.getMonth() + 1).padStart(2, "0")}${String(hakisNow.getDate()).padStart(2, "0")}-${String(hakisNow.getHours()).padStart(2, "0")}${String(hakisNow.getMinutes()).padStart(2, "0")}${String(hakisNow.getSeconds()).padStart(2, "0")}`;
+
+          const { data: hakisExisting } = await supabase
+            .from("hazir_eleman_akis")
+            .select("hakis_id")
+            .eq("hakis_id", hakisId)
+            .limit(1);
+
+          const finalHakisId = hakisExisting && hakisExisting.length > 0
+            ? `${hakisId}-${cutId}`
+            : hakisId;
+
+          await supabase.from("hazir_eleman_akis").insert({
+            hakis_id: finalHakisId,
+            tarih: now,
+            part_id: mdfPart.part_id,
+            qty: -parsed.data.adet,
+            operator: operatorId,
+            not_text: `Kesim MDF Düşüm (Oluşturma) — ${cutId}`,
+          });
+        }
+      }
+    }
+
     revalidatePath("/uretim/kesim");
+    revalidatePath("/stok/hazir-eleman");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -339,37 +391,67 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
       }
     }
 
-    // MDF stok düşümü: plaka tipi+renk ile eşleşen MDF hazır elemanın stoğunu düş
-    if (batch.plaka_id) {
-      const { data: plaka } = await supabase
+    // MDF stok düşümü artık createCutBatch'te yapılıyor (kesim oluşturulduğunda)
+
+    revalidatePath("/uretim/kesim");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Kesimi iptal et: kesiliyor → bekliyor + MDF stok iadesi */
+export async function cancelCut(cutId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data: cancelData } = await supabase
+      .from("cut_batches")
+      .select("durum, plaka_id, adet, operator_id")
+      .eq("cut_id", cutId)
+      .single();
+
+    const cancelBatch = cancelData as { durum: string; plaka_id: string | null; adet: number; operator_id: string | null } | null;
+    if (!cancelBatch) return { success: false, error: "Kesim bulunamadı" };
+    if (cancelBatch.durum !== "kesiliyor") return { success: false, error: "Sadece kesiliyor durumundaki kayıt iptal edilebilir" };
+
+    const { error } = await supabase
+      .from("cut_batches")
+      .update({ durum: "bekliyor", baslama_zamani: null })
+      .eq("cut_id", cutId);
+
+    if (error) return { success: false, error: error.message };
+
+    // MDF stok iadesi: iptal edilen kesimin MDF düşümünü geri al
+    if (cancelBatch.plaka_id) {
+      const { data: plakaData } = await supabase
         .from("plakalar")
         .select("tipi, renk")
-        .eq("plaka_id", batch.plaka_id)
+        .eq("plaka_id", cancelBatch.plaka_id)
         .limit(1)
         .single();
 
-      if (plaka?.tipi && plaka?.renk) {
+      if (plakaData?.tipi && plakaData?.renk) {
         const { data: mdfPart } = await supabase
           .from("all_parts")
-          .select("part_id, part_adi, hazir_eleman_aktif_stok")
-          .eq("mdf_tipi", plaka.tipi)
-          .eq("mdf_renk", plaka.renk)
+          .select("part_id, hazir_eleman_aktif_stok")
+          .eq("mdf_tipi", plakaData.tipi)
+          .eq("mdf_renk", plakaData.renk)
           .limit(1)
           .single();
 
         if (mdfPart) {
-          // Stok düş
-          const newStok = mdfPart.hazir_eleman_aktif_stok - batch.adet;
+          const restoredStok = mdfPart.hazir_eleman_aktif_stok + cancelBatch.adet;
           await supabase
             .from("all_parts")
-            .update({ hazir_eleman_aktif_stok: newStok })
+            .update({ hazir_eleman_aktif_stok: restoredStok })
             .eq("part_id", mdfPart.part_id);
 
-          // Hareket kaydı (hazir_eleman_akis)
+          // Hareket kaydı (iade)
           const hakisNow = new Date();
           const hakisId = `HA-${hakisNow.getFullYear()}${String(hakisNow.getMonth() + 1).padStart(2, "0")}${String(hakisNow.getDate()).padStart(2, "0")}-${String(hakisNow.getHours()).padStart(2, "0")}${String(hakisNow.getMinutes()).padStart(2, "0")}${String(hakisNow.getSeconds()).padStart(2, "0")}`;
 
-          // Unique check — aynı saniyede birden fazla işlem olursa suffix ekle
           const { data: hakisExisting } = await supabase
             .from("hazir_eleman_akis")
             .select("hakis_id")
@@ -382,11 +464,11 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
 
           await supabase.from("hazir_eleman_akis").insert({
             hakis_id: finalHakisId,
-            tarih: now,
+            tarih: new Date().toISOString(),
             part_id: mdfPart.part_id,
-            qty: -batch.adet,
-            operator: batch.operator_id,
-            not_text: `Kesim MDF Düşüm — ${cutId}`,
+            qty: cancelBatch.adet,
+            operator: cancelBatch.operator_id,
+            not_text: `Kesim MDF İade (İptal) — ${cutId}`,
           });
         }
       }
@@ -394,36 +476,6 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
 
     revalidatePath("/uretim/kesim");
     revalidatePath("/stok/hazir-eleman");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Kesimi iptal et: kesiliyor → bekliyor (yanlış başlatma düzeltme) */
-export async function cancelCut(cutId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    const { data: cancelData } = await supabase
-      .from("cut_batches")
-      .select("durum")
-      .eq("cut_id", cutId)
-      .single();
-
-    const cancelBatch = cancelData as { durum: string } | null;
-    if (!cancelBatch) return { success: false, error: "Kesim bulunamadı" };
-    if (cancelBatch.durum !== "kesiliyor") return { success: false, error: "Sadece kesiliyor durumundaki kayıt iptal edilebilir" };
-
-    const { error } = await supabase
-      .from("cut_batches")
-      .update({ durum: "bekliyor", baslama_zamani: null })
-      .eq("cut_id", cutId);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/uretim/kesim");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -520,7 +572,7 @@ export async function getTopCutSkus(limit: number = 10) {
   }
 }
 
-/** Kesim operatörlerini getir (station='Kesim' veya 'Kesim Hattı') */
+/** Kesim operatörlerini getir (station='Kesim') */
 export async function getKesimOperators() {
   try {
     await requireProductionAccess();
@@ -529,7 +581,7 @@ export async function getKesimOperators() {
     const { data, error } = await supabase
       .from("users")
       .select("user_id, full_name, station")
-      .in("station", ["Kesim", "Kesim Hattı"])
+      .eq("station", "Kesim")
       .order("full_name");
 
     if (error) return { success: false as const, error: error.message };

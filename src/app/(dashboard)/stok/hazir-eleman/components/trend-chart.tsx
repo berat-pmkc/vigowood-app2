@@ -55,12 +55,12 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   );
 }
 
-export function TrendChart({ data }: { data: DailyChartData[] }) {
+export function TrendChart({ data, title }: { data: DailyChartData[]; title?: string }) {
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">
-          Son 30 Gün — Hazır Eleman Girişleri
+          {title || "Son 30 Gün — Hazır Eleman Girişleri"}
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4">

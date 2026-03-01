@@ -62,15 +62,15 @@ export function getHazirElemanColumns({
       ),
     },
     {
-      id: "mdf_esleme",
-      header: "MDF Tipi/Renk",
+      accessorKey: "part_type",
+      header: "Tür",
       cell: ({ row }) => {
-        const { mdf_tipi, mdf_renk } = row.original;
-        if (!mdf_tipi && !mdf_renk) return <span className="text-muted-foreground">—</span>;
+        const tur = row.original.part_type;
+        if (!tur) return <span className="text-muted-foreground">—</span>;
         return (
-          <span className="text-sm">
-            {mdf_tipi || "—"} / {mdf_renk || "—"}
-          </span>
+          <Badge variant="outline" className="text-xs">
+            {tur}
+          </Badge>
         );
       },
     },

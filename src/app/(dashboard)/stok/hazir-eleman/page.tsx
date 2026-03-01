@@ -17,6 +17,7 @@ interface PageProps {
     pageSize?: string;
     search?: string;
     partType?: string;
+    tur?: string;
     sortBy?: string;
     sortOrder?: string;
     mPage?: string;
@@ -45,6 +46,7 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
     : 100;
   const stokSearch = params.search?.trim() || "";
   const stokPartType = params.partType || "";
+  const stokTur = params.tur?.trim() || "";
   const stokSortBy = params.sortBy || "part_id";
   const stokSortOrder = params.sortOrder === "desc" ? "desc" as const : "asc" as const;
 
@@ -70,7 +72,9 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
   if (stokSearch) {
     partsQuery = partsQuery.or(`part_id.ilike.%${stokSearch}%,part_adi.ilike.%${stokSearch}%`);
   }
-  if (stokPartType && ["HAZIR", "KUTU", "KARTON"].includes(stokPartType)) {
+  if (stokTur) {
+    partsQuery = partsQuery.eq("tur", stokTur);
+  } else if (stokPartType && ["HAZIR", "KUTU", "KARTON"].includes(stokPartType)) {
     partsQuery = partsQuery.eq("part_type", stokPartType as "HAZIR" | "KUTU" | "KARTON");
   }
 
@@ -218,6 +222,7 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
         stokPageSize={stokPageSize}
         stokSearch={stokSearch}
         stokPartType={stokPartType}
+        stokTur={stokTur}
         stokSortBy={stokSortColumn}
         stokSortOrder={stokSortOrder}
         movementsData={movements}

@@ -12,8 +12,8 @@ import {
   type MakineId,
 } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { LiveTimer } from "@/components/shared/live-timer";
-import { CheckCircle, User, Timer, XCircle } from "lucide-react";
+import { getSkuBadgeStyle } from "@/lib/sku-colors";
+import { CheckCircle, User, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export interface CutBatchRow {
@@ -58,6 +58,8 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
     ? MAKINE_BADGE_COLORS[batch.makine_id] ?? "bg-gray-100 text-gray-800"
     : "";
 
+  const skuStyle = batch.sku ? getSkuBadgeStyle(batch.sku) : null;
+
   const handleComplete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
@@ -80,15 +82,19 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
     <>
       <Card
         className={cn(
-          "border-l-4 border-l-blue-500 cursor-pointer transition-all hover:shadow-md",
-          "bg-blue-50/30"
+          "border-l-4 cursor-pointer transition-all hover:shadow-md",
+          !skuStyle && "border-l-blue-500 bg-blue-50/30"
         )}
+        style={skuStyle ? {
+          borderLeftColor: skuStyle.borderColor,
+          backgroundColor: `${skuStyle.backgroundColor}40`,
+        } : undefined}
         onClick={() => setSheetOpen(true)}
       >
-        <div className="p-4">
+        <div className="p-3">
           {/* Header — ID + Makine + Status */}
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
+          <div className="flex justify-between items-center mb-1.5">
+            <div className="flex items-center gap-1.5">
               <Badge variant="secondary" className="font-mono text-xs">
                 {batch.cut_id}
               </Badge>
@@ -102,7 +108,7 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
           </div>
 
           {/* Ürün + Plaka */}
-          <div className="mb-2">
+          <div className="mb-1.5">
             <p className="font-medium text-foreground truncate text-sm">
               {batch.urun_adi ?? batch.sku ?? "—"}
             </p>
@@ -111,48 +117,39 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
             </p>
           </div>
 
-          {/* Adet + Timer */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-3xl font-bold text-foreground tabular-nums">
+          {/* Adet + Operatör */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xl font-bold text-foreground tabular-nums">
                 {batch.adet}
               </span>
-              <span className="text-sm text-muted-foreground">adet</span>
+              <span className="text-xs text-muted-foreground">adet</span>
             </div>
-
-            {batch.baslama_zamani && (
-              <div className="flex items-center gap-1.5">
-                <Timer className="w-4 h-4 text-blue-600" />
-                <LiveTimer startTime={batch.baslama_zamani} />
+            {batch.operator_adi && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <User className="w-3 h-3" />
+                <span>{batch.operator_adi}</span>
               </div>
             )}
           </div>
 
-          {/* Operatör */}
-          {batch.operator_adi && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
-              <User className="w-3 h-3" />
-              <span>{batch.operator_adi}</span>
-            </div>
-          )}
-
           {/* Bitir butonu */}
           <div className="flex gap-2">
             <Button
-              className="flex-1 h-12 text-base"
+              className="flex-1 h-9 text-sm"
               onClick={handleComplete}
               disabled={loading}
             >
-              <CheckCircle className="w-5 h-5 mr-2" />
+              <CheckCircle className="w-4 h-4 mr-1.5" />
               Bitir
             </Button>
             <Button
               variant="outline"
-              className="h-12 px-3"
+              className="h-9 px-2.5"
               onClick={handleCancel}
               disabled={loading}
             >
-              <XCircle className="w-5 h-5" />
+              <XCircle className="w-4 h-4" />
             </Button>
           </div>
         </div>

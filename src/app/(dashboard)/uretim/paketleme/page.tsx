@@ -24,17 +24,17 @@ export default async function PaketlemePage() {
     .eq("durum", "paketlemede")
     .order("start_time", { ascending: true });
 
-  // Son 30 gün tamamlanan seanslar
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  // Son 62 gün tamamlanan seanslar (geçen ay filtresi için yeterli)
+  const sixtyTwoDaysAgo = new Date();
+  sixtyTwoDaysAgo.setDate(sixtyTwoDaysAgo.getDate() - 62);
 
   const { data: completedData } = await supabase
     .from("pack_events")
     .select("session_id, sku, qty, start_time, end_time, durum, worker_count, workers, birim_paketleme_dk")
     .eq("durum", "tamamlandi")
-    .gte("end_time", thirtyDaysAgo.toISOString())
+    .gte("end_time", sixtyTwoDaysAgo.toISOString())
     .order("end_time", { ascending: false })
-    .limit(50);
+    .limit(500);
 
   // Ürün adlarını çek
   const allSessions = [...(activeData ?? []), ...(completedData ?? [])];

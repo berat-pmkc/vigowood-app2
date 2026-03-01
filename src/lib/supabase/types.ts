@@ -279,6 +279,7 @@ export type Database = {
           part_adi: string
           part_id: string
           part_type: Database["public"]["Enums"]["part_type"]
+          tur: string | null
           updated_at: string
           yari_mamul_stok: number
         }
@@ -291,6 +292,7 @@ export type Database = {
           part_adi: string
           part_id: string
           part_type: Database["public"]["Enums"]["part_type"]
+          tur?: string | null
           updated_at?: string
           yari_mamul_stok?: number
         }
@@ -303,6 +305,7 @@ export type Database = {
           part_adi?: string
           part_id?: string
           part_type?: Database["public"]["Enums"]["part_type"]
+          tur?: string | null
           updated_at?: string
           yari_mamul_stok?: number
         }
@@ -586,6 +589,7 @@ export type Database = {
       daily_summary: {
         Row: {
           avg_basket: number
+          channel: string
           created_at: string
           date: string
           refund_count: number
@@ -600,6 +604,7 @@ export type Database = {
         }
         Insert: {
           avg_basket?: number
+          channel?: string
           created_at?: string
           date: string
           refund_count?: number
@@ -614,6 +619,7 @@ export type Database = {
         }
         Update: {
           avg_basket?: number
+          channel?: string
           created_at?: string
           date?: string
           refund_count?: number
@@ -1404,7 +1410,9 @@ export type Database = {
       monthly_sku_summary: {
         Row: {
           avg_price: number
+          channel: string
           created_at: string
+          master_sku: string | null
           month_start: string
           product_name: string
           quantity_sold: number
@@ -1415,7 +1423,9 @@ export type Database = {
         }
         Insert: {
           avg_price?: number
+          channel?: string
           created_at?: string
+          master_sku?: string | null
           month_start: string
           product_name?: string
           quantity_sold?: number
@@ -1426,7 +1436,9 @@ export type Database = {
         }
         Update: {
           avg_price?: number
+          channel?: string
           created_at?: string
+          master_sku?: string | null
           month_start?: string
           product_name?: string
           quantity_sold?: number
@@ -3910,7 +3922,9 @@ export type Database = {
       weekly_sku_summary: {
         Row: {
           avg_price: number
+          channel: string
           created_at: string
+          master_sku: string | null
           product_name: string
           quantity_sold: number
           refund_count: number
@@ -3921,7 +3935,9 @@ export type Database = {
         }
         Insert: {
           avg_price?: number
+          channel?: string
           created_at?: string
+          master_sku?: string | null
           product_name?: string
           quantity_sold?: number
           refund_count?: number
@@ -3932,7 +3948,9 @@ export type Database = {
         }
         Update: {
           avg_price?: number
+          channel?: string
           created_at?: string
+          master_sku?: string | null
           product_name?: string
           quantity_sold?: number
           refund_count?: number

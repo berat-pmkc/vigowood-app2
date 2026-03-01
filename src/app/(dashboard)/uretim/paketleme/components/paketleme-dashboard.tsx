@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Package, ClipboardList } from "lucide-react";
@@ -49,6 +49,15 @@ export function PaketlemeDashboard({
   // Realtime subscription
   usePaketlemeRealtime();
 
+  // Bugün tamamlanan sayısı (badge için)
+  const todayCompletedCount = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    return completedSessions.filter(
+      (s) => s.end_time && new Date(s.end_time) >= todayStart
+    ).length;
+  }, [completedSessions]);
+
   const handleClose = (session: ActiveSession) => {
     setSelectedSession(session);
     setCloseDialogOpen(true);
@@ -85,9 +94,9 @@ export function PaketlemeDashboard({
             <ClipboardList className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Tamamlananlar</span>
             <span className="sm:hidden">Geçmiş</span>
-            {completedSessions.length > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold px-1.5">
-                {completedSessions.length}
+            {todayCompletedCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[20px] h-5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold px-1.5" title="Bugün tamamlanan">
+                {todayCompletedCount}
               </span>
             )}
           </Button>

@@ -10,6 +10,7 @@ interface PageProps {
     page?: string;
     pageSize?: string;
     search?: string;
+    tur?: string;
     sortBy?: string;
     sortOrder?: string;
   }>;
@@ -25,6 +26,7 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
     ? Number(params.pageSize || "25")
     : 25;
   const search = params.search?.trim() || "";
+  const tur = params.tur?.trim() || "";
   const sortBy = params.sortBy || "part_id";
   const sortOrder = params.sortOrder === "desc" ? false : true;
 
@@ -46,6 +48,10 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
     .from("all_parts")
     .select("*", { count: "exact" })
     .eq("part_type", "HAZIR");
+
+  if (tur) {
+    q.eq("tur", tur);
+  }
 
   if (search) {
     q.or(`part_id.ilike.%${search}%,part_adi.ilike.%${search}%`);
@@ -81,6 +87,7 @@ export default async function HazirElemanPage({ searchParams }: PageProps) {
         pageIndex={page}
         pageSize={pageSize}
         search={search}
+        tur={tur}
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
       />

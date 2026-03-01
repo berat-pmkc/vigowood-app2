@@ -8,19 +8,57 @@ import type { CutBatchRow } from "./components/active-cut-card";
 
 export const metadata: Metadata = { title: "Kesim" };
 
-export default async function KesimPage() {
+function getDateRange(filter: string) {
+  const now = new Date();
+
+  switch (filter) {
+    case "yesterday": {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yStr = yesterday.toISOString().split("T")[0];
+      return { start: `${yStr}T00:00:00.000Z`, end: `${yStr}T23:59:59.999Z` };
+    }
+    case "week": {
+      const monday = new Date(now);
+      const dayOfWeek = monday.getDay() || 7;
+      monday.setDate(monday.getDate() - dayOfWeek + 1);
+      return {
+        start: `${monday.toISOString().split("T")[0]}T00:00:00.000Z`,
+        end: now.toISOString(),
+      };
+    }
+    case "month": {
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      return {
+        start: `${firstOfMonth.toISOString().split("T")[0]}T00:00:00.000Z`,
+        end: now.toISOString(),
+      };
+    }
+    default: {
+      // "today"
+      const todayStr = now.toISOString().split("T")[0];
+      return { start: `${todayStr}T00:00:00.000Z`, end: `${todayStr}T23:59:59.999Z` };
+    }
+  }
+}
+
+export default async function KesimPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dateFilter?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
     redirect("/");
   }
 
+  const params = await searchParams;
+  const dateFilter = params.dateFilter || "today";
+  const { start: rangeStart, end: rangeEnd } = getDateRange(dateFilter);
+
   const supabase = await createClient();
 
-  const today = new Date().toISOString().split("T")[0];
-  const dayStart = `${today}T00:00:00.000Z`;
-  const dayEnd = `${today}T23:59:59.999Z`;
-
-  // Parallel fetches: aktif kesimler, bugünün tamamlananları, makineler
+  // Parallel fetches: aktif kesimler, tamamlananlar (filtreli), makineler
   const [activeBatchesRes, completedBatchesRes, makinelerRes] = await Promise.all([
     supabase
       .from("cut_batches")
@@ -31,8 +69,8 @@ export default async function KesimPage() {
       .from("cut_batches")
       .select("*")
       .eq("durum", "tamamlandi")
-      .gte("bitis_zamani", dayStart)
-      .lte("bitis_zamani", dayEnd)
+      .gte("bitis_zamani", rangeStart)
+      .lte("bitis_zamani", rangeEnd)
       .order("bitis_zamani", { ascending: false }),
     supabase
       .from("kesim_makinesi")
@@ -83,7 +121,7 @@ export default async function KesimPage() {
   const enrichedActive = activeBatches.map(enrich);
   const enrichedCompleted = completedBatches.map(enrich);
 
-  // Bugünün KPI için toplam adet
+  // KPI: tamamlanan toplam adet
   const todayTotalAdet = completedBatches.reduce((sum, b) => sum + b.adet, 0);
   const todayTotalBatch = completedBatches.length;
 
@@ -94,6 +132,7 @@ export default async function KesimPage() {
         completedCuts={enrichedCompleted}
         todayTotalAdet={todayTotalAdet}
         todayTotalBatch={todayTotalBatch}
+        dateFilter={dateFilter}
         makineler={(makinelerRes.data ?? []) as { makine_id: string; tipi: string; bolum: string; aktif: boolean }[]}
       />
     </div>

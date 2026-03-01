@@ -23,6 +23,7 @@ interface HazirElemanClientProps {
   stokPageSize: number;
   stokSearch: string;
   stokPartType: string;
+  stokTur: string;
   stokSortBy: string;
   stokSortOrder: "asc" | "desc";
   movementsData: HazirElemanHareket[];
@@ -44,6 +45,7 @@ export function HazirElemanClient({
   stokPageSize,
   stokSearch,
   stokPartType,
+  stokTur,
   stokSortBy,
   stokSortOrder,
   movementsData,
@@ -79,7 +81,7 @@ export function HazirElemanClient({
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/stok/hazir-eleman/grafik">
+            <Link href={`/stok/hazir-eleman/grafik${stokTur ? `?tur=${stokTur}` : ""}`}>
               <BarChart3 className="mr-1.5 h-4 w-4" />
               Grafik
             </Link>
@@ -105,6 +107,7 @@ export function HazirElemanClient({
             pageSize={stokPageSize}
             search={stokSearch}
             partType={stokPartType}
+            tur={stokTur}
             sortBy={stokSortBy}
             sortOrder={stokSortOrder}
           />

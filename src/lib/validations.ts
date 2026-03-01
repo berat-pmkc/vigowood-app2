@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI, TASK_STATUSES, TASK_PRIORITIES, TASK_DEPARTMENTS, TASK_SOURCE_TYPES } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, MONTAJ_SESSION_STATUS, PACK_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI, TASK_STATUSES, TASK_PRIORITIES, TASK_DEPARTMENTS, TASK_SOURCE_TYPES } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -724,6 +724,67 @@ export const maliyetGirisBatchSchema = z.object({
 });
 
 export type MaliyetGirisBatchData = z.infer<typeof maliyetGirisBatchSchema>;
+
+// ─── Üretim Database (Admin) ─────────────────────────────────
+
+/** Kesim batch güncelleme */
+export const cutBatchUpdateSchema = z.object({
+  sku: z.string().nullable(),
+  plaka_id: z.string().nullable(),
+  makine_id: z.string().nullable(),
+  adet: z.number().min(0, "Adet 0 veya üzeri olmalıdır"),
+  operator_id: z.string().nullable(),
+  durum: z.enum(CUT_STATUS, { error: "Geçerli bir durum seçiniz" }),
+  plk_notu: z.string().nullable(),
+  tarih: z.string().min(1, "Tarih gereklidir"),
+  baslama_zamani: z.string().nullable(),
+  bitis_zamani: z.string().nullable(),
+});
+
+export type CutBatchUpdateData = z.infer<typeof cutBatchUpdateSchema>;
+
+/** Kesim satırı güncelleme */
+export const cutLineUpdateSchema = z.object({
+  part_id: z.string().nullable(),
+  adet: z.number().min(0, "Adet 0 veya üzeri olmalıdır"),
+  not_text: z.string().nullable(),
+  renk: z.string().nullable(),
+});
+
+export type CutLineUpdateData = z.infer<typeof cutLineUpdateSchema>;
+
+/** Montaj seans güncelleme */
+export const montajSessionUpdateSchema = z.object({
+  sku: z.string().min(1, "SKU gereklidir"),
+  step_name: z.string().nullable(),
+  durum: z.enum(MONTAJ_SESSION_STATUS, { error: "Geçerli bir durum seçiniz" }),
+  operator_id: z.string().nullable(),
+  operator_name: z.string().nullable(),
+  qty: z.number().min(0, "Adet 0 veya üzeri olmalıdır"),
+  worker_count: z.number().int().min(1, "En az 1 kişi olmalıdır"),
+  notes: z.string().nullable(),
+  start_time: z.string().nullable(),
+  end_time: z.string().nullable(),
+  is_final_step: z.boolean(),
+});
+
+export type MontajSessionUpdateData = z.infer<typeof montajSessionUpdateSchema>;
+
+/** Paketleme seans güncelleme */
+export const packEventUpdateSchema = z.object({
+  sku: z.string().nullable(),
+  durum: z.enum(PACK_STATUS, { error: "Geçerli bir durum seçiniz" }),
+  operator_id: z.string().nullable(),
+  operator_name: z.string().nullable(),
+  qty: z.number().min(0, "Adet 0 veya üzeri olmalıdır"),
+  worker_count: z.number().int().min(1, "En az 1 kişi olmalıdır"),
+  not_text: z.string().nullable(),
+  tarih: z.string().nullable(),
+  start_time: z.string().nullable(),
+  end_time: z.string().nullable(),
+});
+
+export type PackEventUpdateData = z.infer<typeof packEventUpdateSchema>;
 
 // ─── Ops Center — Task Management ────────────────────────────
 

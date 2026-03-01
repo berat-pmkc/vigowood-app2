@@ -267,6 +267,21 @@ export const KUTU_STATUS_BORDER_COLORS: Record<KutuStatus, string> = {
 // Hazır Eleman parça tipleri (HAZIR + KUTU + KARTON)
 export const HAZIR_ELEMAN_PART_TYPES: PartType[] = ["HAZIR", "KUTU", "KARTON"];
 
+// Hazır Eleman Tür kategorileri (all_parts.tur kolonu)
+export const HAZIR_ELEMAN_TURLERI = [
+  "MDF",
+  "Vida",
+  "Kumaş",
+  "Sünger",
+  "Aksesuar",
+  "Menteşe",
+  "Mıknatıs",
+  "Kutu",
+  "Karton",
+] as const;
+
+export type HazirElemanTur = (typeof HAZIR_ELEMAN_TURLERI)[number];
+
 // İade durumları
 export const IADE_DURUM = ["Kullanilabilir", "Kullanilamaz"] as const;
 export type IadeDurum = (typeof IADE_DURUM)[number];

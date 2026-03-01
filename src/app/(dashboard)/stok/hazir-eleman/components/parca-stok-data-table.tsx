@@ -11,15 +11,10 @@ import {
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { formatNumber, cn } from "@/lib/utils";
+import { HAZIR_ELEMAN_TURLERI } from "@/lib/constants";
 import type { PartType } from "@/lib/constants";
 
 export interface HazirElemanStok {
@@ -38,6 +33,7 @@ interface ParcaStokDataTableProps {
   pageSize: number;
   search: string;
   partType: string;
+  tur: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -114,7 +110,7 @@ export function ParcaStokDataTable({
   pageIndex,
   pageSize,
   search,
-  partType,
+  tur,
   sortBy,
   sortOrder,
 }: ParcaStokDataTableProps) {
@@ -190,22 +186,29 @@ export function ParcaStokDataTable({
             className="pl-9"
           />
         </div>
-        <Select
-          value={partType || "all"}
-          onValueChange={(v) =>
-            navigate({ partType: v === "all" ? undefined : v, page: "0" })
-          }
+      </div>
+
+      {/* Tür filtre butonları */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Button
+          variant={tur === "" ? "default" : "outline"}
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => navigate({ tur: undefined, partType: undefined, page: "0" })}
         >
-          <SelectTrigger className="w-[140px] sm:w-[180px]">
-            <SelectValue placeholder="Tüm Tipler" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tüm Tipler</SelectItem>
-            <SelectItem value="HAZIR">Hazır Eleman</SelectItem>
-            <SelectItem value="KUTU">Kutu</SelectItem>
-            <SelectItem value="KARTON">Karton</SelectItem>
-          </SelectContent>
-        </Select>
+          Tümü
+        </Button>
+        {HAZIR_ELEMAN_TURLERI.map((t) => (
+          <Button
+            key={t}
+            variant={tur === t ? "default" : "outline"}
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => navigate({ tur: t, partType: undefined, page: "0" })}
+          >
+            {t}
+          </Button>
+        ))}
       </div>
 
       <DataTable table={table} emptyMessage="Parça bulunamadı." />

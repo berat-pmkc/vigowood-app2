@@ -42,6 +42,7 @@ interface HazirElemanDataTableProps {
   pageIndex: number;
   pageSize: number;
   search: string;
+  tur: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -52,6 +53,7 @@ export function HazirElemanDataTable({
   pageIndex,
   pageSize,
   search,
+  tur,
   sortBy,
   sortOrder,
 }: HazirElemanDataTableProps) {
@@ -175,6 +177,10 @@ export function HazirElemanDataTable({
             search={search}
             onSearchChange={(v) =>
               navigate({ search: v || undefined, page: "0" })
+            }
+            tur={tur}
+            onTurChange={(v) =>
+              navigate({ tur: v || undefined, page: "0" })
             }
           />
         </div>
