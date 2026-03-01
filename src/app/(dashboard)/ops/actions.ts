@@ -1147,3 +1147,214 @@ export async function getUsageStats(period: "day" | "week" | "month" = "week") {
     actions: actions ?? [],
   };
 }
+
+// ─── Agent Detail Actions ──────────────────────────────────────
+
+export type AgentMemoryItem = {
+  id: string;
+  agent_id: string;
+  memory_type: string;
+  key: string;
+  value: Record<string, unknown>;
+  context: string | null;
+  confidence: number;
+  source: string | null;
+  is_active: boolean;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getAgentMemories(agentCode: string) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("agent_memory")
+    .select("*")
+    .eq("agent_id", agentCode)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+
+  if (error) return [];
+  return (data ?? []) as AgentMemoryItem[];
+}
+
+export async function deleteAgentMemory(memoryId: string) {
+  const user = await requireUser();
+  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+    return { success: false, error: "Yetkiniz yok" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("agent_memory")
+    .delete()
+    .eq("id", memoryId);
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/ops/ajanlar");
+  return { success: true };
+}
+
+export type AgentPerformance = {
+  totalCompletedTasks: number;
+  avgTaskDurationHours: number;
+  totalTokensUsed: number;
+  dailyTrend: { date: string; count: number }[];
+};
+
+export async function getAgentPerformance(agentCode: string): Promise<AgentPerformance> {
+  const supabase = await createClient();
+
+  // Tasks assigned to this agent
+  const { data: doneTasks } = await supabase
+    .from("tasks")
+    .select("created_at, updated_at")
+    .eq("assigned_to", agentCode)
+    .eq("status", "done");
+
+  const totalCompletedTasks = doneTasks?.length ?? 0;
+
+  // Average task duration in hours
+  let avgTaskDurationHours = 0;
+  if (doneTasks && doneTasks.length > 0) {
+    const totalMs = doneTasks.reduce((sum, t) => {
+      const created = new Date(t.created_at).getTime();
+      const updated = new Date(t.updated_at).getTime();
+      return sum + (updated - created);
+    }, 0);
+    avgTaskDurationHours = totalMs / doneTasks.length / (1000 * 60 * 60);
+  }
+
+  // Total tokens from agent_actions
+  const { data: actions } = await supabase
+    .from("agent_actions")
+    .select("tokens_used")
+    .eq("agent_id", agentCode);
+
+  const totalTokensUsed = actions?.reduce((sum, a) => sum + (a.tokens_used ?? 0), 0) ?? 0;
+
+  // Daily completed tasks trend (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const { data: recentTasks } = await supabase
+    .from("tasks")
+    .select("updated_at")
+    .eq("assigned_to", agentCode)
+    .eq("status", "done")
+    .gte("updated_at", sevenDaysAgo.toISOString());
+
+  const trendMap = new Map<string, number>();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    trendMap.set(d.toISOString().split("T")[0], 0);
+  }
+  for (const t of recentTasks ?? []) {
+    const day = new Date(t.updated_at).toISOString().split("T")[0];
+    if (trendMap.has(day)) {
+      trendMap.set(day, (trendMap.get(day) ?? 0) + 1);
+    }
+  }
+
+  const dailyTrend = [...trendMap.entries()].map(([date, count]) => ({ date, count }));
+
+  return { totalCompletedTasks, avgTaskDurationHours, totalTokensUsed, dailyTrend };
+}
+
+export type AgentCosts = {
+  totalCost: number;
+  thisMonthCost: number;
+  lastMonthCost: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  dailyCosts: { date: string; cost: number }[];
+};
+
+export async function getAgentCosts(agentCode: string): Promise<AgentCosts> {
+  const supabase = await createClient();
+
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const { data: allActions } = await supabase
+    .from("agent_actions")
+    .select("tokens_used, cost_estimate, created_at, metadata")
+    .eq("agent_id", agentCode)
+    .order("created_at", { ascending: false });
+
+  let totalCost = 0;
+  let thisMonthCost = 0;
+  let lastMonthCost = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+
+  const dailyCostMap = new Map<string, number>();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dailyCostMap.set(d.toISOString().split("T")[0], 0);
+  }
+
+  for (const a of allActions ?? []) {
+    const cost = Number(a.cost_estimate ?? 0);
+    const tokens = a.tokens_used ?? 0;
+    const createdAt = new Date(a.created_at);
+
+    totalCost += cost;
+
+    // Estimate input/output split (70/30 ratio as typical)
+    totalInputTokens += Math.round(tokens * 0.7);
+    totalOutputTokens += Math.round(tokens * 0.3);
+
+    if (createdAt >= thisMonthStart) {
+      thisMonthCost += cost;
+    } else if (createdAt >= lastMonthStart && createdAt < thisMonthStart) {
+      lastMonthCost += cost;
+    }
+
+    if (createdAt >= thirtyDaysAgo) {
+      const day = createdAt.toISOString().split("T")[0];
+      if (dailyCostMap.has(day)) {
+        dailyCostMap.set(day, (dailyCostMap.get(day) ?? 0) + cost);
+      }
+    }
+  }
+
+  const dailyCosts = [...dailyCostMap.entries()].map(([date, cost]) => ({ date, cost }));
+
+  return { totalCost, thisMonthCost, lastMonthCost, totalInputTokens, totalOutputTokens, dailyCosts };
+}
+
+export type AgentTaskItem = {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  duration_hours: number;
+};
+
+export async function getAgentTasks(agentCode: string): Promise<AgentTaskItem[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("id, title, status, created_at, updated_at")
+    .eq("assigned_to", agentCode)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) return [];
+
+  return (data ?? []).map((t) => {
+    const created = new Date(t.created_at).getTime();
+    const updated = new Date(t.updated_at).getTime();
+    const duration_hours = (updated - created) / (1000 * 60 * 60);
+    return { ...t, duration_hours };
+  }) as AgentTaskItem[];
+}

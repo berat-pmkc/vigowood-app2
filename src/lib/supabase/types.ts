@@ -367,6 +367,39 @@ export type Database = {
           },
         ]
       }
+      assistant_feedback: {
+        Row: {
+          agent_id: string
+          comment: string | null
+          comment_id: string | null
+          created_at: string
+          id: string
+          promoted_to_rule: boolean
+          rating: number | null
+          task_id: string | null
+        }
+        Insert: {
+          agent_id: string
+          comment?: string | null
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          promoted_to_rule?: boolean
+          rating?: number | null
+          task_id?: string | null
+        }
+        Update: {
+          agent_id?: string
+          comment?: string | null
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          promoted_to_rule?: boolean
+          rating?: number | null
+          task_id?: string | null
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           att_id: string
@@ -549,6 +582,51 @@ export type Database = {
             referencedColumns: ["cut_id"]
           },
         ]
+      }
+      daily_summary: {
+        Row: {
+          avg_basket: number
+          created_at: string
+          date: string
+          refund_count: number
+          status_distribution: Json | null
+          top_cities: Json | null
+          top_products: Json | null
+          top_refunded_products: Json | null
+          total_orders: number
+          total_refunds: number
+          total_revenue: number
+          updated_at: string
+        }
+        Insert: {
+          avg_basket?: number
+          created_at?: string
+          date: string
+          refund_count?: number
+          status_distribution?: Json | null
+          top_cities?: Json | null
+          top_products?: Json | null
+          top_refunded_products?: Json | null
+          total_orders?: number
+          total_refunds?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_basket?: number
+          created_at?: string
+          date?: string
+          refund_count?: number
+          status_distribution?: Json | null
+          top_cities?: Json | null
+          top_products?: Json | null
+          top_refunded_products?: Json | null
+          total_orders?: number
+          total_refunds?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       doviz_kurlari: {
         Row: {
@@ -745,6 +823,30 @@ export type Database = {
           synced_at?: string
           total_price?: number | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      ikas_products: {
+        Row: {
+          ikas_id: string
+          name: string
+          synced_at: string
+          total_stock: number
+          variants: Json | null
+        }
+        Insert: {
+          ikas_id: string
+          name: string
+          synced_at?: string
+          total_stock?: number
+          variants?: Json | null
+        }
+        Update: {
+          ikas_id?: string
+          name?: string
+          synced_at?: string
+          total_stock?: number
+          variants?: Json | null
         }
         Relationships: []
       }
@@ -1296,6 +1398,42 @@ export type Database = {
           updated_at?: string | null
           worker_count?: number | null
           workers?: Json | null
+        }
+        Relationships: []
+      }
+      monthly_sku_summary: {
+        Row: {
+          avg_price: number
+          created_at: string
+          month_start: string
+          product_name: string
+          quantity_sold: number
+          refund_count: number
+          revenue: number
+          sku: string
+          updated_at: string
+        }
+        Insert: {
+          avg_price?: number
+          created_at?: string
+          month_start: string
+          product_name?: string
+          quantity_sold?: number
+          refund_count?: number
+          revenue?: number
+          sku: string
+          updated_at?: string
+        }
+        Update: {
+          avg_price?: number
+          created_at?: string
+          month_start?: string
+          product_name?: string
+          quantity_sold?: number
+          refund_count?: number
+          revenue?: number
+          sku?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2777,6 +2915,54 @@ export type Database = {
         }
         Relationships: []
       }
+      sku_mappings: {
+        Row: {
+          channel: string
+          channel_barcode: string | null
+          channel_product_code: string | null
+          channel_product_id: string | null
+          channel_product_name: string | null
+          channel_sku: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          master_sku: string
+          match_method: string | null
+          match_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          channel: string
+          channel_barcode?: string | null
+          channel_product_code?: string | null
+          channel_product_id?: string | null
+          channel_product_name?: string | null
+          channel_sku?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          master_sku: string
+          match_method?: string | null
+          match_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          channel?: string
+          channel_barcode?: string | null
+          channel_product_code?: string | null
+          channel_product_id?: string | null
+          channel_product_name?: string | null
+          channel_sku?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          master_sku?: string
+          match_method?: string | null
+          match_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       step_bom: {
         Row: {
           created_at: string
@@ -2947,6 +3133,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          role: string | null
           task_id: string
         }
         Insert: {
@@ -2954,6 +3141,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          role?: string | null
           task_id: string
         }
         Update: {
@@ -2961,6 +3149,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          role?: string | null
           task_id?: string
         }
         Relationships: [
@@ -3081,6 +3270,7 @@ export type Database = {
           is_waiting_approval: boolean | null
           parent_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
+          source: string | null
           source_id: string | null
           source_type: Database["public"]["Enums"]["task_source_type"]
           status: Database["public"]["Enums"]["task_status"]
@@ -3099,6 +3289,7 @@ export type Database = {
           is_waiting_approval?: boolean | null
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          source?: string | null
           source_id?: string | null
           source_type?: Database["public"]["Enums"]["task_source_type"]
           status?: Database["public"]["Enums"]["task_status"]
@@ -3117,6 +3308,7 @@ export type Database = {
           is_waiting_approval?: boolean | null
           parent_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          source?: string | null
           source_id?: string | null
           source_type?: Database["public"]["Enums"]["task_source_type"]
           status?: Database["public"]["Enums"]["task_status"]
@@ -3197,11 +3389,48 @@ export type Database = {
         }
         Relationships: []
       }
+      trendyol_claims: {
+        Row: {
+          cargo_tracking_number: string | null
+          claim_date: number
+          created_at: string
+          id: string
+          items: Json
+          order_number: string
+          shipment_package_id: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cargo_tracking_number?: string | null
+          claim_date: number
+          created_at?: string
+          id: string
+          items?: Json
+          order_number: string
+          shipment_package_id?: number | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          cargo_tracking_number?: string | null
+          claim_date?: number
+          created_at?: string
+          id?: string
+          items?: Json
+          order_number?: string
+          shipment_package_id?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       trendyol_order_lines: {
         Row: {
           amount: number | null
           barcode: string | null
           commission: number | null
+          commission_amount: number | null
           currency_code: string | null
           discount: number | null
           id: number
@@ -3224,6 +3453,7 @@ export type Database = {
           amount?: number | null
           barcode?: string | null
           commission?: number | null
+          commission_amount?: number | null
           currency_code?: string | null
           discount?: number | null
           id: number
@@ -3246,6 +3476,7 @@ export type Database = {
           amount?: number | null
           barcode?: string | null
           commission?: number | null
+          commission_amount?: number | null
           currency_code?: string | null
           discount?: number | null
           id?: number
@@ -3349,6 +3580,36 @@ export type Database = {
           total_discount?: number | null
           total_price?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      trendyol_other_financials: {
+        Row: {
+          created_at: string | null
+          credit: number | null
+          debt: number | null
+          description: string | null
+          id: string
+          transaction_date: string | null
+          transaction_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          credit?: number | null
+          debt?: number | null
+          description?: string | null
+          id: string
+          transaction_date?: string | null
+          transaction_type: string
+        }
+        Update: {
+          created_at?: string | null
+          credit?: number | null
+          debt?: number | null
+          description?: string | null
+          id?: string
+          transaction_date?: string | null
+          transaction_type?: string
         }
         Relationships: []
       }
@@ -3643,6 +3904,42 @@ export type Database = {
           station?: Database["public"]["Enums"]["station"]
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_sku_summary: {
+        Row: {
+          avg_price: number
+          created_at: string
+          product_name: string
+          quantity_sold: number
+          refund_count: number
+          revenue: number
+          sku: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          avg_price?: number
+          created_at?: string
+          product_name?: string
+          quantity_sold?: number
+          refund_count?: number
+          revenue?: number
+          sku: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          avg_price?: number
+          created_at?: string
+          product_name?: string
+          quantity_sold?: number
+          refund_count?: number
+          revenue?: number
+          sku?: string
+          updated_at?: string
+          week_start?: string
         }
         Relationships: []
       }
@@ -4041,42 +4338,38 @@ export const Constants = {
   },
 } as const
 
-// ─── Custom Type Aliases ─────────────────────────────────────
+// Custom type aliases
 export type Product = Database["public"]["Tables"]["products"]["Row"];
-export type User = Database["public"]["Tables"]["users"]["Row"];
 export type AllPart = Database["public"]["Tables"]["all_parts"]["Row"];
-export type KesimMakinesi = Database["public"]["Tables"]["kesim_makinesi"]["Row"];
 export type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
 export type PlakaPart = Database["public"]["Tables"]["plaka_parts"]["Row"];
 export type AssemblyStep = Database["public"]["Tables"]["assembly_steps"]["Row"];
 export type StepBom = Database["public"]["Tables"]["step_bom"]["Row"];
 export type CutBatch = Database["public"]["Tables"]["cut_batches"]["Row"];
 export type CutLine = Database["public"]["Tables"]["cut_lines"]["Row"];
-export type Clean = Database["public"]["Tables"]["clean"]["Row"];
+export type CleanRecord = Database["public"]["Tables"]["clean"]["Row"];
+export type MontajSession = Database["public"]["Tables"]["montaj_sessions"]["Row"];
 export type PackEvent = Database["public"]["Tables"]["pack_events"]["Row"];
+export type KutuUretim = Database["public"]["Tables"]["kutu_uretim"]["Row"];
 export type StockMovement = Database["public"]["Tables"]["stock_movements"]["Row"];
 export type YariMamulStok = Database["public"]["Tables"]["yari_mamul_stok"]["Row"];
 export type HazirElemanAkis = Database["public"]["Tables"]["hazir_eleman_akis"]["Row"];
 export type IadeGiris = Database["public"]["Tables"]["iade_giris"]["Row"];
 export type Attendance = Database["public"]["Tables"]["attendance"]["Row"];
-export type AppNotification = Database["public"]["Tables"]["notifications"]["Row"];
+export type NotificationRecord = Database["public"]["Tables"]["notifications"]["Row"];
 export type NotificationRead = Database["public"]["Tables"]["notification_reads"]["Row"];
+export type UserRecord = Database["public"]["Tables"]["users"]["Row"];
+export type KesimMakinesi = Database["public"]["Tables"]["kesim_makinesi"]["Row"];
 export type Sevkiyat = Database["public"]["Tables"]["sevkiyat"]["Row"];
 export type SevkiyatItem = Database["public"]["Tables"]["sevkiyat_items"]["Row"];
 export type SevkiyatFiyat = Database["public"]["Tables"]["sevkiyat_fiyatlar"]["Row"];
-export type SevkiyatFirma = Database["public"]["Tables"]["sevkiyat_firmalar"]["Row"];
-export type SevkiyatMaliyet = Database["public"]["Tables"]["sevkiyat_maliyetler"]["Row"];
-export type SevkiyatPaletSablon = Database["public"]["Tables"]["sevkiyat_palet_sablon"]["Row"];
-export type SatisRaporu = Database["public"]["Tables"]["satis_raporlari"]["Row"];
-export type Kampanya = Database["public"]["Tables"]["kampanyalar"]["Row"];
-export type MontajSession = Database["public"]["Tables"]["montaj_sessions"]["Row"];
-export type KutuUretim = Database["public"]["Tables"]["kutu_uretim"]["Row"];
-export type AppSetting = Database["public"]["Tables"]["app_settings"]["Row"];
+export type PaletSablon = Database["public"]["Tables"]["sevkiyat_palet_sablon"]["Row"];
 export type NakitDonem = Database["public"]["Tables"]["nakit_donemler"]["Row"];
 export type NakitGiris = Database["public"]["Tables"]["nakit_girisler"]["Row"];
 export type NakitCikis = Database["public"]["Tables"]["nakit_cikislar"]["Row"];
 export type Odeme = Database["public"]["Tables"]["odemeler"]["Row"];
 export type NakitGirisTakip = Database["public"]["Tables"]["nakit_giris_takip"]["Row"];
+export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
 export type SatisGiris = Database["public"]["Tables"]["satis_giris"]["Row"];
 export type MaliyetGiris = Database["public"]["Tables"]["maliyet_giris"]["Row"];
 export type KarlilikData = Database["public"]["Tables"]["karlilik_data"]["Row"];
@@ -4102,7 +4395,7 @@ export type PartType = Database["public"]["Enums"]["part_type"];
 export type ProductCategory = Database["public"]["Enums"]["product_category"];
 export type UserRole = Database["public"]["Enums"]["user_role"];
 export type Station = Database["public"]["Enums"]["station"];
-export type FaaliyetDonem = Database["public"]["Tables"]["faaliyet_donemler"]["Row"];
 export type DovizKuru = Database["public"]["Tables"]["doviz_kurlari"]["Row"];
 export type SatisSatiri = Database["public"]["Tables"]["satis_satirlari"]["Row"];
 export type AgentChat = Database["public"]["Tables"]["agent_chats"]["Row"];
+export type SkuMapping = Database["public"]["Tables"]["sku_mappings"]["Row"];

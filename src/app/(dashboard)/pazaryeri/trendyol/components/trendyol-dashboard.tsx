@@ -29,7 +29,9 @@ import {
   MessageSquareText,
   CalendarDays,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatTRY } from "@/lib/trendyol/helpers";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
@@ -55,9 +57,15 @@ interface KpiData {
   weekCiro: number;
   monthOrderCount: number;
   monthCiro: number;
+  monthGrossCiro: number;
+  monthDiscount: number;
   totalOrderCount: number;
   pendingCount: number;
   cancelledCount: number;
+  returnedCount: number;
+  cancelledAmount: number;
+  returnedAmount: number;
+  totalItemQuantity: number;
   totalProducts: number;
   outOfStockCount: number;
   pendingQuestions: number;
@@ -99,6 +107,8 @@ interface Props {
   isCurrentMonth: boolean;
   lastSyncAt: string | null;
   lastSyncError?: string | null;
+  monthStartMs: number;
+  monthEndMs: number;
 }
 
 export function TrendyolDashboard({
@@ -113,16 +123,37 @@ export function TrendyolDashboard({
   isCurrentMonth,
   lastSyncAt,
   lastSyncError,
+  monthStartMs,
+  monthEndMs,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
 
   const selectedMonthLabel = months.find((m) => m.value === selectedMonth)?.label || selectedMonth;
 
+  const [fullSyncing, setFullSyncing] = useState(false);
+
   // Auto-refresh every 5 minutes (server component re-fetch)
   const refreshData = useCallback(() => {
     router.refresh();
   }, [router]);
+
+  async function handleFullSync() {
+    setFullSyncing(true);
+    try {
+      const res = await fetch("/api/trendyol-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity: "orders", startMs: monthStartMs, endMs: monthEndMs }),
+      });
+      if (!res.ok) throw new Error("Sync failed");
+      router.refresh();
+    } catch {
+      // Error is visible in sync status after refresh
+    } finally {
+      setFullSyncing(false);
+    }
+  }
 
   useEffect(() => {
     if (!isCurrentMonth) return; // Only auto-refresh for current month
@@ -250,6 +281,21 @@ export function TrendyolDashboard({
         </div>
         <div className="flex items-center gap-2">
           <SyncStatus lastSyncAt={lastSyncAt} lastSyncError={lastSyncError} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs gap-1.5"
+            onClick={handleFullSync}
+            disabled={fullSyncing}
+            title="Bu ay için tüm siparişleri Trendyol'dan tekrar çeker"
+          >
+            {fullSyncing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
+            {fullSyncing ? "Senkronize ediliyor..." : "Tam Sync"}
+          </Button>
           <Select value={selectedMonth} onValueChange={handleMonthChange}>
             <SelectTrigger className="h-8 w-[160px] text-xs">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -278,10 +324,7 @@ export function TrendyolDashboard({
           <CardContent>
             <div className="text-lg font-bold text-orange-700">{formatTRY(kpi.monthCiro)}</div>
             <p className="text-xs text-muted-foreground">
-              {kpi.monthOrderCount} sipariş
-              {kpi.cancelledCount > 0 && (
-                <span className="text-red-400 ml-1">({kpi.cancelledCount} iptal/iade hariç)</span>
-              )}
+              {kpi.monthOrderCount.toLocaleString("tr-TR")} sipariş / {kpi.totalItemQuantity.toLocaleString("tr-TR")} adet
             </p>
           </CardContent>
         </Card>
@@ -325,12 +368,52 @@ export function TrendyolDashboard({
               <span className="text-xs text-muted-foreground">/</span>
               <span className="text-lg font-bold text-red-500">{kpi.cancelledCount}</span>
               <span className="text-xs text-muted-foreground">/</span>
-              <span className="text-lg font-bold text-rose-600">{kpi.activeClaimsCount}</span>
+              <span className="text-lg font-bold text-rose-600">{kpi.returnedCount}</span>
             </div>
-            <p className="text-xs text-muted-foreground">bekleyen / iptal / aktif iade talebi</p>
+            <p className="text-xs text-muted-foreground">
+              bekleyen / iptal / iade
+              {kpi.activeClaimsCount > 0 && (
+                <span className="text-rose-400 ml-1">({kpi.activeClaimsCount} aktif iade talebi)</span>
+              )}
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Satış Özeti */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Satış Özeti — {selectedMonthLabel}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Brüt Satış</p>
+              <p className="text-sm font-bold tabular-nums">{formatTRY(kpi.monthGrossCiro)}</p>
+              <p className="text-xs text-muted-foreground tabular-nums">{(kpi.totalItemQuantity + kpi.cancelledAmount + kpi.returnedAmount > 0 ? kpi.totalItemQuantity : 0).toLocaleString("tr-TR")} adet</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">İptaller</p>
+              <p className="text-sm font-bold text-red-500 tabular-nums">-{formatTRY(kpi.cancelledAmount)}</p>
+              <p className="text-xs text-red-400 tabular-nums">-{kpi.cancelledCount} sipariş</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">İadeler</p>
+              <p className="text-sm font-bold text-red-500 tabular-nums">-{formatTRY(kpi.returnedAmount)}</p>
+              <p className="text-xs text-red-400 tabular-nums">-{kpi.returnedCount} sipariş</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">İndirimler</p>
+              <p className="text-sm font-bold text-red-500 tabular-nums">-{formatTRY(kpi.monthDiscount)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-0.5">Net Satış</p>
+              <p className="text-sm font-bold text-emerald-600 tabular-nums">{formatTRY(kpi.monthCiro)}</p>
+              <p className="text-xs text-muted-foreground tabular-nums">{kpi.monthOrderCount.toLocaleString("tr-TR")} sipariş</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts Row 1: Trend + Status Distribution */}
       <div className="grid gap-4 lg:grid-cols-3">

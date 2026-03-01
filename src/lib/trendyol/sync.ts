@@ -247,8 +247,8 @@ export async function syncOrders(
     const chunks: { start: number; end: number }[] = [];
 
     if (isIncremental) {
-      // Recent sync exists — only fetch orders modified in last 2 days
-      chunks.push({ start: now - 2 * DAY_MS, end: now });
+      // Recent sync exists — fetch orders modified in last 7 days (catches late status changes)
+      chunks.push({ start: now - 7 * DAY_MS, end: now });
     } else {
       // No recent sync — full 90-day sweep in weekly chunks
       const TOTAL_WEEKS = 13;
@@ -693,10 +693,102 @@ export async function syncClaims(
   }
 }
 
+// ─── Date-Range Sync (for manual month sync) ─────────────
+// Belirli bir tarih aralığını CREATED_DATE ile tam tarar.
+// "Tam Senkronizasyon" butonu tarafından çağrılır.
+
+export async function syncOrdersForDateRange(
+  supabase: SupabaseClient,
+  rangeStartMs: number,
+  rangeEndMs: number
+): Promise<{ synced: number; error?: string }> {
+  const logId = await createSyncLog(supabase, "orders");
+  let totalSynced = 0;
+
+  try {
+    const WEEK_MS = 7 * 86_400_000;
+    const range = rangeEndMs - rangeStartMs;
+    const chunks: { start: number; end: number }[] = [];
+
+    if (range <= WEEK_MS) {
+      chunks.push({ start: rangeStartMs, end: rangeEndMs });
+    } else {
+      // Split into weekly chunks
+      let cursor = rangeStartMs;
+      while (cursor < rangeEndMs) {
+        const chunkEnd = Math.min(cursor + WEEK_MS, rangeEndMs);
+        chunks.push({ start: cursor, end: chunkEnd });
+        cursor = chunkEnd;
+      }
+    }
+
+    let requestCount = 0;
+
+    for (const chunk of chunks) {
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        if (requestCount > 0 && requestCount % 40 === 0) {
+          await sleep(10_000);
+        }
+
+        const result = await getOrders({
+          startDate: chunk.start,
+          endDate: chunk.end,
+          page,
+          size: 200,
+          orderByField: "PackageLastModifiedDate",
+          orderByDirection: "DESC",
+          dateQueryType: "CREATED_DATE",
+        });
+        requestCount++;
+
+        if (result.content.length === 0) break;
+
+        const orderRows = result.content.map(mapOrderToRow);
+        const { error: orderErr } = await supabase
+          .from("trendyol_orders")
+          .upsert(orderRows, { onConflict: "id" });
+
+        if (orderErr) throw new Error(`Order upsert failed: ${orderErr.message}`);
+
+        const allLineRows: ReturnType<typeof mapOrderLineToRow>[] = [];
+        for (const order of result.content) {
+          if (order.lines.length === 0) continue;
+          for (const l of order.lines) {
+            allLineRows.push(mapOrderLineToRow(l, order.shipmentPackageId));
+          }
+        }
+        for (let i = 0; i < allLineRows.length; i += 500) {
+          const batch = allLineRows.slice(i, i + 500);
+          const { error: lineErr } = await supabase
+            .from("trendyol_order_lines")
+            .upsert(batch, { onConflict: "id" });
+          if (lineErr) {
+            console.warn(`[Trendyol DateRange Sync] Order lines upsert failed: ${lineErr.message}`);
+          }
+        }
+
+        totalSynced += result.content.length;
+        page++;
+        hasMore = page < result.totalPages;
+      }
+    }
+
+    await completeSyncLog(supabase, logId, totalSynced);
+    return { synced: totalSynced };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await completeSyncLog(supabase, logId, totalSynced, msg);
+    return { synced: totalSynced, error: msg };
+  }
+}
+
 // ─── On-Demand Quick Sync ────────────────────────────────
 // Dashboard sayfası açıldığında çağrılır.
 // Son 5 dk içinde sync yapılmışsa tekrar yapmaz (rate limit koruması).
-// Sadece son 2 günü tarar — hızlı (1-3 sn).
+// Son 7 günü tarar — hızlı (2-5 sn).
 
 export async function quickSyncRecentOrders(): Promise<void> {
   const adminSupabase = createClient(
@@ -716,13 +808,13 @@ export async function quickSyncRecentOrders(): Promise<void> {
   let totalSynced = 0;
 
   try {
-    // Only fetch last 2 days
+    // Fetch last 7 days (catches late status changes like cancellations/returns)
     let page = 0;
     let hasMore = true;
 
     while (hasMore) {
       const result = await getOrders({
-        startDate: now - 2 * DAY_MS,
+        startDate: now - 7 * DAY_MS,
         endDate: now,
         page,
         size: 200,

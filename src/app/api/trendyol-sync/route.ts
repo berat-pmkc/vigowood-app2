@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getCurrentUser } from "@/lib/auth";
 import { MARKETPLACE_ACCESS_ROLES } from "@/lib/constants";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
-import { syncOrders, syncProducts, syncQuestions, syncSettlements, syncOtherFinancials, syncClaims } from "@/lib/trendyol/sync";
+import { syncOrders, syncProducts, syncQuestions, syncSettlements, syncOtherFinancials, syncClaims, syncOrdersForDateRange } from "@/lib/trendyol/sync";
 
 /**
  * Manuel sync endpoint — Kullanıcı tarafından tetiklenir.
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json() as { entity?: string };
+    const body = await request.json() as { entity?: string; startMs?: number; endMs?: number };
     const entity = body.entity || "all";
 
     const supabase = createClient(
@@ -37,7 +37,11 @@ export async function POST(request: Request) {
     const results: Record<string, { synced: number; error?: string }> = {};
 
     if (entity === "all" || entity === "orders") {
-      results.orders = await syncOrders(supabase);
+      if (entity === "orders" && body.startMs && body.endMs) {
+        results.orders = await syncOrdersForDateRange(supabase, body.startMs, body.endMs);
+      } else {
+        results.orders = await syncOrders(supabase);
+      }
     }
     if (entity === "all" || entity === "products") {
       results.products = await syncProducts(supabase);

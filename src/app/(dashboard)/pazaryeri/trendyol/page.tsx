@@ -63,6 +63,8 @@ interface OrderLineRow {
   product_name: string;
   quantity: number;
   amount: number;
+  discount: number;
+  status_name: string | null;
 }
 
 export default async function TrendyolDashboardPage({ searchParams }: PageProps) {
@@ -116,7 +118,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
       const chunk = orderIds.slice(i, i + 500);
       const { data } = await supabase
         .from("trendyol_order_lines")
-        .select("order_id, barcode, product_name, quantity, amount")
+        .select("order_id, barcode, product_name, quantity, amount, discount, status_name")
         .in("order_id", chunk);
       allLines.push(...((data || []) as OrderLineRow[]));
     }
@@ -150,16 +152,40 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   const EXCLUDED_STATUSES = new Set(["Cancelled", "Returned", "UnSupplied"]);
   const activeOrders = allOrders.filter((o) => !EXCLUDED_STATUSES.has(o.status));
 
+  // ─── Split cancelled / returned ───
+  const cancelledOrders = allOrders.filter((o) => o.status === "Cancelled" || o.status === "UnSupplied");
+  const returnedOrders = allOrders.filter((o) => o.status === "Returned");
+  const activeOrderIds = new Set(activeOrders.map((o) => o.id));
+  const cancelledOrderIds = new Set(cancelledOrders.map((o) => o.id));
+  const returnedOrderIds = new Set(returnedOrders.map((o) => o.id));
+
+  // ─── Line-level revenue calculation ───
+  const activeLinesForKpi = allLines.filter((l) => activeOrderIds.has(l.order_id));
+  const cancelledLines = allLines.filter((l) => cancelledOrderIds.has(l.order_id));
+  const returnedLines = allLines.filter((l) => returnedOrderIds.has(l.order_id));
+
+  const monthCiro = activeLinesForKpi.reduce((s, l) => s + l.amount, 0);
+  const monthGrossCiro = activeLinesForKpi.reduce((s, l) => s + l.amount + l.discount, 0);
+  const monthDiscount = activeLinesForKpi.reduce((s, l) => s + l.discount, 0);
+  const cancelledAmount = cancelledLines.reduce((s, l) => s + l.amount, 0);
+  const returnedAmount = returnedLines.reduce((s, l) => s + l.amount, 0);
+  const totalItemQuantity = activeLinesForKpi.reduce((s, l) => s + l.quantity, 0);
+
+  // Order-to-line-revenue map (for daily/weekly breakdowns + trend chart)
+  const lineRevenueByOrderId = new Map<number, number>();
+  for (const line of allLines) {
+    const current = lineRevenueByOrderId.get(line.order_id) || 0;
+    lineRevenueByOrderId.set(line.order_id, current + line.amount);
+  }
+
   // ─── KPIs ───────────────────────────────────────────
   const todayActiveOrders = activeOrders.filter((o) => tsToTRDateKey(o.order_date) === todayKey);
-  const todayCiro = todayActiveOrders.reduce((s, o) => s + o.total_price, 0);
+  const todayCiro = todayActiveOrders.reduce((s, o) => s + (lineRevenueByOrderId.get(o.id) ?? o.total_price), 0);
   const todayOrderCount = todayActiveOrders.length;
 
   const weekActiveOrders = activeOrders.filter((o) => tsToTRDateKey(o.order_date) >= weekAgoKey);
-  const weekCiro = weekActiveOrders.reduce((s, o) => s + o.total_price, 0);
+  const weekCiro = weekActiveOrders.reduce((s, o) => s + (lineRevenueByOrderId.get(o.id) ?? o.total_price), 0);
   const weekOrderCount = weekActiveOrders.length;
-
-  const monthCiro = activeOrders.reduce((s, o) => s + o.total_price, 0);
 
   const kpi = {
     todayOrderCount,
@@ -168,13 +194,17 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
     weekCiro,
     monthOrderCount: activeOrders.length,
     monthCiro,
+    monthGrossCiro,
+    monthDiscount,
     totalOrderCount: allOrders.length,
     pendingCount: allOrders.filter(
       (o) => o.status === "Created" || o.status === "Picking" || o.status === "Invoiced"
     ).length,
-    cancelledCount: allOrders.filter(
-      (o) => o.status === "Cancelled" || o.status === "Returned" || o.status === "UnSupplied"
-    ).length,
+    cancelledCount: cancelledOrders.length,
+    returnedCount: returnedOrders.length,
+    cancelledAmount,
+    returnedAmount,
+    totalItemQuantity,
     totalProducts,
     outOfStockCount,
     pendingQuestions,
@@ -198,7 +228,7 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
     const entry = trendMap.get(key);
     if (entry) {
       entry.orders++;
-      entry.ciro += order.total_price;
+      entry.ciro += lineRevenueByOrderId.get(order.id) ?? order.total_price;
     }
   }
   const trendData = Array.from(trendMap.values());
@@ -213,7 +243,6 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
   // Build a map from orderId to order for fast lookup
   const orderMap = new Map(allOrders.map((o) => [o.id, o]));
   // Only include lines from active (non-cancelled/returned) orders
-  const activeOrderIds = new Set(activeOrders.map((o) => o.id));
   const activeLines = allLines.filter((l) => activeOrderIds.has(l.order_id));
   const barcodeMap = new Map<string, { barcode: string; name: string; quantity: number; revenue: number }>();
 
@@ -311,6 +340,8 @@ export default async function TrendyolDashboardPage({ searchParams }: PageProps)
       isCurrentMonth={isCurrentMonth}
       lastSyncAt={lastSyncAt}
       lastSyncError={lastSyncError}
+      monthStartMs={startMs}
+      monthEndMs={endMs}
     />
   );
 }

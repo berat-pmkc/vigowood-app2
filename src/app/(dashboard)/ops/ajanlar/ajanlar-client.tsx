@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -19,13 +13,12 @@ import {
 } from "@/components/ui/select";
 import {
   Bot,
-  Clock,
   CheckCircle2,
   FileOutput,
   DollarSign,
   Zap,
+  ChevronRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import {
   TASK_DEPARTMENTS,
   TASK_DEPARTMENT_LABELS,
@@ -36,7 +29,7 @@ import {
   type TaskDepartment,
   type AgentStatus,
 } from "@/lib/constants";
-import { updateAgent, type OpsAgent } from "../actions";
+import type { OpsAgent } from "../actions";
 
 type AgentStat = {
   agent_id: string;
@@ -112,12 +105,6 @@ const DEPT_BORDER_COLORS: Record<string, string> = {
   genel: "#6b7280",
 };
 
-const STATUS_SEGMENT_COLORS: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800 shadow-sm",
-  paused: "bg-amber-100 text-amber-800 shadow-sm",
-  disabled: "bg-red-100 text-red-800 shadow-sm",
-};
-
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -125,9 +112,9 @@ function formatTokens(n: number): string {
 }
 
 export function AjanlarClient({ agents, usageStats }: AjanlarClientProps) {
+  const router = useRouter();
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedAgent, setSelectedAgent] = useState<OpsAgent | null>(null);
 
   const filtered = agents.filter((a) => {
     if (deptFilter !== "all" && a.department !== deptFilter) return false;
@@ -137,27 +124,6 @@ export function AjanlarClient({ agents, usageStats }: AjanlarClientProps) {
 
   // Usage stats map by agent name
   const usageMap = new Map(usageStats.agents.map((a) => [a.agent_name, a]));
-
-  const handleToggleStatus = async (agent: OpsAgent, newStatus: AgentStatus) => {
-    const result = await updateAgent(agent.id, { status: newStatus });
-    if (result.success) {
-      toast.success(
-        `${agent.name} ${AGENT_STATUS_LABELS[newStatus].toLowerCase()} durumuna alındı`
-      );
-    } else {
-      toast.error(result.error || "Durum güncellenemedi");
-    }
-  };
-
-  const formatDate = (d: string | null) =>
-    d
-      ? new Date(d).toLocaleDateString("tr-TR", {
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "—";
 
   return (
     <>
@@ -211,7 +177,7 @@ export function AjanlarClient({ agents, usageStats }: AjanlarClientProps) {
               key={agent.id}
               className="cursor-pointer transition-shadow hover:shadow-md border-l-4"
               style={{ borderLeftColor: borderColor }}
-              onClick={() => setSelectedAgent(agent)}
+              onClick={() => router.push(`/ops/ajanlar/${agent.id}`)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
@@ -289,6 +255,7 @@ export function AjanlarClient({ agents, usageStats }: AjanlarClientProps) {
                           </span>
                         </>
                       )}
+                      <ChevronRight className="h-3.5 w-3.5 ml-auto text-muted-foreground/50" />
                     </div>
                   </div>
                 </div>
@@ -297,202 +264,6 @@ export function AjanlarClient({ agents, usageStats }: AjanlarClientProps) {
           );
         })}
       </div>
-
-      {/* Agent Detail Sheet */}
-      <Sheet
-        open={!!selectedAgent}
-        onOpenChange={(o) => !o && setSelectedAgent(null)}
-      >
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          {selectedAgent && (() => {
-            const agentUsage = usageMap.get(selectedAgent.name);
-            const borderColor = DEPT_BORDER_COLORS[selectedAgent.department] ?? DEPT_BORDER_COLORS.genel;
-
-            return (
-              <>
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-full shrink-0"
-                      style={{ backgroundColor: `${borderColor}18` }}
-                    >
-                      <Bot className="h-4 w-4" style={{ color: borderColor }} />
-                    </div>
-                    {selectedAgent.name}
-                  </SheetTitle>
-                </SheetHeader>
-
-                <div className="mt-6 space-y-6">
-                  {/* Status + Badges */}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge
-                      className={`${AGENT_STATUS_COLORS[selectedAgent.status as AgentStatus].bg} ${AGENT_STATUS_COLORS[selectedAgent.status as AgentStatus].text}`}
-                    >
-                      {AGENT_STATUS_LABELS[selectedAgent.status as AgentStatus]}
-                    </Badge>
-                    <Badge variant="outline">
-                      {TASK_DEPARTMENT_LABELS[selectedAgent.department as TaskDepartment] ?? selectedAgent.department}
-                    </Badge>
-                    <Badge variant="outline" className="font-mono text-[10px]">{selectedAgent.code}</Badge>
-                  </div>
-
-                  {/* Segmented Status Control */}
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Durum Değiştir</p>
-                    <div className="flex gap-1 rounded-lg bg-muted p-1">
-                      {AGENT_STATUSES.map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => handleToggleStatus(selectedAgent, s as AgentStatus)}
-                          className={cn(
-                            "rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex-1",
-                            selectedAgent.status === s
-                              ? STATUS_SEGMENT_COLORS[s]
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {AGENT_STATUS_LABELS[s as AgentStatus]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {selectedAgent.description && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Açıklama</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedAgent.description}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Capabilities */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Yetenekler</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedAgent.capabilities.map((cap) => (
-                          <Badge key={cap} variant="outline" className="text-xs">
-                            {CAPABILITY_LABELS[cap] ?? cap}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Schedule */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Çalışma Planı</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-1 text-sm">
-                      {selectedAgent.schedule.description && (
-                        <p className="text-muted-foreground">
-                          {selectedAgent.schedule.description}
-                        </p>
-                      )}
-                      {selectedAgent.schedule.cron && (
-                        <p className="font-mono text-xs text-muted-foreground">
-                          Cron: {selectedAgent.schedule.cron}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Stats + Usage */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">İstatistikler</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                          <p className="text-2xl font-bold">
-                            {selectedAgent.total_tasks_completed}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Görev
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold">
-                            {selectedAgent.total_approvals_requested}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Onay Talebi
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold">
-                            {selectedAgent.total_outputs_generated}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Çıktı
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Monthly usage from usage stats */}
-                      {agentUsage && (
-                        <div className="mt-4 pt-4 border-t">
-                          <p className="text-xs text-muted-foreground mb-2">Aylık Kullanım</p>
-                          <div className="grid grid-cols-3 gap-3 text-center">
-                            <div className="rounded-md bg-muted/50 py-2">
-                              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
-                                <Zap className="h-3 w-3" />
-                              </div>
-                              <span className="text-sm font-bold text-vw-dark">
-                                {formatTokens(agentUsage.total_tokens)}
-                              </span>
-                              <p className="text-[10px] text-muted-foreground">Token</p>
-                            </div>
-                            <div className="rounded-md bg-muted/50 py-2">
-                              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
-                                <DollarSign className="h-3 w-3" />
-                              </div>
-                              <span className="text-sm font-bold text-vw-dark">
-                                ${agentUsage.total_cost.toFixed(4)}
-                              </span>
-                              <p className="text-[10px] text-muted-foreground">Maliyet</p>
-                            </div>
-                            <div className="rounded-md bg-muted/50 py-2">
-                              <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
-                                <CheckCircle2 className="h-3 w-3" />
-                              </div>
-                              <span className="text-sm font-bold text-vw-dark">
-                                {agentUsage.action_count}
-                              </span>
-                              <p className="text-[10px] text-muted-foreground">İşlem</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Meta */}
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <p className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Son aktivite: {formatDate(selectedAgent.last_active_at)}
-                    </p>
-                    <p>
-                      Oluşturulma: {formatDate(selectedAgent.created_at)}
-                    </p>
-                  </div>
-                </div>
-              </>
-            );
-          })()}
-        </SheetContent>
-      </Sheet>
     </>
   );
 }
