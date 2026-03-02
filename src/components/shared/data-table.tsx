@@ -22,7 +22,7 @@ export function DataTable<TData>({
   emptyMessage = "Kayıt bulunamadı.",
 }: DataTableProps<TData>) {
   return (
-    <div className="overflow-hidden rounded-md border">
+    <div className="overflow-hidden rounded-xl border border-border/60 shadow-[var(--shadow-card)]">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (

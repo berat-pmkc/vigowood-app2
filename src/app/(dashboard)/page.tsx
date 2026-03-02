@@ -192,7 +192,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   return (
     <DashboardRealtimeWrapper>
-    <div className="space-y-6">
+    <div className="animate-fade-in space-y-6">
       {/* Period Filter */}
       <PeriodFilter activePeriod={period} />
 
@@ -234,9 +234,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Activity className="size-4 text-vw-info" />
-              Uretim Durumu
+              Üretim Durumu
             </CardTitle>
-            <CardDescription>Kesim hatti guncel ozet</CardDescription>
+            <CardDescription>Kesim hattı güncel özet</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3">
@@ -251,10 +251,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 color="blue"
               />
               <StatusCard
-                label="Tamamlandi"
+                label="Tamamlandı"
                 count={completedToday}
                 color="emerald"
-                subtitle="bugun"
+                subtitle="bugün"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                     href="/uretim/kesim"
                     className="flex items-center gap-1 text-xs text-vw-info hover:underline"
                   >
-                    Tumunu Gor
+                    Tümünü Gör
                     <ArrowRight className="size-3" />
                   </Link>
                 </div>
@@ -309,7 +309,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           {/* Hızlı Erişim */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Hizli Erisim</CardTitle>
+              <CardTitle className="text-base">Hızlı Erişim</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-2">
@@ -359,14 +359,14 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
           {/* Kritik Stok Uyarıları */}
           {criticalParts.length > 0 && (
-            <Card className="border-vw-error/30">
+            <Card className="border-vw-error/30 bg-gradient-to-b from-red-50/30 to-card">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base text-vw-error">
                   <AlertTriangle className="size-4" />
                   Kritik Stok
                 </CardTitle>
                 <CardDescription>
-                  Stok seviyesi kritik parcalar
+                  Stok seviyesi kritik parçalar
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -374,7 +374,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   {criticalParts.slice(0, 4).map((part) => (
                     <div
                       key={part.part_id}
-                      className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2"
+                      className="flex items-center justify-between rounded-xl bg-red-50 px-3 py-2"
                     >
                       <div>
                         <p className="text-sm font-medium">{part.part_adi}</p>
@@ -397,7 +397,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   href="/admin/parcalar"
                   className="mt-3 flex items-center justify-center gap-1 text-xs text-vw-info hover:underline"
                 >
-                  Tum Parcalari Gor
+                  Tüm Parçaları Gör
                   <ArrowRight className="size-3" />
                 </Link>
               </CardContent>
@@ -409,7 +409,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="size-4 text-vw-success" />
-                Sistem Ozeti
+                Sistem Özeti
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -425,7 +425,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   active={cuttingCuts > 0}
                 />
                 <SummaryRow
-                  label="Bugun Tamamlanan"
+                  label="Bugün Tamamlanan"
                   value={completedToday}
                 />
               </div>
@@ -454,16 +454,17 @@ function KpiCard({
   color: "blue" | "primary" | "warning" | "success";
 }) {
   return (
-    <Link href={href}>
-      <Card className="transition-shadow hover:shadow-md">
-        <CardContent className="flex items-center gap-3 pt-0">
-          <div className="rounded-lg bg-muted p-2.5">{icon}</div>
-          <div className="min-w-0">
+    <Link href={href} className="group">
+      <Card className="card-hover">
+        <CardContent className="flex items-center gap-4 pt-0">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted">{icon}</div>
+          <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-muted-foreground">{title}</p>
-            <p className="text-xl font-bold tracking-tight">
+            <p className="text-2xl font-bold tracking-tight">
               {formatNumber(value)}
             </p>
           </div>
+          <ArrowRight className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" />
         </CardContent>
       </Card>
     </Link>
@@ -482,22 +483,30 @@ function StatusCard({
   subtitle?: string;
 }) {
   const colors = {
-    amber: "border-amber-200 bg-amber-50",
-    blue: "border-blue-200 bg-blue-50",
-    emerald: "border-emerald-200 bg-emerald-50",
+    amber: "border-amber-200/50 bg-amber-50/50",
+    blue: "border-blue-200/50 bg-blue-50/50",
+    emerald: "border-emerald-200/50 bg-emerald-50/50",
   };
   const textColors = {
     amber: "text-amber-700",
     blue: "text-blue-700",
     emerald: "text-emerald-700",
   };
+  const dotColors = {
+    amber: "bg-amber-400",
+    blue: "bg-blue-500 animate-pulse-subtle",
+    emerald: "bg-emerald-500",
+  };
 
   return (
-    <div className={`rounded-lg border p-3 text-center ${colors[color]}`}>
-      <p className={`text-2xl font-bold ${textColors[color]}`}>
+    <div className={`rounded-xl border p-4 text-center ${colors[color]}`}>
+      <p className={`text-3xl font-bold ${textColors[color]}`}>
         {formatNumber(count)}
       </p>
-      <p className={`text-xs font-medium ${textColors[color]}`}>{label}</p>
+      <p className={`flex items-center justify-center gap-1.5 text-xs font-medium ${textColors[color]}`}>
+        <span className={`status-dot ${dotColors[color]}`} />
+        {label}
+      </p>
       {subtitle && (
         <p className="text-xs text-muted-foreground">{subtitle}</p>
       )}
@@ -519,7 +528,7 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${color}`}
+      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all hover:scale-[1.02] active:scale-[0.98] ${color}`}
     >
       {icon}
       {label}
@@ -559,9 +568,9 @@ function SummaryRow({
       <span
         className={`text-sm font-semibold ${
           warning
-            ? "text-vw-warning"
+            ? "rounded-md bg-amber-50 px-2 py-0.5 text-vw-warning"
             : active
-              ? "text-vw-info"
+              ? "rounded-md bg-blue-50 px-2 py-0.5 text-vw-info"
               : "text-foreground"
         }`}
       >

@@ -67,10 +67,16 @@
   --color-vw-deep-navy: #0c1c2d;
   --color-vw-hot-walnuts: #6f4c37;
   --color-vw-ice-blue: #adb5be;
+
+  /* Shadow scale override */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.04);
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   /* VigoWood Natural Color Theme */
   --background: #f0ede1;
   --foreground: #474237;
@@ -87,8 +93,8 @@
   --accent: #e8e4d8;
   --accent-foreground: #5e5747;
   --destructive: #ee7683;
-  --border: #d4cbb4;
-  --input: #d4cbb4;
+  --border: #ddd5c2;
+  --input: #ddd5c2;
   --ring: #cdbd9d;
 
   /* Charts — VigoWood functional colors */
@@ -107,6 +113,22 @@
   --sidebar-accent-foreground: #f0ede1;
   --sidebar-border: #5e5747;
   --sidebar-ring: #cdbd9d;
+
+  /* Modern shadow tokens */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.02);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-elevated: 0 10px 25px -3px rgb(0 0 0 / 0.08), 0 4px 10px -4px rgb(0 0 0 / 0.04);
+
+  /* Spacing tokens */
+  --spacing-page: 1.5rem;
+  --spacing-section: 2rem;
+  --spacing-card-padding: 1.5rem;
+  --spacing-card-gap: 1rem;
+
+  /* Transition tokens */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
@@ -141,6 +163,11 @@
   --sidebar-accent-foreground: #f0ede1;
   --sidebar-border: #5e5747;
   --sidebar-ring: #cdbd9d;
+
+  /* Dark mode shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.15);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
+  --shadow-elevated: 0 10px 25px -3px rgb(0 0 0 / 0.4), 0 4px 10px -4px rgb(0 0 0 / 0.25);
 }
 
 @layer base {
@@ -148,7 +175,18 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring/50 rounded-sm;
+  }
+  ::selection {
+    background: rgba(205, 189, 157, 0.25);
   }
 }
 
@@ -187,6 +225,66 @@
 @theme inline {
   --animate-collapsible-down: collapsible-down 0.2s ease-out;
   --animate-collapsible-up: collapsible-up 0.15s ease-in;
+}
+
+/* ─── Modern Utility Classes ─── */
+@layer utilities {
+  .card-hover {
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-card);
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-1px);
+  }
+
+  .glass {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.8);
+  }
+  .dark .glass {
+    background: rgba(53, 47, 41, 0.8);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #5e5747, #a99c7d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn var(--transition-slow) ease-out;
+  }
+
+  .animate-pulse-subtle {
+    animation: pulseSubtle 2s ease-in-out infinite;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-dot-live {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulseSubtle 2s ease-in-out infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Accessibility — reduce motion */
