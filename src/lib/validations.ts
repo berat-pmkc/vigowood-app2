@@ -130,7 +130,7 @@ export const plakaUpdateSchema = z.object({
   tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
   renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
   kesim_sureleri: kesimSureleriSchema,
-  sku: z.string().nullable(),
+  sku: z.array(z.string()).nullable(),
 });
 
 export type PlakaUpdateData = z.infer<typeof plakaUpdateSchema>;
@@ -288,7 +288,7 @@ export const kartonSablonCreateSchema = z.object({
     .max(200, "Şablon adı en fazla 200 karakter olabilir"),
   tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
   renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
-  sku: z.string().min(1, "SKU (ürün) seçimi gereklidir"),
+  sku: z.array(z.string()).min(1, "En az bir SKU seçimi gereklidir"),
   kutu_sure_dk: z
     .number()
     .int("Tam sayı olmalıdır")
@@ -306,7 +306,7 @@ export const kartonSablonUpdateSchema = z.object({
     .max(200, "Şablon adı en fazla 200 karakter olabilir"),
   tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
   renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
-  sku: z.string().min(1, "SKU (ürün) seçimi gereklidir"),
+  sku: z.array(z.string()).min(1, "En az bir SKU seçimi gereklidir"),
   kutu_sure_dk: z
     .number()
     .int("Tam sayı olmalıdır")

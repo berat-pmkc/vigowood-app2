@@ -46,7 +46,7 @@ export async function getPlakalarForKesim(sku: string) {
     const { data, error } = await supabase
       .from("plakalar")
       .select("plakalar_id, plaka_id, plaka_adi, sku, tipi, renk, kesim_sureleri")
-      .eq("sku", sku)
+      .contains("sku", [sku])
       .order("plaka_adi");
 
     if (error) return { success: false as const, error: error.message };

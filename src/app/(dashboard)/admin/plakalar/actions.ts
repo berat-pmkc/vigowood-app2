@@ -28,6 +28,53 @@ function cleanKesimSureleri(ks: Record<string, number | null | undefined> | unde
   return clean;
 }
 
+/** Aktif ürünleri getir (SKU dropdown için) */
+export async function getProductsForSelect(): Promise<
+  | { success: true; data: { sku: string; urun_adi: string | null }[] }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .eq("aktif_mi", true)
+      .order("urun_adi");
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data ?? []) as { sku: string; urun_adi: string | null }[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Mevcut tip ve renk değerlerini getir (dropdown seçenekleri için) */
+export async function getDistinctPlakaValues(kategori: "MDF" | "KARTON"): Promise<
+  | { success: true; data: { types: string[]; colors: string[] } }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("plakalar")
+      .select("tipi, renk")
+      .eq("plaka_kategori", kategori);
+
+    if (error) return { success: false, error: error.message };
+
+    const types = [...new Set((data ?? []).map((r) => r.tipi).filter(Boolean))] as string[];
+    const colors = [...new Set((data ?? []).map((r) => r.renk).filter(Boolean))] as string[];
+
+    return { success: true, data: { types: types.sort(), colors: colors.sort() } };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 export async function createPlaka(
   formData: {
     plaka_id: string;
@@ -35,7 +82,7 @@ export async function createPlaka(
     tipi: string | null;
     renk: string | null;
     kesim_sureleri: Record<string, number | null | undefined>;
-    sku: string | null;
+    sku: string[] | null;
   }
 ): Promise<ActionResult> {
   try {
@@ -98,7 +145,7 @@ export async function updatePlaka(
     tipi: string | null;
     renk: string | null;
     kesim_sureleri: Record<string, number | null | undefined>;
-    sku: string | null;
+    sku: string[] | null;
   }
 ): Promise<ActionResult> {
   try {
@@ -361,7 +408,8 @@ export async function deletePlaka(plakalarId: string): Promise<ActionResult> {
 }
 
 /** Export helper: flatten kesim_sureleri into separate columns (MDF only) */
-interface ExportPlaka extends Omit<Plaka, "kesim_sureleri"> {
+interface ExportPlaka extends Omit<Plaka, "kesim_sureleri" | "sku"> {
+  sku: string | null;
   mak1_dk: number | null;
   mak2_dk: number | null;
   mak3_dk: number | null;
@@ -383,9 +431,10 @@ export async function exportPlakalar(): Promise<
 
     const exportData = ((data ?? []) as Plaka[]).map((p) => {
       const ks = (p.kesim_sureleri ?? {}) as Record<string, number>;
-      const { kesim_sureleri: _ks, ...rest } = p;
+      const { kesim_sureleri: _ks, sku: skuArr, ...rest } = p;
       return {
         ...rest,
+        sku: skuArr ? skuArr.join(", ") : null,
         mak1_dk: ks["MAK-1"] ?? null,
         mak2_dk: ks["MAK-2"] ?? null,
         mak3_dk: ks["MAK-3"] ?? null,
@@ -434,6 +483,11 @@ export async function importPlakalar(
         if (!isNaN(v)) kesimSureleri["MAK-3"] = v;
       }
 
+      // Parse SKU: comma-separated string → array
+      const skuArray = row.sku
+        ? row.sku.split(",").map((s) => s.trim()).filter(Boolean)
+        : null;
+
       if (row.plakalar_id) {
         const { error } = await supabase
           .from("plakalar")
@@ -445,7 +499,7 @@ export async function importPlakalar(
               tipi: row.tipi || null,
               renk: row.renk || null,
               kesim_sureleri: kesimSureleri,
-              sku: row.sku || null,
+              sku: skuArray && skuArray.length > 0 ? skuArray : null,
               plaka_kategori: "MDF",
             },
             { onConflict: "plakalar_id" }
@@ -476,7 +530,7 @@ export async function importPlakalar(
           tipi: row.tipi || null,
           renk: row.renk || null,
           kesim_sureleri: kesimSureleri,
-          sku: row.sku || null,
+          sku: skuArray && skuArray.length > 0 ? skuArray : null,
           plaka_kategori: "MDF",
         });
 
@@ -517,7 +571,7 @@ export async function getAllPartsForSelect(): Promise<
 
 /** Tüm plakaları getir (plaka seçici için — pagination yok) */
 export async function getAllPlakalar(): Promise<
-  | { success: true; data: { plaka_id: string; plaka_adi: string; sku: string | null }[] }
+  | { success: true; data: { plaka_id: string; plaka_adi: string; sku: string[] | null }[] }
   | { success: false; error: string }
 > {
   try {
@@ -530,7 +584,7 @@ export async function getAllPlakalar(): Promise<
       .order("plaka_id");
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: (data ?? []) as { plaka_id: string; plaka_adi: string; sku: string | null }[] };
+    return { success: true, data: (data ?? []) as { plaka_id: string; plaka_adi: string; sku: string[] | null }[] };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

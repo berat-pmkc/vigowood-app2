@@ -50,7 +50,7 @@ interface PlakaOption {
   plakalar_id: string;
   plaka_id: string;
   plaka_adi: string | null;
-  sku: string | null;
+  sku: string[] | null;
   tipi: string | null;
   renk: string | null;
   kesim_sureleri: Record<string, number | null>;

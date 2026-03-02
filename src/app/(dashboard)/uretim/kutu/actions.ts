@@ -28,7 +28,7 @@ export async function getKartonSablonlarForSku(sku: string) {
       .from("plakalar")
       .select("plakalar_id, plaka_id, plaka_adi, tipi, renk, kesim_sureleri")
       .eq("plaka_kategori", "KARTON")
-      .eq("sku", sku)
+      .contains("sku", [sku])
       .order("plaka_adi");
 
     if (error) return { success: false as const, error: error.message };

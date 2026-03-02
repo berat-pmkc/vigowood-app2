@@ -37,13 +37,60 @@ export async function getKutuKartonParts(): Promise<
   }
 }
 
+/** Aktif ürünleri getir (SKU dropdown için) */
+export async function getProductsForSelect(): Promise<
+  | { success: true; data: { sku: string; urun_adi: string | null }[] }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("sku, urun_adi")
+      .eq("aktif_mi", true)
+      .order("urun_adi");
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data ?? []) as { sku: string; urun_adi: string | null }[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Mevcut tip ve renk değerlerini getir (dropdown seçenekleri için) */
+export async function getDistinctKartonValues(): Promise<
+  | { success: true; data: { types: string[]; colors: string[] } }
+  | { success: false; error: string }
+> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("plakalar")
+      .select("tipi, renk")
+      .eq("plaka_kategori", "KARTON");
+
+    if (error) return { success: false, error: error.message };
+
+    const types = [...new Set((data ?? []).map((r) => r.tipi).filter(Boolean))] as string[];
+    const colors = [...new Set((data ?? []).map((r) => r.renk).filter(Boolean))] as string[];
+
+    return { success: true, data: { types: types.sort(), colors: colors.sort() } };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 /** Karton şablon oluştur: plaka (KARTON) + tek plaka_parts kaydı */
 export async function createKartonSablon(formData: {
   plaka_id: string;
   plaka_adi: string;
   tipi: string | null;
   renk: string | null;
-  sku: string;
+  sku: string[];
   kutu_sure_dk: number | null;
   output_part_id: string;
 }): Promise<ActionResult> {
@@ -113,7 +160,7 @@ export async function createKartonSablon(formData: {
       plaka_id: parsed.data.plaka_id,
       part_id: parsed.data.output_part_id,
       default_qty: 1,
-      sku: parsed.data.sku,
+      sku: parsed.data.sku[0] ?? null,
     });
 
     if (partError) return { success: false, error: partError.message };
@@ -132,7 +179,7 @@ export async function updateKartonSablon(
     plaka_adi: string;
     tipi: string | null;
     renk: string | null;
-    sku: string;
+    sku: string[];
     kutu_sure_dk: number | null;
     output_part_id: string;
   }
@@ -190,7 +237,7 @@ export async function updateKartonSablon(
         .update({
           part_id: parsed.data.output_part_id,
           default_qty: 1,
-          sku: parsed.data.sku,
+          sku: parsed.data.sku[0] ?? null,
         })
         .eq("ppart_id", existingParts[0].ppart_id);
     } else {
@@ -213,7 +260,7 @@ export async function updateKartonSablon(
         plaka_id: plaka.plaka_id,
         part_id: parsed.data.output_part_id,
         default_qty: 1,
-        sku: parsed.data.sku,
+        sku: parsed.data.sku[0] ?? null,
       });
     }
 

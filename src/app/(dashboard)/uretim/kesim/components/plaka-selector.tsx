@@ -9,7 +9,7 @@ interface Plaka {
   plakalar_id: string;
   plaka_id: string;
   plaka_adi: string;
-  sku: string | null;
+  sku: string[] | null;
   tipi: string | null;
   renk: string | null;
   makine_id: string;

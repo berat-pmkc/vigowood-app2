@@ -240,26 +240,33 @@ export function getPlakaColumns({
         <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
       ),
       cell: ({ row }) => {
-        const sku = row.getValue("sku") as string | null;
-        if (!sku) {
+        const skuArr = row.getValue("sku") as string[] | null;
+        if (!skuArr || skuArr.length === 0) {
           return <span className="text-sm text-muted-foreground">—</span>;
         }
-        const style = getSkuBadgeStyle(sku);
         return (
-          <Badge
-            variant="outline"
-            className="font-mono text-xs"
-            style={{
-              backgroundColor: style.backgroundColor,
-              color: style.color,
-              borderColor: style.borderColor,
-            }}
-          >
-            {sku}
-          </Badge>
+          <div className="flex gap-1 flex-wrap">
+            {skuArr.map((sku) => {
+              const style = getSkuBadgeStyle(sku);
+              return (
+                <Badge
+                  key={sku}
+                  variant="outline"
+                  className="font-mono text-xs"
+                  style={{
+                    backgroundColor: style.backgroundColor,
+                    color: style.color,
+                    borderColor: style.borderColor,
+                  }}
+                >
+                  {sku}
+                </Badge>
+              );
+            })}
+          </div>
         );
       },
-      size: 140,
+      size: 180,
     },
     {
       id: "actions",

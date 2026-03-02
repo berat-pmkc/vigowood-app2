@@ -154,7 +154,7 @@ export function CompletedSessionsSheet({ sessions, open, onOpenChange }: Complet
                       {/* Header row */}
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-sm truncate max-w-[200px]">
-                          {s.urun_adi ?? s.sku ?? "—"}
+                          {s.sku ?? "—"}
                         </span>
                         <div className="flex items-center gap-1">
                           <PaketlemeStatusBadge durum={s.durum} />
@@ -198,9 +198,9 @@ export function CompletedSessionsSheet({ sessions, open, onOpenChange }: Complet
                         </div>
                       )}
 
-                      {/* SKU + date */}
+                      {/* Product name + date */}
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        {s.sku && <span>{s.sku}</span>}
+                        {s.urun_adi && <span className="truncate max-w-[160px]">{s.urun_adi}</span>}
                         {s.end_time && (
                           <span>
                             {new Date(s.end_time).toLocaleDateString("tr-TR", {

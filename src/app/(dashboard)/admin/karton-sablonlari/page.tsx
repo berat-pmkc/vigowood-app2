@@ -42,12 +42,12 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
 
   if (search) {
     query = query.or(
-      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%,sku.ilike.%${search}%`
+      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%`
     );
   }
 
   if (sku) {
-    query = query.eq("sku", sku);
+    query = query.contains("sku", [sku]);
   }
 
   const validSortColumns: (keyof Plaka)[] = [
@@ -66,17 +66,9 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
 
   const { data: sablonlar, count, error } = await query;
 
-  // Distinct SKUs for filter
-  const { data: skuList } = await supabase
-    .from("plakalar")
-    .select("sku")
-    .eq("plaka_kategori", "KARTON")
-    .not("sku", "is", null)
-    .order("sku");
-
-  const uniqueSkus = [
-    ...new Set((skuList ?? []).map((r) => r.sku).filter(Boolean)),
-  ] as string[];
+  // Distinct SKUs for filter (from array column using DB function)
+  const { data: skuData } = await supabase.rpc("get_distinct_plaka_skus", { p_kategori: "KARTON" });
+  const uniqueSkus = ((skuData ?? []) as { sku: string }[]).map((r) => r.sku);
 
   // Get plaka_parts for each (to show output part)
   const plakaIds = ((sablonlar ?? []) as Plaka[]).map((p) => p.plaka_id);

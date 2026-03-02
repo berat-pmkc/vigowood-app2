@@ -47,16 +47,16 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
     .select("*", { count: "exact" })
     .eq("plaka_kategori", "MDF");
 
-  // Search filter
+  // Search filter (sku is now TEXT[], exclude from ilike search)
   if (search) {
     query = query.or(
-      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%,sku.ilike.%${search}%`
+      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%`
     );
   }
 
-  // SKU filter
+  // SKU filter (array contains)
   if (sku) {
-    query = query.eq("sku", sku);
+    query = query.contains("sku", [sku]);
   }
 
   // Sorting
@@ -79,20 +79,11 @@ export default async function PlakalarPage({ searchParams }: PageProps) {
   // Execute main query + SKU dropdown in parallel
   const [mainResult, skuResult] = await Promise.all([
     query,
-    supabase
-      .from("plakalar")
-      .select("sku")
-      .eq("plaka_kategori", "MDF")
-      .not("sku", "is", null)
-      .order("sku"),
+    supabase.rpc("get_distinct_plaka_skus", { p_kategori: "MDF" }),
   ]);
 
   const { data: plakalar, count, error } = mainResult;
-  const { data: skuList } = skuResult;
-
-  const uniqueSkus = [
-    ...new Set((skuList ?? []).map((r) => r.sku).filter(Boolean)),
-  ] as string[];
+  const uniqueSkus = ((skuResult.data ?? []) as { sku: string }[]).map((r) => r.sku);
 
   if (error) {
     return (

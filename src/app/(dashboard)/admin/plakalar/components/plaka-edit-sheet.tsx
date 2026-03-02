@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -14,12 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { MultiSkuSelect } from "@/components/shared/multi-sku-select";
+import { ComboboxFreesolo } from "@/components/shared/combobox-freesolo";
 import {
   plakaCreateSchema,
   type PlakaCreateData,
 } from "@/lib/validations";
 import { formatDate } from "@/lib/utils";
-import { updatePlaka, createPlaka } from "../actions";
+import { updatePlaka, createPlaka, getProductsForSelect, getDistinctPlakaValues } from "../actions";
 import { toast } from "sonner";
 import type { Database } from "@/lib/supabase/types";
 
@@ -43,14 +45,40 @@ export function PlakaEditSheet({
   const [isPending, startTransition] = useTransition();
   const isCreate = mode === "create";
 
+  // Dropdown data
+  const [products, setProducts] = useState<{ sku: string; urun_adi: string | null }[]>([]);
+  const [typeOptions, setTypeOptions] = useState<string[]>([]);
+  const [colorOptions, setColorOptions] = useState<string[]>([]);
+
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<PlakaCreateData>({
     resolver: zodResolver(plakaCreateSchema) as never,
   });
+
+  const selectedSkus = watch("sku") ?? [];
+  const selectedTipi = watch("tipi");
+  const selectedRenk = watch("renk");
+
+  // Load dropdown data on open
+  useEffect(() => {
+    if (open) {
+      getProductsForSelect().then((r) => {
+        if (r.success) setProducts(r.data);
+      });
+      getDistinctPlakaValues("MDF").then((r) => {
+        if (r.success) {
+          setTypeOptions(r.data.types);
+          setColorOptions(r.data.colors);
+        }
+      });
+    }
+  }, [open]);
 
   useEffect(() => {
     if (isCreate) {
@@ -75,7 +103,7 @@ export function PlakaEditSheet({
           "MAK-3": ks["MAK-3"] ?? null,
           "KUTU": ks["KUTU"] ?? null,
         },
-        sku: plaka.sku || null,
+        sku: plaka.sku ?? null,
       });
     }
   }, [plaka, isCreate, reset, open]);
@@ -157,11 +185,12 @@ export function PlakaEditSheet({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="tipi">Tip</Label>
-                  <Input
-                    id="tipi"
-                    {...register("tipi")}
-                    placeholder="ör: 8mm MDF"
+                  <Label>Tip</Label>
+                  <ComboboxFreesolo
+                    options={typeOptions}
+                    value={selectedTipi ?? null}
+                    onChange={(val) => setValue("tipi", val, { shouldValidate: true })}
+                    placeholder="Tip seçin..."
                   />
                   {errors.tipi && (
                     <p className="text-sm text-destructive">
@@ -171,11 +200,12 @@ export function PlakaEditSheet({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="renk">Renk</Label>
-                  <Input
-                    id="renk"
-                    {...register("renk")}
-                    placeholder="ör: Ceviz"
+                  <Label>Renk</Label>
+                  <ComboboxFreesolo
+                    options={colorOptions}
+                    value={selectedRenk ?? null}
+                    onChange={(val) => setValue("renk", val, { shouldValidate: true })}
+                    placeholder="Renk seçin..."
                   />
                   {errors.renk && (
                     <p className="text-sm text-destructive">
@@ -185,7 +215,7 @@ export function PlakaEditSheet({
                 </div>
               </div>
 
-              {/* Kesim Süreleri — 3 MDF makine (KUTU karton şablonlarında) */}
+              {/* Kesim Süreleri — 3 MDF makine */}
               <div className="space-y-2">
                 <Label>Kesim Süreleri (dk)</Label>
                 <div className="grid grid-cols-3 gap-3">
@@ -239,15 +269,16 @@ export function PlakaEditSheet({
                 )}
               </div>
 
+              {/* Multi-SKU selection */}
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU (Ürün)</Label>
-                <Input
-                  id="sku"
-                  {...register("sku", {
-                    setValueAs: (v) =>
-                      v === "" ? null : v,
-                  })}
-                  placeholder="ör: VW-001"
+                <Label>SKU (Ürünler)</Label>
+                <MultiSkuSelect
+                  products={products}
+                  selected={selectedSkus ?? []}
+                  onChange={(skus) =>
+                    setValue("sku", skus.length > 0 ? skus : null, { shouldValidate: true })
+                  }
+                  placeholder="Ürün SKU seçin..."
                 />
                 {errors.sku && (
                   <p className="text-sm text-destructive">

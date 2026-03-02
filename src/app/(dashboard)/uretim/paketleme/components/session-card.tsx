@@ -65,13 +65,13 @@ export function SessionCard({ session, onClose, onCancel }: SessionCardProps) {
           <X className="w-4 h-4" />
         </button>
 
-        {/* Product name */}
+        {/* SKU + Product name */}
         <div className="mb-2 pr-6">
           <p className="font-medium text-foreground truncate text-sm">
-            {session.urun_adi ?? session.sku ?? "—"}
+            {session.sku ?? "—"}
           </p>
-          {session.sku && session.urun_adi && (
-            <p className="text-xs text-muted-foreground">{session.sku}</p>
+          {session.urun_adi && (
+            <p className="text-xs text-muted-foreground truncate">{session.urun_adi}</p>
           )}
         </div>
 

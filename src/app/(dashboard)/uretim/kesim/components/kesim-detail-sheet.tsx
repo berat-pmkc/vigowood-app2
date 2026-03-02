@@ -94,8 +94,11 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
               <p className="font-medium">{batch.plaka_adi ?? batch.plaka_id ?? "—"}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Ürün</p>
-              <p className="font-medium">{batch.urun_adi ?? batch.sku ?? "—"}</p>
+              <p className="text-muted-foreground">SKU</p>
+              <p className="font-medium">{batch.sku ?? "—"}</p>
+              {batch.urun_adi && (
+                <p className="text-xs text-muted-foreground">{batch.urun_adi}</p>
+              )}
             </div>
             <div>
               <p className="text-muted-foreground">Makine</p>

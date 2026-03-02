@@ -107,10 +107,10 @@ export function ActiveCutCard({ batch }: ActiveCutCardProps) {
             <KesimStatusBadge durum={batch.durum} />
           </div>
 
-          {/* Ürün + Plaka */}
+          {/* SKU + Plaka */}
           <div className="mb-1.5">
             <p className="font-medium text-foreground truncate text-sm">
-              {batch.urun_adi ?? batch.sku ?? "—"}
+              {batch.sku ?? "—"}
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {batch.plaka_adi ?? batch.plaka_id ?? "—"}

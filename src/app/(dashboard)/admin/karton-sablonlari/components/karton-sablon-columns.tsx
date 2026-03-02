@@ -35,7 +35,7 @@ export interface KartonSablonRow {
   tipi: string | null;
   renk: string | null;
   kesim_sureleri: unknown;
-  sku: string | null;
+  sku: string[] | null;
   created_at: string;
   updated_at: string | null;
   plaka_kategori: string;
@@ -161,24 +161,33 @@ export function getKartonSablonColumns({
         <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
       ),
       cell: ({ row }) => {
-        const sku = row.getValue("sku") as string | null;
-        if (!sku) return <span className="text-sm text-muted-foreground">—</span>;
-        const style = getSkuBadgeStyle(sku);
+        const skuArr = row.getValue("sku") as string[] | null;
+        if (!skuArr || skuArr.length === 0) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
         return (
-          <Badge
-            variant="outline"
-            className="font-mono text-xs"
-            style={{
-              backgroundColor: style.backgroundColor,
-              color: style.color,
-              borderColor: style.borderColor,
-            }}
-          >
-            {sku}
-          </Badge>
+          <div className="flex gap-1 flex-wrap">
+            {skuArr.map((sku) => {
+              const style = getSkuBadgeStyle(sku);
+              return (
+                <Badge
+                  key={sku}
+                  variant="outline"
+                  className="font-mono text-xs"
+                  style={{
+                    backgroundColor: style.backgroundColor,
+                    color: style.color,
+                    borderColor: style.borderColor,
+                  }}
+                >
+                  {sku}
+                </Badge>
+              );
+            })}
+          </div>
         );
       },
-      size: 140,
+      size: 180,
     },
     {
       accessorKey: "tipi",

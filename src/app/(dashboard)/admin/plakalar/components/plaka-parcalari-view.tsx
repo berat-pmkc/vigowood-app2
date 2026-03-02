@@ -40,7 +40,7 @@ import { toast } from "sonner";
 interface PlakaOption {
   plaka_id: string;
   plaka_adi: string;
-  sku: string | null;
+  sku: string[] | null;
 }
 
 interface PlakaPartRow {
@@ -161,7 +161,7 @@ export function PlakaParcalariView({ initialPlaka }: PlakaParcalariViewProps) {
     }
 
     startTransition(async () => {
-      const result = await addPlakaPart(selectedPlaka, selectedPlakaObj?.sku ?? null, {
+      const result = await addPlakaPart(selectedPlaka, selectedPlakaObj?.sku?.[0] ?? null, {
         part_id: newPartId.trim(),
         default_qty: newQty ? Number(newQty) : null,
       });

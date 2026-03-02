@@ -30,9 +30,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MultiSkuSelect } from "@/components/shared/multi-sku-select";
+import { ComboboxFreesolo } from "@/components/shared/combobox-freesolo";
 import { kartonSablonCreateSchema, type KartonSablonCreateData } from "@/lib/validations";
 import { formatDate } from "@/lib/utils";
-import { createKartonSablon, updateKartonSablon, getKutuKartonParts } from "../actions";
+import {
+  createKartonSablon,
+  updateKartonSablon,
+  getKutuKartonParts,
+  getProductsForSelect,
+  getDistinctKartonValues,
+} from "../actions";
 import { toast } from "sonner";
 import type { KartonSablonRow } from "./karton-sablon-columns";
 
@@ -55,6 +63,9 @@ export function KartonSablonEditSheet({
   const isCreate = mode === "create";
   const [parts, setParts] = useState<{ part_id: string; part_adi: string; part_type: string }[]>([]);
   const [partOpen, setPartOpen] = useState(false);
+  const [products, setProducts] = useState<{ sku: string; urun_adi: string | null }[]>([]);
+  const [typeOptions, setTypeOptions] = useState<string[]>([]);
+  const [colorOptions, setColorOptions] = useState<string[]>([]);
 
   const {
     register,
@@ -68,12 +79,24 @@ export function KartonSablonEditSheet({
   });
 
   const selectedPartId = watch("output_part_id");
+  const selectedSkus = watch("sku") ?? [];
+  const selectedTipi = watch("tipi");
+  const selectedRenk = watch("renk");
 
-  // Load parts on open
+  // Load dropdown data on open
   useEffect(() => {
     if (open) {
       getKutuKartonParts().then((r) => {
         if (r.success) setParts(r.data);
+      });
+      getProductsForSelect().then((r) => {
+        if (r.success) setProducts(r.data);
+      });
+      getDistinctKartonValues().then((r) => {
+        if (r.success) {
+          setTypeOptions(r.data.types);
+          setColorOptions(r.data.colors);
+        }
       });
     }
   }, [open]);
@@ -85,7 +108,7 @@ export function KartonSablonEditSheet({
         plaka_adi: "",
         tipi: null,
         renk: null,
-        sku: "",
+        sku: [],
         kutu_sure_dk: null,
         output_part_id: "",
       });
@@ -96,7 +119,7 @@ export function KartonSablonEditSheet({
         plaka_adi: sablon.plaka_adi || "",
         tipi: sablon.tipi || null,
         renk: sablon.renk || null,
-        sku: sablon.sku || "",
+        sku: (sablon.sku as string[] | null) ?? [],
         kutu_sure_dk: ks["KUTU"] ?? null,
         output_part_id: sablon.output_part_id || "",
       });
@@ -175,12 +198,16 @@ export function KartonSablonEditSheet({
                 )}
               </div>
 
+              {/* Multi-SKU selection */}
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU (Ürün)</Label>
-                <Input
-                  id="sku"
-                  {...register("sku")}
-                  placeholder="ör: VW-001"
+                <Label>SKU (Ürünler)</Label>
+                <MultiSkuSelect
+                  products={products}
+                  selected={selectedSkus}
+                  onChange={(skus) =>
+                    setValue("sku", skus, { shouldValidate: true })
+                  }
+                  placeholder="Ürün SKU seçin..."
                 />
                 {errors.sku && (
                   <p className="text-sm text-destructive">{errors.sku.message}</p>
@@ -189,19 +216,21 @@ export function KartonSablonEditSheet({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="tipi">Tip</Label>
-                  <Input
-                    id="tipi"
-                    {...register("tipi")}
-                    placeholder="ör: Karton"
+                  <Label>Tip</Label>
+                  <ComboboxFreesolo
+                    options={typeOptions}
+                    value={selectedTipi ?? null}
+                    onChange={(val) => setValue("tipi", val, { shouldValidate: true })}
+                    placeholder="Tip seçin..."
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="renk">Renk</Label>
-                  <Input
-                    id="renk"
-                    {...register("renk")}
-                    placeholder="ör: Kraft"
+                  <Label>Renk</Label>
+                  <ComboboxFreesolo
+                    options={colorOptions}
+                    value={selectedRenk ?? null}
+                    onChange={(val) => setValue("renk", val, { shouldValidate: true })}
+                    placeholder="Renk seçin..."
                   />
                 </div>
               </div>
