@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { KRITIK_STOK_DEFAULT_GUN, KRITIK_STOK_DEFAULT_LOOKBACK_DAYS } from "@/lib/constants";
+import { KRITIK_STOK_DEFAULT_GUN, WMA_WEIGHT_7D, WMA_WEIGHT_30D, WMA_WEIGHT_90D } from "@/lib/constants";
 import type { Database, Json } from "@/lib/supabase/types";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
@@ -36,43 +36,59 @@ export async function GET(request: Request) {
     const { data: settingsData } = await supabase
       .from("app_settings")
       .select("key, value")
-      .in("key", ["kritik_stok_gun", "kritik_stok_lookback_days"]);
+      .in("key", ["kritik_stok_gun"]);
 
     const settingsMap = new Map<string, unknown>();
     for (const row of settingsData ?? []) {
       settingsMap.set(row.key, row.value);
     }
 
-    const lookbackDays = Number(settingsMap.get("kritik_stok_lookback_days")) || KRITIK_STOK_DEFAULT_LOOKBACK_DAYS;
     const kritikGun = Number(settingsMap.get("kritik_stok_gun")) || KRITIK_STOK_DEFAULT_GUN;
 
-    // 2. Son N günün satışlarını çek
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
-    const cutoffISO = cutoffDate.toISOString().split("T")[0];
+    // 2. Son 90 günün satışlarını satis_satirlari'dan çek (WMA)
+    const now = new Date();
+    const cutoff90 = new Date(now);
+    cutoff90.setDate(cutoff90.getDate() - 90);
+    const cutoff90ISO = cutoff90.toISOString().split("T")[0];
+
+    const cutoff30 = new Date(now);
+    cutoff30.setDate(cutoff30.getDate() - 30);
+    const cutoff30ISO = cutoff30.toISOString().split("T")[0];
+
+    const cutoff7 = new Date(now);
+    cutoff7.setDate(cutoff7.getDate() - 7);
+    const cutoff7ISO = cutoff7.toISOString().split("T")[0];
 
     const { data: salesData, error: salesErr } = await supabase
-      .from("stock_movements")
-      .select("sku, qty")
-      .eq("source", "Satis")
-      .gte("tarih", cutoffISO);
+      .from("satis_satirlari")
+      .select("sku, miktar, tarih")
+      .eq("is_hizmet", false)
+      .not("sku", "is", null)
+      .gte("tarih", cutoff90ISO);
 
     if (salesErr) {
       return NextResponse.json({ error: `Satış verileri okunamadı: ${salesErr.message}` }, { status: 500 });
     }
 
-    // SKU bazında toplam satış
-    const salesMap = new Map<string, number>();
+    // SKU bazında 3 kova topla: 7g, 30g, 90g
+    const skuBuckets = new Map<string, { sum7: number; sum30: number; sum90: number }>();
     for (const row of salesData ?? []) {
-      if (!row.sku) continue;
-      const prev = salesMap.get(row.sku) || 0;
-      salesMap.set(row.sku, prev + Math.abs(row.qty));
+      if (!row.sku || !row.tarih) continue;
+      const qty = Math.abs(Number(row.miktar) || 0);
+      const bucket = skuBuckets.get(row.sku) || { sum7: 0, sum30: 0, sum90: 0 };
+
+      bucket.sum90 += qty;
+      if (row.tarih >= cutoff30ISO) bucket.sum30 += qty;
+      if (row.tarih >= cutoff7ISO) bucket.sum7 += qty;
+
+      skuBuckets.set(row.sku, bucket);
     }
 
-    // Günlük satış oranı
+    // WMA hesapla: (sum7/7 × 0.50) + (sum30/30 × 0.30) + (sum90/90 × 0.20)
     const dailyRateMap = new Map<string, number>();
-    for (const [sku, total] of salesMap) {
-      dailyRateMap.set(sku, Math.ceil(total / lookbackDays));
+    for (const [sku, b] of skuBuckets) {
+      const velocity = (b.sum7 / 7) * WMA_WEIGHT_7D + (b.sum30 / 30) * WMA_WEIGHT_30D + (b.sum90 / 90) * WMA_WEIGHT_90D;
+      dailyRateMap.set(sku, Math.round(velocity * 100) / 100);
     }
 
     // 3. Ürünleri güncelle
@@ -91,7 +107,7 @@ export async function GET(request: Request) {
 
     for (const prod of products ?? []) {
       const dailyRate = dailyRateMap.get(prod.sku) || 0;
-      const kritikStok = dailyRate * kritikGun;
+      const kritikStok = Math.ceil(dailyRate * kritikGun);
 
       if (dailyRate > 0) productsWithSales++;
       else productsWithoutSales++;

@@ -29,7 +29,7 @@ export async function getActiveProductsWithSteps() {
       .from("products")
       .select("sku, urun_adi, kategori")
       .eq("aktif_mi", true)
-      .order("urun_adi");
+      .order("gunluk_satis", { ascending: false });
 
     if (pErr) return { success: false as const, error: pErr.message };
     if (!products || products.length === 0) return { success: true as const, data: [] };
@@ -316,54 +316,26 @@ export async function getStepTrend(sku: string, days: number = 30) {
   }
 }
 
-/** Günlük satış hızına göre en çok satan ürünleri getir (quick-select) */
+/** Günlük satış hızına göre en çok satan ürünler — montaj adımı olanlar (quick-select) */
 export async function getTopMontajProducts(limit: number = 10) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    // Son 30 gün satış verileri
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
-    const dayCount = 30;
-
+    // Over-fetch: montaj adımı olmayanlar filtrelenecek
     const { data, error } = await supabase
-      .from("satis_satirlari")
-      .select("sku, miktar, tarih")
-      .gte("tarih", since.toISOString().split("T")[0])
-      .not("sku", "is", null);
+      .from("products")
+      .select("sku, urun_adi, gunluk_satis")
+      .eq("aktif_mi", true)
+      .gt("gunluk_satis", 0)
+      .order("gunluk_satis", { ascending: false })
+      .limit(50);
 
     if (error) return { success: false as const, error: error.message };
-
-    // SKU bazlı toplam satış
-    const skuMap = new Map<string, { totalQty: number; orderCount: number }>();
-    for (const row of data ?? []) {
-      if (!row.sku) continue;
-      const existing = skuMap.get(row.sku);
-      const qty = Number(row.miktar) || 0;
-      if (existing) {
-        existing.totalQty += qty;
-        existing.orderCount += 1;
-      } else {
-        skuMap.set(row.sku, { totalQty: qty, orderCount: 1 });
-      }
-    }
-
-    // Günlük satış hızına göre sırala
-    const sorted = Array.from(skuMap.entries())
-      .map(([sku, stats]) => ({
-        sku,
-        dailyVelocity: Math.round((stats.totalQty / dayCount) * 100) / 100,
-        totalQty: stats.totalQty,
-        orderCount: stats.orderCount,
-      }))
-      .sort((a, b) => b.dailyVelocity - a.dailyVelocity)
-      .slice(0, limit);
-
-    const skus = sorted.map((s) => s.sku);
-    if (skus.length === 0) return { success: true as const, data: [] };
+    if (!data || data.length === 0) return { success: true as const, data: [] };
 
     // Sadece montaj adımı olan ürünleri filtrele
+    const skus = data.map((p) => p.sku);
     const { data: stepsData } = await supabase
       .from("assembly_steps")
       .select("sku")
@@ -371,23 +343,14 @@ export async function getTopMontajProducts(limit: number = 10) {
 
     const skusWithSteps = new Set((stepsData ?? []).map((s) => s.sku));
 
-    const { data: products } = await supabase
-      .from("products")
-      .select("sku, urun_adi")
-      .in("sku", skus);
-
-    const productMap = new Map<string, string>();
-    for (const p of products ?? []) {
-      productMap.set(p.sku, p.urun_adi ?? p.sku);
-    }
-
-    const result = sorted
-      .filter((s) => skusWithSteps.has(s.sku))
-      .map((s) => ({
-        sku: s.sku,
-        urun_adi: productMap.get(s.sku) ?? s.sku,
-        totalQty: s.totalQty,
-        sessionCount: s.orderCount,
+    const result = data
+      .filter((p) => skusWithSteps.has(p.sku))
+      .slice(0, limit)
+      .map((p) => ({
+        sku: p.sku,
+        urun_adi: p.urun_adi ?? p.sku,
+        totalQty: 0,
+        sessionCount: 0,
       }));
 
     return { success: true as const, data: result };

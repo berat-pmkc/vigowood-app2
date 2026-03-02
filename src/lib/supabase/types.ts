@@ -1177,6 +1177,33 @@ export type Database = {
         }
         Relationships: []
       }
+      makine_durum_log: {
+        Row: {
+          created_at: string
+          degistiren: string | null
+          durum: string
+          id: string
+          makine_id: string
+          neden: string | null
+        }
+        Insert: {
+          created_at?: string
+          degistiren?: string | null
+          durum: string
+          id?: string
+          makine_id: string
+          neden?: string | null
+        }
+        Update: {
+          created_at?: string
+          degistiren?: string | null
+          durum?: string
+          id?: string
+          makine_id?: string
+          neden?: string | null
+        }
+        Relationships: []
+      }
       maliyet_giris: {
         Row: {
           aktarim_tarihi: string | null
@@ -4408,6 +4435,7 @@ export type MonitorDefinition = Database['public']['Tables']['monitor_definition
 export type TaskTemplate = Database['public']['Tables']['task_templates']['Row'];
 export type RecurringTask = Database['public']['Tables']['recurring_tasks']['Row'];
 export type TaskRun = Database['public']['Tables']['task_runs']['Row'];
+export type MakineDurumLog = Database['public']['Tables']['makine_durum_log']['Row'];
 export type PartType = Database['public']['Enums']['part_type'];
 export type ProductCategory = Database['public']['Enums']['product_category'];
 export type UserRole = Database['public']['Enums']['user_role'];

@@ -129,6 +129,20 @@ export const MAKINE_BOLUM_LABELS: Record<MakineBolum, string> = {
   "Kutu-Koli": "Kutu-Koli",
 };
 
+// Makine durumları
+export const MAKINE_DURUM = ["aktif", "bakim"] as const;
+export type MakineDurum = (typeof MAKINE_DURUM)[number];
+
+export const MAKINE_DURUM_LABELS: Record<MakineDurum, string> = {
+  aktif: "Aktif",
+  bakim: "Bakımda",
+};
+
+export const MAKINE_DURUM_COLORS: Record<MakineDurum, { bg: string; text: string; dot: string }> = {
+  aktif: { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
+  bakim: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
+};
+
 export const MAKINE_BOLUM_COLORS: Record<MakineBolum, { bg: string; text: string }> = {
   Kesim: { bg: "bg-blue-100", text: "text-blue-800" },
   "Kutu-Koli": { bg: "bg-amber-100", text: "text-amber-800" },
@@ -811,6 +825,12 @@ export const MARKETPLACE_ACCESS_ROLES: UserRole[] = [
 // ─── Kritik Stok Hesaplama Sabitleri ───────────────────────────
 export const KRITIK_STOK_DEFAULT_GUN = 30;
 export const KRITIK_STOK_DEFAULT_LOOKBACK_DAYS = 90;
+
+// ─── WMA (Weighted Moving Average) Ağırlıkları ────────────────
+// hız = (ort_7g × 0.20) + (ort_30g × 0.50) + (ort_90g × 0.30)
+export const WMA_WEIGHT_7D = 0.20;
+export const WMA_WEIGHT_30D = 0.50;
+export const WMA_WEIGHT_90D = 0.30;
 
 // ─── Proforma Fatura Konfigürasyonu ────────────────────────────
 /** @deprecated DB'den okunacak (sevkiyat_firmalar). Fallback olarak kalıyor. */

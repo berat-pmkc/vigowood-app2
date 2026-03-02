@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ActiveCuts } from "./active-cuts";
-import { TodayCompleted } from "./today-completed";
 import { KesimSummaryCards } from "./kesim-summary-cards";
+import { MachineStatusBar } from "./machine-status-bar";
+import { KesimRecords } from "./kesim-records";
 import { YeniKesimDialog } from "./yeni-kesim-dialog";
-import type { CutBatchRow } from "./active-cut-card";
+import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
 import { Plus, Scissors } from "lucide-react";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
@@ -19,10 +19,10 @@ const DATE_FILTERS = [
 ] as const;
 
 const DATE_FILTER_LABELS: Record<string, string> = {
-  today: "Bugün Tamamlanan",
-  yesterday: "Dün Tamamlanan",
-  week: "Bu Hafta Tamamlanan",
-  month: "Bu Ay Tamamlanan",
+  today: "Bugün",
+  yesterday: "Dün",
+  week: "Bu Hafta",
+  month: "Bu Ay",
 };
 
 interface KesimDashboardProps {
@@ -32,6 +32,10 @@ interface KesimDashboardProps {
   todayTotalBatch: number;
   dateFilter: string;
   makineler: { makine_id: string; tipi: string; bolum: string; aktif: boolean }[];
+  machineCounts: MachineCounts;
+  mdfStok: MdfStokItem[];
+  machineStatus: MachineStatusEntry[];
+  stokTahminiGun: number | null;
 }
 
 export function KesimDashboard({
@@ -40,66 +44,61 @@ export function KesimDashboard({
   todayTotalAdet: serverTodayTotalAdet,
   todayTotalBatch: serverTodayTotalBatch,
   dateFilter,
+  machineCounts,
+  mdfStok,
+  machineStatus,
+  stokTahminiGun,
 }: KesimDashboardProps) {
   const router = useRouter();
   const activeCuts = useServerDataCache("kesim-active", serverActiveCuts);
   const completedCuts = useServerDataCache("kesim-completed", serverCompletedCuts);
-  const todayTotalAdet = useServerDataCache("kesim-adet", serverTodayTotalAdet);
   const todayTotalBatch = useServerDataCache("kesim-batch", serverTodayTotalBatch);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const sectionTitle = DATE_FILTER_LABELS[dateFilter] || "Tamamlanan";
+  const sectionLabel = DATE_FILTER_LABELS[dateFilter] || "Bugün";
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-blue-50 p-2 rounded-lg">
-            <Scissors className="w-5 h-5 text-blue-600" />
+      {/* Header + Machine Status */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-50 p-2 rounded-lg">
+              <Scissors className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-vw-dark">Kesim</h1>
+              <p className="text-sm text-muted-foreground">Lazer kesim istasyonu</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-vw-dark">Kesim</h1>
-            <p className="text-sm text-muted-foreground">Lazer kesim istasyonu</p>
-          </div>
+          <Button
+            onClick={() => setDialogOpen(true)}
+            className="h-11 px-5"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Yeni Kesim
+          </Button>
         </div>
-        <Button
-          onClick={() => setDialogOpen(true)}
-          className="h-11 px-5"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Yeni Kesim
-        </Button>
+        <MachineStatusBar machineStatus={machineStatus} />
       </div>
 
       {/* KPI Cards */}
       <KesimSummaryCards
-        activeCuts={activeCuts}
-        todayTotalAdet={todayTotalAdet}
         todayTotalBatch={todayTotalBatch}
+        machineCounts={machineCounts}
+        mdfStok={mdfStok}
+        stokTahminiGun={stokTahminiGun}
       />
 
-      {/* Aktif Kesimler */}
-      <div>
-        <h2 className="text-base font-semibold mb-2 flex items-center gap-2">
-          Aktif Kesimler
-          {activeCuts.length > 0 && (
-            <span className="text-sm font-normal text-muted-foreground">
-              ({activeCuts.length})
-            </span>
-          )}
-        </h2>
-        <ActiveCuts cuts={activeCuts} />
-      </div>
-
-      {/* Tarih Filtre + Tamamlanan */}
+      {/* Kesim Kayıtları */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-semibold">
-            {sectionTitle}
-            {completedCuts.length > 0 && (
+            Kesim Kayıtları
+            {(activeCuts.length + completedCuts.length) > 0 && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
-                ({completedCuts.length})
+                — {sectionLabel}
+                {" "}({activeCuts.length + completedCuts.length})
               </span>
             )}
           </h2>
@@ -121,7 +120,7 @@ export function KesimDashboard({
             </Button>
           ))}
         </div>
-        <TodayCompleted cuts={completedCuts} />
+        <KesimRecords activeCuts={activeCuts} completedCuts={completedCuts} />
       </div>
 
       {/* FAB — Mobile */}

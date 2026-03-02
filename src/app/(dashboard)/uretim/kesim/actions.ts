@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cutBatchCreateSchema } from "@/lib/validations";
-import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS } from "@/lib/constants";
 import type { Database } from "@/lib/supabase/types";
+import type { MachineStatusEntry, MdfStokItem } from "./types";
 
 type ActionResult = { success: true } | { success: false; error: string };
 type CutBatch = Database["public"]["Tables"]["cut_batches"]["Row"];
@@ -28,7 +29,7 @@ export async function getActiveProducts() {
       .from("products")
       .select("sku, urun_adi, kategori")
       .eq("aktif_mi", true)
-      .order("urun_adi");
+      .order("gunluk_satis", { ascending: false });
 
     if (error) return { success: false as const, error: error.message };
     return { success: true as const, data: data ?? [] };
@@ -519,51 +520,26 @@ export async function getCutLines(cutId: string) {
   }
 }
 
-/** Son 3 ayda en çok kesilen SKU'lar (hızlı seçim için) */
+/** Günlük satış hızına göre en çok satan ürünler (hızlı seçim için) */
 export async function getTopCutSkus(limit: number = 10) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
     const { data, error } = await supabase
-      .from("cut_batches")
-      .select("sku")
-      .gte("tarih", threeMonthsAgo.toISOString())
-      .not("sku", "is", null);
+      .from("products")
+      .select("sku, urun_adi, gunluk_satis")
+      .eq("aktif_mi", true)
+      .gt("gunluk_satis", 0)
+      .order("gunluk_satis", { ascending: false })
+      .limit(limit);
 
     if (error) return { success: false as const, error: error.message };
 
-    // Group by SKU and count
-    const skuCounts = new Map<string, number>();
-    (data ?? []).forEach((row) => {
-      if (row.sku) {
-        skuCounts.set(row.sku, (skuCounts.get(row.sku) ?? 0) + 1);
-      }
-    });
-
-    // Sort desc and take top N
-    const topSkus = [...skuCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit)
-      .map(([sku, count]) => ({ sku, count }));
-
-    // Fetch product names
-    const skuList = topSkus.map((s) => s.sku);
-    const { data: products } = await supabase
-      .from("products")
-      .select("sku, urun_adi")
-      .in("sku", skuList.length > 0 ? skuList : ["__none__"]);
-
-    const productMap = new Map(
-      (products ?? []).map((p) => [p.sku, p.urun_adi])
-    );
-
-    const result = topSkus.map((s) => ({
-      ...s,
-      urun_adi: productMap.get(s.sku) ?? s.sku,
+    const result = (data ?? []).map((p) => ({
+      sku: p.sku,
+      urun_adi: p.urun_adi ?? p.sku,
+      count: Number(p.gunluk_satis) || 0,
     }));
 
     return { success: true as const, data: result };
@@ -588,5 +564,92 @@ export async function getKesimOperators() {
     return { success: true as const, data: data ?? [] };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Makine durumunu toggle et (aktif ↔ bakim) + log kaydı */
+export async function toggleMachineStatus(
+  makineId: string,
+  newDurum: "aktif" | "bakim",
+  neden?: string
+): Promise<ActionResult> {
+  try {
+    const user = await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { error } = await supabase.from("makine_durum_log").insert({
+      makine_id: makineId,
+      durum: newDurum,
+      neden: neden || null,
+      degistiren: user.user_id,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/uretim/kesim");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Her makine için son durum kaydını getir */
+export async function getMachineStatuses(): Promise<{
+  success: boolean;
+  data?: MachineStatusEntry[];
+  error?: string;
+}> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const results: MachineStatusEntry[] = [];
+
+    for (const makineId of KESIM_MAKINE_IDS) {
+      const { data } = await supabase
+        .from("makine_durum_log")
+        .select("makine_id, durum, neden, created_at")
+        .eq("makine_id", makineId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        results.push(data[0] as MachineStatusEntry);
+      } else {
+        results.push({
+          makine_id: makineId,
+          durum: "aktif",
+          neden: null,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    return { success: true, data: results };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** MDF stok seviyelerini getir (mdf_tipi not null olan parçalar) */
+export async function getMdfStokLevels(): Promise<{
+  success: boolean;
+  data?: MdfStokItem[];
+  error?: string;
+}> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("all_parts")
+      .select("part_id, part_adi, hazir_eleman_aktif_stok, hazir_eleman_kritik_stok")
+      .not("mdf_tipi", "is", null)
+      .order("part_adi");
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, data: (data ?? []) as MdfStokItem[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

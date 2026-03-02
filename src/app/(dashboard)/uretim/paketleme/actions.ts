@@ -28,7 +28,7 @@ export async function getActiveProducts() {
       .from("products")
       .select("sku, urun_adi, kategori")
       .eq("aktif_mi", true)
-      .order("urun_adi");
+      .order("gunluk_satis", { ascending: false });
 
     if (error) return { success: false as const, error: error.message };
     return { success: true as const, data: products ?? [] };
@@ -146,61 +146,27 @@ export async function getProductTrend(sku: string, days: number = 30) {
   }
 }
 
-/** Son 3 ayda en çok paketlenen ürünleri getir (top N) */
+/** Günlük satış hızına göre en çok satan ürünler (hızlı seçim için) */
 export async function getTopPackagedProducts(limit: number = 10) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    const since = new Date();
-    since.setMonth(since.getMonth() - 3);
-
     const { data, error } = await supabase
-      .from("pack_events")
-      .select("sku, qty")
-      .eq("durum", "tamamlandi")
-      .not("sku", "is", null)
-      .gte("end_time", since.toISOString());
+      .from("products")
+      .select("sku, urun_adi, gunluk_satis")
+      .eq("aktif_mi", true)
+      .gt("gunluk_satis", 0)
+      .order("gunluk_satis", { ascending: false })
+      .limit(limit);
 
     if (error) return { success: false as const, error: error.message };
 
-    // SKU bazlı toplam qty ve seans sayısı
-    const skuMap = new Map<string, { totalQty: number; sessionCount: number }>();
-    for (const row of data ?? []) {
-      if (!row.sku) continue;
-      const existing = skuMap.get(row.sku);
-      if (existing) {
-        existing.totalQty += row.qty || 0;
-        existing.sessionCount += 1;
-      } else {
-        skuMap.set(row.sku, { totalQty: row.qty || 0, sessionCount: 1 });
-      }
-    }
-
-    // Sırala: toplam adet DESC
-    const sorted = Array.from(skuMap.entries())
-      .sort((a, b) => b[1].totalQty - a[1].totalQty)
-      .slice(0, limit);
-
-    // Ürün isimlerini çek
-    const skus = sorted.map(([sku]) => sku);
-    if (skus.length === 0) return { success: true as const, data: [] };
-
-    const { data: products } = await supabase
-      .from("products")
-      .select("sku, urun_adi")
-      .in("sku", skus);
-
-    const productMap = new Map<string, string>();
-    for (const p of products ?? []) {
-      productMap.set(p.sku, p.urun_adi ?? p.sku);
-    }
-
-    const result = sorted.map(([sku, stats]) => ({
-      sku,
-      urun_adi: productMap.get(sku) ?? sku,
-      totalQty: stats.totalQty,
-      sessionCount: stats.sessionCount,
+    const result = (data ?? []).map((p) => ({
+      sku: p.sku,
+      urun_adi: p.urun_adi ?? p.sku,
+      totalQty: 0,
+      sessionCount: 0,
     }));
 
     return { success: true as const, data: result };
@@ -373,7 +339,27 @@ export async function closePackSession(
 
     if (movError) return { success: false, error: movError.message };
 
+    // products.stok_aktif güncelle — paketlenen adet kadar artır
+    if (session.sku) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("stok_aktif")
+        .eq("sku", session.sku)
+        .single();
+
+      if (product) {
+        await supabase
+          .from("products")
+          .update({
+            stok_aktif:
+              ((product as { stok_aktif: number }).stok_aktif || 0) + qty,
+          })
+          .eq("sku", session.sku);
+      }
+    }
+
     revalidatePath("/uretim/paketleme");
+    revalidatePath("/stok/mamul");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -474,7 +460,7 @@ export async function updateCompletedSession(
 
     if (updateError) return { success: false, error: updateError.message };
 
-    // stock_movements güncelle (qty farkı)
+    // stock_movements + products.stok_aktif güncelle (qty farkı)
     if (qty !== oldQty && session.sku) {
       const { data: existingMov } = await supabase
         .from("stock_movements")
@@ -488,9 +474,30 @@ export async function updateCompletedSession(
           .update({ qty: qty })
           .eq("id", existingMov[0].id);
       }
+
+      // products.stok_aktif farkı uygula
+      const diff = qty - oldQty;
+      if (diff !== 0) {
+        const { data: product } = await supabase
+          .from("products")
+          .select("stok_aktif")
+          .eq("sku", session.sku)
+          .single();
+
+        if (product) {
+          await supabase
+            .from("products")
+            .update({
+              stok_aktif:
+                ((product as { stok_aktif: number }).stok_aktif || 0) + diff,
+            })
+            .eq("sku", session.sku);
+        }
+      }
     }
 
     revalidatePath("/uretim/paketleme");
+    revalidatePath("/stok/mamul");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

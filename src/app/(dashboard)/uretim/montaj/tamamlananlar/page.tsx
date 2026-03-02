@@ -19,7 +19,7 @@ export default async function TamamlananlarPage() {
     .from("products")
     .select("sku, urun_adi")
     .eq("aktif_mi", true)
-    .order("urun_adi");
+    .order("gunluk_satis", { ascending: false });
 
   const productOptions = (products ?? []).map((p) => ({
     sku: p.sku,

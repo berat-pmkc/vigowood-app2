@@ -57,7 +57,7 @@ export default async function PaketlemePage() {
     .from("products")
     .select("sku, urun_adi")
     .eq("aktif_mi", true)
-    .order("urun_adi");
+    .order("gunluk_satis", { ascending: false });
 
   const productOptions = (activeProducts ?? []).map((p) => ({
     sku: p.sku,

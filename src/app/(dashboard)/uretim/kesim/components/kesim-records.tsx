@@ -7,9 +7,11 @@ import { Card } from "@/components/ui/card";
 import { MAKINE_LABELS, type MakineId } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
-import { CheckCircle, ChevronDown, ChevronUp, User } from "lucide-react";
-import type { CutBatchRow } from "./active-cut-card";
+import { CheckCircle, ChevronDown, ChevronUp, User, XCircle } from "lucide-react";
+import type { CutBatchRow } from "../types";
 import { KesimDetailSheet } from "./kesim-detail-sheet";
+import { completeCut, cancelCut } from "../actions";
+import { toast } from "sonner";
 
 const MAKINE_BADGE_COLORS: Record<string, string> = {
   "MAK-1": "bg-emerald-100 text-emerald-800 border-emerald-200",
@@ -18,28 +20,51 @@ const MAKINE_BADGE_COLORS: Record<string, string> = {
   KUTU: "bg-amber-100 text-amber-800 border-amber-200",
 };
 
-interface TodayCompletedProps {
-  cuts: CutBatchRow[];
+interface KesimRecordsProps {
+  activeCuts: CutBatchRow[];
+  completedCuts: CutBatchRow[];
 }
 
-export function TodayCompleted({ cuts }: TodayCompletedProps) {
+export function KesimRecords({ activeCuts, completedCuts }: KesimRecordsProps) {
   const [expanded, setExpanded] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<CutBatchRow | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  if (cuts.length === 0) {
+  // Birleşik liste: kesiliyor önce, sonra tamamlandi
+  const allCuts = [...activeCuts, ...completedCuts];
+  const displayCuts = expanded ? allCuts : allCuts.slice(0, 8);
+
+  const handleComplete = async (e: React.MouseEvent, cutId: string) => {
+    e.stopPropagation();
+    setLoadingId(cutId);
+    const result = await completeCut(cutId);
+    if (!result.success) toast.error(result.error);
+    else toast.success("Kesim tamamlandı, stok güncellendi");
+    setLoadingId(null);
+  };
+
+  const handleCancel = async (e: React.MouseEvent, cutId: string) => {
+    e.stopPropagation();
+    setLoadingId(cutId);
+    const result = await cancelCut(cutId);
+    if (!result.success) toast.error(result.error);
+    else toast.success("Kesim iptal edildi");
+    setLoadingId(null);
+  };
+
+  if (allCuts.length === 0) {
     return (
-      <div className="text-center py-4 text-sm text-muted-foreground">
-        Henüz tamamlanan kesim yok
+      <div className="text-center py-6 text-sm text-muted-foreground">
+        Henüz kesim kaydı yok
       </div>
     );
   }
-
-  const displayCuts = expanded ? cuts : cuts.slice(0, 8);
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {displayCuts.map((cut) => {
+          const isActive = cut.durum === "kesiliyor";
           const skuStyle = cut.sku ? getSkuBadgeStyle(cut.sku) : null;
           const makineLabel = cut.makine_id
             ? MAKINE_LABELS[cut.makine_id as MakineId] ?? cut.makine_id
@@ -47,22 +72,25 @@ export function TodayCompleted({ cuts }: TodayCompletedProps) {
           const makineBadge = cut.makine_id
             ? MAKINE_BADGE_COLORS[cut.makine_id] ?? "bg-gray-100 text-gray-800"
             : "";
+          const isLoading = loadingId === cut.cut_id;
 
           return (
             <Card
               key={cut.cut_id}
               className={cn(
                 "border-l-4 cursor-pointer transition-all hover:shadow-md",
-                !skuStyle && "border-l-emerald-500 bg-emerald-50/30"
+                isActive
+                  ? !skuStyle && "border-l-amber-500 bg-amber-50/30"
+                  : !skuStyle && "border-l-emerald-500 bg-emerald-50/30"
               )}
               style={skuStyle ? {
-                borderLeftColor: skuStyle.borderColor,
-                backgroundColor: `${skuStyle.backgroundColor}30`,
+                borderLeftColor: isActive ? "#f59e0b" : skuStyle.borderColor,
+                backgroundColor: `${skuStyle.backgroundColor}${isActive ? "40" : "30"}`,
               } : undefined}
               onClick={() => setSelectedBatch(cut)}
             >
               <div className="p-3">
-                {/* Header — ID + Makine + Check */}
+                {/* Header — ID + Makine + Status */}
                 <div className="flex justify-between items-center mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <Badge variant="secondary" className="font-mono text-xs">
@@ -74,7 +102,14 @@ export function TodayCompleted({ cuts }: TodayCompletedProps) {
                       </Badge>
                     )}
                   </div>
-                  <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  {isActive ? (
+                    <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      Kesiliyor
+                    </span>
+                  ) : (
+                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                  )}
                 </div>
 
                 {/* Ürün + Plaka */}
@@ -88,7 +123,7 @@ export function TodayCompleted({ cuts }: TodayCompletedProps) {
                 </div>
 
                 {/* Adet + Operatör */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xl font-bold text-foreground tabular-nums">
                       {cut.adet}
@@ -102,13 +137,35 @@ export function TodayCompleted({ cuts }: TodayCompletedProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Bitir butonu (sadece aktif kesimler) */}
+                {isActive && (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      className="flex-1 h-9 text-sm"
+                      onClick={(e) => handleComplete(e, cut.cut_id)}
+                      disabled={isLoading}
+                    >
+                      <CheckCircle className="w-4 h-4 mr-1.5" />
+                      Bitir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-9 px-2.5"
+                      onClick={(e) => handleCancel(e, cut.cut_id)}
+                      disabled={isLoading}
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
           );
         })}
       </div>
 
-      {cuts.length > 8 && (
+      {allCuts.length > 8 && (
         <Button
           variant="ghost"
           size="sm"
@@ -121,7 +178,7 @@ export function TodayCompleted({ cuts }: TodayCompletedProps) {
             </>
           ) : (
             <>
-              <ChevronDown className="w-3 h-3 mr-1" /> {cuts.length - 8} kesim daha
+              <ChevronDown className="w-3 h-3 mr-1" /> {allCuts.length - 8} kesim daha
             </>
           )}
         </Button>

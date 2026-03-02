@@ -7,6 +7,7 @@ export function useKesimRealtime() {
     channelName: "kesim-realtime",
     subscriptions: [
       { event: "*", table: "cut_batches" },
+      { event: "*", table: "makine_durum_log" },
     ],
     debounceMs: 1000,
   });
