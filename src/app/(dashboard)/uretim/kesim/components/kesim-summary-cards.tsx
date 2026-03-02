@@ -59,7 +59,7 @@ export function KesimSummaryCards({
   mdfStok,
   stokTahminiGun,
 }: KesimSummaryCardsProps) {
-  // En kritik MDF bulma
+  // En kritik MDF bulma (stok/kritik oranı en düşük olan)
   const kritikMdf = mdfStok.length > 0
     ? mdfStok.reduce((min, m) => {
         const minRatio = min.hazir_eleman_kritik_stok
@@ -72,17 +72,35 @@ export function KesimSummaryCards({
       })
     : null;
 
+  // MDF stok: toplam adet ve kritik durumda olanların sayısı
+  const totalMdfStok = mdfStok.reduce((sum, m) => sum + (m.hazir_eleman_aktif_stok ?? 0), 0);
+  const kritikCount = mdfStok.filter(
+    (m) => m.hazir_eleman_kritik_stok !== null && m.hazir_eleman_aktif_stok < m.hazir_eleman_kritik_stok
+  ).length;
+
+  function getMdfStokColor() {
+    if (mdfStok.length === 0) return "text-muted-foreground";
+    if (kritikCount > 0) return "text-red-600";
+    return "text-emerald-600";
+  }
+
+  function getMdfStokBg() {
+    if (mdfStok.length === 0) return "bg-gray-50";
+    if (kritikCount > 0) return "bg-red-50";
+    return "bg-amber-50";
+  }
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-4 gap-2">
       {/* 1: Bugün Kesilen */}
-      <Card className="p-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-50 p-2 rounded-lg">
-            <Scissors className="w-4 h-4 text-emerald-600" />
+      <Card className="px-3 py-2">
+        <div className="flex items-center gap-2">
+          <div className="bg-emerald-50 p-1.5 rounded-lg shrink-0">
+            <Scissors className="w-3.5 h-3.5 text-emerald-600" />
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Bugün Kesilen</p>
-            <p className={cn("text-xl font-bold tabular-nums", getBatchColor(todayTotalBatch))}>
+          <div className="min-w-0">
+            <p className="text-[10px] text-muted-foreground leading-tight">Bugün Kesilen</p>
+            <p className={cn("text-lg font-bold tabular-nums leading-tight", getBatchColor(todayTotalBatch))}>
               {todayTotalBatch}
             </p>
           </div>
@@ -90,23 +108,23 @@ export function KesimSummaryCards({
       </Card>
 
       {/* 2: Makine Bazlı */}
-      <Card className="p-3">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="bg-blue-50 p-2 rounded-lg">
-            <BarChart3 className="w-4 h-4 text-blue-600" />
+      <Card className="px-3 py-2">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="bg-blue-50 p-1.5 rounded-lg shrink-0">
+            <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
           </div>
-          <p className="text-xs text-muted-foreground">Makine Bazlı</p>
+          <p className="text-[10px] text-muted-foreground leading-tight">Makine Bazlı</p>
         </div>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-1">
           {KESIM_MAKINE_IDS.map((id) => {
             const count = machineCounts[id] ?? 0;
             const colors = MAKINE_COLORS[id] ?? { text: "text-gray-700", bg: "bg-gray-100" };
             return (
-              <div key={id} className={cn("rounded-md px-2 py-0.5 text-center flex-1", colors.bg)}>
-                <p className="text-[10px] text-muted-foreground truncate">
+              <div key={id} className={cn("rounded px-1.5 py-0.5 text-center flex-1", colors.bg)}>
+                <p className="text-[9px] text-muted-foreground truncate leading-tight">
                   {MAKINE_LABELS[id as KesimMakineId]?.split(" ")[0] ?? id}
                 </p>
-                <p className={cn("text-lg font-bold tabular-nums", colors.text)}>{count}</p>
+                <p className={cn("text-sm font-bold tabular-nums leading-tight", colors.text)}>{count}</p>
               </div>
             );
           })}
@@ -114,56 +132,52 @@ export function KesimSummaryCards({
       </Card>
 
       {/* 3: MDF Stok */}
-      <Card className="p-3">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="bg-amber-50 p-2 rounded-lg">
-            <Package className="w-4 h-4 text-amber-600" />
+      <Card className="px-3 py-2">
+        <div className="flex items-center gap-2">
+          <div className={cn("p-1.5 rounded-lg shrink-0", getMdfStokBg())}>
+            <Package className={cn("w-3.5 h-3.5", kritikCount > 0 ? "text-red-600" : "text-amber-600")} />
           </div>
-          <p className="text-xs text-muted-foreground">MDF Stok</p>
-        </div>
-        {mdfStok.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Veri yok</p>
-        ) : (
-          <div className="space-y-0.5 mt-1 max-h-20 overflow-y-auto">
-            {mdfStok.map((m) => (
-              <div
-                key={m.part_id}
-                className={cn(
-                  "flex items-center justify-between text-xs rounded px-1",
-                  getStokBg(m.hazir_eleman_aktif_stok, m.hazir_eleman_kritik_stok)
+          <div className="min-w-0">
+            <p className="text-[10px] text-muted-foreground leading-tight">MDF Stok</p>
+            {mdfStok.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Veri yok</p>
+            ) : (
+              <>
+                <p className={cn("text-lg font-bold tabular-nums leading-tight", getMdfStokColor())}>
+                  {totalMdfStok} <span className="text-[10px] font-normal">adet</span>
+                </p>
+                {kritikCount > 0 && (
+                  <p className="text-[10px] text-red-600 leading-tight truncate">
+                    {kritikCount} kalem kritik
+                  </p>
                 )}
-              >
-                <span className="truncate flex-1 mr-2">{m.part_adi ?? m.part_id}</span>
-                <span className={cn("font-bold tabular-nums", getStokColor(m.hazir_eleman_aktif_stok, m.hazir_eleman_kritik_stok))}>
-                  {m.hazir_eleman_aktif_stok}
-                </span>
-              </div>
-            ))}
+              </>
+            )}
           </div>
-        )}
+        </div>
       </Card>
 
       {/* 4: Stok Tahmini */}
-      <Card className="p-3">
-        <div className="flex items-center gap-3">
-          <div className={cn("p-2 rounded-lg", getTahminBg(stokTahminiGun))}>
-            <Clock className={cn("w-4 h-4", getTahminColor(stokTahminiGun))} />
+      <Card className="px-3 py-2">
+        <div className="flex items-center gap-2">
+          <div className={cn("p-1.5 rounded-lg shrink-0", getTahminBg(stokTahminiGun))}>
+            <Clock className={cn("w-3.5 h-3.5", getTahminColor(stokTahminiGun))} />
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Stok Tahmini</p>
+          <div className="min-w-0">
+            <p className="text-[10px] text-muted-foreground leading-tight">Stok Tahmini</p>
             {stokTahminiGun !== null ? (
-              <div>
-                <p className={cn("text-xl font-bold tabular-nums", getTahminColor(stokTahminiGun))}>
-                  {stokTahminiGun} <span className="text-sm font-normal">gün</span>
+              <>
+                <p className={cn("text-lg font-bold tabular-nums leading-tight", getTahminColor(stokTahminiGun))}>
+                  {stokTahminiGun} <span className="text-[10px] font-normal">gün</span>
                 </p>
                 {kritikMdf && (
-                  <p className="text-[10px] text-muted-foreground truncate">
+                  <p className="text-[10px] text-muted-foreground leading-tight truncate">
                     {kritikMdf.part_adi ?? kritikMdf.part_id}
                   </p>
                 )}
-              </div>
+              </>
             ) : (
-              <p className="text-sm text-muted-foreground">Hesaplanamıyor</p>
+              <p className="text-xs text-muted-foreground">Hesaplanamıyor</p>
             )}
           </div>
         </div>
