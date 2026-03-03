@@ -216,6 +216,7 @@ export default async function KesimPage({
         mdfStok={mdfStok}
         machineStatus={machineStatusResults}
         stokTahminiGun={stokTahminiGun}
+        dailyAvgConsumption={dailyAvgConsumption}
       />
     </div>
   );

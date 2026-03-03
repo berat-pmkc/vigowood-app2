@@ -25,6 +25,8 @@ interface SatisDashboardProps {
   trToplam: number;
   ihracatToplam: number;
   channels: SalesChannel[];
+  customStart?: string;
+  customEnd?: string;
 }
 
 export function SatisDashboard({
@@ -37,6 +39,8 @@ export function SatisDashboard({
   trToplam,
   ihracatToplam,
   channels,
+  customStart,
+  customEnd,
 }: SatisDashboardProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -54,7 +58,7 @@ export function SatisDashboard({
       </div>
 
       {/* Period Filter */}
-      <PeriodFilter currentPeriod={period} currentKanal={kanal} channels={channels} />
+      <PeriodFilter currentPeriod={period} currentKanal={kanal} channels={channels} customStart={customStart} customEnd={customEnd} />
 
       {/* KPI Cards */}
       <SatisKpiCards data={kpiData} />

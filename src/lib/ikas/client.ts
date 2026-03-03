@@ -143,13 +143,10 @@ async function tryFetchOrMock<T>(
     console.log("[İkas] No credentials found — using mock data");
     return mockFn();
   }
-  try {
-    return await fetchFn();
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[İkas] API error: ${errorMsg} — falling back to mock data`);
-    return mockFn();
-  }
+  // When credentials exist, don't fall back to mock data on API errors.
+  // Let errors propagate so the error boundary shows a proper error state
+  // instead of silently serving fake data.
+  return fetchFn();
 }
 
 /** Check if currently using mock data */

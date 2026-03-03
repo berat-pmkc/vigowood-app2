@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,14 +24,6 @@ export function KurlarClient({ kurlar }: KurlarClientProps) {
   // En güncel kur (bugünkü veya en son)
   const todayKur = kurlar.find((k) => k.tarih === today);
   const latestKur = kurlar[0]; // Sıralı geldiği için ilk eleman en güncel
-
-  // Sayfa açıldığında bugünün kuru yoksa otomatik çek
-  useEffect(() => {
-    if (!todayKur) {
-      handleFetchFromApi();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleFetchFromApi = async () => {
     setApiLoading(true);

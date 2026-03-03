@@ -7,7 +7,11 @@ import type { SkuSalesRow } from "./components/satis-table";
 import { getSalesSettings, isExportChannelFromSettings } from "@/lib/sales-settings";
 import type { PeriodType } from "./actions";
 
-function getPeriodDates(period: PeriodType): { start: string | null; end: string | null } {
+function getPeriodDates(
+  period: PeriodType,
+  customStart?: string,
+  customEnd?: string,
+): { start: string | null; end: string | null } {
   const now = new Date();
   const todayStr = now.toISOString().split("T")[0];
   switch (period) {
@@ -24,11 +28,13 @@ function getPeriodDates(period: PeriodType): { start: string | null; end: string
     }
     case "all":
       return { start: null, end: null };
+    case "custom":
+      return { start: customStart || null, end: customEnd || null };
   }
 }
 
 interface PageProps {
-  searchParams: Promise<{ period?: string; kanal?: string }>;
+  searchParams: Promise<{ period?: string; kanal?: string; start?: string; end?: string }>;
 }
 
 export const metadata: Metadata = { title: "Satis" };
@@ -40,7 +46,7 @@ export default async function SatisPage({ searchParams }: PageProps) {
   const kanal = params.kanal || "all";
 
   const supabase = await createClient();
-  const { start, end } = getPeriodDates(period);
+  const { start, end } = getPeriodDates(period, params.start, params.end);
 
   // Build base query filter
   let query = supabase
@@ -128,6 +134,8 @@ export default async function SatisPage({ searchParams }: PageProps) {
         trToplam={trToplam}
         ihracatToplam={ihracatToplam}
         channels={settings.kanallari}
+        customStart={params.start}
+        customEnd={params.end}
       />
     </div>
   );

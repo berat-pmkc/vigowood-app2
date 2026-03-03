@@ -38,14 +38,20 @@ export default async function VigowoodMusterilerPage({ searchParams }: PageProps
   // Enrich customers with order stats (API may return null for computed fields)
   let enrichedCustomers = await enrichCustomersWithOrderStats(result.data);
 
-  // Client-side sort for non-server fields (orderCount, totalOrderPrice)
-  if (sortOption && !sortOption.serverSide) {
-    enrichedCustomers = [...enrichedCustomers].sort((a, b) => {
-      const aVal = (a[sortField] as number) ?? 0;
-      const bVal = (b[sortField] as number) ?? 0;
-      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
-    });
-  }
+  // Always re-sort after enrichment — enrichment may have updated lastOrderDate,
+  // orderCount, totalOrderPrice which can break the original API sort order
+  enrichedCustomers = [...enrichedCustomers].sort((a, b) => {
+    if (sortField === "firstName") {
+      const aName = (a.firstName ?? "").toLowerCase();
+      const bName = (b.firstName ?? "").toLowerCase();
+      return sortDir === "asc"
+        ? aName.localeCompare(bName, "tr")
+        : bName.localeCompare(aName, "tr");
+    }
+    const aVal = (a[sortField as keyof typeof a] as number) ?? 0;
+    const bVal = (b[sortField as keyof typeof b] as number) ?? 0;
+    return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+  });
 
   return (
     <MusterilerClient

@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/trendyol-settlements?secret=${CRON_SECRET}",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/kurlar?secret=${CRON_SECRET}",
+      "schedule": "0 9 * * *"
     }
   ]
 }

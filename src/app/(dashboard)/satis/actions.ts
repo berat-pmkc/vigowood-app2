@@ -475,4 +475,4 @@ export async function deleteReport(
 
 // ─── TYPES ──────────────────────────────────────────────────────
 
-export type PeriodType = "today" | "week" | "month" | "all";
+export type PeriodType = "today" | "week" | "month" | "all" | "custom";

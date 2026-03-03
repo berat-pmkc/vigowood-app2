@@ -36,6 +36,7 @@ interface KesimDashboardProps {
   mdfStok: MdfStokItem[];
   machineStatus: MachineStatusEntry[];
   stokTahminiGun: number | null;
+  dailyAvgConsumption: number;
 }
 
 export function KesimDashboard({
@@ -48,6 +49,7 @@ export function KesimDashboard({
   mdfStok,
   machineStatus,
   stokTahminiGun,
+  dailyAvgConsumption,
 }: KesimDashboardProps) {
   const router = useRouter();
   const activeCuts = useServerDataCache("kesim-active", serverActiveCuts);
@@ -88,6 +90,7 @@ export function KesimDashboard({
         machineCounts={machineCounts}
         mdfStok={mdfStok}
         stokTahminiGun={stokTahminiGun}
+        dailyAvgConsumption={dailyAvgConsumption}
       />
 
       {/* Kesim Kayıtları */}

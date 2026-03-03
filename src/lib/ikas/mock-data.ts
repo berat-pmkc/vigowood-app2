@@ -373,6 +373,44 @@ export function getMockCustomers(
     );
   }
 
+  // Sort support (mirrors İkas API sort format: "field:direction")
+  if (params?.sort) {
+    const [field, dir] = params.sort.split(":");
+    const asc = dir === "asc";
+    filtered.sort((a, b) => {
+      let aVal: string | number | null = null;
+      let bVal: string | number | null = null;
+      switch (field) {
+        case "firstName":
+          aVal = a.firstName.toLowerCase();
+          bVal = b.firstName.toLowerCase();
+          break;
+        case "lastName":
+          aVal = a.lastName.toLowerCase();
+          bVal = b.lastName.toLowerCase();
+          break;
+        case "lastOrderDate":
+          aVal = a.lastOrderDate ?? 0;
+          bVal = b.lastOrderDate ?? 0;
+          break;
+        case "orderCount":
+          aVal = a.orderCount ?? 0;
+          bVal = b.orderCount ?? 0;
+          break;
+        case "totalOrderPrice":
+          aVal = a.totalOrderPrice ?? 0;
+          bVal = b.totalOrderPrice ?? 0;
+          break;
+        default:
+          return 0;
+      }
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return asc ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
+  }
+
   const page = params?.page ?? 1;
   const limit = params?.limit ?? 50;
   const start = (page - 1) * limit;

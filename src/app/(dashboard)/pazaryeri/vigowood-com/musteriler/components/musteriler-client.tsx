@@ -86,11 +86,11 @@ export function MusterilerClient({
   }
 
   function handleSearch() {
+    setActiveSegment("all"); // Reset segment filter — search results shouldn't be hidden by active segment
     updateParams({ search, page: "1" });
   }
 
   function handleSortChange(field: CustomerSortField) {
-    // If same field clicked, toggle direction
     if (field === currentSort) {
       updateParams({ dir: currentDir === "asc" ? "desc" : "asc", page: "1" });
     } else {
@@ -106,16 +106,13 @@ export function MusterilerClient({
 
   const hasActiveFilters = currentSearch || currentSort !== "lastOrderDate" || currentDir !== "desc" || activeSegment !== "all";
 
-  // Client-side segment filtering
+  // Client-side segment filtering (sayfadaki veriler üzerinden)
   const filteredCustomers = useMemo(() => {
     if (activeSegment === "all") return customers;
-    return customers.filter((c) => {
-      const seg = getCustomerSegment(c.orderCount);
-      return seg.key === activeSegment;
-    });
+    return customers.filter((c) => getCustomerSegment(c.orderCount).key === activeSegment);
   }, [customers, activeSegment]);
 
-  // Segment counts
+  // Segment counts (sayfadaki müşterilerden)
   const segmentCounts = useMemo(() => {
     const counts: Record<CustomerSegmentKey, number> = { all: customers.length, vip: 0, sadik: 0, aktif: 0, yeni: 0 };
     for (const c of customers) {
@@ -216,15 +213,18 @@ export function MusterilerClient({
     getCoreRowModel: getCoreRowModel(),
   });
 
+  // Sayfa bilgisi — segment aktifse sayfadaki veriyi, değilse toplam API verisini göster
+  const displayInfo = activeSegment !== "all"
+    ? `${filteredCustomers.length} / ${customers.length} müşteri gösteriliyor`
+    : `Toplam ${totalCount.toLocaleString("tr-TR")} müşteri`;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-vw-dark">Müşteriler</h1>
           <p className="text-sm text-muted-foreground">
-            {activeSegment !== "all"
-              ? `${filteredCustomers.length} / ${totalCount} müşteri`
-              : `${totalCount} müşteri`}
+            {displayInfo}
             {isMock && " (demo veri)"}
           </p>
         </div>
@@ -329,7 +329,9 @@ export function MusterilerClient({
                 {table.getRowModel().rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                      Müşteri bulunamadı.
+                      {activeSegment !== "all"
+                        ? `Bu segmentte müşteri bulunamadı.`
+                        : `Müşteri bulunamadı.`}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -354,7 +356,8 @@ export function MusterilerClient({
           {/* Pagination */}
           <div className="flex items-center justify-between border-t px-4 py-3">
             <p className="text-sm text-muted-foreground">
-              Sayfa {currentPage} {hasNext && "/ ..."}
+              Sayfa {currentPage}
+              {totalCount > 0 && ` — ${customers.length} / ${totalCount.toLocaleString("tr-TR")}`}
             </p>
             <div className="flex gap-2">
               <Button
