@@ -22,6 +22,7 @@ interface KartonSablonlarDataTableProps {
   pageSize: number;
   search: string;
   sku: string;
+  tur: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
   skuOptions: string[];
@@ -34,6 +35,7 @@ export function KartonSablonlarDataTable({
   pageSize,
   search,
   sku,
+  tur,
   sortBy,
   sortOrder,
   skuOptions,
@@ -128,11 +130,13 @@ export function KartonSablonlarDataTable({
       <KartonSablonlarToolbar
         search={search}
         sku={sku}
+        tur={tur}
         skuOptions={skuOptions}
         onSearchChange={(v) =>
           navigate({ search: v || undefined, page: "0" })
         }
         onSkuChange={(v) => navigate({ sku: v || undefined, page: "0" })}
+        onTurChange={(v) => navigate({ tur: v || undefined, page: "0" })}
       />
 
       <DataTable

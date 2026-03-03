@@ -15,9 +15,9 @@ async function requireAdmin() {
   return user;
 }
 
-/** KUTU ve KARTON tipindeki parçaları getir (çıkan parça seçimi için) */
-export async function getKutuKartonParts(): Promise<
-  | { success: true; data: { part_id: string; part_adi: string; part_type: string }[] }
+/** Karton tipindeki parçaları getir (tip seçimi için) */
+export async function getKartonTipParts(): Promise<
+  | { success: true; data: { part_id: string; part_adi: string }[] }
   | { success: false; error: string }
 > {
   try {
@@ -26,12 +26,12 @@ export async function getKutuKartonParts(): Promise<
 
     const { data, error } = await supabase
       .from("all_parts")
-      .select("part_id, part_adi, part_type")
-      .in("part_type", ["KUTU", "KARTON"])
+      .select("part_id, part_adi")
+      .eq("tur", "Karton")
       .order("part_adi");
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: (data ?? []) as { part_id: string; part_adi: string; part_type: string }[] };
+    return { success: true, data: (data ?? []) as { part_id: string; part_adi: string }[] };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
@@ -59,40 +59,14 @@ export async function getProductsForSelect(): Promise<
   }
 }
 
-/** Mevcut tip ve renk değerlerini getir (dropdown seçenekleri için) */
-export async function getDistinctKartonValues(): Promise<
-  | { success: true; data: { types: string[]; colors: string[] } }
-  | { success: false; error: string }
-> {
-  try {
-    await requireAdmin();
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from("plakalar")
-      .select("tipi, renk")
-      .eq("plaka_kategori", "KARTON");
-
-    if (error) return { success: false, error: error.message };
-
-    const types = [...new Set((data ?? []).map((r) => r.tipi).filter(Boolean))] as string[];
-    const colors = [...new Set((data ?? []).map((r) => r.renk).filter(Boolean))] as string[];
-
-    return { success: true, data: { types: types.sort(), colors: colors.sort() } };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
 /** Karton şablon oluştur: plaka (KARTON) + tek plaka_parts kaydı */
 export async function createKartonSablon(formData: {
-  plaka_id: string;
-  plaka_adi: string;
-  tipi: string | null;
-  renk: string | null;
   sku: string[];
+  tur: "İç Kutu" | "Dış Koli";
+  tip_part_id: string;
+  en: number | null;
+  boy: number | null;
   kutu_sure_dk: number | null;
-  output_part_id: string;
 }): Promise<ActionResult> {
   try {
     await requireAdmin();
@@ -105,34 +79,33 @@ export async function createKartonSablon(formData: {
 
     const supabase = await createClient();
 
-    // Generate next plakalar_id (PL-XXXX)
-    const { data: lastPlaka } = await supabase
+    // Generate next KRT-XXX ID
+    const { data: lastKarton } = await supabase
       .from("plakalar")
       .select("plakalar_id")
-      .like("plakalar_id", "PL-%")
+      .like("plakalar_id", "KRT-%")
       .order("plakalar_id", { ascending: false })
       .limit(1);
 
     let nextNum = 1;
-    if (lastPlaka && lastPlaka.length > 0) {
-      const match = lastPlaka[0].plakalar_id.match(/PL-(\d+)/);
+    if (lastKarton && lastKarton.length > 0) {
+      const match = lastKarton[0].plakalar_id.match(/KRT-(\d+)/);
       if (match) nextNum = parseInt(match[1], 10) + 1;
     }
-    const plakalarId = `PL-${String(nextNum).padStart(4, "0")}`;
+    const kartonId = `KRT-${String(nextNum).padStart(3, "0")}`;
 
     // Build kesim_sureleri (only KUTU key)
-    const kesimSureleri: Record<string, number> = {};
-    if (parsed.data.kutu_sure_dk != null) {
-      kesimSureleri["KUTU"] = parsed.data.kutu_sure_dk;
-    }
+    const kesimSureleri: Record<string, number | null> = { KUTU: parsed.data.kutu_sure_dk };
 
     // Insert plaka
     const { error: plakaError } = await supabase.from("plakalar").insert({
-      plakalar_id: plakalarId,
-      plaka_id: parsed.data.plaka_id,
-      plaka_adi: parsed.data.plaka_adi,
-      tipi: parsed.data.tipi,
-      renk: parsed.data.renk,
+      plakalar_id: kartonId,
+      plaka_id: kartonId,
+      plaka_adi: null,
+      tipi: null,
+      renk: parsed.data.tur,
+      en: parsed.data.en,
+      boy: parsed.data.boy,
       kesim_sureleri: kesimSureleri,
       sku: parsed.data.sku,
       plaka_kategori: "KARTON",
@@ -157,8 +130,8 @@ export async function createKartonSablon(formData: {
     // Insert plaka_parts (1:1)
     const { error: partError } = await supabase.from("plaka_parts").insert({
       ppart_id: ppartId,
-      plaka_id: parsed.data.plaka_id,
-      part_id: parsed.data.output_part_id,
+      plaka_id: kartonId,
+      part_id: parsed.data.tip_part_id,
       default_qty: 1,
       sku: parsed.data.sku[0] ?? null,
     });
@@ -176,12 +149,12 @@ export async function createKartonSablon(formData: {
 export async function updateKartonSablon(
   plakalarId: string,
   formData: {
-    plaka_adi: string;
-    tipi: string | null;
-    renk: string | null;
     sku: string[];
+    tur: "İç Kutu" | "Dış Koli";
+    tip_part_id: string;
+    en: number | null;
+    boy: number | null;
     kutu_sure_dk: number | null;
-    output_part_id: string;
   }
 ): Promise<ActionResult> {
   try {
@@ -205,18 +178,15 @@ export async function updateKartonSablon(
     if (!plaka) return { success: false, error: "Şablon bulunamadı" };
 
     // Build kesim_sureleri
-    const kesimSureleri: Record<string, number> = {};
-    if (parsed.data.kutu_sure_dk != null) {
-      kesimSureleri["KUTU"] = parsed.data.kutu_sure_dk;
-    }
+    const kesimSureleri: Record<string, number | null> = { KUTU: parsed.data.kutu_sure_dk };
 
     // Update plaka
     const { error: plakaError } = await supabase
       .from("plakalar")
       .update({
-        plaka_adi: parsed.data.plaka_adi,
-        tipi: parsed.data.tipi,
-        renk: parsed.data.renk,
+        renk: parsed.data.tur,
+        en: parsed.data.en,
+        boy: parsed.data.boy,
         kesim_sureleri: kesimSureleri,
         sku: parsed.data.sku,
       })
@@ -231,17 +201,15 @@ export async function updateKartonSablon(
       .eq("plaka_id", plaka.plaka_id);
 
     if (existingParts && existingParts.length > 0) {
-      // Update existing
       await supabase
         .from("plaka_parts")
         .update({
-          part_id: parsed.data.output_part_id,
+          part_id: parsed.data.tip_part_id,
           default_qty: 1,
           sku: parsed.data.sku[0] ?? null,
         })
         .eq("ppart_id", existingParts[0].ppart_id);
     } else {
-      // Insert new
       const { data: lastPpart } = await supabase
         .from("plaka_parts")
         .select("ppart_id")
@@ -258,7 +226,7 @@ export async function updateKartonSablon(
       await supabase.from("plaka_parts").insert({
         ppart_id: ppartId,
         plaka_id: plaka.plaka_id,
-        part_id: parsed.data.output_part_id,
+        part_id: parsed.data.tip_part_id,
         default_qty: 1,
         sku: parsed.data.sku[0] ?? null,
       });

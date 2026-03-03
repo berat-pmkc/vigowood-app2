@@ -11,6 +11,7 @@ interface PageProps {
     pageSize?: string;
     search?: string;
     sku?: string;
+    tur?: string;
     sortBy?: string;
     sortOrder?: string;
   }>;
@@ -27,6 +28,7 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
     : 50;
   const search = params.search?.trim() || "";
   const sku = params.sku || "";
+  const tur = params.tur || "";
   const sortBy = params.sortBy || "plakalar_id";
   const sortOrder = params.sortOrder === "desc" ? false : true;
 
@@ -42,7 +44,7 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
 
   if (search) {
     query = query.or(
-      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%,plaka_adi.ilike.%${search}%`
+      `plakalar_id.ilike.%${search}%,plaka_id.ilike.%${search}%`
     );
   }
 
@@ -50,12 +52,16 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
     query = query.contains("sku", [sku]);
   }
 
+  if (tur) {
+    query = query.eq("renk", tur);
+  }
+
   const validSortColumns: (keyof Plaka)[] = [
     "plakalar_id",
     "plaka_id",
-    "plaka_adi",
-    "tipi",
     "renk",
+    "en",
+    "boy",
     "sku",
   ];
   const sortColumn = validSortColumns.includes(sortBy as keyof Plaka)
@@ -66,11 +72,11 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
 
   const { data: sablonlar, count, error } = await query;
 
-  // Distinct SKUs for filter (from array column using DB function)
+  // Distinct SKUs for filter
   const { data: skuData } = await supabase.rpc("get_distinct_plaka_skus", { p_kategori: "KARTON" });
   const uniqueSkus = ((skuData ?? []) as { sku: string }[]).map((r) => r.sku);
 
-  // Get plaka_parts for each (to show output part)
+  // Get plaka_parts for each (to show tip part info)
   const plakaIds = ((sablonlar ?? []) as Plaka[]).map((p) => p.plaka_id);
   let partMap = new Map<string, { part_id: string; part_adi: string }>();
 
@@ -103,11 +109,21 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
     }
   }
 
-  // Enrich sablonlar with output part info
+  // Enrich sablonlar with tip part info
   const enrichedData = ((sablonlar ?? []) as Plaka[]).map((s) => ({
-    ...s,
-    output_part_id: partMap.get(s.plaka_id)?.part_id ?? null,
-    output_part_adi: partMap.get(s.plaka_id)?.part_adi ?? null,
+    plakalar_id: s.plakalar_id,
+    plaka_id: s.plaka_id,
+    plaka_adi: s.plaka_adi,
+    renk: s.renk,
+    en: s.en,
+    boy: s.boy,
+    kesim_sureleri: s.kesim_sureleri,
+    sku: s.sku,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+    plaka_kategori: s.plaka_kategori,
+    tip_part_id: partMap.get(s.plaka_id)?.part_id ?? null,
+    tip_part_adi: partMap.get(s.plaka_id)?.part_adi ?? null,
   }));
 
   if (error) {
@@ -135,6 +151,7 @@ export default async function KartonSablonlariPage({ searchParams }: PageProps) 
         pageSize={pageSize}
         search={search}
         sku={sku}
+        tur={tur}
         sortBy={sortColumn}
         sortOrder={sortOrder ? "asc" : "desc"}
         skuOptions={uniqueSkus}

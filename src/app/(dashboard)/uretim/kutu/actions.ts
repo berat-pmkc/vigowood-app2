@@ -26,10 +26,10 @@ export async function getKartonSablonlarForSku(sku: string) {
 
     const { data: sablonlar, error } = await supabase
       .from("plakalar")
-      .select("plakalar_id, plaka_id, plaka_adi, tipi, renk, kesim_sureleri")
+      .select("plakalar_id, plaka_id, renk, kesim_sureleri, en, boy")
       .eq("plaka_kategori", "KARTON")
       .contains("sku", [sku])
-      .order("plaka_adi");
+      .order("plakalar_id");
 
     if (error) return { success: false as const, error: error.message };
 
@@ -83,9 +83,9 @@ export async function getKartonSablonlarForSku(sku: string) {
       const partInfo = partInfoMap.get(s.plaka_id);
       return {
         plaka_id: s.plaka_id,
-        plaka_adi: s.plaka_adi,
-        tipi: s.tipi,
-        renk: s.renk,
+        tur: s.renk as string | null,
+        en: s.en,
+        boy: s.boy,
         kutu_sure_dk: ks["KUTU"] ?? null,
         part_id: partInfo?.part_id ?? null,
         part_adi: partInfo?.part_adi ?? null,

@@ -276,44 +276,22 @@ export const kutuSessionCreateSchema = z.object({
 
 export type KutuSessionCreateData = z.infer<typeof kutuSessionCreateSchema>;
 
-// Karton Şablon oluşturma (Admin)
+// Karton Şablon oluşturma/güncelleme (Admin)
 export const kartonSablonCreateSchema = z.object({
-  plaka_id: z
-    .string()
-    .min(1, "Şablon ID gereklidir")
-    .max(30, "Şablon ID en fazla 30 karakter olabilir"),
-  plaka_adi: z
-    .string()
-    .min(1, "Şablon adı gereklidir")
-    .max(200, "Şablon adı en fazla 200 karakter olabilir"),
-  tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
-  renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
   sku: z.array(z.string()).min(1, "En az bir SKU seçimi gereklidir"),
+  tur: z.enum(["İç Kutu", "Dış Koli"] as const, { error: "Tür seçimi gereklidir" }),
+  tip_part_id: z.string().min(1, "Karton tipi seçimi gereklidir"),
+  en: z.number().min(0.1, "En en az 0.1 olmalıdır").max(999).nullable(),
+  boy: z.number().min(0.1, "Boy en az 0.1 olmalıdır").max(999).nullable(),
   kutu_sure_dk: z
     .number()
-    .int("Tam sayı olmalıdır")
     .min(0, "Süre 0 veya üzeri olmalıdır")
     .nullable(),
-  output_part_id: z.string().min(1, "Çıkan parça seçimi gereklidir"),
 });
 
 export type KartonSablonCreateData = z.infer<typeof kartonSablonCreateSchema>;
 
-export const kartonSablonUpdateSchema = z.object({
-  plaka_adi: z
-    .string()
-    .min(1, "Şablon adı gereklidir")
-    .max(200, "Şablon adı en fazla 200 karakter olabilir"),
-  tipi: z.string().max(100, "Tip en fazla 100 karakter olabilir").nullable(),
-  renk: z.string().max(100, "Renk en fazla 100 karakter olabilir").nullable(),
-  sku: z.array(z.string()).min(1, "En az bir SKU seçimi gereklidir"),
-  kutu_sure_dk: z
-    .number()
-    .int("Tam sayı olmalıdır")
-    .min(0, "Süre 0 veya üzeri olmalıdır")
-    .nullable(),
-  output_part_id: z.string().min(1, "Çıkan parça seçimi gereklidir"),
-});
+export const kartonSablonUpdateSchema = kartonSablonCreateSchema;
 
 export type KartonSablonUpdateData = z.infer<typeof kartonSablonUpdateSchema>;
 

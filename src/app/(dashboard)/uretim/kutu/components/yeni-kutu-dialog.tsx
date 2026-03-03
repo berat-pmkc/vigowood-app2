@@ -34,9 +34,9 @@ interface YeniKutuDialogProps {
 
 interface KartonSablon {
   plaka_id: string;
-  plaka_adi: string;
-  tipi: string | null;
-  renk: string | null;
+  tur: string | null;
+  en: number | null;
+  boy: number | null;
   kutu_sure_dk: number | null;
   part_id: string | null;
   part_adi: string | null;
@@ -319,6 +319,7 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
                       {sablonlar.map((s) => {
                         const isSelected = selectedSablon?.plaka_id === s.plaka_id;
                         const isLowStock = s.part_stok < s.part_kritik;
+                        const dimensions = s.en && s.boy ? `${s.en}×${s.boy} cm` : null;
                         return (
                           <Card
                             key={s.plaka_id}
@@ -332,13 +333,26 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
                           >
                             <div className="flex items-center justify-between">
                               <div className="min-w-0">
-                                <p className="font-medium text-sm truncate">{s.plaka_adi}</p>
+                                <p className="font-medium text-sm truncate">
+                                  {s.plaka_id}
+                                  {s.part_adi && <span className="text-muted-foreground font-normal ml-1.5">— {s.part_adi}</span>}
+                                </p>
                                 <div className="flex items-center gap-2 mt-1">
-                                  {s.tipi && (
-                                    <Badge variant="outline" className="text-[10px]">{s.tipi}</Badge>
+                                  {s.tur && (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px]",
+                                        s.tur === "İç Kutu"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : "bg-orange-50 text-orange-700 border-orange-200"
+                                      )}
+                                    >
+                                      {s.tur}
+                                    </Badge>
                                   )}
-                                  {s.renk && (
-                                    <Badge variant="outline" className="text-[10px]">{s.renk}</Badge>
+                                  {dimensions && (
+                                    <Badge variant="outline" className="text-[10px]">{dimensions}</Badge>
                                   )}
                                   {s.kutu_sure_dk != null && (
                                     <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700">
@@ -349,10 +363,8 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0 ml-3">
-                                {/* Parça stok badge */}
                                 {s.part_adi && (
                                   <div className="text-right">
-                                    <p className="text-xs text-muted-foreground truncate max-w-[100px]">{s.part_adi}</p>
                                     <Badge
                                       variant="outline"
                                       className={cn(
@@ -390,11 +402,17 @@ export function YeniKutuDialog({ open, onOpenChange }: YeniKutuDialogProps) {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Şablon:</span>
-                  <span className="font-medium truncate ml-4">{selectedSablon?.plaka_adi}</span>
+                  <span className="font-medium truncate ml-4">{selectedSablon?.plaka_id}</span>
                 </div>
+                {selectedSablon?.tur && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tür:</span>
+                    <span className="font-medium truncate ml-4">{selectedSablon.tur}</span>
+                  </div>
+                )}
                 {selectedSablon?.part_adi && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Çıkan Parça:</span>
+                    <span className="text-muted-foreground">Karton Tip:</span>
                     <span className="font-medium truncate ml-4">{selectedSablon.part_adi}</span>
                   </div>
                 )}

@@ -31,16 +31,17 @@ import { useRouter } from "next/navigation";
 export interface KartonSablonRow {
   plakalar_id: string;
   plaka_id: string;
-  plaka_adi: string;
-  tipi: string | null;
-  renk: string | null;
+  plaka_adi: string | null;
+  renk: string | null;        // "İç Kutu" / "Dış Koli" (UI'da "Tür")
+  en: number | null;
+  boy: number | null;
   kesim_sureleri: unknown;
   sku: string[] | null;
   created_at: string;
   updated_at: string | null;
   plaka_kategori: string;
-  output_part_id: string | null;
-  output_part_adi: string | null;
+  tip_part_id: string | null;
+  tip_part_adi: string | null;
 }
 
 interface ColumnOptions {
@@ -107,8 +108,8 @@ function KartonActionsCell({
           <AlertDialogHeader>
             <AlertDialogTitle>Şablonu Sil</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{row.plakalar_id}</strong> — {row.plaka_adi || "İsimsiz"}{" "}
-              şablonunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+              <strong>{row.plakalar_id}</strong> şablonunu silmek istediğinize
+              emin misiniz? Bu işlem geri alınamaz.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -145,17 +146,6 @@ export function getKartonSablonColumns({
       size: 100,
     },
     {
-      accessorKey: "plaka_adi",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Şablon Adı" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="max-w-[180px] truncate block sm:max-w-none">
-          {row.getValue("plaka_adi") || "—"}
-        </span>
-      ),
-    },
-    {
       accessorKey: "sku",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="SKU" onSort={onSort} />
@@ -163,7 +153,7 @@ export function getKartonSablonColumns({
       cell: ({ row }) => {
         const skuArr = row.getValue("sku") as string[] | null;
         if (!skuArr || skuArr.length === 0) {
-          return <span className="text-sm text-muted-foreground">—</span>;
+          return <span className="text-sm text-muted-foreground">&mdash;</span>;
         }
         return (
           <div className="flex gap-1 flex-wrap">
@@ -190,38 +180,72 @@ export function getKartonSablonColumns({
       size: 180,
     },
     {
-      accessorKey: "tipi",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Tip" onSort={onSort} />
-      ),
-      cell: ({ row }) => (
-        <span className="text-sm whitespace-nowrap">
-          {(row.getValue("tipi") as string | null) || "—"}
-        </span>
-      ),
-      size: 100,
-    },
-    {
       accessorKey: "renk",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Renk" onSort={onSort} />
+        <DataTableColumnHeader column={column} title="Tür" onSort={onSort} />
       ),
       cell: ({ row }) => {
-        const renk = row.getValue("renk") as string | null;
-        return renk ? (
-          <Badge variant="outline" className="text-xs whitespace-nowrap">
-            {renk}
+        const tur = row.getValue("renk") as string | null;
+        if (!tur) return <span className="text-sm text-muted-foreground">&mdash;</span>;
+        return (
+          <Badge
+            variant="outline"
+            className={
+              tur === "İç Kutu"
+                ? "text-xs bg-blue-50 text-blue-700 border-blue-200"
+                : "text-xs bg-orange-50 text-orange-700 border-orange-200"
+            }
+          >
+            {tur}
           </Badge>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
         );
       },
+      size: 110,
+    },
+    {
+      id: "tip",
+      header: "Tip",
+      cell: ({ row }) => {
+        const name = row.original.tip_part_adi;
+        return name ? (
+          <span className="text-sm truncate block max-w-[160px]">{name}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">&mdash;</span>
+        );
+      },
+      size: 160,
+    },
+    {
+      accessorKey: "en",
+      header: "En (cm)",
+      cell: ({ row }) => {
+        const val = row.getValue("en") as number | null;
+        return val != null ? (
+          <span className="text-sm font-mono">{val}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">&mdash;</span>
+        );
+      },
+      size: 80,
       meta: { className: "hidden md:table-cell" },
-      size: 100,
+    },
+    {
+      accessorKey: "boy",
+      header: "Boy (cm)",
+      cell: ({ row }) => {
+        const val = row.getValue("boy") as number | null;
+        return val != null ? (
+          <span className="text-sm font-mono">{val}</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">&mdash;</span>
+        );
+      },
+      size: 80,
+      meta: { className: "hidden md:table-cell" },
     },
     {
       id: "kutu_sure",
-      header: "KUTU (dk)",
+      header: "Kesim (dk)",
       cell: ({ row }) => {
         const ks = (row.original.kesim_sureleri ?? {}) as Record<string, number>;
         const val = ks["KUTU"];
@@ -230,24 +254,10 @@ export function getKartonSablonColumns({
             {val} dk
           </Badge>
         ) : (
-          <span className="text-sm text-muted-foreground">—</span>
+          <span className="text-sm text-muted-foreground">&mdash;</span>
         );
       },
       size: 90,
-    },
-    {
-      id: "output_part",
-      header: "Çıkan Parça",
-      cell: ({ row }) => {
-        const name = row.original.output_part_adi;
-        return name ? (
-          <span className="text-sm truncate block max-w-[150px]">{name}</span>
-        ) : (
-          <span className="text-sm text-muted-foreground">—</span>
-        );
-      },
-      size: 150,
-      meta: { className: "hidden lg:table-cell" },
     },
     {
       id: "actions",

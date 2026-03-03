@@ -2165,9 +2165,11 @@ export type Database = {
       }
       plakalar: {
         Row: {
+          boy: number | null
           created_at: string
+          en: number | null
           kesim_sureleri: Json | null
-          plaka_adi: string
+          plaka_adi: string | null
           plaka_id: string
           plaka_kategori: string
           plakalar_id: string
@@ -2177,9 +2179,11 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          boy?: number | null
           created_at?: string
+          en?: number | null
           kesim_sureleri?: Json | null
-          plaka_adi: string
+          plaka_adi?: string | null
           plaka_id: string
           plaka_kategori?: string
           plakalar_id: string
@@ -2189,9 +2193,11 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          boy?: number | null
           created_at?: string
+          en?: number | null
           kesim_sureleri?: Json | null
-          plaka_adi?: string
+          plaka_adi?: string | null
           plaka_id?: string
           plaka_kategori?: string
           plakalar_id?: string
@@ -4381,8 +4387,7 @@ export const Constants = {
   },
 } as const
 
-
-// Custom type aliases
+// ─── Custom Type Aliases ────────────────────────────────────
 export type Product = Database['public']['Tables']['products']['Row'];
 export type User = Database['public']['Tables']['users']['Row'];
 export type AllPart = Database['public']['Tables']['all_parts']['Row'];

@@ -543,6 +543,10 @@ export const PAZARYERI_OPTIONS = [
 
 // ─── Muhasebe & Finans Sabitleri ────────────────────────────
 
+/** Kutu türleri (Karton Şablonlar) */
+export const KUTU_TURLERI = ["İç Kutu", "Dış Koli"] as const;
+export type KutuTuru = (typeof KUTU_TURLERI)[number];
+
 /** Muhasebe erişim rolleri (Yönetici + Muhasebe + E-Ticaret Müdürü) */
 export const FINANCE_ROLES: UserRole[] = [
   "Yönetici",
