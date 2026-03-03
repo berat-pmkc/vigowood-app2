@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCustomers, enrichCustomersWithOrderStats, isUsingMockData } from "@/lib/ikas";
+import { CUSTOMER_SORT_OPTIONS, type CustomerSortField } from "@/lib/ikas/helpers";
 import { MusterilerClient } from "./components/musteriler-client";
 
 export const metadata: Metadata = { title: "vigowood.com — Müşteriler" };
@@ -8,6 +9,8 @@ interface PageProps {
   searchParams: Promise<{
     page?: string;
     search?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }
 
@@ -16,15 +19,33 @@ export default async function VigowoodMusterilerPage({ searchParams }: PageProps
   const isMock = isUsingMockData();
   const page = parseInt(params.page || "1", 10);
 
+  const sortField = (params.sort as CustomerSortField) || "lastOrderDate";
+  const sortDir = params.dir === "asc" ? "asc" : "desc";
+
+  // Check if API supports this sort field
+  const sortOption = CUSTOMER_SORT_OPTIONS.find((o) => o.value === sortField);
+  const apiSort = sortOption?.serverSide
+    ? `${sortField}:${sortDir}`
+    : `lastOrderDate:desc`; // fallback for client-side sort fields
+
   const result = await getCustomers({
     page,
     limit: 50,
     search: params.search || undefined,
-    sort: "lastOrderDate:desc",
+    sort: apiSort,
   });
 
   // Enrich customers with order stats (API may return null for computed fields)
-  const enrichedCustomers = await enrichCustomersWithOrderStats(result.data);
+  let enrichedCustomers = await enrichCustomersWithOrderStats(result.data);
+
+  // Client-side sort for non-server fields (orderCount, totalOrderPrice)
+  if (sortOption && !sortOption.serverSide) {
+    enrichedCustomers = [...enrichedCustomers].sort((a, b) => {
+      const aVal = (a[sortField] as number) ?? 0;
+      const bVal = (b[sortField] as number) ?? 0;
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    });
+  }
 
   return (
     <MusterilerClient
@@ -33,6 +54,8 @@ export default async function VigowoodMusterilerPage({ searchParams }: PageProps
       hasNext={result.hasNext}
       currentPage={page}
       currentSearch={params.search || ""}
+      currentSort={sortField}
+      currentDir={sortDir}
       isMock={isMock}
     />
   );

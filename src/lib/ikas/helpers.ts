@@ -247,3 +247,48 @@ export function getProductPrice(product: { variants: { prices: { sellPrice: numb
 export function getProductSku(product: { variants: { sku: string }[] }): string {
   return product.variants[0]?.sku ?? "-";
 }
+
+// ─── Customer Segments ─────────────────────────────────
+export type CustomerSegmentKey = "all" | "vip" | "sadik" | "aktif" | "yeni";
+
+export interface CustomerSegment {
+  key: CustomerSegmentKey;
+  label: string;
+  minOrders: number;
+  maxOrders: number | null;
+  bg: string;
+  text: string;
+}
+
+export const CUSTOMER_SEGMENTS: CustomerSegment[] = [
+  { key: "all", label: "Tümü", minOrders: 0, maxOrders: null, bg: "bg-gray-100", text: "text-gray-800" },
+  { key: "vip", label: "VIP", minOrders: 10, maxOrders: null, bg: "bg-amber-100", text: "text-amber-800" },
+  { key: "sadik", label: "Sadık", minOrders: 3, maxOrders: 9, bg: "bg-emerald-100", text: "text-emerald-800" },
+  { key: "aktif", label: "Aktif", minOrders: 1, maxOrders: 2, bg: "bg-blue-100", text: "text-blue-800" },
+  { key: "yeni", label: "Yeni", minOrders: 0, maxOrders: 0, bg: "bg-gray-100", text: "text-gray-800" },
+];
+
+/** Get customer segment based on order count */
+export function getCustomerSegment(orderCount: number | null): CustomerSegment {
+  const count = orderCount ?? 0;
+  if (count >= 10) return CUSTOMER_SEGMENTS[1]; // VIP
+  if (count >= 3) return CUSTOMER_SEGMENTS[2];  // Sadık
+  if (count >= 1) return CUSTOMER_SEGMENTS[3];  // Aktif
+  return CUSTOMER_SEGMENTS[4];                  // Yeni
+}
+
+// ─── Customer Sort Options ─────────────────────────────
+export type CustomerSortField = "lastOrderDate" | "firstName" | "orderCount" | "totalOrderPrice";
+
+export interface CustomerSortOption {
+  value: CustomerSortField;
+  label: string;
+  serverSide: boolean; // İkas API supports this sort field
+}
+
+export const CUSTOMER_SORT_OPTIONS: CustomerSortOption[] = [
+  { value: "lastOrderDate", label: "Son Sipariş", serverSide: true },
+  { value: "firstName", label: "Ad", serverSide: true },
+  { value: "orderCount", label: "Sipariş Sayısı", serverSide: false },
+  { value: "totalOrderPrice", label: "Toplam Harcama", serverSide: false },
+];

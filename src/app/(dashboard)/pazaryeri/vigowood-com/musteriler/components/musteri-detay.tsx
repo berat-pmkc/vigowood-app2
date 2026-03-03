@@ -1,23 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  User,
   Mail,
   Phone,
   ShoppingCart,
   Calendar,
 } from "lucide-react";
 import type { IkasCustomer } from "@/lib/ikas/types";
-import { formatTRY, formatIkasDateShort } from "@/lib/ikas/helpers";
+import { formatTRY, formatIkasDateShort, getCustomerSegment } from "@/lib/ikas/helpers";
 
 interface Props {
   customer: IkasCustomer;
 }
 
 export function MusteriDetay({ customer }: Props) {
+  const segment = getCustomerSegment(customer.orderCount);
+
   return (
     <div className="mt-4 space-y-5">
       {/* Customer Name */}
@@ -86,15 +86,12 @@ export function MusteriDetay({ customer }: Props) {
 
       {/* Customer value badge */}
       <div>
-        {(customer.orderCount ?? 0) >= 10 ? (
-          <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">VIP Müşteri</Badge>
-        ) : (customer.orderCount ?? 0) >= 3 ? (
-          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Sadık Müşteri</Badge>
-        ) : (customer.orderCount ?? 0) >= 1 ? (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Aktif Müşteri</Badge>
-        ) : (
-          <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Yeni Kayıt</Badge>
-        )}
+        <Badge className={`${segment.bg} ${segment.text} hover:${segment.bg}`}>
+          {segment.key === "vip" ? "VIP Müşteri" :
+           segment.key === "sadik" ? "Sadık Müşteri" :
+           segment.key === "aktif" ? "Aktif Müşteri" :
+           "Yeni Kayıt"}
+        </Badge>
       </div>
     </div>
   );
