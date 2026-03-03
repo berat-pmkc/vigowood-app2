@@ -140,7 +140,7 @@ export interface IkasCustomer {
   lastName: string;
   email: string;
   phone: string | null;
-  orderCount: number;
+  orderCount: number | null;
   totalOrderPrice: number | null;
   firstOrderDate: number | null;
   lastOrderDate: number | null;

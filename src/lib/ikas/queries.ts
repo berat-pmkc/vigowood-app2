@@ -159,6 +159,23 @@ mutation SaveVariantPrices($input: SaveVariantPricesInput!) {
 }
 `;
 
+// Lightweight query for customer stats enrichment (no line items)
+export const CUSTOMER_ORDER_STATS_QUERY = `
+query CustomerOrderStats($customerId: StringFilterInput, $pagination: PaginationInput, $sort: String) {
+  listOrder(
+    customerId: $customerId
+    pagination: $pagination
+    sort: $sort
+  ) {
+    data {
+      totalFinalPrice
+      orderedAt
+    }
+    count
+  }
+}
+`;
+
 export const LIST_STOCK_LOCATIONS_QUERY = `
 query {
   listStockLocation {

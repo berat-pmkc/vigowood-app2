@@ -54,7 +54,7 @@ export function MusteriDetay({ customer }: Props) {
             <ShoppingCart className="h-4 w-4" />
             <span className="text-xs">Toplam Sipariş</span>
           </div>
-          <p className="mt-1 text-2xl font-bold">{customer.orderCount}</p>
+          <p className="mt-1 text-2xl font-bold">{customer.orderCount ?? 0}</p>
         </div>
         <div className="rounded-md border p-3 text-center">
           <div className="flex items-center justify-center gap-1 text-muted-foreground">
@@ -86,11 +86,11 @@ export function MusteriDetay({ customer }: Props) {
 
       {/* Customer value badge */}
       <div>
-        {customer.orderCount >= 10 ? (
+        {(customer.orderCount ?? 0) >= 10 ? (
           <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">VIP Müşteri</Badge>
-        ) : customer.orderCount >= 3 ? (
+        ) : (customer.orderCount ?? 0) >= 3 ? (
           <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Sadık Müşteri</Badge>
-        ) : customer.orderCount >= 1 ? (
+        ) : (customer.orderCount ?? 0) >= 1 ? (
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Aktif Müşteri</Badge>
         ) : (
           <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Yeni Kayıt</Badge>

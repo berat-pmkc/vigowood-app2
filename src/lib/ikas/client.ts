@@ -23,6 +23,7 @@ import {
   LIST_PRODUCTS_QUERY,
   LIST_CUSTOMERS_QUERY,
   LIST_CUSTOMER_ORDERS_QUERY,
+  CUSTOMER_ORDER_STATS_QUERY,
   UPDATE_STOCK_MUTATION,
   UPDATE_PRICES_MUTATION,
   LIST_STOCK_LOCATIONS_QUERY,
@@ -359,4 +360,65 @@ export async function getPriceLists(): Promise<IkasPriceList[]> {
   }>(LIST_PRICE_LISTS_QUERY);
 
   return data.listPriceList;
+}
+
+// ─── Customer Stats Enrichment ─────────────────────────
+/** Enrich customers with order stats when API returns null for computed fields */
+export async function enrichCustomersWithOrderStats(
+  customers: IkasCustomer[]
+): Promise<IkasCustomer[]> {
+  // Fast path: if all customers already have stats, return as-is
+  const needsEnrichment = customers.some(
+    (c) => c.orderCount == null || c.orderCount === 0
+  );
+  if (!needsEnrichment || !hasCredentials()) return customers;
+
+  const BATCH_SIZE = 10;
+  const enriched = [...customers];
+
+  for (let i = 0; i < enriched.length; i += BATCH_SIZE) {
+    const batch = enriched.slice(i, Math.min(i + BATCH_SIZE, enriched.length));
+    const results = await Promise.all(
+      batch.map(async (customer) => {
+        // Skip customers that already have stats
+        if (customer.orderCount != null && customer.orderCount > 0) return customer;
+        try {
+          const response = await ikasGraphQL<{
+            listOrder: {
+              data: { totalFinalPrice: number; orderedAt: number }[];
+              count: number;
+            };
+          }>(CUSTOMER_ORDER_STATS_QUERY, {
+            customerId: { eq: customer.id },
+            pagination: { page: 1, limit: 200 },
+            sort: "orderedAt:desc",
+          });
+
+          const { data: orders, count } = response.listOrder;
+          const totalPrice = orders.reduce(
+            (sum, o) => sum + (o.totalFinalPrice || 0),
+            0
+          );
+
+          return {
+            ...customer,
+            orderCount: count,
+            totalOrderPrice: count > 0 ? totalPrice : null,
+            lastOrderDate: orders[0]?.orderedAt ?? null,
+            firstOrderDate:
+              orders.length > 0
+                ? orders[orders.length - 1]?.orderedAt ?? null
+                : null,
+          };
+        } catch {
+          return customer;
+        }
+      })
+    );
+    for (let j = 0; j < results.length; j++) {
+      enriched[i + j] = results[j];
+    }
+  }
+
+  return enriched;
 }

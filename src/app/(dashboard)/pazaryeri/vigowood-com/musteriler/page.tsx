@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCustomers, isUsingMockData } from "@/lib/ikas";
+import { getCustomers, enrichCustomersWithOrderStats, isUsingMockData } from "@/lib/ikas";
 import { MusterilerClient } from "./components/musteriler-client";
 
 export const metadata: Metadata = { title: "vigowood.com — Müşteriler" };
@@ -23,9 +23,12 @@ export default async function VigowoodMusterilerPage({ searchParams }: PageProps
     sort: "lastOrderDate:desc",
   });
 
+  // Enrich customers with order stats (API may return null for computed fields)
+  const enrichedCustomers = await enrichCustomersWithOrderStats(result.data);
+
   return (
     <MusterilerClient
-      customers={result.data}
+      customers={enrichedCustomers}
       totalCount={result.count}
       hasNext={result.hasNext}
       currentPage={page}

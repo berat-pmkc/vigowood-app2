@@ -98,7 +98,7 @@ export function MusterilerClient({
       header: "Sipariş",
       cell: ({ row }) => (
         <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-          {row.original.orderCount}
+          {row.original.orderCount ?? 0}
         </Badge>
       ),
     },
