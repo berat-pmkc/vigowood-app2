@@ -233,32 +233,60 @@ function generateMockOrders(): IkasOrder[] {
 const mockOrders = generateMockOrders();
 
 // ─── Mock Customers ─────────────────────────────────────
-const MOCK_CUSTOMERS: IkasCustomer[] = CUSTOMER_NAMES.map((name, i) => ({
-  id: `mock-customer-${i}`,
-  firstName: name[0],
-  lastName: name[1],
-  email: `${name[0].toLowerCase()}.${name[1].toLowerCase()}@mock.com`,
-  phone: `+9054${randomBetween(10000000, 99999999)}`,
-  orderCount: randomBetween(1, 15),
-  totalOrderPrice: randomBetween(200, 8000),
-  firstOrderDate: now - randomBetween(30, 365) * DAY,
-  lastOrderDate: now - randomBetween(0, 30) * DAY,
-}));
+// Segment distribution: VIP(10+): 5, Sadık(3-9): 10, Aktif(1-2): 15, Yeni(0): 5 = 35 total
+const CUSTOMER_PROFILES: { firstName: string; lastName: string; orderCount: number; totalOrderPrice: number }[] = [
+  // VIP (10+ sipariş) — 5 kişi
+  { firstName: "Ahmet", lastName: "Yılmaz", orderCount: 18, totalOrderPrice: 24500 },
+  { firstName: "Ayşe", lastName: "Demir", orderCount: 14, totalOrderPrice: 18200 },
+  { firstName: "Mehmet", lastName: "Kaya", orderCount: 12, totalOrderPrice: 15800 },
+  { firstName: "Fatma", lastName: "Çelik", orderCount: 11, totalOrderPrice: 14200 },
+  { firstName: "Mustafa", lastName: "Şahin", orderCount: 10, totalOrderPrice: 12000 },
+  // Sadık (3-9 sipariş) — 10 kişi
+  { firstName: "Zeynep", lastName: "Öztürk", orderCount: 9, totalOrderPrice: 8900 },
+  { firstName: "Ali", lastName: "Arslan", orderCount: 8, totalOrderPrice: 7600 },
+  { firstName: "Elif", lastName: "Koç", orderCount: 7, totalOrderPrice: 6300 },
+  { firstName: "Hasan", lastName: "Kurt", orderCount: 6, totalOrderPrice: 5800 },
+  { firstName: "Merve", lastName: "Aydın", orderCount: 5, totalOrderPrice: 4200 },
+  { firstName: "Emre", lastName: "Özdemir", orderCount: 5, totalOrderPrice: 3900 },
+  { firstName: "Selin", lastName: "Yıldırım", orderCount: 4, totalOrderPrice: 3500 },
+  { firstName: "Burak", lastName: "Doğan", orderCount: 4, totalOrderPrice: 3200 },
+  { firstName: "Deniz", lastName: "Polat", orderCount: 3, totalOrderPrice: 2800 },
+  { firstName: "Can", lastName: "Erdoğan", orderCount: 3, totalOrderPrice: 2100 },
+  // Aktif (1-2 sipariş) — 15 kişi
+  { firstName: "Gökhan", lastName: "Taş", orderCount: 2, totalOrderPrice: 1800 },
+  { firstName: "Sevgi", lastName: "Güneş", orderCount: 2, totalOrderPrice: 1600 },
+  { firstName: "Tolga", lastName: "Erdem", orderCount: 2, totalOrderPrice: 1400 },
+  { firstName: "Pınar", lastName: "Bal", orderCount: 2, totalOrderPrice: 1200 },
+  { firstName: "Oğuz", lastName: "Kılıç", orderCount: 1, totalOrderPrice: 950 },
+  { firstName: "Ceren", lastName: "Akın", orderCount: 1, totalOrderPrice: 890 },
+  { firstName: "Baran", lastName: "Yüksel", orderCount: 1, totalOrderPrice: 780 },
+  { firstName: "Nihan", lastName: "Çetin", orderCount: 1, totalOrderPrice: 650 },
+  { firstName: "Ege", lastName: "Aslan", orderCount: 2, totalOrderPrice: 1350 },
+  { firstName: "Defne", lastName: "Korkmaz", orderCount: 1, totalOrderPrice: 550 },
+  { firstName: "Murat", lastName: "Yıldız", orderCount: 1, totalOrderPrice: 480 },
+  { firstName: "Seda", lastName: "Aktaş", orderCount: 2, totalOrderPrice: 1100 },
+  { firstName: "Okan", lastName: "Güler", orderCount: 1, totalOrderPrice: 720 },
+  { firstName: "Esra", lastName: "Çakır", orderCount: 1, totalOrderPrice: 390 },
+  { firstName: "Barış", lastName: "Özkan", orderCount: 2, totalOrderPrice: 1500 },
+  // Yeni (0 sipariş) — 5 kişi
+  { firstName: "Tuğba", lastName: "Koçak", orderCount: 0, totalOrderPrice: 0 },
+  { firstName: "Kerem", lastName: "Acar", orderCount: 0, totalOrderPrice: 0 },
+  { firstName: "Gül", lastName: "Sarı", orderCount: 0, totalOrderPrice: 0 },
+  { firstName: "Onur", lastName: "Kaplan", orderCount: 0, totalOrderPrice: 0 },
+  { firstName: "Nehir", lastName: "Tekin", orderCount: 0, totalOrderPrice: 0 },
+];
 
-// Add 5 more customers
-for (let i = 0; i < 5; i++) {
-  MOCK_CUSTOMERS.push({
-    id: `mock-customer-extra-${i}`,
-    firstName: ["Gökhan", "Sevgi", "Tolga", "Pınar", "Oğuz"][i],
-    lastName: ["Taş", "Güneş", "Erdem", "Bal", "Kılıç"][i],
-    email: `extra${i}@mock.com`,
-    phone: `+9053${randomBetween(10000000, 99999999)}`,
-    orderCount: randomBetween(0, 5),
-    totalOrderPrice: randomBetween(0, 3000),
-    firstOrderDate: now - randomBetween(10, 180) * DAY,
-    lastOrderDate: now - randomBetween(0, 60) * DAY,
-  });
-}
+const MOCK_CUSTOMERS: IkasCustomer[] = CUSTOMER_PROFILES.map((p, i) => ({
+  id: `mock-customer-${i}`,
+  firstName: p.firstName,
+  lastName: p.lastName,
+  email: `${p.firstName.toLowerCase()}.${p.lastName.toLowerCase()}@mock.com`,
+  phone: `+9054${randomBetween(10000000, 99999999)}`,
+  orderCount: p.orderCount,
+  totalOrderPrice: p.totalOrderPrice,
+  firstOrderDate: p.orderCount > 0 ? now - randomBetween(30, 365) * DAY : null,
+  lastOrderDate: p.orderCount > 0 ? now - randomBetween(0, 30) * DAY : null,
+}));
 
 // ─── Exported Mock Functions ─────────────────────────────
 export function getMockOrders(
@@ -296,7 +324,7 @@ export function getMockOrders(
 
   return {
     data,
-    count: data.length,
+    count: filtered.length,
     hasNext: start + limit < filtered.length,
     page,
     limit,
@@ -324,7 +352,7 @@ export function getMockProducts(
 
   return {
     data,
-    count: data.length,
+    count: filtered.length,
     hasNext: start + limit < filtered.length,
     page,
     limit,
@@ -352,7 +380,7 @@ export function getMockCustomers(
 
   return {
     data,
-    count: data.length,
+    count: filtered.length,
     hasNext: start + limit < filtered.length,
     page,
     limit,
