@@ -7,14 +7,14 @@ import { createClient } from "@/lib/supabase/server";
 import { MARKETPLACE_ACCESS_ROLES } from "@/lib/constants";
 import {
   targetPriceSchema,
-  boxDimensionSchema,
   shippingProviderSchema,
+  shippingProviderCreateSchema,
+  marketplaceCreateSchema,
 } from "@/lib/validations";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
 // Helper: cast supabase.from() for tables not yet in generated types
-// Remove after running: npx supabase gen types typescript --project-id qqoojonxpaufcyyzvfpo > src/lib/supabase/types.ts
 async function getDb() {
   const supabase = await createClient();
   return supabase as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -34,10 +34,8 @@ async function requireMarketplaceAccess() {
 
 export async function upsertTargetPrice(formData: {
   sku: string;
-  perakende_min: number;
-  perakende_standart: number;
-  toptan_min: number;
-  toptan_standart: number;
+  hedef_fiyat: number;
+  toptan_hedef_fiyat: number;
   aktif?: boolean;
 }): Promise<ActionResult> {
   try {
@@ -52,14 +50,10 @@ export async function upsertTargetPrice(formData: {
 
     const { error } = await supabase.from("product_target_prices").upsert({
       sku: d.sku,
-      perakende_min: d.perakende_min,
-      perakende_standart: d.perakende_standart,
-      toptan_min: d.toptan_min,
-      toptan_standart: d.toptan_standart,
-      perakende_min_kdv: Math.round(d.perakende_min * 1.1 * 100) / 100,
-      perakende_standart_kdv: Math.round(d.perakende_standart * 1.1 * 100) / 100,
-      toptan_min_kdv: Math.round(d.toptan_min * 1.1 * 100) / 100,
-      toptan_standart_kdv: Math.round(d.toptan_standart * 1.1 * 100) / 100,
+      hedef_fiyat: d.hedef_fiyat,
+      toptan_hedef_fiyat: d.toptan_hedef_fiyat,
+      hedef_fiyat_kdv: Math.round(d.hedef_fiyat * 1.1 * 100) / 100,
+      toptan_hedef_fiyat_kdv: Math.round(d.toptan_hedef_fiyat * 1.1 * 100) / 100,
       aktif: d.aktif ?? true,
     }, { onConflict: "sku" });
 
@@ -90,10 +84,8 @@ export async function deleteTargetPrice(sku: string): Promise<ActionResult> {
 export async function bulkUpsertTargetPrices(
   rows: Array<{
     sku: string;
-    perakende_min: number;
-    perakende_standart: number;
-    toptan_min: number;
-    toptan_standart: number;
+    hedef_fiyat: number;
+    toptan_hedef_fiyat: number;
   }>
 ): Promise<{ success: boolean; inserted: number; errors: string[] }> {
   try {
@@ -119,14 +111,10 @@ export async function bulkUpsertTargetPrices(
 
     const records = validRows.map(r => ({
       sku: r.sku,
-      perakende_min: r.perakende_min,
-      perakende_standart: r.perakende_standart,
-      toptan_min: r.toptan_min,
-      toptan_standart: r.toptan_standart,
-      perakende_min_kdv: Math.round(r.perakende_min * 1.1 * 100) / 100,
-      perakende_standart_kdv: Math.round(r.perakende_standart * 1.1 * 100) / 100,
-      toptan_min_kdv: Math.round(r.toptan_min * 1.1 * 100) / 100,
-      toptan_standart_kdv: Math.round(r.toptan_standart * 1.1 * 100) / 100,
+      hedef_fiyat: r.hedef_fiyat,
+      toptan_hedef_fiyat: r.toptan_hedef_fiyat,
+      hedef_fiyat_kdv: Math.round(r.hedef_fiyat * 1.1 * 100) / 100,
+      toptan_hedef_fiyat_kdv: Math.round(r.toptan_hedef_fiyat * 1.1 * 100) / 100,
       aktif: true,
     }));
 
@@ -136,102 +124,6 @@ export async function bulkUpsertTargetPrices(
     }
 
     revalidatePath("/pazaryeri/fiyatlama/hedef-fiyatlar");
-    return { success: true, inserted: validRows.length, errors };
-  } catch (e) {
-    return { success: false, inserted: 0, errors: [e instanceof Error ? e.message : "Bir hata oluştu"] };
-  }
-}
-
-// =============================================
-// Kutu Boyutları
-// =============================================
-
-export async function upsertBoxDimension(formData: {
-  sku: string;
-  en_cm: number;
-  boy_cm: number;
-  yukseklik_cm: number;
-}): Promise<ActionResult> {
-  try {
-    await requireMarketplaceAccess();
-    const parsed = boxDimensionSchema.safeParse(formData);
-    if (!parsed.success) {
-      return { success: false, error: parsed.error.issues[0]?.message ?? "Geçersiz veri" };
-    }
-
-    const d = parsed.data;
-    const desi = Math.ceil((d.en_cm * d.boy_cm * d.yukseklik_cm) / 3000);
-    const supabase = await getDb();
-
-    const { error } = await supabase.from("product_box_dimensions").upsert({
-      sku: d.sku,
-      en_cm: d.en_cm,
-      boy_cm: d.boy_cm,
-      yukseklik_cm: d.yukseklik_cm,
-      desi,
-    }, { onConflict: "sku" });
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/pazaryeri/fiyatlama/kutu-boyutlari");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-export async function deleteBoxDimension(sku: string): Promise<ActionResult> {
-  try {
-    await requireMarketplaceAccess();
-    const supabase = await getDb();
-
-    const { error } = await supabase.from("product_box_dimensions").delete().eq("sku", sku);
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/pazaryeri/fiyatlama/kutu-boyutlari");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-export async function bulkUpsertBoxDimensions(
-  rows: Array<{ sku: string; en_cm: number; boy_cm: number; yukseklik_cm: number }>
-): Promise<{ success: boolean; inserted: number; errors: string[] }> {
-  try {
-    await requireMarketplaceAccess();
-    const supabase = await getDb();
-
-    const { data: products } = await supabase.from("products").select("sku");
-    const validSkus = new Set(products?.map((p: any) => p.sku) ?? []);
-
-    const errors: string[] = [];
-    const validRows = rows.filter(r => {
-      if (!validSkus.has(r.sku)) {
-        errors.push(`SKU bulunamadı: ${r.sku}`);
-        return false;
-      }
-      return true;
-    });
-
-    if (validRows.length === 0) {
-      return { success: false, inserted: 0, errors: errors.length > 0 ? errors : ["Geçerli satır bulunamadı"] };
-    }
-
-    const records = validRows.map(r => ({
-      sku: r.sku,
-      en_cm: r.en_cm,
-      boy_cm: r.boy_cm,
-      yukseklik_cm: r.yukseklik_cm,
-      desi: Math.ceil((r.en_cm * r.boy_cm * r.yukseklik_cm) / 3000),
-    }));
-
-    const { error } = await supabase.from("product_box_dimensions").upsert(records, { onConflict: "sku" });
-    if (error) {
-      return { success: false, inserted: 0, errors: [error.message] };
-    }
-
-    revalidatePath("/pazaryeri/fiyatlama/kutu-boyutlari");
     return { success: true, inserted: validRows.length, errors };
   } catch (e) {
     return { success: false, inserted: 0, errors: [e instanceof Error ? e.message : "Bir hata oluştu"] };
@@ -272,6 +164,75 @@ export async function updateShippingProvider(
   }
 }
 
+export async function createShippingProvider(formData: {
+  name: string;
+  code: string;
+  desi_fiyatlari: Record<string, number>;
+  aktif?: boolean;
+}): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const parsed = shippingProviderCreateSchema.safeParse(formData);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Geçersiz veri" };
+    }
+
+    const supabase = await getDb();
+    const d = parsed.data;
+
+    // Insert shipping provider
+    const { data: sp, error } = await supabase
+      .from("shipping_providers")
+      .insert({ name: d.name, code: d.code, desi_fiyatlari: d.desi_fiyatlari, aktif: d.aktif ?? true })
+      .select("id")
+      .single();
+
+    if (error) return { success: false, error: error.message };
+
+    // Auto-create marketplace_shipping entries for all active marketplaces (#13)
+    const { data: mps } = await supabase.from("marketplaces").select("id").eq("aktif", true);
+    if (mps && mps.length > 0 && sp) {
+      const mappings = mps.map((m: any) => ({
+        marketplace_id: m.id,
+        shipping_provider_id: sp.id,
+        varsayilan: false,
+      }));
+      await supabase.from("marketplace_shipping").insert(mappings);
+    }
+
+    revalidatePath("/pazaryeri/fiyatlama/kargo");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function deleteShippingProvider(id: string): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    // Check if any listings reference this provider
+    const { data: refs } = await supabase
+      .from("marketplace_listings")
+      .select("id")
+      .eq("shipping_provider_id", id)
+      .limit(1);
+
+    if (refs && refs.length > 0) {
+      return { success: false, error: "Bu kargo firması listing'lerde kullanılıyor, silinemez" };
+    }
+
+    const { error } = await supabase.from("shipping_providers").delete().eq("id", id);
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/pazaryeri/fiyatlama/kargo");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 export async function updateMarketplaceShipping(
   marketplaceId: string,
   shippingProviderId: string
@@ -298,6 +259,195 @@ export async function updateMarketplaceShipping(
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/pazaryeri/fiyatlama/kargo");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// =============================================
+// Pazaryeri CRUD
+// =============================================
+
+export async function createMarketplace(formData: {
+  code: string;
+  name: string;
+  vergi_dahil: boolean;
+  stopaj_orani: number;
+  hedef_fiyat_tipi: string;
+  sira?: number;
+}): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const parsed = marketplaceCreateSchema.safeParse(formData);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Geçersiz veri" };
+    }
+
+    const supabase = await getDb();
+    const d = parsed.data;
+
+    // Insert marketplace
+    const { data: mp, error } = await supabase
+      .from("marketplaces")
+      .insert({
+        code: d.code,
+        name: d.name,
+        vergi_dahil: d.vergi_dahil,
+        stopaj_orani: d.stopaj_orani,
+        hedef_fiyat_tipi: d.hedef_fiyat_tipi,
+        sira: d.sira ?? 0,
+      })
+      .select("id")
+      .single();
+
+    if (error) return { success: false, error: error.message };
+
+    // Auto-create marketplace_shipping entries for all active shipping providers (#13)
+    const { data: sps } = await supabase.from("shipping_providers").select("id").eq("aktif", true);
+    if (sps && sps.length > 0 && mp) {
+      const mappings = sps.map((sp: any) => ({
+        marketplace_id: mp.id,
+        shipping_provider_id: sp.id,
+        varsayilan: false,
+      }));
+      await supabase.from("marketplace_shipping").insert(mappings);
+    }
+
+    revalidatePath("/pazaryeri/fiyatlama");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function deleteMarketplace(id: string): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    // Check if any active listings exist
+    const { data: refs } = await supabase
+      .from("marketplace_listings")
+      .select("id")
+      .eq("marketplace_id", id)
+      .eq("aktif", true)
+      .limit(1);
+
+    if (refs && refs.length > 0) {
+      return { success: false, error: "Bu pazaryerinde aktif listing'ler var, önce bunları kaldırın" };
+    }
+
+    // CASCADE will delete marketplace_shipping entries
+    const { error } = await supabase.from("marketplaces").delete().eq("id", id);
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/pazaryeri/fiyatlama");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function updateMarketplaceStopaj(
+  marketplaceId: string,
+  stopajOrani: number
+): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    const { error } = await supabase
+      .from("marketplaces")
+      .update({ stopaj_orani: stopajOrani })
+      .eq("id", marketplaceId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/pazaryeri/fiyatlama/panel");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// =============================================
+// Listing CRUD
+// =============================================
+
+export async function createListing(formData: {
+  marketplace_id: string;
+  sku: string;
+  listing_kodu: string;
+  barkod?: string;
+  urun_adi?: string;
+}): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    const { error } = await supabase.from("marketplace_listings").insert({
+      marketplace_id: formData.marketplace_id,
+      sku: formData.sku,
+      listing_kodu: formData.listing_kodu,
+      barkod: formData.barkod || null,
+      urun_adi: formData.urun_adi || null,
+      satis_fiyati: 0,
+      komisyon_orani: 0,
+      reklam_orani: 0,
+      kargo_maliyeti: 0,
+      ham_fiyat: 0,
+      hedef_fiyat_kullanilan: 0,
+      kar_marji: 0,
+      oneri_fiyat: 0,
+      aktif: true,
+    });
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/pazaryeri/fiyatlama/panel");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function deactivateListing(id: string): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    const { error } = await supabase
+      .from("marketplace_listings")
+      .update({ aktif: false })
+      .eq("id", id);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/pazaryeri/fiyatlama/panel");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function bulkUpdateReklamOrani(
+  marketplaceId: string,
+  reklamOrani: number
+): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    const { error } = await supabase
+      .from("marketplace_listings")
+      .update({ reklam_orani: reklamOrani })
+      .eq("marketplace_id", marketplaceId)
+      .eq("aktif", true);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/pazaryeri/fiyatlama/panel");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -365,40 +515,33 @@ export async function getListingsForMarketplace(marketplaceId: string) {
 
   const skus = (listings ?? []).map((l: any) => l.sku).filter(Boolean);
 
-  // 4. Batch fetch target prices + box dimensions for all SKUs
+  // 4. Batch fetch target prices + desi from products for all SKUs
   let targetPrices: Record<string, any> = {};
-  let boxDimensions: Record<string, any> = {};
+  let productDesi: Record<string, number> = {};
 
   if (skus.length > 0) {
-    const [tpResult, bdResult] = await Promise.all([
+    const [tpResult, prodResult] = await Promise.all([
       supabase.from("product_target_prices").select("*").in("sku", skus),
-      supabase.from("product_box_dimensions").select("*").in("sku", skus),
+      supabase.from("products").select("sku, desi").in("sku", skus),
     ]);
     for (const tp of tpResult.data ?? []) targetPrices[tp.sku] = tp;
-    for (const bd of bdResult.data ?? []) boxDimensions[bd.sku] = bd;
+    for (const p of prodResult.data ?? []) productDesi[p.sku] = Number(p.desi) || 0;
   }
 
   // 5. Enrich listings with joined data
   const enriched = (listings ?? []).map((listing: any) => {
     const tp = targetPrices[listing.sku] ?? null;
-    const bd = boxDimensions[listing.sku] ?? null;
 
     // Determine which target price to use based on marketplace's hedef_fiyat_tipi
-    const tipi = mp.hedef_fiyat_tipi ?? "perakende_min";
-    const hedefMin = tp ? (tp[tipi] ?? tp.perakende_min ?? 0) : 0;
-    // Std is always the "standart" variant of the same tier
-    const stdTipi = tipi.replace("_min", "_standart").replace("toptan_standart", "toptan_standart");
-    const hedefStd = tp
-      ? (tipi.includes("min")
-        ? (tp[tipi.replace("_min", "_standart")] ?? 0)
-        : (tp[tipi] ?? 0))
+    const tipi = mp.hedef_fiyat_tipi ?? "perakende";
+    const hedefFiyat = tp
+      ? (tipi === "toptan" ? (tp.toptan_hedef_fiyat ?? 0) : (tp.hedef_fiyat ?? 0))
       : 0;
 
     return {
       ...listing,
-      hedef_min: hedefMin,
-      hedef_std: hedefStd,
-      desi: bd?.desi ?? 0,
+      hedef_fiyat: hedefFiyat,
+      desi: productDesi[listing.sku] ?? 0,
       stopaj_orani: mp.stopaj_orani ?? 0.01,
     };
   });
@@ -418,8 +561,7 @@ export async function updateListings(
     reklam_orani?: number;
     ham_fiyat?: number;
     kar_marji?: number;
-    oneri_fiyat_min?: number;
-    oneri_fiyat_std?: number;
+    oneri_fiyat?: number;
     kargo_maliyeti?: number;
     hedef_fiyat_kullanilan?: number;
   }>
@@ -655,4 +797,34 @@ export async function saveSnapshot(
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
+}
+
+// =============================================
+// Ürün listesi (hedef fiyatlar sayfası için)
+// =============================================
+
+export async function getAllProductsWithTargetPrices() {
+  await requireMarketplaceAccess();
+  const supabase = await getDb();
+
+  const { data: products } = await supabase
+    .from("products")
+    .select("sku, urun_adi")
+    .eq("aktif_mi", true)
+    .order("sku");
+
+  const { data: targetPrices } = await supabase
+    .from("product_target_prices")
+    .select("*")
+    .order("sku");
+
+  const tpMap: Record<string, any> = {};
+  for (const tp of targetPrices ?? []) {
+    tpMap[tp.sku] = tp;
+  }
+
+  return {
+    products: (products ?? []) as Array<{ sku: string; urun_adi: string | null }>,
+    targetPrices: tpMap,
+  };
 }

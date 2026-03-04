@@ -18,7 +18,7 @@ export interface Marketplace {
   updated_at: string;
 }
 
-export type HedefFiyatTipi = 'perakende_min' | 'perakende_standart' | 'toptan_min' | 'toptan_standart';
+export type HedefFiyatTipi = 'perakende' | 'toptan';
 
 export interface ShippingProvider {
   id: string;
@@ -41,14 +41,10 @@ export interface MarketplaceShipping {
 export interface ProductTargetPrice {
   id: string;
   sku: string;
-  perakende_min: number;
-  perakende_standart: number;
-  toptan_min: number;
-  toptan_standart: number;
-  perakende_min_kdv: number;
-  perakende_standart_kdv: number;
-  toptan_min_kdv: number;
-  toptan_standart_kdv: number;
+  hedef_fiyat: number;
+  toptan_hedef_fiyat: number;
+  hedef_fiyat_kdv: number;
+  toptan_hedef_fiyat_kdv: number;
   gecerlilik_baslangic: string;
   aktif: boolean;
   created_at: string;
@@ -81,8 +77,7 @@ export interface MarketplaceListing {
   ham_fiyat: number;
   hedef_fiyat_kullanilan: number;
   kar_marji: number;
-  oneri_fiyat_min: number;
-  oneri_fiyat_std: number;
+  oneri_fiyat: number;
   ozel_maliyetler: Record<string, unknown>;
   aktif: boolean;
   created_at: string;
@@ -102,6 +97,17 @@ export interface PricingSnapshot {
   ham_fiyat: number | null;
   kar_marji: number | null;
   hedef_fiyat: number | null;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface ShippingSnapshot {
+  id: string;
+  donem_kodu: string;
+  shipping_provider_id: string;
+  provider_name: string;
+  provider_code: string;
+  desi_fiyatlari: Record<string, number>;
   created_at: string;
   created_by: string | null;
 }
@@ -139,7 +145,7 @@ export interface MarketplaceSummary {
 
 export type MarketplaceFormData = Omit<Marketplace, 'id' | 'created_at' | 'updated_at'>;
 
-export type ListingFormData = Omit<MarketplaceListing, 'id' | 'created_at' | 'updated_at' | 'ham_fiyat' | 'kar_marji' | 'oneri_fiyat_min' | 'oneri_fiyat_std' | 'hedef_fiyat_kullanilan'>;
+export type ListingFormData = Omit<MarketplaceListing, 'id' | 'created_at' | 'updated_at' | 'ham_fiyat' | 'kar_marji' | 'oneri_fiyat' | 'hedef_fiyat_kullanilan'>;
 
 export type TargetPriceFormData = Omit<ProductTargetPrice, 'id' | 'created_at' | 'updated_at'>;
 

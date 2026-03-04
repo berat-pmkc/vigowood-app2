@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition, useRef } from "react";
+import { useCallback, useMemo, useState, useTransition, useRef, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -21,85 +21,150 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { SimplePagination } from "../../../fiyatlama/components/simple-pagination";
 import { toast } from "sonner";
-import { Plus, Upload, Search, Trash2 } from "lucide-react";
+import { Upload, Search, Trash2, Loader2 } from "lucide-react";
 import { upsertTargetPrice, deleteTargetPrice, bulkUpsertTargetPrices } from "../../../fiyatlama/actions";
-import type { ProductTargetPrice } from "@/types/pricing";
 import * as XLSX from "xlsx";
 
-interface Props {
-  data: ProductTargetPrice[];
-  productMap: Record<string, string>;
-  allSkus: string[];
+// Row type: all active products with optional target price data
+interface HedefFiyatRow {
+  sku: string;
+  urun_adi: string | null;
+  hedef_fiyat: number;
+  toptan_hedef_fiyat: number;
+  hedef_fiyat_kdv: number;
+  toptan_hedef_fiyat_kdv: number;
+  has_target: boolean; // whether this product has a target price entry
+  aktif: boolean;
 }
 
-export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editItem, setEditItem] = useState<ProductTargetPrice | null>(null);
+interface Props {
+  products: Array<{ sku: string; urun_adi: string | null }>;
+  targetPrices: Record<string, {
+    hedef_fiyat: number;
+    toptan_hedef_fiyat: number;
+    hedef_fiyat_kdv: number;
+    toptan_hedef_fiyat_kdv: number;
+    aktif: boolean;
+  }>;
+}
+
+// Inline editable cell
+function InlineEditableCell({
+  value,
+  onSave,
+}: {
+  value: number;
+  onSave: (val: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [localValue, setLocalValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const handleStart = () => {
+    setEditing(true);
+    setLocalValue(value > 0 ? Math.round(value).toString() : "");
+  };
+
+  const handleCommit = () => {
+    setEditing(false);
+    const parsed = parseFloat(localValue);
+    if (!isNaN(parsed) && parsed >= 0 && parsed !== value) {
+      onSave(parsed);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      handleCommit();
+    }
+    if (e.key === "Escape") setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <Input
+        ref={inputRef}
+        type="number"
+        step="1"
+        min="0"
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleCommit}
+        onKeyDown={handleKeyDown}
+        className="h-7 w-24 px-1 text-right text-xs"
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={handleStart}
+      className={`cursor-pointer rounded px-1.5 py-0.5 text-right text-xs font-medium transition-colors ${
+        value > 0
+          ? "bg-blue-50 text-blue-800 hover:bg-blue-100"
+          : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+      }`}
+    >
+      {value > 0 ? `₺${Math.round(value).toFixed(0)}` : "—"}
+    </span>
+  );
+}
+
+export function HedefFiyatlarClient({ products, targetPrices }: Props) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Form state
-  const [formSku, setFormSku] = useState("");
-  const [formPerMin, setFormPerMin] = useState(0);
-  const [formPerStd, setFormPerStd] = useState(0);
-  const [formTopMin, setFormTopMin] = useState(0);
-  const [formTopStd, setFormTopStd] = useState(0);
-  const [skuSearch, setSkuSearch] = useState("");
-
-  const openCreate = useCallback(() => {
-    setEditItem(null);
-    setFormSku("");
-    setFormPerMin(0);
-    setFormPerStd(0);
-    setFormTopMin(0);
-    setFormTopStd(0);
-    setSkuSearch("");
-    setSheetOpen(true);
-  }, []);
-
-  const openEdit = useCallback((item: ProductTargetPrice) => {
-    setEditItem(item);
-    setFormSku(item.sku);
-    setFormPerMin(item.perakende_min);
-    setFormPerStd(item.perakende_standart);
-    setFormTopMin(item.toptan_min);
-    setFormTopStd(item.toptan_standart);
-    setSheetOpen(true);
-  }, []);
-
-  const handleSave = useCallback(() => {
-    if (!formSku) {
-      toast.error("SKU seçimi gereklidir");
-      return;
-    }
-    startTransition(async () => {
-      const result = await upsertTargetPrice({
-        sku: formSku,
-        perakende_min: formPerMin,
-        perakende_standart: formPerStd,
-        toptan_min: formTopMin,
-        toptan_standart: formTopStd,
-      });
-      if (result.success) {
-        toast.success(editItem ? "Hedef fiyat güncellendi" : "Hedef fiyat eklendi");
-        setSheetOpen(false);
-      } else {
-        toast.error(result.error);
-      }
+  // Build rows: all active products with their target price (or empty)
+  const rows: HedefFiyatRow[] = useMemo(() => {
+    return products.map((p) => {
+      const tp = targetPrices[p.sku];
+      return {
+        sku: p.sku,
+        urun_adi: p.urun_adi,
+        hedef_fiyat: tp ? Number(tp.hedef_fiyat) || 0 : 0,
+        toptan_hedef_fiyat: tp ? Number(tp.toptan_hedef_fiyat) || 0 : 0,
+        hedef_fiyat_kdv: tp ? Number(tp.hedef_fiyat_kdv) || 0 : 0,
+        toptan_hedef_fiyat_kdv: tp ? Number(tp.toptan_hedef_fiyat_kdv) || 0 : 0,
+        has_target: !!tp,
+        aktif: tp?.aktif ?? true,
+      };
     });
-  }, [formSku, formPerMin, formPerStd, formTopMin, formTopStd, editItem]);
+  }, [products, targetPrices]);
+
+  const handleInlineSave = useCallback(
+    (sku: string, field: "hedef_fiyat" | "toptan_hedef_fiyat", value: number) => {
+      const tp = targetPrices[sku];
+      const currentHedef = field === "hedef_fiyat" ? value : (tp ? Number(tp.hedef_fiyat) || 0 : 0);
+      const currentToptan = field === "toptan_hedef_fiyat" ? value : (tp ? Number(tp.toptan_hedef_fiyat) || 0 : 0);
+
+      startTransition(async () => {
+        const result = await upsertTargetPrice({
+          sku,
+          hedef_fiyat: currentHedef,
+          toptan_hedef_fiyat: currentToptan,
+        });
+        if (result.success) {
+          toast.success(`${sku} hedef fiyat güncellendi`);
+        } else {
+          toast.error(result.error);
+        }
+      });
+    },
+    [targetPrices]
+  );
 
   const handleDelete = useCallback((sku: string) => {
     if (!confirm(`${sku} hedef fiyatını silmek istediğinize emin misiniz?`)) return;
@@ -124,21 +189,19 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
 
-        const rows = jsonData.map((row) => ({
+        const uploadRows = jsonData.map((row) => ({
           sku: String(row["SKU"] || row["sku"] || row["Ürün Kodu"] || "").trim(),
-          perakende_min: Number(row["Per.Min"] || row["perakende_min"] || 0),
-          perakende_standart: Number(row["Per.Std"] || row["perakende_standart"] || 0),
-          toptan_min: Number(row["Top.Min"] || row["toptan_min"] || 0),
-          toptan_standart: Number(row["Top.Std"] || row["toptan_standart"] || 0),
+          hedef_fiyat: Number(row["Hedef Fiyat"] || row["hedef_fiyat"] || row["Per.Std"] || row["perakende_standart"] || 0),
+          toptan_hedef_fiyat: Number(row["Toptan Hedef"] || row["toptan_hedef_fiyat"] || row["Top.Std"] || row["toptan_standart"] || 0),
         })).filter(r => r.sku);
 
-        if (rows.length === 0) {
+        if (uploadRows.length === 0) {
           toast.error("Excel'de geçerli satır bulunamadı");
           return;
         }
 
         startTransition(async () => {
-          const result = await bulkUpsertTargetPrices(rows);
+          const result = await bulkUpsertTargetPrices(uploadRows);
           if (result.success) {
             toast.success(`${result.inserted} hedef fiyat güncellendi`);
             if (result.errors.length > 0) {
@@ -151,19 +214,17 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
       } catch {
         toast.error("Excel dosyası okunamadı");
       }
-      // Reset file input
       if (fileRef.current) fileRef.current.value = "";
     };
     reader.readAsBinaryString(file);
   }, []);
 
-  const formatPrice = (v: number) => v > 0 ? `${v.toLocaleString("tr-TR")} ₺` : "-";
-
-  const columns: ColumnDef<ProductTargetPrice>[] = useMemo(
+  const columns: ColumnDef<HedefFiyatRow>[] = useMemo(
     () => [
       {
         accessorKey: "sku",
         header: "SKU",
+        size: 120,
         cell: ({ row }) => (
           <span className="font-mono text-sm font-medium">{row.original.sku}</span>
         ),
@@ -171,73 +232,102 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
       {
         id: "urun_adi",
         header: "Ürün Adı",
+        size: 200,
         cell: ({ row }) => (
-          <span className="text-sm text-muted-foreground">
-            {productMap[row.original.sku] ?? "-"}
+          <span className="text-sm text-muted-foreground truncate max-w-[200px] block">
+            {row.original.urun_adi ?? "—"}
           </span>
+        ),
+        filterFn: (row, _id, filterValue) => {
+          const search = filterValue.toLowerCase();
+          return (
+            row.original.sku.toLowerCase().includes(search) ||
+            (row.original.urun_adi?.toLowerCase().includes(search) ?? false)
+          );
+        },
+      },
+      {
+        accessorKey: "hedef_fiyat",
+        header: "Hedef Fiyat",
+        size: 110,
+        cell: ({ row }) => (
+          <InlineEditableCell
+            value={row.original.hedef_fiyat}
+            onSave={(v) => handleInlineSave(row.original.sku, "hedef_fiyat", v)}
+          />
         ),
       },
       {
-        accessorKey: "perakende_min",
-        header: "Per. Min",
-        cell: ({ row }) => formatPrice(row.original.perakende_min),
+        accessorKey: "hedef_fiyat_kdv",
+        header: "Hedef +KDV",
+        size: 100,
+        cell: ({ row }) => {
+          const v = row.original.hedef_fiyat;
+          return (
+            <span className="text-xs text-muted-foreground">
+              {v > 0 ? `₺${Math.round(v * 1.1).toFixed(0)}` : "—"}
+            </span>
+          );
+        },
       },
       {
-        accessorKey: "perakende_standart",
-        header: "Per. Std",
-        cell: ({ row }) => formatPrice(row.original.perakende_standart),
-      },
-      {
-        accessorKey: "perakende_min_kdv",
-        header: "Per. Min+KDV",
-        cell: ({ row }) => formatPrice(row.original.perakende_min_kdv),
-      },
-      {
-        accessorKey: "perakende_standart_kdv",
-        header: "Per. Std+KDV",
-        cell: ({ row }) => formatPrice(row.original.perakende_standart_kdv),
-      },
-      {
-        accessorKey: "toptan_min",
-        header: "Top. Min",
-        cell: ({ row }) => formatPrice(row.original.toptan_min),
-      },
-      {
-        accessorKey: "toptan_standart",
-        header: "Top. Std",
-        cell: ({ row }) => formatPrice(row.original.toptan_standart),
-      },
-      {
-        accessorKey: "aktif",
-        header: "Aktif",
+        accessorKey: "toptan_hedef_fiyat",
+        header: "Toptan Hedef",
+        size: 110,
         cell: ({ row }) => (
-          <Badge variant={row.original.aktif ? "default" : "secondary"}>
-            {row.original.aktif ? "Aktif" : "Pasif"}
+          <InlineEditableCell
+            value={row.original.toptan_hedef_fiyat}
+            onSave={(v) => handleInlineSave(row.original.sku, "toptan_hedef_fiyat", v)}
+          />
+        ),
+      },
+      {
+        accessorKey: "toptan_hedef_fiyat_kdv",
+        header: "Toptan +KDV",
+        size: 100,
+        cell: ({ row }) => {
+          const v = row.original.toptan_hedef_fiyat;
+          return (
+            <span className="text-xs text-muted-foreground">
+              {v > 0 ? `₺${Math.round(v * 1.1).toFixed(0)}` : "—"}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "has_target",
+        header: "Durum",
+        size: 80,
+        cell: ({ row }) => (
+          <Badge variant={row.original.has_target ? "default" : "secondary"}>
+            {row.original.has_target ? "Tanımlı" : "Boş"}
           </Badge>
         ),
       },
       {
         id: "actions",
         header: "",
-        cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(row.original.sku);
-            }}
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
-        ),
+        size: 40,
+        cell: ({ row }) =>
+          row.original.has_target ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(row.original.sku);
+              }}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          ) : null,
       },
     ],
-    [productMap, handleDelete]
+    [handleInlineSave, handleDelete]
   );
 
   const table = useReactTable({
-    data,
+    data: rows,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -247,28 +337,35 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     initialState: { pagination: { pageSize: 25 } },
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const search = filterValue.toLowerCase();
+      return (
+        row.original.sku.toLowerCase().includes(search) ||
+        (row.original.urun_adi?.toLowerCase().includes(search) ?? false)
+      );
+    },
   });
 
-  // SKU autocomplete for create
-  const filteredSkus = useMemo(() => {
-    const existingSkus = new Set(data.map((d) => d.sku));
-    return allSkus
-      .filter((s) => !existingSkus.has(s))
-      .filter((s) => !skuSearch || s.toLowerCase().includes(skuSearch.toLowerCase()));
-  }, [allSkus, data, skuSearch]);
+  const definedCount = rows.filter(r => r.has_target).length;
 
   return (
     <>
       {/* Toolbar */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="SKU veya ürün ara..."
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="SKU veya ürün ara..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {definedCount}/{rows.length} tanımlı
+          </span>
+          {isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
         <div className="flex gap-2">
           <input
@@ -287,10 +384,6 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
             <Upload className="mr-1 h-4 w-4" />
             Excel ile Güncelle
           </Button>
-          <Button size="sm" onClick={openCreate} disabled={isPending}>
-            <Plus className="mr-1 h-4 w-4" />
-            Yeni Hedef Fiyat
-          </Button>
         </div>
       </div>
 
@@ -303,10 +396,15 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
                 {hg.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="cursor-pointer select-none"
+                    className="cursor-pointer select-none text-xs"
+                    style={{ width: header.getSize() }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
+                    <div className="flex items-center gap-1">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.column.getIsSorted() === "asc" && " ↑"}
+                      {header.column.getIsSorted() === "desc" && " ↓"}
+                    </div>
                   </TableHead>
                 ))}
               </TableRow>
@@ -316,18 +414,17 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Hedef fiyat bulunamadı
+                  Ürün bulunamadı
                 </TableCell>
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => openEdit(row.original)}
+                  className={row.original.has_target ? "" : "bg-gray-50/50"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="py-1.5">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -339,109 +436,6 @@ export function HedefFiyatlarClient({ data, productMap, allSkus }: Props) {
       </div>
 
       <SimplePagination table={table} />
-
-      {/* Edit/Create Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{editItem ? "Hedef Fiyat Düzenle" : "Yeni Hedef Fiyat"}</SheetTitle>
-          </SheetHeader>
-
-          <div className="mt-6 space-y-4">
-            {/* SKU Select */}
-            <div className="space-y-2">
-              <Label>SKU</Label>
-              {editItem ? (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono">{editItem.sku}</Badge>
-                  <span className="text-sm text-muted-foreground">{productMap[editItem.sku]}</span>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <Input
-                    placeholder="SKU ara..."
-                    value={skuSearch}
-                    onChange={(e) => setSkuSearch(e.target.value)}
-                  />
-                  {skuSearch && (
-                    <div className="max-h-40 overflow-y-auto rounded border bg-popover">
-                      {filteredSkus.slice(0, 20).map((sku) => (
-                        <button
-                          key={sku}
-                          type="button"
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted"
-                          onClick={() => {
-                            setFormSku(sku);
-                            setSkuSearch(sku);
-                          }}
-                        >
-                          <span className="font-mono">{sku}</span>
-                          <span className="text-muted-foreground">{productMap[sku]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {formSku && (
-                    <Badge variant="secondary" className="font-mono">{formSku}</Badge>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Price Fields */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Perakende Min</Label>
-                <Input
-                  type="number"
-                  value={formPerMin}
-                  onChange={(e) => setFormPerMin(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  +KDV: {(formPerMin * 1.1).toFixed(0)} ₺
-                </p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Perakende Standart</Label>
-                <Input
-                  type="number"
-                  value={formPerStd}
-                  onChange={(e) => setFormPerStd(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  +KDV: {(formPerStd * 1.1).toFixed(0)} ₺
-                </p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Toptan Min</Label>
-                <Input
-                  type="number"
-                  value={formTopMin}
-                  onChange={(e) => setFormTopMin(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  +KDV: {(formTopMin * 1.1).toFixed(0)} ₺
-                </p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Toptan Standart</Label>
-                <Input
-                  type="number"
-                  value={formTopStd}
-                  onChange={(e) => setFormTopStd(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  +KDV: {(formTopStd * 1.1).toFixed(0)} ₺
-                </p>
-              </div>
-            </div>
-
-            <Button onClick={handleSave} disabled={isPending} className="w-full">
-              {isPending ? "Kaydediliyor..." : "Kaydet"}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
     </>
   );
 }

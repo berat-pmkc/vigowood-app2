@@ -11,6 +11,13 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { X, Info } from "lucide-react";
 import { hesaplaSatir, karMarjiRenk } from "@/lib/pricingCalculator";
 import type { ShippingProvider } from "@/types/pricing";
 
@@ -24,8 +31,7 @@ export interface PricingRow {
   komisyon_orani: number;
   reklam_orani: number;
   kargo_maliyeti: number;
-  hedef_min: number;
-  hedef_std: number;
+  hedef_fiyat: number;
   desi: number;
   stopaj_orani: number;
   // Calculated fields (client-side)
@@ -35,16 +41,17 @@ export interface PricingRow {
   stopaj_tutari: number;
   reklam_bedeli: number;
   kar_marji: number;
-  oneri_fiyat_min: number;
-  oneri_fiyat_std: number;
+  oneri_fiyat: number;
 }
 
 interface PricingTableProps {
   initialRows: any[];
   defaultProvider: ShippingProvider | null;
   kdvOrani: number;
+  stopajOrani: number;
   onDirtyChange: (dirtyIds: Set<string>) => void;
   onRowsChange: (rows: PricingRow[]) => void;
+  onDeactivate?: (id: string) => void;
 }
 
 // Editable cell component
@@ -63,7 +70,7 @@ function EditableCell({
 
   const displayValue = isPercentage
     ? `%${(value * 100).toFixed(1)}`
-    : `₺${value.toFixed(2)}`;
+    : `₺${Math.round(value).toFixed(0)}`;
 
   useEffect(() => {
     if (editing && inputRef.current) {
@@ -74,7 +81,7 @@ function EditableCell({
 
   const handleStart = () => {
     setEditing(true);
-    setLocalValue(isPercentage ? (value * 100).toFixed(1) : value.toFixed(2));
+    setLocalValue(isPercentage ? (value * 100).toFixed(1) : Math.round(value).toString());
   };
 
   const handleCommit = () => {
@@ -96,7 +103,6 @@ function EditableCell({
         if (row) {
           const nextRow = e.shiftKey ? row.previousElementSibling : row.nextElementSibling;
           if (nextRow) {
-            // Find the same column's editable cell in next row
             const colIndex = Array.from(row.children).indexOf(parent!);
             const targetCell = nextRow.children[colIndex];
             const clickTarget = targetCell?.querySelector("[data-editable]") as HTMLElement;
@@ -115,7 +121,7 @@ function EditableCell({
       <Input
         ref={inputRef}
         type="number"
-        step={isPercentage ? "0.1" : "0.01"}
+        step={isPercentage ? "0.1" : "1"}
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onBlur={handleCommit}
@@ -145,8 +151,7 @@ function recalcRow(row: PricingRow, desiFiyatlari: Record<string, number> | null
     kdvOrani,
     desi: row.desi,
     desiFiyatlari,
-    hedefMin: row.hedef_min,
-    hedefStd: row.hedef_std,
+    hedefFiyat: row.hedef_fiyat,
   });
 
   return {
@@ -158,8 +163,7 @@ function recalcRow(row: PricingRow, desiFiyatlari: Record<string, number> | null
     reklam_bedeli: calc.reklamBedeli,
     kargo_maliyeti: calc.kargoMaliyeti,
     kar_marji: calc.karMarji,
-    oneri_fiyat_min: calc.oneriFiyatMin,
-    oneri_fiyat_std: calc.oneriFiyatStd,
+    oneri_fiyat: calc.oneriFiyat,
   };
 }
 
@@ -167,8 +171,10 @@ export function PricingTable({
   initialRows,
   defaultProvider,
   kdvOrani,
+  stopajOrani,
   onDirtyChange,
   onRowsChange,
+  onDeactivate,
 }: PricingTableProps) {
   const desiFiyatlari = defaultProvider?.desi_fiyatlari ?? null;
 
@@ -185,18 +191,16 @@ export function PricingTable({
           komisyon_orani: Number(r.komisyon_orani) || 0,
           reklam_orani: Number(r.reklam_orani) || 0,
           kargo_maliyeti: Number(r.kargo_maliyeti) || 0,
-          hedef_min: Number(r.hedef_min) || 0,
-          hedef_std: Number(r.hedef_std) || 0,
+          hedef_fiyat: Number(r.hedef_fiyat) || 0,
           desi: Number(r.desi) || 0,
-          stopaj_orani: Number(r.stopaj_orani) || 0.01,
+          stopaj_orani: Number(r.stopaj_orani) || stopajOrani,
           ham_fiyat: 0,
           komisyon_bedeli: 0,
           vergi_tutari: 0,
           stopaj_tutari: 0,
           reklam_bedeli: 0,
           kar_marji: 0,
-          oneri_fiyat_min: 0,
-          oneri_fiyat_std: 0,
+          oneri_fiyat: 0,
         },
         desiFiyatlari,
         kdvOrani
@@ -232,8 +236,44 @@ export function PricingTable({
     [desiFiyatlari, kdvOrani, onDirtyChange]
   );
 
+  // Expose method to bulk update reklam_orani
+  useEffect(() => {
+    // @ts-expect-error — exposing imperative method via ref-like pattern
+    if (typeof window !== "undefined") window.__pricingTableBulkReklam = (oran: number) => {
+      setRows((prev) =>
+        prev.map((r) => recalcRow({ ...r, reklam_orani: oran }, desiFiyatlari, kdvOrani))
+      );
+      setDirtyIds((prev) => {
+        const next = new Set(prev);
+        rows.forEach(r => next.add(r.id));
+        onDirtyChange(next);
+        return next;
+      });
+    };
+  }, [rows, desiFiyatlari, kdvOrani, onDirtyChange]);
+
   const columns = useMemo<ColumnDef<PricingRow, any>[]>(
     () => [
+      {
+        id: "actions",
+        header: "",
+        size: 32,
+        cell: ({ row }) => (
+          onDeactivate ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onDeactivate(row.original.id)}
+                  className="rounded p-0.5 text-muted-foreground/50 hover:text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Listeden kaldır (geri alınabilir)</TooltipContent>
+            </Tooltip>
+          ) : null
+        ),
+      },
       {
         accessorKey: "listing_kodu",
         header: "Listing Kodu",
@@ -252,8 +292,8 @@ export function PricingTable({
       },
       {
         accessorKey: "satis_fiyati",
-        header: "Satış Fiyatı ₺",
-        size: 110,
+        header: "Satış ₺",
+        size: 100,
         cell: ({ row }) => (
           <EditableCell
             value={row.original.satis_fiyati}
@@ -262,39 +302,29 @@ export function PricingTable({
         ),
       },
       {
-        accessorKey: "hedef_min",
-        header: "Hedef Min ₺",
+        accessorKey: "hedef_fiyat",
+        header: "Hedef ₺",
         size: 90,
         cell: ({ getValue }) => (
           <span className="text-xs text-muted-foreground">
-            {getValue<number>() > 0 ? `₺${getValue<number>().toFixed(2)}` : "—"}
-          </span>
-        ),
-      },
-      {
-        accessorKey: "hedef_std",
-        header: "Hedef Std ₺",
-        size: 90,
-        cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">
-            {getValue<number>() > 0 ? `₺${getValue<number>().toFixed(2)}` : "—"}
+            {getValue<number>() > 0 ? `₺${Math.round(getValue<number>()).toFixed(0)}` : "—"}
           </span>
         ),
       },
       {
         accessorKey: "ham_fiyat",
-        header: "Ham Fiyat ₺",
-        size: 100,
+        header: "Ham ₺",
+        size: 90,
         cell: ({ row }) => {
           const v = row.original.ham_fiyat;
           const cls = v >= 0 ? "text-green-700" : "text-red-700";
-          return <span className={`text-xs font-semibold ${cls}`}>₺{v.toFixed(2)}</span>;
+          return <span className={`text-xs font-semibold ${cls}`}>₺{Math.round(v).toFixed(0)}</span>;
         },
       },
       {
         accessorKey: "komisyon_orani",
-        header: "Komisyon %",
-        size: 90,
+        header: "Kom. %",
+        size: 80,
         cell: ({ row }) => (
           <EditableCell
             value={row.original.komisyon_orani}
@@ -306,39 +336,57 @@ export function PricingTable({
       {
         accessorKey: "komisyon_bedeli",
         header: "Kom. ₺",
-        size: 80,
+        size: 70,
         cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">₺{getValue<number>().toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground">₺{Math.round(getValue<number>()).toFixed(0)}</span>
         ),
       },
       {
         accessorKey: "kargo_maliyeti",
         header: "Kargo ₺",
-        size: 80,
+        size: 70,
         cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">₺{getValue<number>().toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground">₺{Math.round(getValue<number>()).toFixed(0)}</span>
         ),
       },
       {
         accessorKey: "vergi_tutari",
-        header: "Vergi ₺",
-        size: 80,
+        header: () => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 cursor-help">
+                Vergi ₺ <Info className="h-3 w-3 text-muted-foreground" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>%10 KDV (sabit)</TooltipContent>
+          </Tooltip>
+        ),
+        size: 70,
         cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">₺{getValue<number>().toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground">₺{Math.round(getValue<number>()).toFixed(0)}</span>
         ),
       },
       {
         accessorKey: "stopaj_tutari",
-        header: "Stopaj ₺",
-        size: 80,
+        header: () => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center gap-1 cursor-help">
+                Stopaj ₺ <Info className="h-3 w-3 text-muted-foreground" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>%{(stopajOrani * 100).toFixed(1)} stopaj</TooltipContent>
+          </Tooltip>
+        ),
+        size: 70,
         cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">₺{getValue<number>().toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground">₺{Math.round(getValue<number>()).toFixed(0)}</span>
         ),
       },
       {
         accessorKey: "reklam_orani",
         header: "Reklam %",
-        size: 90,
+        size: 80,
         cell: ({ row }) => (
           <EditableCell
             value={row.original.reklam_orani}
@@ -350,15 +398,15 @@ export function PricingTable({
       {
         accessorKey: "reklam_bedeli",
         header: "Rek. ₺",
-        size: 80,
+        size: 70,
         cell: ({ getValue }) => (
-          <span className="text-xs text-muted-foreground">₺{getValue<number>().toFixed(2)}</span>
+          <span className="text-xs text-muted-foreground">₺{Math.round(getValue<number>()).toFixed(0)}</span>
         ),
       },
       {
         accessorKey: "kar_marji",
-        header: "Kar Marjı %",
-        size: 100,
+        header: "Kar %",
+        size: 80,
         cell: ({ getValue }) => {
           const v = getValue<number>();
           return (
@@ -369,27 +417,17 @@ export function PricingTable({
         },
       },
       {
-        accessorKey: "oneri_fiyat_min",
-        header: "Öneri Min ₺",
-        size: 100,
+        accessorKey: "oneri_fiyat",
+        header: "Öneri ₺",
+        size: 80,
         cell: ({ getValue }) => (
           <span className="text-xs italic text-blue-600">
-            {getValue<number>() > 0 ? `₺${getValue<number>().toFixed(2)}` : "—"}
-          </span>
-        ),
-      },
-      {
-        accessorKey: "oneri_fiyat_std",
-        header: "Öneri Std ₺",
-        size: 100,
-        cell: ({ getValue }) => (
-          <span className="text-xs italic text-blue-600">
-            {getValue<number>() > 0 ? `₺${getValue<number>().toFixed(2)}` : "—"}
+            {getValue<number>() > 0 ? `₺${Math.round(getValue<number>()).toFixed(0)}` : "—"}
           </span>
         ),
       },
     ],
-    [updateCell]
+    [updateCell, stopajOrani, onDeactivate]
   );
 
   const table = useReactTable({

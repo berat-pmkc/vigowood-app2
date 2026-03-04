@@ -884,10 +884,8 @@ export type RecurringTaskData = z.infer<typeof recurringTaskSchema>;
 /** Hedef fiyat oluşturma/güncelleme */
 export const targetPriceSchema = z.object({
   sku: z.string().min(1, "SKU gereklidir"),
-  perakende_min: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
-  perakende_standart: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
-  toptan_min: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
-  toptan_standart: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  hedef_fiyat: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  toptan_hedef_fiyat: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
   aktif: z.boolean().optional(),
 });
 
@@ -911,3 +909,25 @@ export const shippingProviderSchema = z.object({
 });
 
 export type ShippingProviderData = z.infer<typeof shippingProviderSchema>;
+
+/** Kargo firması oluşturma */
+export const shippingProviderCreateSchema = z.object({
+  name: z.string().min(1, "Kargo firması adı gereklidir").max(200),
+  code: z.string().min(1, "Kargo firması kodu gereklidir").max(50),
+  desi_fiyatlari: z.record(z.string(), z.number().min(0)),
+  aktif: z.boolean().optional(),
+});
+
+export type ShippingProviderCreateData = z.infer<typeof shippingProviderCreateSchema>;
+
+/** Pazaryeri oluşturma */
+export const marketplaceCreateSchema = z.object({
+  code: z.string().min(1, "Pazaryeri kodu gereklidir").max(50),
+  name: z.string().min(1, "Pazaryeri adı gereklidir").max(200),
+  vergi_dahil: z.boolean(),
+  stopaj_orani: z.number().min(0).max(1),
+  hedef_fiyat_tipi: z.enum(["perakende", "toptan"]),
+  sira: z.number().int().min(0).optional(),
+});
+
+export type MarketplaceCreateData = z.infer<typeof marketplaceCreateSchema>;

@@ -1287,17 +1287,13 @@ export const VARSAYILAN_STOPAJ_ORANI = 0.01; // %1
 
 /** Hedef fiyat tipleri */
 export const HEDEF_FIYAT_TIPLERI = [
-  "perakende_min",
-  "perakende_standart",
-  "toptan_min",
-  "toptan_standart",
+  "perakende",
+  "toptan",
 ] as const;
 
 export const HEDEF_FIYAT_TIPI_LABELS: Record<string, string> = {
-  perakende_min: "Perakende Min",
-  perakende_standart: "Perakende Standart",
-  toptan_min: "Toptan Min",
-  toptan_standart: "Toptan Standart",
+  perakende: "Perakende",
+  toptan: "Toptan",
 };
 
 /** Pazaryeri kodları */

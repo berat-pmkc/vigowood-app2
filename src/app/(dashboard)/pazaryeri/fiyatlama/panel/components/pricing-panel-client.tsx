@@ -11,10 +11,37 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { Save, Download, Camera, Loader2 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandItem,
+  CommandGroup,
+} from "@/components/ui/command";
+import { Save, Download, Camera, Loader2, Plus, Megaphone, Pencil, Truck } from "lucide-react";
 import type { Marketplace, ShippingProvider } from "@/types/pricing";
-import { getListingsForMarketplace, updateListings, saveSnapshot } from "../../actions";
+import {
+  getListingsForMarketplace,
+  updateListings,
+  saveSnapshot,
+  createListing,
+  deactivateListing,
+  bulkUpdateReklamOrani,
+  updateMarketplaceStopaj,
+} from "../../actions";
 import { MarketplaceTabs } from "./marketplace-tabs";
 import { PricingSummaryCards } from "./pricing-summary-cards";
 import { PricingTable, type PricingRow } from "./pricing-table";
@@ -23,9 +50,10 @@ const KDV_ORANI = 0.10; // System-wide default
 
 interface Props {
   marketplaces: Marketplace[];
+  allProducts: Array<{ sku: string; urun_adi: string | null }>;
 }
 
-export function PricingPanelClient({ marketplaces }: Props) {
+export function PricingPanelClient({ marketplaces, allProducts }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialMp = searchParams.get("marketplace") ?? marketplaces[0]?.code ?? null;
@@ -40,6 +68,15 @@ export function PricingPanelClient({ marketplaces }: Props) {
   const [isPending, startTransition] = useTransition();
   const [snapshotOpen, setSnapshotOpen] = useState(false);
   const [snapshotDonem, setSnapshotDonem] = useState("");
+  const [addListingOpen, setAddListingOpen] = useState(false);
+  const [newListingSku, setNewListingSku] = useState("");
+  const [newListingKodu, setNewListingKodu] = useState("");
+  const [newListingBarkod, setNewListingBarkod] = useState("");
+  const [bulkReklamOpen, setBulkReklamOpen] = useState(false);
+  const [bulkReklamValue, setBulkReklamValue] = useState("");
+  const [stopajEditOpen, setStopajEditOpen] = useState(false);
+  const [stopajValue, setStopajValue] = useState("");
+  const [deactivateConfirmId, setDeactivateConfirmId] = useState<string | null>(null);
   const tableKeyRef = useRef(0);
 
   const selectedMp = marketplaces.find((m) => m.code === selectedCode) ?? null;
@@ -106,10 +143,9 @@ export function PricingPanelClient({ marketplaces }: Props) {
           reklam_orani: r.reklam_orani,
           ham_fiyat: r.ham_fiyat,
           kar_marji: r.kar_marji,
-          oneri_fiyat_min: r.oneri_fiyat_min,
-          oneri_fiyat_std: r.oneri_fiyat_std,
+          oneri_fiyat: r.oneri_fiyat,
           kargo_maliyeti: r.kargo_maliyeti,
-          hedef_fiyat_kullanilan: r.hedef_std || r.hedef_min,
+          hedef_fiyat_kullanilan: r.hedef_fiyat,
         }));
 
       const result = await updateListings(updates);
@@ -122,6 +158,95 @@ export function PricingPanelClient({ marketplaces }: Props) {
     });
   };
 
+  // Add listing handler
+  const handleAddListing = async () => {
+    if (!marketplace || !newListingSku || !newListingKodu) return;
+
+    startTransition(async () => {
+      const product = allProducts.find(p => p.sku === newListingSku);
+      const result = await createListing({
+        marketplace_id: marketplace.id,
+        sku: newListingSku,
+        listing_kodu: newListingKodu,
+        barkod: newListingBarkod || undefined,
+        urun_adi: product?.urun_adi || undefined,
+      });
+
+      if (result.success) {
+        toast.success("Listing eklendi");
+        setAddListingOpen(false);
+        setNewListingSku("");
+        setNewListingKodu("");
+        setNewListingBarkod("");
+        loadListings(selectedCode!);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  // Deactivate listing handler
+  const handleDeactivate = async (id: string) => {
+    setDeactivateConfirmId(id);
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deactivateConfirmId) return;
+    startTransition(async () => {
+      const result = await deactivateListing(deactivateConfirmId);
+      if (result.success) {
+        toast.success("Listing listeden kaldırıldı");
+        setDeactivateConfirmId(null);
+        loadListings(selectedCode!);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  // Bulk reklam handler
+  const handleBulkReklam = async () => {
+    if (!marketplace) return;
+    const oran = parseFloat(bulkReklamValue);
+    if (isNaN(oran) || oran < 0 || oran > 100) {
+      toast.error("Geçerli bir yüzde girin (0-100)");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await bulkUpdateReklamOrani(marketplace.id, oran / 100);
+      if (result.success) {
+        toast.success(`Tüm ürünlere %${oran} reklam oranı uygulandı`);
+        setBulkReklamOpen(false);
+        setBulkReklamValue("");
+        loadListings(selectedCode!);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  // Stopaj update handler
+  const handleStopajUpdate = async () => {
+    if (!marketplace) return;
+    const oran = parseFloat(stopajValue);
+    if (isNaN(oran) || oran < 0 || oran > 100) {
+      toast.error("Geçerli bir yüzde girin (0-100)");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateMarketplaceStopaj(marketplace.id, oran / 100);
+      if (result.success) {
+        toast.success(`Stopaj oranı %${oran} olarak güncellendi`);
+        setStopajEditOpen(false);
+        loadListings(selectedCode!);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
   // Excel export
   const handleExcelExport = () => {
     if (rows.length === 0) {
@@ -130,46 +255,30 @@ export function PricingPanelClient({ marketplaces }: Props) {
     }
 
     const headers = [
-      "Listing Kodu",
-      "SKU",
-      "Satış Fiyatı",
-      "Hedef Min",
-      "Hedef Std",
-      "Ham Fiyat",
-      "Komisyon %",
-      "Komisyon ₺",
-      "Kargo ₺",
-      "Vergi ₺",
-      "Stopaj ₺",
-      "Reklam %",
-      "Reklam ₺",
-      "Kar Marjı %",
-      "Öneri Min",
-      "Öneri Std",
+      "Listing Kodu", "SKU", "Satış Fiyatı", "Hedef Fiyat",
+      "Ham Fiyat", "Komisyon %", "Komisyon ₺", "Kargo ₺",
+      "Vergi ₺", "Stopaj ₺", "Reklam %", "Reklam ₺",
+      "Kar Marjı %", "Öneri Fiyat",
     ];
 
     const csvRows = rows.map((r) =>
       [
-        r.listing_kodu,
-        r.sku,
-        r.satis_fiyati.toFixed(2),
-        r.hedef_min.toFixed(2),
-        r.hedef_std.toFixed(2),
-        r.ham_fiyat.toFixed(2),
+        r.listing_kodu, r.sku,
+        Math.round(r.satis_fiyati).toFixed(0),
+        Math.round(r.hedef_fiyat).toFixed(0),
+        Math.round(r.ham_fiyat).toFixed(0),
         (r.komisyon_orani * 100).toFixed(1),
-        r.komisyon_bedeli.toFixed(2),
-        r.kargo_maliyeti.toFixed(2),
-        r.vergi_tutari.toFixed(2),
-        r.stopaj_tutari.toFixed(2),
+        Math.round(r.komisyon_bedeli).toFixed(0),
+        Math.round(r.kargo_maliyeti).toFixed(0),
+        Math.round(r.vergi_tutari).toFixed(0),
+        Math.round(r.stopaj_tutari).toFixed(0),
         (r.reklam_orani * 100).toFixed(1),
-        r.reklam_bedeli.toFixed(2),
+        Math.round(r.reklam_bedeli).toFixed(0),
         (r.kar_marji * 100).toFixed(1),
-        r.oneri_fiyat_min.toFixed(2),
-        r.oneri_fiyat_std.toFixed(2),
+        Math.round(r.oneri_fiyat).toFixed(0),
       ].join("\t")
     );
 
-    // BOM for Excel UTF-8
     const bom = "\uFEFF";
     const content = bom + headers.join("\t") + "\n" + csvRows.join("\n");
     const blob = new Blob([content], { type: "text/tab-separated-values;charset=utf-8" });
@@ -198,6 +307,9 @@ export function PricingPanelClient({ marketplaces }: Props) {
     });
   };
 
+  // SKUs already in this marketplace (for filtering "Ürün Ekle" combobox)
+  const existingSkus = new Set(rawListings.map((l: any) => l.sku));
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -209,6 +321,49 @@ export function PricingPanelClient({ marketplaces }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {marketplace && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setAddListingOpen(true)}
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Ürün Ekle
+              </Button>
+              <Popover open={bulkReklamOpen} onOpenChange={setBulkReklamOpen}>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Megaphone className="mr-1.5 h-3.5 w-3.5" />
+                    Toplu Reklam %
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64" align="end">
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Toplu Reklam Oranı</p>
+                    <p className="text-xs text-muted-foreground">
+                      Tüm aktif ürünlere uygulanır
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        placeholder="%"
+                        value={bulkReklamValue}
+                        onChange={(e) => setBulkReklamValue(e.target.value)}
+                        className="h-8"
+                      />
+                      <Button size="sm" onClick={handleBulkReklam} disabled={isPending}>
+                        Uygula
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -222,9 +377,7 @@ export function PricingPanelClient({ marketplaces }: Props) {
             size="sm"
             variant="outline"
             onClick={() => {
-              setSnapshotDonem(
-                new Date().toISOString().slice(0, 7) // YYYY-MM default
-              );
+              setSnapshotDonem(new Date().toISOString().slice(0, 7));
               setSnapshotOpen(true);
             }}
             disabled={rows.length === 0}
@@ -232,18 +385,29 @@ export function PricingPanelClient({ marketplaces }: Props) {
             <Camera className="mr-1.5 h-3.5 w-3.5" />
             Snapshot
           </Button>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={dirtyIds.size === 0 || isPending}
-          >
-            {isPending ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Save className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            Kaydet ({dirtyIds.size})
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={dirtyIds.size === 0 || isPending}
+                >
+                  {isPending ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  Kaydet ({dirtyIds.size})
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {dirtyIds.size === 0
+                ? "Değişiklik yok"
+                : "Değiştirilen satış fiyatı, komisyon ve reklam oranlarını veritabanına kaydeder."}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -253,6 +417,48 @@ export function PricingPanelClient({ marketplaces }: Props) {
         selected={selectedCode}
         onSelect={handleSelectMarketplace}
       />
+
+      {/* Info bar: Kargo + Stopaj */}
+      {marketplace && defaultProvider && (
+        <div className="flex items-center gap-3 rounded-md border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Truck className="h-3.5 w-3.5" />
+            Kargo: <strong>{defaultProvider.name}</strong>
+          </span>
+          <span className="text-border">|</span>
+          <Popover open={stopajEditOpen} onOpenChange={(open) => {
+            setStopajEditOpen(open);
+            if (open) setStopajValue(((marketplace.stopaj_orani ?? 0.01) * 100).toFixed(1));
+          }}>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-1 hover:text-foreground transition-colors">
+                Stopaj: <strong>%{((marketplace.stopaj_orani ?? 0.01) * 100).toFixed(1)}</strong>
+                <Pencil className="h-3 w-3" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56" align="start">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Stopaj Oranı</p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={stopajValue}
+                    onChange={(e) => setStopajValue(e.target.value)}
+                    className="h-8"
+                  />
+                  <span className="text-sm">%</span>
+                  <Button size="sm" onClick={handleStopajUpdate} disabled={isPending}>
+                    Kaydet
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
 
       {/* Loading state */}
       {loading && (
@@ -271,8 +477,10 @@ export function PricingPanelClient({ marketplaces }: Props) {
             initialRows={rawListings}
             defaultProvider={defaultProvider}
             kdvOrani={KDV_ORANI}
+            stopajOrani={marketplace?.stopaj_orani ?? 0.01}
             onDirtyChange={setDirtyIds}
             onRowsChange={setRows}
+            onDeactivate={handleDeactivate}
           />
         </>
       )}
@@ -283,8 +491,16 @@ export function PricingPanelClient({ marketplaces }: Props) {
             <strong>{marketplace.name}</strong> pazaryerinde aktif listing bulunamadı.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Önce listing ekleyin veya mevcut listing&apos;leri aktifleştirin.
+            &quot;Ürün Ekle&quot; butonu ile listing ekleyin.
           </p>
+          <Button
+            className="mt-3"
+            size="sm"
+            onClick={() => setAddListingOpen(true)}
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Ürün Ekle
+          </Button>
         </div>
       )}
 
@@ -293,6 +509,100 @@ export function PricingPanelClient({ marketplaces }: Props) {
           <p className="text-muted-foreground">Başlamak için bir pazaryeri seçin.</p>
         </div>
       )}
+
+      {/* Add Listing Dialog */}
+      <Dialog open={addListingOpen} onOpenChange={setAddListingOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ürün Ekle — {marketplace?.name}</DialogTitle>
+            <DialogDescription>
+              Bu pazaryerine yeni bir listing ekleyin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium">SKU</label>
+              <Command className="rounded-lg border mt-1">
+                <CommandInput placeholder="SKU ara..." />
+                <CommandList className="max-h-40">
+                  <CommandEmpty>SKU bulunamadı</CommandEmpty>
+                  <CommandGroup>
+                    {allProducts
+                      .filter(p => !existingSkus.has(p.sku))
+                      .map(p => (
+                        <CommandItem
+                          key={p.sku}
+                          value={p.sku}
+                          onSelect={() => setNewListingSku(p.sku)}
+                          className={newListingSku === p.sku ? "bg-accent" : ""}
+                        >
+                          <span className="font-mono text-xs">{p.sku}</span>
+                          <span className="ml-2 text-xs text-muted-foreground truncate">
+                            {p.urun_adi}
+                          </span>
+                        </CommandItem>
+                      ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+              {newListingSku && (
+                <p className="mt-1 text-xs text-green-600">Seçili: {newListingSku}</p>
+              )}
+            </div>
+            <div>
+              <label className="text-sm font-medium">Listing Kodu</label>
+              <Input
+                placeholder="ör. TRN-001"
+                value={newListingKodu}
+                onChange={(e) => setNewListingKodu(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Barkod (opsiyonel)</label>
+              <Input
+                placeholder="Barkod"
+                value={newListingBarkod}
+                onChange={(e) => setNewListingBarkod(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddListingOpen(false)}>
+              İptal
+            </Button>
+            <Button
+              onClick={handleAddListing}
+              disabled={!newListingSku || !newListingKodu || isPending}
+            >
+              {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Ekle
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivate Confirm Dialog */}
+      <Dialog open={!!deactivateConfirmId} onOpenChange={(open) => !open && setDeactivateConfirmId(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Listeden Kaldır</DialogTitle>
+            <DialogDescription>
+              Bu listing pasife alınacak. Daha sonra geri alınabilir.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeactivateConfirmId(null)}>
+              İptal
+            </Button>
+            <Button variant="destructive" onClick={confirmDeactivate} disabled={isPending}>
+              {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Kaldır
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Snapshot Dialog */}
       <Dialog open={snapshotOpen} onOpenChange={setSnapshotOpen}>

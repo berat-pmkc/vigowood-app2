@@ -29,6 +29,7 @@ export function hesaplaHamFiyat(
 /**
  * ÖNERİ FİYAT hesaplama (tersten hesap)
  * Öneri = (Hedef + Kargo + Özel) / (1 - Komisyon - Vergi - Stopaj - Reklam)
+ * Sonuç tam sayıya yuvarlanır (#11)
  */
 export function hesaplaOneriFiyat(
   hedefFiyat: number,
@@ -43,7 +44,7 @@ export function hesaplaOneriFiyat(
   const payda = 1 - komisyonOrani - vergiOrani - stopajOrani - reklamOrani;
   if (payda <= 0) return 0; // Impossible margin — prevent division by zero/negative
   const oneri = (hedefFiyat + kargo + ozelMaliyetler) / payda;
-  return Math.round(oneri * 100) / 100;
+  return Math.round(oneri);
 }
 
 /**
@@ -92,8 +93,7 @@ export interface PricingRowCalc {
   reklamBedeli: number;
   kargoMaliyeti: number;
   karMarji: number;
-  oneriFiyatMin: number;
-  oneriFiyatStd: number;
+  oneriFiyat: number;
 }
 
 export function hesaplaSatir(params: {
@@ -104,8 +104,7 @@ export function hesaplaSatir(params: {
   kdvOrani: number;
   desi: number;
   desiFiyatlari: Record<string, number> | null;
-  hedefMin: number;
-  hedefStd: number;
+  hedefFiyat: number;
   ozelMaliyetler?: number;
 }): PricingRowCalc {
   const {
@@ -116,8 +115,7 @@ export function hesaplaSatir(params: {
     kdvOrani,
     desi,
     desiFiyatlari,
-    hedefMin,
-    hedefStd,
+    hedefFiyat,
     ozelMaliyetler = 0,
   } = params;
 
@@ -139,21 +137,10 @@ export function hesaplaSatir(params: {
   const stopajTutari = Math.round(satisFiyati * stopajOrani * 100) / 100;
   const reklamBedeli = Math.round(satisFiyati * reklamOrani * 100) / 100;
 
-  // Kar marjı: hedefStd'ye göre (standart hedef)
-  const karMarji = hesaplaKarMarji(hamFiyat, hedefStd > 0 ? hedefStd : hedefMin);
+  const karMarji = hesaplaKarMarji(hamFiyat, hedefFiyat);
 
-  const oneriFiyatMin = hesaplaOneriFiyat(
-    hedefMin,
-    komisyonOrani,
-    reklamOrani,
-    stopajOrani,
-    kdvOrani,
-    kargoMaliyeti,
-    ozelMaliyetler
-  );
-
-  const oneriFiyatStd = hesaplaOneriFiyat(
-    hedefStd,
+  const oneriFiyat = hesaplaOneriFiyat(
+    hedefFiyat,
     komisyonOrani,
     reklamOrani,
     stopajOrani,
@@ -170,8 +157,7 @@ export function hesaplaSatir(params: {
     reklamBedeli,
     kargoMaliyeti,
     karMarji,
-    oneriFiyatMin,
-    oneriFiyatStd,
+    oneriFiyat,
   };
 }
 
