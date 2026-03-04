@@ -48,12 +48,12 @@ export default async function FiyatlamaPage() {
       color: "text-emerald-600 bg-emerald-100",
     },
     {
-      title: "Aktif Listingler",
-      description: "Pazaryerlerindeki aktif ürün listingleri",
-      href: "/pazaryeri/fiyatlama",
+      title: "Fiyatlama Paneli",
+      description: "Pazaryeri bazlı fiyat düzenle, kar marjı analiz et",
+      href: "/pazaryeri/fiyatlama/panel",
       icon: Package,
       count: listingCount ?? 0,
-      label: "listing",
+      label: "aktif listing",
       color: "text-purple-600 bg-purple-100",
     },
   ];

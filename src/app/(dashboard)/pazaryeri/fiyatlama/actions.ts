@@ -303,3 +303,188 @@ export async function updateMarketplaceShipping(
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
+
+// =============================================
+// Fiyatlama Paneli — Pazaryeri & Listing İşlemleri
+// =============================================
+
+export async function getMarketplaces() {
+  await requireMarketplaceAccess();
+  const supabase = await getDb();
+
+  const { data, error } = await supabase
+    .from("marketplaces")
+    .select("*")
+    .eq("aktif", true)
+    .order("sira", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as import("@/types/pricing").Marketplace[];
+}
+
+export async function getListingsForMarketplace(marketplaceId: string) {
+  await requireMarketplaceAccess();
+  const supabase = await getDb();
+
+  // 1. Get marketplace info (for stopaj_orani, hedef_fiyat_tipi)
+  const { data: mp } = await supabase
+    .from("marketplaces")
+    .select("*")
+    .eq("id", marketplaceId)
+    .single();
+
+  if (!mp) throw new Error("Pazaryeri bulunamadı");
+
+  // 2. Get default shipping provider for this marketplace
+  const { data: msData } = await supabase
+    .from("marketplace_shipping")
+    .select("shipping_provider_id")
+    .eq("marketplace_id", marketplaceId)
+    .eq("varsayilan", true)
+    .single();
+
+  let defaultProvider: import("@/types/pricing").ShippingProvider | null = null;
+  if (msData?.shipping_provider_id) {
+    const { data: sp } = await supabase
+      .from("shipping_providers")
+      .select("*")
+      .eq("id", msData.shipping_provider_id)
+      .single();
+    defaultProvider = sp;
+  }
+
+  // 3. Get listings
+  const { data: listings, error } = await supabase
+    .from("marketplace_listings")
+    .select("*")
+    .eq("marketplace_id", marketplaceId)
+    .eq("aktif", true)
+    .order("listing_kodu", { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  const skus = (listings ?? []).map((l: any) => l.sku).filter(Boolean);
+
+  // 4. Batch fetch target prices + box dimensions for all SKUs
+  let targetPrices: Record<string, any> = {};
+  let boxDimensions: Record<string, any> = {};
+
+  if (skus.length > 0) {
+    const [tpResult, bdResult] = await Promise.all([
+      supabase.from("product_target_prices").select("*").in("sku", skus),
+      supabase.from("product_box_dimensions").select("*").in("sku", skus),
+    ]);
+    for (const tp of tpResult.data ?? []) targetPrices[tp.sku] = tp;
+    for (const bd of bdResult.data ?? []) boxDimensions[bd.sku] = bd;
+  }
+
+  // 5. Enrich listings with joined data
+  const enriched = (listings ?? []).map((listing: any) => {
+    const tp = targetPrices[listing.sku] ?? null;
+    const bd = boxDimensions[listing.sku] ?? null;
+
+    // Determine which target price to use based on marketplace's hedef_fiyat_tipi
+    const tipi = mp.hedef_fiyat_tipi ?? "perakende_min";
+    const hedefMin = tp ? (tp[tipi] ?? tp.perakende_min ?? 0) : 0;
+    // Std is always the "standart" variant of the same tier
+    const stdTipi = tipi.replace("_min", "_standart").replace("toptan_standart", "toptan_standart");
+    const hedefStd = tp
+      ? (tipi.includes("min")
+        ? (tp[tipi.replace("_min", "_standart")] ?? 0)
+        : (tp[tipi] ?? 0))
+      : 0;
+
+    return {
+      ...listing,
+      hedef_min: hedefMin,
+      hedef_std: hedefStd,
+      desi: bd?.desi ?? 0,
+      stopaj_orani: mp.stopaj_orani ?? 0.01,
+    };
+  });
+
+  return {
+    marketplace: mp as import("@/types/pricing").Marketplace,
+    listings: enriched,
+    defaultProvider,
+  };
+}
+
+export async function updateListings(
+  updates: Array<{
+    id: string;
+    satis_fiyati?: number;
+    komisyon_orani?: number;
+    reklam_orani?: number;
+    ham_fiyat?: number;
+    kar_marji?: number;
+    oneri_fiyat_min?: number;
+    oneri_fiyat_std?: number;
+    kargo_maliyeti?: number;
+    hedef_fiyat_kullanilan?: number;
+  }>
+): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    // Update each listing individually (Supabase doesn't support batch update by different IDs)
+    for (const u of updates) {
+      const { id, ...fields } = u;
+      const { error } = await supabase
+        .from("marketplace_listings")
+        .update(fields)
+        .eq("id", id);
+      if (error) return { success: false, error: `${id}: ${error.message}` };
+    }
+
+    revalidatePath("/pazaryeri/fiyatlama/panel");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function saveSnapshot(
+  donemKodu: string,
+  marketplaceId: string
+): Promise<ActionResult> {
+  try {
+    const user = await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    // Get all active listings for this marketplace
+    const { data: listings, error: fetchError } = await supabase
+      .from("marketplace_listings")
+      .select("*")
+      .eq("marketplace_id", marketplaceId)
+      .eq("aktif", true);
+
+    if (fetchError) return { success: false, error: fetchError.message };
+    if (!listings || listings.length === 0) {
+      return { success: false, error: "Kayıt edilecek listing bulunamadı" };
+    }
+
+    const snapshots = listings.map((l: any) => ({
+      donem_kodu: donemKodu,
+      marketplace_id: marketplaceId,
+      sku: l.sku,
+      listing_kodu: l.listing_kodu,
+      satis_fiyati: l.satis_fiyati,
+      komisyon_orani: l.komisyon_orani,
+      reklam_orani: l.reklam_orani,
+      kargo_maliyeti: l.kargo_maliyeti,
+      ham_fiyat: l.ham_fiyat,
+      kar_marji: l.kar_marji,
+      hedef_fiyat: l.hedef_fiyat_kullanilan,
+      created_by: user.user_id,
+    }));
+
+    const { error } = await supabase.from("pricing_snapshots").insert(snapshots);
+    if (error) return { success: false, error: error.message };
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
