@@ -40,7 +40,8 @@ export default async function UrunlerPage({ searchParams }: PageProps) {
 
   const validSortColumns: (keyof Product)[] = [
     "sku", "urun_adi", "kategori", "aktif_mi", "stok_aktif",
-    "gunluk_satis", "aylik_uretim",
+    "gunluk_satis", "aylik_uretim", "kutu_boy_cm", "kutu_en_cm",
+    "kutu_yukseklik_cm", "urun_agirlik_kg", "desi",
   ];
   const sortColumn = validSortColumns.includes(sortBy as keyof Product)
     ? sortBy

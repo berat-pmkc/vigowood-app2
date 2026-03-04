@@ -169,6 +169,90 @@ export function getProductColumns({
       size: 110,
     },
     {
+      accessorKey: "kutu_boy_cm",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          column={column}
+          title="Boy (cm)"
+          onSort={onSort}
+          className="justify-end"
+        />
+      ),
+      cell: ({ row }) => {
+        const val = row.getValue("kutu_boy_cm") as number | null;
+        return (
+          <div className="text-right font-mono text-sm">
+            {val != null ? formatNumber(val) : "—"}
+          </div>
+        );
+      },
+      meta: { className: "hidden lg:table-cell" },
+      size: 80,
+    },
+    {
+      accessorKey: "kutu_en_cm",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          column={column}
+          title="En (cm)"
+          onSort={onSort}
+          className="justify-end"
+        />
+      ),
+      cell: ({ row }) => {
+        const val = row.getValue("kutu_en_cm") as number | null;
+        return (
+          <div className="text-right font-mono text-sm">
+            {val != null ? formatNumber(val) : "—"}
+          </div>
+        );
+      },
+      meta: { className: "hidden lg:table-cell" },
+      size: 80,
+    },
+    {
+      accessorKey: "kutu_yukseklik_cm",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          column={column}
+          title="Yükseklik (cm)"
+          onSort={onSort}
+          className="justify-end"
+        />
+      ),
+      cell: ({ row }) => {
+        const val = row.getValue("kutu_yukseklik_cm") as number | null;
+        return (
+          <div className="text-right font-mono text-sm">
+            {val != null ? formatNumber(val) : "—"}
+          </div>
+        );
+      },
+      meta: { className: "hidden lg:table-cell" },
+      size: 100,
+    },
+    {
+      accessorKey: "urun_agirlik_kg",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          column={column}
+          title="Ağırlık (kg)"
+          onSort={onSort}
+          className="justify-end"
+        />
+      ),
+      cell: ({ row }) => {
+        const val = row.getValue("urun_agirlik_kg") as number | null;
+        return (
+          <div className="text-right font-mono text-sm">
+            {val != null ? val.toFixed(2) : "—"}
+          </div>
+        );
+      },
+      meta: { className: "hidden lg:table-cell" },
+      size: 90,
+    },
+    {
       accessorKey: "desi",
       header: ({ column }) => (
         <DataTableColumnHeader
@@ -186,7 +270,7 @@ export function getProductColumns({
           </div>
         );
       },
-      meta: { className: "hidden xl:table-cell" },
+      meta: { className: "hidden lg:table-cell" },
       size: 80,
     },
     {
