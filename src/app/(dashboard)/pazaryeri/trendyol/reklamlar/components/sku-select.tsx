@@ -21,16 +21,15 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { updateAdSkuMapping } from "../actions";
 
-interface Product {
-  urun_id: string;
-  urun_adi: string;
+export interface SkuProduct {
   sku: string;
+  urun_adi: string;
 }
 
 interface Props {
   adName: string;
   selectedIds: string[];
-  products: Product[];
+  products: SkuProduct[];
 }
 
 export function SkuSelect({ adName, selectedIds: initialIds, products }: Props) {
@@ -95,22 +94,22 @@ export function SkuSelect({ adName, selectedIds: initialIds, products }: Props) 
     [adName, selected]
   );
 
-  const selectedProducts = selected
-    .map((id) => products.find((p) => p.urun_id === id))
-    .filter(Boolean) as Product[];
+  const selectedSkuProducts = selected
+    .map((id) => products.find((p) => p.sku === id))
+    .filter(Boolean) as SkuProduct[];
 
   return (
     <div className="flex items-center gap-1">
       {/* Selected badges */}
-      {selectedProducts.map((p) => (
+      {selectedSkuProducts.map((p) => (
         <Badge
-          key={p.urun_id}
+          key={p.sku}
           variant="secondary"
           className="max-w-[90px] gap-0.5 truncate text-[10px]"
         >
-          <span className="truncate">{p.sku || p.urun_id}</span>
+          <span className="truncate">{p.sku}</span>
           <button
-            onClick={() => handleRemove(p.urun_id)}
+            onClick={() => handleRemove(p.sku)}
             className="ml-0.5 rounded-full hover:bg-muted-foreground/20"
             disabled={saving}
           >
@@ -140,19 +139,19 @@ export function SkuSelect({ adName, selectedIds: initialIds, products }: Props) 
                 <CommandGroup>
                   {products.map((p) => (
                     <CommandItem
-                      key={p.urun_id}
+                      key={p.sku}
                       value={`${p.sku} ${p.urun_adi}`}
-                      onSelect={() => handleSelect(p.urun_id)}
+                      onSelect={() => handleSelect(p.sku)}
                     >
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          selected.includes(p.urun_id) ? "opacity-100" : "opacity-0"
+                          selected.includes(p.sku) ? "opacity-100" : "opacity-0"
                         )}
                       />
                       <div className="flex-1 min-w-0">
                         <span className="block truncate text-xs font-medium">
-                          {p.sku || p.urun_id}
+                          {p.sku}
                         </span>
                         <span className="block truncate text-[10px] text-muted-foreground">
                           {p.urun_adi}

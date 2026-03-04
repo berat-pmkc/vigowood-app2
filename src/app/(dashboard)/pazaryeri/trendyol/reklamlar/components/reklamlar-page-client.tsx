@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { UploadDialog } from "./upload-dialog";
-import { SkuSelect } from "./sku-select";
+import { SkuSelect, type SkuProduct } from "./sku-select";
 import { FilterBar, type MetricKey } from "./filter-bar";
 import { KpiCards } from "./kpi-cards";
 
@@ -65,11 +65,6 @@ interface WeeklyRow {
   actual_cpc: number;
 }
 
-interface Product {
-  sku: string;
-  urun_adi: string;
-}
-
 interface SnapshotDate {
   date: string;
   uploaded_by: string;
@@ -83,7 +78,7 @@ interface Props {
   initialTo: string;
   initialMetric: MetricKey;
   skuMap: Record<string, string[]>;
-  products: Product[];
+  products: SkuProduct[];
   snapshotDates: SnapshotDate[];
 }
 
