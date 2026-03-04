@@ -593,6 +593,12 @@ Oturumlar arası hafıza. Önceki oturumlardan context yükler.
 - [x] Mevcut veriler: İkas channel default, sku_mappings'den master_sku otomatik eşleşme
 - [x] Indexler: channel, master_sku, match_status
 
+### Fiyatlama Paneli (Faz 1-4) ✅
+- [x] Faz 1: DB (7 tablo: marketplaces, shipping_providers, marketplace_shipping, product_target_prices, product_box_dimensions, marketplace_listings, pricing_snapshots) + seed + types + constants
+- [x] Faz 2: Yönetim sayfaları (hedef-fiyatlar, kutu-boyutlari, kargo, panel) + inline editing + snapshot
+- [x] Faz 3: Hesaplama motoru (pricingCalculator.ts), KPI kartları, Excel export
+- [x] Faz 4: Geçmiş takibi (/pazaryeri/fiyatlama/gecmis + [donemKodu] detay) + Pazaryerleri arası karşılaştırma (/pazaryeri/fiyatlama/karsilastirma)
+
 ### KATMAN 29: Test & Güvenlik Denetimi ✅
 - [x] Güvenlik: 38/38 server action + 9/9 API route auth guard doğrulandı
 - [x] Güvenlik: admin.ts'e `import "server-only"` eklendi

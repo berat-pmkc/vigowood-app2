@@ -445,6 +445,174 @@ export async function updateListings(
   }
 }
 
+// =============================================
+// Snapshot Geçmişi & Karşılaştırma
+// =============================================
+
+export interface SnapshotPeriodSummary {
+  donem_kodu: string;
+  marketplace_count: number;
+  listing_count: number;
+  avg_kar_marji: number;
+  created_at: string;
+  created_by: string | null;
+}
+
+export async function getSnapshotPeriods(): Promise<SnapshotPeriodSummary[]> {
+  await requireMarketplaceAccess();
+  const supabase = await getDb();
+
+  // Get all distinct periods with aggregated info
+  const { data, error } = await supabase
+    .from("pricing_snapshots")
+    .select("donem_kodu, marketplace_id, kar_marji, created_at, created_by");
+
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) return [];
+
+  // Group by donem_kodu
+  const grouped: Record<string, { marketplaces: Set<string>; count: number; totalMarj: number; marjCount: number; created_at: string; created_by: string | null }> = {};
+
+  for (const row of data) {
+    const dk = row.donem_kodu;
+    if (!grouped[dk]) {
+      grouped[dk] = { marketplaces: new Set(), count: 0, totalMarj: 0, marjCount: 0, created_at: row.created_at, created_by: row.created_by };
+    }
+    grouped[dk].marketplaces.add(row.marketplace_id);
+    grouped[dk].count++;
+    if (row.kar_marji != null) {
+      grouped[dk].totalMarj += Number(row.kar_marji);
+      grouped[dk].marjCount++;
+    }
+    // Keep the latest created_at
+    if (row.created_at > grouped[dk].created_at) {
+      grouped[dk].created_at = row.created_at;
+    }
+  }
+
+  return Object.entries(grouped)
+    .map(([donem_kodu, g]) => ({
+      donem_kodu,
+      marketplace_count: g.marketplaces.size,
+      listing_count: g.count,
+      avg_kar_marji: g.marjCount > 0 ? g.totalMarj / g.marjCount : 0,
+      created_at: g.created_at,
+      created_by: g.created_by,
+    }))
+    .sort((a, b) => b.donem_kodu.localeCompare(a.donem_kodu));
+}
+
+export async function getSnapshotsByPeriod(donemKodu: string) {
+  await requireMarketplaceAccess();
+  const supabase = await getDb();
+
+  // 1. Get snapshots for period
+  const { data: snapshots, error } = await supabase
+    .from("pricing_snapshots")
+    .select("*")
+    .eq("donem_kodu", donemKodu)
+    .order("listing_kodu", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  if (!snapshots || snapshots.length === 0) return { snapshots: [], marketplaces: [], currentListings: {} };
+
+  // 2. Get marketplace info
+  const mpIds = [...new Set(snapshots.map((s: any) => s.marketplace_id))];
+  const { data: mps } = await supabase
+    .from("marketplaces")
+    .select("*")
+    .in("id", mpIds)
+    .order("sira", { ascending: true });
+
+  // 3. Get current listings for comparison
+  const skus = [...new Set(snapshots.map((s: any) => s.sku).filter(Boolean))];
+  const currentListings: Record<string, any> = {};
+
+  if (skus.length > 0) {
+    for (const mpId of mpIds) {
+      const { data: listings } = await supabase
+        .from("marketplace_listings")
+        .select("sku, satis_fiyati, komisyon_orani, ham_fiyat, kar_marji, kargo_maliyeti")
+        .eq("marketplace_id", mpId)
+        .in("sku", skus)
+        .eq("aktif", true);
+
+      for (const l of listings ?? []) {
+        currentListings[`${mpId}:${l.sku}`] = l;
+      }
+    }
+  }
+
+  return {
+    snapshots: snapshots as import("@/types/pricing").PricingSnapshot[],
+    marketplaces: (mps ?? []) as import("@/types/pricing").Marketplace[],
+    currentListings,
+  };
+}
+
+export async function getCrossMarketplaceComparison() {
+  await requireMarketplaceAccess();
+  const supabase = await getDb();
+
+  // 1. Get all active marketplaces
+  const { data: mps } = await supabase
+    .from("marketplaces")
+    .select("*")
+    .eq("aktif", true)
+    .order("sira", { ascending: true });
+
+  if (!mps || mps.length === 0) return { marketplaces: [], skuRows: [] };
+
+  // 2. Get all active listings
+  const { data: listings } = await supabase
+    .from("marketplace_listings")
+    .select("marketplace_id, sku, urun_adi, satis_fiyati, ham_fiyat, kar_marji, komisyon_orani, kargo_maliyeti")
+    .eq("aktif", true);
+
+  if (!listings || listings.length === 0) return { marketplaces: mps as import("@/types/pricing").Marketplace[], skuRows: [] };
+
+  // 3. Group by SKU
+  const skuMap: Record<string, { sku: string; urun_adi: string | null; byMarketplace: Record<string, { satis_fiyati: number; ham_fiyat: number; kar_marji: number; komisyon_orani: number; kargo_maliyeti: number }> }> = {};
+
+  for (const l of listings) {
+    if (!skuMap[l.sku]) {
+      skuMap[l.sku] = { sku: l.sku, urun_adi: l.urun_adi, byMarketplace: {} };
+    }
+    skuMap[l.sku].byMarketplace[l.marketplace_id] = {
+      satis_fiyati: Number(l.satis_fiyati) || 0,
+      ham_fiyat: Number(l.ham_fiyat) || 0,
+      kar_marji: Number(l.kar_marji) || 0,
+      komisyon_orani: Number(l.komisyon_orani) || 0,
+      kargo_maliyeti: Number(l.kargo_maliyeti) || 0,
+    };
+  }
+
+  // Sort SKUs alphabetically
+  const skuRows = Object.values(skuMap).sort((a, b) => a.sku.localeCompare(b.sku));
+
+  return {
+    marketplaces: mps as import("@/types/pricing").Marketplace[],
+    skuRows,
+  };
+}
+
+export async function deleteSnapshotPeriod(donemKodu: string): Promise<ActionResult> {
+  try {
+    await requireMarketplaceAccess();
+    const supabase = await getDb();
+
+    const { error } = await supabase
+      .from("pricing_snapshots")
+      .delete()
+      .eq("donem_kodu", donemKodu);
+
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 export async function saveSnapshot(
   donemKodu: string,
   marketplaceId: string

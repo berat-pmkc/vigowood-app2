@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Target, Box, Truck, LayoutDashboard, Calculator } from "lucide-react";
+import { Target, Box, Truck, LayoutDashboard, Calculator, History, GitCompareArrows } from "lucide-react";
 
 const tabs = [
   { title: "Genel Bakış", href: "/pazaryeri/fiyatlama", icon: LayoutDashboard, exact: true },
   { title: "Fiyatlama Paneli", href: "/pazaryeri/fiyatlama/panel", icon: Calculator },
+  { title: "Karşılaştırma", href: "/pazaryeri/fiyatlama/karsilastirma", icon: GitCompareArrows },
+  { title: "Geçmiş", href: "/pazaryeri/fiyatlama/gecmis", icon: History },
   { title: "Hedef Fiyatlar", href: "/pazaryeri/fiyatlama/hedef-fiyatlar", icon: Target },
   { title: "Kutu Boyutları", href: "/pazaryeri/fiyatlama/kutu-boyutlari", icon: Box },
   { title: "Kargo Yönetimi", href: "/pazaryeri/fiyatlama/kargo", icon: Truck },
