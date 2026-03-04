@@ -142,11 +142,14 @@ export function getProductColumns({
           className="justify-end"
         />
       ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono text-sm">
-          {formatNumber(row.getValue("gunluk_satis"))}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const val = row.getValue("gunluk_satis") as number | null;
+        return (
+          <div className="text-right font-mono text-sm">
+            {val != null ? val.toFixed(2).replace(".", ",") : "—"}
+          </div>
+        );
+      },
       meta: { className: "hidden lg:table-cell" },
       size: 110,
     },

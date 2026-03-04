@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/kurlar?secret=${CRON_SECRET}",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/kritik-stok?secret=${CRON_SECRET}",
+      "schedule": "0 12 * * *"
     }
   ]
 }
