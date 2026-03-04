@@ -78,7 +78,16 @@ export async function createProduct(
 
 export async function updateProduct(
   sku: string,
-  formData: { urun_adi: string; kategori: string; aktif_mi: boolean }
+  formData: {
+    urun_adi: string;
+    kategori: string;
+    aktif_mi: boolean;
+    kutu_boy_cm?: number | null;
+    kutu_en_cm?: number | null;
+    kutu_yukseklik_cm?: number | null;
+    urun_agirlik_kg?: number | null;
+    kutu_agirlik_kg?: number | null;
+  }
 ): Promise<ActionResult> {
   try {
     await requireAdmin();
@@ -89,6 +98,12 @@ export async function updateProduct(
       return { success: false, error: firstError };
     }
 
+    // Desi hesapla: (boy * en * yükseklik) / 3000
+    const boy = parsed.data.kutu_boy_cm ?? null;
+    const en = parsed.data.kutu_en_cm ?? null;
+    const yuk = parsed.data.kutu_yukseklik_cm ?? null;
+    const desi = boy && en && yuk ? Math.round((boy * en * yuk) / 3000 * 100) / 100 : null;
+
     const supabase = await createClient();
     const { error } = await supabase
       .from("products")
@@ -96,6 +111,12 @@ export async function updateProduct(
         urun_adi: parsed.data.urun_adi,
         kategori: parsed.data.kategori as ProductCategory,
         aktif_mi: parsed.data.aktif_mi,
+        kutu_boy_cm: boy,
+        kutu_en_cm: en,
+        kutu_yukseklik_cm: yuk,
+        urun_agirlik_kg: parsed.data.urun_agirlik_kg ?? null,
+        kutu_agirlik_kg: parsed.data.kutu_agirlik_kg ?? null,
+        desi,
       })
       .eq("sku", sku);
 

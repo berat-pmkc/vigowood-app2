@@ -169,6 +169,27 @@ export function getProductColumns({
       size: 110,
     },
     {
+      accessorKey: "desi",
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          column={column}
+          title="Desi"
+          onSort={onSort}
+          className="justify-end"
+        />
+      ),
+      cell: ({ row }) => {
+        const desi = row.getValue("desi") as number | null;
+        return (
+          <div className="text-right font-mono text-sm">
+            {desi != null ? desi.toFixed(2) : "—"}
+          </div>
+        );
+      },
+      meta: { className: "hidden xl:table-cell" },
+      size: 80,
+    },
+    {
       id: "actions",
       cell: ({ row }) => {
         const product = row.original;

@@ -25,7 +25,9 @@ import { Separator } from "@/components/ui/separator";
 import { PRODUCT_CATEGORIES } from "@/lib/constants";
 import {
   productCreateSchema,
+  productUpdateSchema,
   type ProductCreateData,
+  type ProductUpdateData,
 } from "@/lib/validations";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { createProduct, updateProduct } from "../actions";
@@ -52,6 +54,7 @@ export function ProductEditSheet({
   const [isPending, startTransition] = useTransition();
   const isCreate = mode === "create";
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const {
     register,
     handleSubmit,
@@ -59,8 +62,8 @@ export function ProductEditSheet({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<ProductCreateData>({
-    resolver: zodResolver(productCreateSchema),
+  } = useForm<ProductUpdateData & { sku?: string }>({
+    resolver: zodResolver(isCreate ? productCreateSchema : productUpdateSchema) as any,
   });
 
   // Reset form when product/mode changes
@@ -71,23 +74,33 @@ export function ProductEditSheet({
         urun_adi: "",
         kategori: PRODUCT_CATEGORIES[0],
         aktif_mi: true,
-      });
+      } as ProductUpdateData);
     } else if (product) {
       reset({
         sku: product.sku,
         urun_adi: product.urun_adi || "",
         kategori: product.kategori || PRODUCT_CATEGORIES[0],
         aktif_mi: product.aktif_mi,
-      });
+        kutu_boy_cm: product.kutu_boy_cm ?? null,
+        kutu_en_cm: product.kutu_en_cm ?? null,
+        kutu_yukseklik_cm: product.kutu_yukseklik_cm ?? null,
+        urun_agirlik_kg: product.urun_agirlik_kg ?? null,
+        kutu_agirlik_kg: product.kutu_agirlik_kg ?? null,
+      } as ProductUpdateData);
     }
   }, [product, isCreate, reset, open]);
 
-  const onSubmit = (data: ProductCreateData) => {
+  const boyVal = watch("kutu_boy_cm");
+  const enVal = watch("kutu_en_cm");
+  const yukVal = watch("kutu_yukseklik_cm");
+  const desiCalc = boyVal && enVal && yukVal ? Math.round((boyVal * enVal * yukVal) / 3000 * 100) / 100 : null;
+
+  const onSubmit = (data: ProductUpdateData) => {
     startTransition(async () => {
       if (isCreate) {
-        const result = await createProduct(data);
+        const result = await createProduct(data as ProductCreateData);
         if (result.success) {
-          toast.success(`${data.sku} oluşturuldu`);
+          toast.success(`${(data as ProductCreateData).sku} oluşturuldu`);
           onOpenChange(false);
           onSaved();
         } else {
@@ -99,6 +112,11 @@ export function ProductEditSheet({
           urun_adi: data.urun_adi,
           kategori: data.kategori,
           aktif_mi: data.aktif_mi,
+          kutu_boy_cm: data.kutu_boy_cm,
+          kutu_en_cm: data.kutu_en_cm,
+          kutu_yukseklik_cm: data.kutu_yukseklik_cm,
+          urun_agirlik_kg: data.urun_agirlik_kg,
+          kutu_agirlik_kg: data.kutu_agirlik_kg,
         });
         if (result.success) {
           toast.success("Ürün güncellendi");
@@ -195,6 +213,83 @@ export function ProductEditSheet({
               </Label>
             </div>
           </div>
+
+          {/* Kutu Bilgileri — only in edit mode */}
+          {!isCreate && (
+            <>
+              <Separator />
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Kutu Bilgileri
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="kutu_boy_cm" className="text-xs">Boy (cm)</Label>
+                    <Input
+                      id="kutu_boy_cm"
+                      type="number"
+                      step="0.01"
+                      {...register("kutu_boy_cm", { valueAsNumber: true, setValueAs: v => v === "" || isNaN(v) ? null : Number(v) })}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="kutu_en_cm" className="text-xs">En (cm)</Label>
+                    <Input
+                      id="kutu_en_cm"
+                      type="number"
+                      step="0.01"
+                      {...register("kutu_en_cm", { valueAsNumber: true, setValueAs: v => v === "" || isNaN(v) ? null : Number(v) })}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="kutu_yukseklik_cm" className="text-xs">Yükseklik (cm)</Label>
+                    <Input
+                      id="kutu_yukseklik_cm"
+                      type="number"
+                      step="0.01"
+                      {...register("kutu_yukseklik_cm", { valueAsNumber: true, setValueAs: v => v === "" || isNaN(v) ? null : Number(v) })}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="urun_agirlik_kg" className="text-xs">Ürün Ağırlığı (kg)</Label>
+                    <Input
+                      id="urun_agirlik_kg"
+                      type="number"
+                      step="0.001"
+                      {...register("urun_agirlik_kg", { valueAsNumber: true, setValueAs: v => v === "" || isNaN(v) ? null : Number(v) })}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="kutu_agirlik_kg" className="text-xs">Kutu Ağırlığı (kg)</Label>
+                    <Input
+                      id="kutu_agirlik_kg"
+                      type="number"
+                      step="0.001"
+                      {...register("kutu_agirlik_kg", { valueAsNumber: true, setValueAs: v => v === "" || isNaN(v) ? null : Number(v) })}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desi</Label>
+                    <div className="h-8 flex items-center px-3 rounded-md border bg-muted text-sm font-mono">
+                      {desiCalc ?? "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Read-only info — only in edit mode */}
           {!isCreate && product && (

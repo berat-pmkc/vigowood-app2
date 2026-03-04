@@ -1266,6 +1266,178 @@ export type Database = {
           },
         ]
       }
+      marketplace_listings: {
+        Row: {
+          aktif: boolean
+          barkod: string | null
+          created_at: string | null
+          ham_fiyat: number
+          hedef_fiyat_kullanilan: number
+          id: string
+          kar_marji: number
+          kargo_maliyeti: number
+          komisyon_orani: number
+          listing_kodu: string
+          marketplace_id: string
+          oneri_fiyat_min: number
+          oneri_fiyat_std: number
+          ozel_maliyetler: Json | null
+          reklam_orani: number
+          satis_fiyati: number
+          shipping_provider_id: string | null
+          sku: string
+          updated_at: string | null
+          urun_adi: string | null
+        }
+        Insert: {
+          aktif?: boolean
+          barkod?: string | null
+          created_at?: string | null
+          ham_fiyat?: number
+          hedef_fiyat_kullanilan?: number
+          id?: string
+          kar_marji?: number
+          kargo_maliyeti?: number
+          komisyon_orani?: number
+          listing_kodu: string
+          marketplace_id: string
+          oneri_fiyat_min?: number
+          oneri_fiyat_std?: number
+          ozel_maliyetler?: Json | null
+          reklam_orani?: number
+          satis_fiyati?: number
+          shipping_provider_id?: string | null
+          sku: string
+          updated_at?: string | null
+          urun_adi?: string | null
+        }
+        Update: {
+          aktif?: boolean
+          barkod?: string | null
+          created_at?: string | null
+          ham_fiyat?: number
+          hedef_fiyat_kullanilan?: number
+          id?: string
+          kar_marji?: number
+          kargo_maliyeti?: number
+          komisyon_orani?: number
+          listing_kodu?: string
+          marketplace_id?: string
+          oneri_fiyat_min?: number
+          oneri_fiyat_std?: number
+          ozel_maliyetler?: Json | null
+          reklam_orani?: number
+          satis_fiyati?: number
+          shipping_provider_id?: string | null
+          sku?: string
+          updated_at?: string | null
+          urun_adi?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_listings_marketplace_id_fkey"
+            columns: ["marketplace_id"]
+            isOneToOne: false
+            referencedRelation: "marketplaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_shipping_provider_id_fkey"
+            columns: ["shipping_provider_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listings_sku_fkey"
+            columns: ["sku"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["sku"]
+          },
+        ]
+      }
+      marketplace_shipping: {
+        Row: {
+          created_at: string | null
+          id: string
+          marketplace_id: string
+          shipping_provider_id: string
+          varsayilan: boolean
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          marketplace_id: string
+          shipping_provider_id: string
+          varsayilan?: boolean
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          marketplace_id?: string
+          shipping_provider_id?: string
+          varsayilan?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_shipping_marketplace_id_fkey"
+            columns: ["marketplace_id"]
+            isOneToOne: false
+            referencedRelation: "marketplaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_shipping_shipping_provider_id_fkey"
+            columns: ["shipping_provider_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplaces: {
+        Row: {
+          aktif: boolean
+          code: string
+          created_at: string | null
+          hedef_fiyat_tipi: string
+          id: string
+          name: string
+          ozel_ayarlar: Json | null
+          sira: number
+          stopaj_orani: number
+          updated_at: string | null
+          vergi_dahil: boolean
+        }
+        Insert: {
+          aktif?: boolean
+          code: string
+          created_at?: string | null
+          hedef_fiyat_tipi?: string
+          id?: string
+          name: string
+          ozel_ayarlar?: Json | null
+          sira?: number
+          stopaj_orani?: number
+          updated_at?: string | null
+          vergi_dahil?: boolean
+        }
+        Update: {
+          aktif?: boolean
+          code?: string
+          created_at?: string | null
+          hedef_fiyat_tipi?: string
+          id?: string
+          name?: string
+          ozel_ayarlar?: Json | null
+          sira?: number
+          stopaj_orani?: number
+          updated_at?: string | null
+          vergi_dahil?: boolean
+        }
+        Relationships: []
+      }
       monitor_definitions: {
         Row: {
           agent_id: string
@@ -2208,15 +2380,193 @@ export type Database = {
         }
         Relationships: []
       }
+      pricing_snapshots: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          donem_kodu: string
+          ham_fiyat: number | null
+          hedef_fiyat: number | null
+          id: string
+          kar_marji: number | null
+          kargo_maliyeti: number | null
+          komisyon_orani: number | null
+          listing_kodu: string
+          marketplace_id: string
+          reklam_orani: number | null
+          satis_fiyati: number | null
+          sku: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          donem_kodu: string
+          ham_fiyat?: number | null
+          hedef_fiyat?: number | null
+          id?: string
+          kar_marji?: number | null
+          kargo_maliyeti?: number | null
+          komisyon_orani?: number | null
+          listing_kodu: string
+          marketplace_id: string
+          reklam_orani?: number | null
+          satis_fiyati?: number | null
+          sku: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          donem_kodu?: string
+          ham_fiyat?: number | null
+          hedef_fiyat?: number | null
+          id?: string
+          kar_marji?: number | null
+          kargo_maliyeti?: number | null
+          komisyon_orani?: number | null
+          listing_kodu?: string
+          marketplace_id?: string
+          reklam_orani?: number | null
+          satis_fiyati?: number | null
+          sku?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_snapshots_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pricing_snapshots_marketplace_id_fkey"
+            columns: ["marketplace_id"]
+            isOneToOne: false
+            referencedRelation: "marketplaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_snapshots_sku_fkey"
+            columns: ["sku"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["sku"]
+          },
+        ]
+      }
+      product_box_dimensions: {
+        Row: {
+          boy_cm: number
+          created_at: string | null
+          desi: number
+          en_cm: number
+          id: string
+          sku: string
+          updated_at: string | null
+          yukseklik_cm: number
+        }
+        Insert: {
+          boy_cm?: number
+          created_at?: string | null
+          desi?: number
+          en_cm?: number
+          id?: string
+          sku: string
+          updated_at?: string | null
+          yukseklik_cm?: number
+        }
+        Update: {
+          boy_cm?: number
+          created_at?: string | null
+          desi?: number
+          en_cm?: number
+          id?: string
+          sku?: string
+          updated_at?: string | null
+          yukseklik_cm?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_box_dimensions_sku_fkey"
+            columns: ["sku"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["sku"]
+          },
+        ]
+      }
+      product_target_prices: {
+        Row: {
+          aktif: boolean
+          created_at: string | null
+          gecerlilik_baslangic: string | null
+          id: string
+          perakende_min: number
+          perakende_min_kdv: number
+          perakende_standart: number
+          perakende_standart_kdv: number
+          sku: string
+          toptan_min: number
+          toptan_min_kdv: number
+          toptan_standart: number
+          toptan_standart_kdv: number
+          updated_at: string | null
+        }
+        Insert: {
+          aktif?: boolean
+          created_at?: string | null
+          gecerlilik_baslangic?: string | null
+          id?: string
+          perakende_min?: number
+          perakende_min_kdv?: number
+          perakende_standart?: number
+          perakende_standart_kdv?: number
+          sku: string
+          toptan_min?: number
+          toptan_min_kdv?: number
+          toptan_standart?: number
+          toptan_standart_kdv?: number
+          updated_at?: string | null
+        }
+        Update: {
+          aktif?: boolean
+          created_at?: string | null
+          gecerlilik_baslangic?: string | null
+          id?: string
+          perakende_min?: number
+          perakende_min_kdv?: number
+          perakende_standart?: number
+          perakende_standart_kdv?: number
+          sku?: string
+          toptan_min?: number
+          toptan_min_kdv?: number
+          toptan_standart?: number
+          toptan_standart_kdv?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_target_prices_sku_fkey"
+            columns: ["sku"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["sku"]
+          },
+        ]
+      }
       products: {
         Row: {
           aktif_mi: boolean
           aylik_uretim: number
           created_at: string
+          desi: number | null
           gecen_ay_uretim: number
           gunluk_satis: number
           ilk_satis_tarihi: string | null
           kategori: Database["public"]["Enums"]["product_category"] | null
+          kutu_agirlik_kg: number | null
+          kutu_boy_cm: number | null
+          kutu_en_cm: number | null
+          kutu_yukseklik_cm: number | null
           mamul_stok_kritik: number
           renk_kodu: string | null
           satilan_gun_sayisi: number
@@ -2225,15 +2575,21 @@ export type Database = {
           toplam_satis: number
           updated_at: string
           urun_adi: string | null
+          urun_agirlik_kg: number | null
         }
         Insert: {
           aktif_mi?: boolean
           aylik_uretim?: number
           created_at?: string
+          desi?: number | null
           gecen_ay_uretim?: number
           gunluk_satis?: number
           ilk_satis_tarihi?: string | null
           kategori?: Database["public"]["Enums"]["product_category"] | null
+          kutu_agirlik_kg?: number | null
+          kutu_boy_cm?: number | null
+          kutu_en_cm?: number | null
+          kutu_yukseklik_cm?: number | null
           mamul_stok_kritik?: number
           renk_kodu?: string | null
           satilan_gun_sayisi?: number
@@ -2242,15 +2598,21 @@ export type Database = {
           toplam_satis?: number
           updated_at?: string
           urun_adi?: string | null
+          urun_agirlik_kg?: number | null
         }
         Update: {
           aktif_mi?: boolean
           aylik_uretim?: number
           created_at?: string
+          desi?: number | null
           gecen_ay_uretim?: number
           gunluk_satis?: number
           ilk_satis_tarihi?: string | null
           kategori?: Database["public"]["Enums"]["product_category"] | null
+          kutu_agirlik_kg?: number | null
+          kutu_boy_cm?: number | null
+          kutu_en_cm?: number | null
+          kutu_yukseklik_cm?: number | null
           mamul_stok_kritik?: number
           renk_kodu?: string | null
           satilan_gun_sayisi?: number
@@ -2259,6 +2621,7 @@ export type Database = {
           toplam_satis?: number
           updated_at?: string
           urun_adi?: string | null
+          urun_agirlik_kg?: number | null
         }
         Relationships: []
       }
@@ -2952,6 +3315,36 @@ export type Database = {
         }
         Relationships: []
       }
+      shipping_providers: {
+        Row: {
+          aktif: boolean
+          code: string
+          created_at: string | null
+          desi_fiyatlari: Json
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          aktif?: boolean
+          code: string
+          created_at?: string | null
+          desi_fiyatlari?: Json
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          aktif?: boolean
+          code?: string
+          created_at?: string | null
+          desi_fiyatlari?: Json
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       sku_mappings: {
         Row: {
           channel: string
@@ -3423,6 +3816,183 @@ export type Database = {
           updated_at?: string
           yil?: number
           ziyaretci?: number
+        }
+        Relationships: []
+      }
+      trendyol_ad_sku_mappings: {
+        Row: {
+          ad_name: string
+          id: string
+          product_ids: string[] | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          ad_name: string
+          id?: string
+          product_ids?: string[] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          ad_name?: string
+          id?: string
+          product_ids?: string[] | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      trendyol_ad_snapshots: {
+        Row: {
+          actual_cpc: number | null
+          ad_name: string
+          clicks: number | null
+          content_ids: string | null
+          cpc_bid: string | null
+          created_at: string | null
+          cumulative_roas: number | null
+          daily_budget: number | null
+          direct_revenue: number | null
+          direct_sales: number | null
+          end_date: string | null
+          id: string
+          impressions: number | null
+          indirect_revenue: number | null
+          indirect_sales: number | null
+          product_count: number | null
+          remaining_budget: number | null
+          snapshot_date: string
+          spent: number | null
+          start_date: string | null
+          status: string | null
+          total_budget: number | null
+          total_revenue: number | null
+          total_sales: number | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          actual_cpc?: number | null
+          ad_name: string
+          clicks?: number | null
+          content_ids?: string | null
+          cpc_bid?: string | null
+          created_at?: string | null
+          cumulative_roas?: number | null
+          daily_budget?: number | null
+          direct_revenue?: number | null
+          direct_sales?: number | null
+          end_date?: string | null
+          id?: string
+          impressions?: number | null
+          indirect_revenue?: number | null
+          indirect_sales?: number | null
+          product_count?: number | null
+          remaining_budget?: number | null
+          snapshot_date: string
+          spent?: number | null
+          start_date?: string | null
+          status?: string | null
+          total_budget?: number | null
+          total_revenue?: number | null
+          total_sales?: number | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          actual_cpc?: number | null
+          ad_name?: string
+          clicks?: number | null
+          content_ids?: string | null
+          cpc_bid?: string | null
+          created_at?: string | null
+          cumulative_roas?: number | null
+          daily_budget?: number | null
+          direct_revenue?: number | null
+          direct_sales?: number | null
+          end_date?: string | null
+          id?: string
+          impressions?: number | null
+          indirect_revenue?: number | null
+          indirect_sales?: number | null
+          product_count?: number | null
+          remaining_budget?: number | null
+          snapshot_date?: string
+          spent?: number | null
+          start_date?: string | null
+          status?: string | null
+          total_budget?: number | null
+          total_revenue?: number | null
+          total_sales?: number | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      trendyol_ad_weekly: {
+        Row: {
+          actual_cpc: number | null
+          ad_name: string
+          clicks: number | null
+          cpa: number | null
+          created_at: string | null
+          ctr: number | null
+          cvr: number | null
+          days_in_period: number | null
+          direct_revenue: number | null
+          direct_sales: number | null
+          id: string
+          impressions: number | null
+          indirect_revenue: number | null
+          indirect_sales: number | null
+          period_end: string
+          period_start: string
+          roas: number | null
+          spent: number | null
+          total_revenue: number | null
+          total_sales: number | null
+        }
+        Insert: {
+          actual_cpc?: number | null
+          ad_name: string
+          clicks?: number | null
+          cpa?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          cvr?: number | null
+          days_in_period?: number | null
+          direct_revenue?: number | null
+          direct_sales?: number | null
+          id?: string
+          impressions?: number | null
+          indirect_revenue?: number | null
+          indirect_sales?: number | null
+          period_end: string
+          period_start: string
+          roas?: number | null
+          spent?: number | null
+          total_revenue?: number | null
+          total_sales?: number | null
+        }
+        Update: {
+          actual_cpc?: number | null
+          ad_name?: string
+          clicks?: number | null
+          cpa?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          cvr?: number | null
+          days_in_period?: number | null
+          direct_revenue?: number | null
+          direct_sales?: number | null
+          id?: string
+          impressions?: number | null
+          indirect_revenue?: number | null
+          indirect_sales?: number | null
+          period_end?: string
+          period_start?: string
+          roas?: number | null
+          spent?: number | null
+          total_revenue?: number | null
+          total_sales?: number | null
         }
         Relationships: []
       }

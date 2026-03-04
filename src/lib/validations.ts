@@ -23,6 +23,11 @@ export const productUpdateSchema = z.object({
     error: "Geçerli bir kategori seçiniz",
   }),
   aktif_mi: z.boolean(),
+  kutu_boy_cm: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
+  kutu_en_cm: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
+  kutu_yukseklik_cm: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
+  urun_agirlik_kg: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
+  kutu_agirlik_kg: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
 });
 
 export type ProductUpdateData = z.infer<typeof productUpdateSchema>;
