@@ -873,3 +873,36 @@ export const recurringTaskSchema = z.object({
 });
 
 export type RecurringTaskData = z.infer<typeof recurringTaskSchema>;
+
+// ─── Pazaryeri Fiyatlama ──────────────────────────────────────
+
+/** Hedef fiyat oluşturma/güncelleme */
+export const targetPriceSchema = z.object({
+  sku: z.string().min(1, "SKU gereklidir"),
+  perakende_min: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  perakende_standart: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  toptan_min: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  toptan_standart: z.number().min(0, "Fiyat 0 veya üzeri olmalıdır"),
+  aktif: z.boolean().optional(),
+});
+
+export type TargetPriceData = z.infer<typeof targetPriceSchema>;
+
+/** Kutu boyutları oluşturma/güncelleme */
+export const boxDimensionSchema = z.object({
+  sku: z.string().min(1, "SKU gereklidir"),
+  en_cm: z.number().min(0, "En 0 veya üzeri olmalıdır"),
+  boy_cm: z.number().min(0, "Boy 0 veya üzeri olmalıdır"),
+  yukseklik_cm: z.number().min(0, "Yükseklik 0 veya üzeri olmalıdır"),
+});
+
+export type BoxDimensionData = z.infer<typeof boxDimensionSchema>;
+
+/** Kargo firması güncelleme */
+export const shippingProviderSchema = z.object({
+  name: z.string().min(1, "Kargo firması adı gereklidir").max(200),
+  desi_fiyatlari: z.record(z.string(), z.number().min(0)),
+  aktif: z.boolean().optional(),
+});
+
+export type ShippingProviderData = z.infer<typeof shippingProviderSchema>;
