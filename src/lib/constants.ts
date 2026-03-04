@@ -1274,3 +1274,99 @@ export const ALERT_STATUS_COLORS: Record<AlertStatus, { bg: string; text: string
   resolved: { bg: "bg-emerald-100", text: "text-emerald-700" },
   muted: { bg: "bg-gray-100", text: "text-gray-500" },
 };
+
+// =============================================
+// Pazaryeri Fiyatlama Sabitleri
+// =============================================
+
+/** KDV oranı — sistem sabiti, KDV dahil fiyattan KDV çıkarma */
+export const VARSAYILAN_KDV_ORANI = 0.10; // %10
+
+/** Varsayılan stopaj oranı — pazaryeri bazında değiştirilebilir */
+export const VARSAYILAN_STOPAJ_ORANI = 0.01; // %1
+
+/** Hedef fiyat tipleri */
+export const HEDEF_FIYAT_TIPLERI = [
+  "perakende_min",
+  "perakende_standart",
+  "toptan_min",
+  "toptan_standart",
+] as const;
+
+export const HEDEF_FIYAT_TIPI_LABELS: Record<string, string> = {
+  perakende_min: "Perakende Min",
+  perakende_standart: "Perakende Standart",
+  toptan_min: "Toptan Min",
+  toptan_standart: "Toptan Standart",
+};
+
+/** Pazaryeri kodları */
+export const MARKETPLACE_CODES = [
+  "TY", "HB", "CS", "N11", "PZM", "IDE", "VW", "TEMU", "AMZ", "TDV",
+] as const;
+
+export const MARKETPLACE_LABELS: Record<string, string> = {
+  TY: "Trendyol",
+  HB: "Hepsiburada",
+  CS: "ÇiçekSepeti",
+  N11: "N11",
+  PZM: "Pazarama",
+  IDE: "İdefix",
+  VW: "VigoWood",
+  TEMU: "TEMU",
+  AMZ: "Amazon",
+  TDV: "TDV",
+};
+
+/** Fiyatlama hesaplama fonksiyonları */
+export function hesaplaHamFiyat(
+  satisFiyati: number,
+  komisyonOrani: number,
+  reklamOrani: number,
+  kargoMaliyeti: number,
+  kdvOrani: number = VARSAYILAN_KDV_ORANI,
+): number {
+  // Vergi = Satış - Satış/1.1 (KDV dahil → KDV çıkarma)
+  const vergiOrani = kdvOrani / (1 + kdvOrani); // ~0.0909
+  const ham = satisFiyati * (1 - komisyonOrani - vergiOrani - reklamOrani) - kargoMaliyeti;
+  return Math.round(ham * 100) / 100;
+}
+
+export function hesaplaStopaj(
+  satisFiyati: number,
+  stopajOrani: number = VARSAYILAN_STOPAJ_ORANI,
+  kdvOrani: number = VARSAYILAN_KDV_ORANI,
+): number {
+  // Stopaj = (Satış/1.1) × stopaj_orani
+  return Math.round(((satisFiyati / (1 + kdvOrani)) * stopajOrani) * 100) / 100;
+}
+
+export function hesaplaVergi(
+  satisFiyati: number,
+  kdvOrani: number = VARSAYILAN_KDV_ORANI,
+): number {
+  // Vergi = Satış - Satış/(1+KDV)
+  return Math.round((satisFiyati - satisFiyati / (1 + kdvOrani)) * 100) / 100;
+}
+
+export function hesaplaKarMarji(
+  hamFiyat: number,
+  hedefFiyat: number,
+  satisFiyati: number,
+): number {
+  if (satisFiyati <= 0) return 0;
+  return Math.round(((hamFiyat - hedefFiyat) / satisFiyati) * 10000) / 10000;
+}
+
+export function hesaplaDesiFiyat(
+  desi: number,
+  desiTablosu: Record<string, number>,
+): number {
+  // Desi tablosundan VLOOKUP benzeri — desi'ye en yakın üst değeri bul
+  const keys = Object.keys(desiTablosu).map(Number).sort((a, b) => a - b);
+  for (const key of keys) {
+    if (desi <= key) return desiTablosu[String(key)];
+  }
+  // Tablodaki en büyük değeri döndür
+  return keys.length > 0 ? desiTablosu[String(keys[keys.length - 1])] : 0;
+}
