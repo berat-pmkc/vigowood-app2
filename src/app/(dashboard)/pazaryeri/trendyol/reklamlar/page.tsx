@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ReklamlarClient } from "./components/reklamlar-client";
+import { ReklamlarPageClient } from "./components/reklamlar-page-client";
+import type { MetricKey } from "./components/filter-bar";
 
 export const metadata: Metadata = { title: "Trendyol — Reklamlar" };
 
+const VALID_METRICS: MetricKey[] = ["spent", "revenue", "roas", "sales", "ctr", "cvr"];
+
 interface PageProps {
-  searchParams: Promise<{ hafta?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; metric?: string }>;
 }
 
 export default async function TrendyolReklamlarPage({ searchParams }: PageProps) {
@@ -25,24 +28,36 @@ export default async function TrendyolReklamlarPage({ searchParams }: PageProps)
     periodSet.add(p.period_end);
   }
   const periods = Array.from(periodSet).sort((a, b) => b.localeCompare(a));
+  // sorted ascending for range math
+  const sortedAsc = [...periods].sort();
 
-  // 2. Selected period
-  const selectedPeriod = params.hafta && periods.includes(params.hafta)
-    ? params.hafta
-    : periods[0] || null;
+  // 2. Determine date range
+  let toPeriod = periods[0] || "";
+  let fromPeriod = sortedAsc.length > 3 ? sortedAsc[sortedAsc.length - 4] : sortedAsc[0] || "";
 
-  // 3. Get weekly data for selected period
-  let weeklyData: Record<string, unknown>[] = [];
-  if (selectedPeriod) {
-    const { data } = await supabase
-      .from("trendyol_ad_weekly")
-      .select("*")
-      .eq("period_end", selectedPeriod)
-      .order("spent", { ascending: false });
-    weeklyData = data || [];
+  if (params.from && periods.includes(params.from)) {
+    fromPeriod = params.from;
+  }
+  if (params.to && periods.includes(params.to)) {
+    toPeriod = params.to;
+  }
+  // Ensure from <= to
+  if (fromPeriod > toPeriod) {
+    fromPeriod = toPeriod;
   }
 
-  // 4. Get SKU mappings
+  // 3. Metric
+  const metric: MetricKey = VALID_METRICS.includes(params.metric as MetricKey)
+    ? (params.metric as MetricKey)
+    : "spent";
+
+  // 4. Get ALL weekly data (small dataset: ~20 ads × ~12 periods ≈ ~240 rows)
+  const { data: allWeeklyData } = await supabase
+    .from("trendyol_ad_weekly")
+    .select("*")
+    .order("period_end", { ascending: true });
+
+  // 5. Get SKU mappings
   const { data: skuMappings } = await supabase
     .from("trendyol_ad_sku_mappings")
     .select("*");
@@ -52,14 +67,14 @@ export default async function TrendyolReklamlarPage({ searchParams }: PageProps)
     skuMap[m.ad_name] = m.product_ids || [];
   }
 
-  // 5. Get active products for SKU selector
+  // 6. Get active products for SKU selector
   const { data: products } = await supabase
     .from("products")
-    .select("urun_id, urun_adi, sku")
-    .eq("aktif", true)
+    .select("sku, urun_adi")
+    .eq("aktif_mi", true)
     .order("urun_adi");
 
-  // 6. Get snapshot dates for info
+  // 7. Get snapshot dates
   const { data: snapshotsRaw } = await supabase
     .from("trendyol_ad_snapshots")
     .select("snapshot_date, uploaded_by, created_at")
@@ -80,12 +95,14 @@ export default async function TrendyolReklamlarPage({ searchParams }: PageProps)
   }));
 
   return (
-    <ReklamlarClient
-      weeklyData={weeklyData}
+    <ReklamlarPageClient
+      allWeeklyData={allWeeklyData || []}
       periods={periods}
-      selectedPeriod={selectedPeriod}
+      initialFrom={fromPeriod}
+      initialTo={toPeriod}
+      initialMetric={metric}
       skuMap={skuMap}
-      products={(products || []) as { urun_id: string; urun_adi: string; sku: string }[]}
+      products={(products || []) as { sku: string; urun_adi: string }[]}
       snapshotDates={snapshotDates}
     />
   );
