@@ -121,8 +121,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     montajRes,
     paketlemeRes,
     kutuRes,
-    pendingCutsRes,
-    cuttingCutsRes,
     completedTodayRes,
     recentCutsRes,
     criticalPartsRes,
@@ -134,16 +132,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     supabase
       .from("cut_batches")
       .select("cut_id", { count: "exact", head: true })
-      .eq("durum", "bekliyor"),
-    supabase
-      .from("cut_batches")
-      .select("cut_id", { count: "exact", head: true })
-      .eq("durum", "kesiliyor"),
-    supabase
-      .from("cut_batches")
-      .select("cut_id", { count: "exact", head: true })
-      .eq("tarih", today)
-      .eq("durum", "tamamlandi"),
+      .eq("durum", "tamamlandi")
+      .gte("tarih", today)
+      .lte("tarih", today),
     supabase
       .from("cut_batches")
       .select(
@@ -163,8 +154,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const montajCount = montajRes.count ?? 0;
   const paketlemeCount = paketlemeRes.count ?? 0;
   const kutuCount = kutuRes.count ?? 0;
-  const pendingCuts = pendingCutsRes.count ?? 0;
-  const cuttingCuts = cuttingCutsRes.count ?? 0;
   const completedToday = completedTodayRes.count ?? 0;
   const recentCuts = (recentCutsRes.data ?? []) as Array<{
     cut_id: string;
@@ -239,22 +228,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             <CardDescription>Kesim hattı güncel özet</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               <StatusCard
-                label="Bekliyor"
-                count={pendingCuts}
-                color="amber"
-              />
-              <StatusCard
-                label="Kesiliyor"
-                count={cuttingCuts}
-                color="blue"
-              />
-              <StatusCard
-                label="Tamamlandı"
+                label="Bugün Tamamlanan"
                 count={completedToday}
                 color="emerald"
-                subtitle="bugün"
               />
             </div>
 
@@ -415,17 +393,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             <CardContent>
               <div className="space-y-3">
                 <SummaryRow
-                  label="Bekleyen Kesim"
-                  value={pendingCuts}
-                  warning={pendingCuts > 5}
-                />
-                <SummaryRow
-                  label="Devam Eden"
-                  value={cuttingCuts}
-                  active={cuttingCuts > 0}
-                />
-                <SummaryRow
-                  label="Bugün Tamamlanan"
+                  label="Bugün Tamamlanan Kesim"
                   value={completedToday}
                 />
               </div>

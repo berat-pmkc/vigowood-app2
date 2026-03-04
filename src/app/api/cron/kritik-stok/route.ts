@@ -84,7 +84,7 @@ export async function GET(request: Request) {
       skuBuckets.set(row.sku, bucket);
     }
 
-    // WMA hesapla: (sum7/7 × 0.50) + (sum30/30 × 0.30) + (sum90/90 × 0.20)
+    // WMA hesapla: (sum7/7 × 0.20) + (sum30/30 × 0.50) + (sum90/90 × 0.30)
     const dailyRateMap = new Map<string, number>();
     for (const [sku, b] of skuBuckets) {
       const velocity = (b.sum7 / 7) * WMA_WEIGHT_7D + (b.sum30 / 30) * WMA_WEIGHT_30D + (b.sum90 / 90) * WMA_WEIGHT_90D;

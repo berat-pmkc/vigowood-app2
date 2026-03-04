@@ -174,7 +174,7 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
     });
 
     if (result.success) {
-      toast.success("Kesim başlatıldı");
+      toast.success("Kesim kaydedildi");
       onOpenChange(false);
     } else {
       toast.error(result.error);
@@ -477,7 +477,7 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
                   ) : (
                     <>
                       <CheckCircle className="w-5 h-5 mr-2" />
-                      Kesimi Başlat
+                      Kaydet
                     </>
                   )}
                 </Button>

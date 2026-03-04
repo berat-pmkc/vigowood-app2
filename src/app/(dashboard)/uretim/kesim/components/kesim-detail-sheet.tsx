@@ -7,16 +7,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { KesimStatusBadge } from "./kesim-status-badge";
-import { getCutLines, startCut, completeCut, cancelCut } from "../actions";
-import { MAKINE_LABELS, type MakineId, type CutStatus } from "@/lib/constants";
-import { formatDate, formatTime, formatDuration } from "@/lib/utils";
-import { Play, CheckCircle, XCircle } from "lucide-react";
-import { toast } from "sonner";
+import { getCutLines } from "../actions";
+import { MAKINE_LABELS, type MakineId } from "@/lib/constants";
+import { formatDate } from "@/lib/utils";
 import type { CutBatchRow } from "../types";
 
 interface KesimDetailSheetProps {
@@ -38,9 +35,6 @@ interface CutLine {
 export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheetProps) {
   const [lines, setLines] = useState<CutLine[]>([]);
   const [linesLoading, setLinesLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const durum = batch.durum as CutStatus;
 
   useEffect(() => {
     if (open) {
@@ -51,30 +45,6 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
       });
     }
   }, [open, batch.cut_id]);
-
-  const handleStart = async () => {
-    setActionLoading(true);
-    const result = await startCut(batch.cut_id);
-    if (!result.success) toast.error(result.error);
-    else { toast.success("Kesim başlatıldı"); onOpenChange(false); }
-    setActionLoading(false);
-  };
-
-  const handleComplete = async () => {
-    setActionLoading(true);
-    const result = await completeCut(batch.cut_id);
-    if (!result.success) toast.error(result.error);
-    else { toast.success("Kesim tamamlandı, stok güncellendi"); onOpenChange(false); }
-    setActionLoading(false);
-  };
-
-  const handleCancel = async () => {
-    setActionLoading(true);
-    const result = await cancelCut(batch.cut_id);
-    if (!result.success) toast.error(result.error);
-    else { toast.success("Kesim iptal edildi"); onOpenChange(false); }
-    setActionLoading(false);
-  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -118,24 +88,6 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
               <p className="text-muted-foreground">Tarih</p>
               <p className="font-medium">{formatDate(batch.tarih)}</p>
             </div>
-            {batch.baslama_zamani && (
-              <div>
-                <p className="text-muted-foreground">Başlama</p>
-                <p className="font-medium">{formatTime(batch.baslama_zamani)}</p>
-              </div>
-            )}
-            {batch.bitis_zamani && (
-              <div>
-                <p className="text-muted-foreground">Bitiş</p>
-                <p className="font-medium">{formatTime(batch.bitis_zamani)}</p>
-              </div>
-            )}
-            {batch.baslama_zamani && batch.bitis_zamani && (
-              <div>
-                <p className="text-muted-foreground">Süre</p>
-                <p className="font-medium">{formatDuration(batch.baslama_zamani, batch.bitis_zamani)}</p>
-              </div>
-            )}
           </div>
 
           {batch.plk_notu && (
@@ -184,43 +136,6 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-
-          <Separator />
-
-          {/* Aksiyon butonları */}
-          <div className="flex gap-2 pb-4">
-            {durum === "bekliyor" && (
-              <Button
-                className="flex-1 h-14 text-base bg-vw-success hover:bg-vw-success/90 text-white"
-                onClick={handleStart}
-                disabled={actionLoading}
-              >
-                <Play className="w-5 h-5 mr-2" />
-                Kesimi Başlat
-              </Button>
-            )}
-
-            {durum === "kesiliyor" && (
-              <>
-                <Button
-                  className="flex-1 h-14 text-base"
-                  onClick={handleComplete}
-                  disabled={actionLoading}
-                >
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  Kesimi Bitir
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-14 px-4"
-                  onClick={handleCancel}
-                  disabled={actionLoading}
-                >
-                  <XCircle className="w-5 h-5" />
-                </Button>
-              </>
             )}
           </div>
         </div>

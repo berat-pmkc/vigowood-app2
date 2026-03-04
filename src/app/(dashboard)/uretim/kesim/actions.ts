@@ -5,11 +5,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cutBatchCreateSchema } from "@/lib/validations";
 import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS } from "@/lib/constants";
-import type { Database } from "@/lib/supabase/types";
 import type { MachineStatusEntry, MdfStokItem } from "./types";
 
 type ActionResult = { success: true } | { success: false; error: string };
-type CutBatch = Database["public"]["Tables"]["cut_batches"]["Row"];
 
 async function requireProductionAccess() {
   const user = await getCurrentUser();
@@ -156,7 +154,7 @@ export async function createCutBatch(formData: {
 
     const now = new Date().toISOString();
 
-    // Insert cut_batch — auto-start as "kesiliyor"
+    // Insert cut_batch — doğrudan tamamlandı olarak kaydet
     const { error: batchError } = await supabase.from("cut_batches").insert({
       cut_id: cutId,
       tarih: now,
@@ -167,8 +165,9 @@ export async function createCutBatch(formData: {
       operator_id: operatorId,
       plk_notu: parsed.data.plk_notu,
       email: email,
-      durum: "kesiliyor",
+      durum: "tamamlandi",
       baslama_zamani: now,
+      bitis_zamani: now,
     });
 
     if (batchError) return { success: false, error: batchError.message };
@@ -256,101 +255,17 @@ export async function createCutBatch(formData: {
       }
     }
 
-    revalidatePath("/uretim/kesim");
-    revalidatePath("/stok/hazir-eleman");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Kesimi başlat: bekliyor → kesiliyor */
-export async function startCut(cutId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    // Durum kontrolü
-    const { data: startData } = await supabase
-      .from("cut_batches")
-      .select("durum")
-      .eq("cut_id", cutId)
-      .single();
-
-    const batch = startData as { durum: string } | null;
-    if (!batch) return { success: false, error: "Kesim bulunamadı" };
-    if (batch.durum !== "bekliyor") return { success: false, error: "Bu kesim zaten başlatılmış" };
-
-    const { error } = await supabase
-      .from("cut_batches")
-      .update({ durum: "kesiliyor", baslama_zamani: new Date().toISOString() })
-      .eq("cut_id", cutId);
-
-    if (error) return { success: false, error: error.message };
-
-    revalidatePath("/uretim/kesim");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Kesimi tamamla: kesiliyor → tamamlandi + yari_mamul_stok INSERT */
-export async function completeCut(cutId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    // Batch bilgilerini al
-    const { data } = await supabase
-      .from("cut_batches")
-      .select("cut_id, durum, sku, operator_id, plaka_id, adet")
-      .eq("cut_id", cutId)
-      .single();
-
-    const batch = data as { cut_id: string; durum: string; sku: string | null; operator_id: string | null; plaka_id: string | null; adet: number } | null;
-    if (!batch) return { success: false, error: "Kesim bulunamadı" };
-    if (batch.durum !== "kesiliyor") return { success: false, error: "Bu kesim henüz başlatılmamış veya zaten tamamlanmış" };
-
-    const now = new Date().toISOString();
-
-    // Update durum
-    const { error: updateError } = await supabase
-      .from("cut_batches")
-      .update({ durum: "tamamlandi", bitis_zamani: now })
-      .eq("cut_id", cutId);
-
-    if (updateError) return { success: false, error: updateError.message };
-
-    // Cut lines al
-    const { data: lines } = await supabase
-      .from("cut_lines")
-      .select("cut_line_id, part_id, adet")
-      .eq("cut_id", cutId);
-
-    if (lines && lines.length > 0) {
-      // Idempotency: mevcut kayıt kontrolü
-      const { data: existing } = await supabase
-        .from("yari_mamul_stok")
-        .select("source_id")
-        .eq("source_id", cutId)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        // Zaten kayıt var, tekrar ekleme
-        revalidatePath("/uretim/kesim");
-        return { success: true };
-      }
-
+    // YarıMamulStok'a otomatik IN kayıtları (kesim tamamlandığında)
+    if (plakaParts && plakaParts.length > 0) {
       // Part adlarını çek
-      const partIds = lines.filter(l => l.part_id).map(l => l.part_id!);
-      const { data: allParts } = await supabase
+      const ymsPartIds = plakaParts.filter(l => l.part_id).map(l => l.part_id);
+      const { data: ymsAllParts } = await supabase
         .from("all_parts")
         .select("part_id, part_adi")
-        .in("part_id", partIds);
+        .in("part_id", ymsPartIds.length > 0 ? ymsPartIds : ["__none__"]);
 
-      const partNameMap = new Map(
-        (allParts ?? []).map(p => [p.part_id, p.part_adi])
+      const ymsPartNameMap = new Map(
+        (ymsAllParts ?? []).map(p => [p.part_id, p.part_adi])
       );
 
       // Generate next YMS ID
@@ -367,7 +282,7 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
         if (match) ymsNum = parseInt(match[1], 10) + 1;
       }
 
-      const ymsInserts = lines
+      const ymsInserts = plakaParts
         .filter(l => l.part_id)
         .map(l => {
           const ymsId = `YMS-${String(ymsNum).padStart(6, "0")}`;
@@ -376,13 +291,13 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
             yms_id: ymsId,
             tarih: now,
             part_id: l.part_id,
-            part_adi: partNameMap.get(l.part_id!) ?? null,
-            sku: batch.sku,
-            qty: l.adet,
+            part_adi: ymsPartNameMap.get(l.part_id) ?? null,
+            sku: parsed.data.sku,
+            qty: (l.default_qty ?? 0) * parsed.data.adet,
             direction: "IN",
             source: "Kesim",
             source_id: cutId,
-            operator: batch.operator_id,
+            operator: operatorId,
           };
         });
 
@@ -392,91 +307,9 @@ export async function completeCut(cutId: string): Promise<ActionResult> {
       }
     }
 
-    // MDF stok düşümü artık createCutBatch'te yapılıyor (kesim oluşturulduğunda)
-
-    revalidatePath("/uretim/kesim");
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
-  }
-}
-
-/** Kesimi iptal et: kesiliyor → bekliyor + MDF stok iadesi */
-export async function cancelCut(cutId: string): Promise<ActionResult> {
-  try {
-    await requireProductionAccess();
-    const supabase = await createClient();
-
-    const { data: cancelData } = await supabase
-      .from("cut_batches")
-      .select("durum, plaka_id, adet, operator_id")
-      .eq("cut_id", cutId)
-      .single();
-
-    const cancelBatch = cancelData as { durum: string; plaka_id: string | null; adet: number; operator_id: string | null } | null;
-    if (!cancelBatch) return { success: false, error: "Kesim bulunamadı" };
-    if (cancelBatch.durum !== "kesiliyor") return { success: false, error: "Sadece kesiliyor durumundaki kayıt iptal edilebilir" };
-
-    const { error } = await supabase
-      .from("cut_batches")
-      .update({ durum: "bekliyor", baslama_zamani: null })
-      .eq("cut_id", cutId);
-
-    if (error) return { success: false, error: error.message };
-
-    // MDF stok iadesi: iptal edilen kesimin MDF düşümünü geri al
-    if (cancelBatch.plaka_id) {
-      const { data: plakaData } = await supabase
-        .from("plakalar")
-        .select("tipi, renk")
-        .eq("plaka_id", cancelBatch.plaka_id)
-        .limit(1)
-        .single();
-
-      if (plakaData?.tipi && plakaData?.renk) {
-        const { data: mdfPart } = await supabase
-          .from("all_parts")
-          .select("part_id, hazir_eleman_aktif_stok")
-          .eq("mdf_tipi", plakaData.tipi)
-          .eq("mdf_renk", plakaData.renk)
-          .limit(1)
-          .single();
-
-        if (mdfPart) {
-          const restoredStok = mdfPart.hazir_eleman_aktif_stok + cancelBatch.adet;
-          await supabase
-            .from("all_parts")
-            .update({ hazir_eleman_aktif_stok: restoredStok })
-            .eq("part_id", mdfPart.part_id);
-
-          // Hareket kaydı (iade)
-          const hakisNow = new Date();
-          const hakisId = `HA-${hakisNow.getFullYear()}${String(hakisNow.getMonth() + 1).padStart(2, "0")}${String(hakisNow.getDate()).padStart(2, "0")}-${String(hakisNow.getHours()).padStart(2, "0")}${String(hakisNow.getMinutes()).padStart(2, "0")}${String(hakisNow.getSeconds()).padStart(2, "0")}`;
-
-          const { data: hakisExisting } = await supabase
-            .from("hazir_eleman_akis")
-            .select("hakis_id")
-            .eq("hakis_id", hakisId)
-            .limit(1);
-
-          const finalHakisId = hakisExisting && hakisExisting.length > 0
-            ? `${hakisId}-${cutId}`
-            : hakisId;
-
-          await supabase.from("hazir_eleman_akis").insert({
-            hakis_id: finalHakisId,
-            tarih: new Date().toISOString(),
-            part_id: mdfPart.part_id,
-            qty: cancelBatch.adet,
-            operator: cancelBatch.operator_id,
-            not_text: `Kesim MDF İade (İptal) — ${cutId}`,
-          });
-        }
-      }
-    }
-
     revalidatePath("/uretim/kesim");
     revalidatePath("/stok/hazir-eleman");
+    revalidatePath("/stok/yari-mamul");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

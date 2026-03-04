@@ -26,12 +26,9 @@ const DATE_FILTER_LABELS: Record<string, string> = {
 };
 
 interface KesimDashboardProps {
-  activeCuts: CutBatchRow[];
-  completedCuts: CutBatchRow[];
-  todayTotalAdet: number;
+  records: CutBatchRow[];
   todayTotalBatch: number;
   dateFilter: string;
-  makineler: { makine_id: string; tipi: string; bolum: string; aktif: boolean }[];
   machineCounts: MachineCounts;
   mdfStok: MdfStokItem[];
   machineStatus: MachineStatusEntry[];
@@ -40,9 +37,7 @@ interface KesimDashboardProps {
 }
 
 export function KesimDashboard({
-  activeCuts: serverActiveCuts,
-  completedCuts: serverCompletedCuts,
-  todayTotalAdet: serverTodayTotalAdet,
+  records: serverRecords,
   todayTotalBatch: serverTodayTotalBatch,
   dateFilter,
   machineCounts,
@@ -52,8 +47,7 @@ export function KesimDashboard({
   dailyAvgConsumption,
 }: KesimDashboardProps) {
   const router = useRouter();
-  const activeCuts = useServerDataCache("kesim-active", serverActiveCuts);
-  const completedCuts = useServerDataCache("kesim-completed", serverCompletedCuts);
+  const records = useServerDataCache("kesim-records", serverRecords);
   const todayTotalBatch = useServerDataCache("kesim-batch", serverTodayTotalBatch);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -98,10 +92,10 @@ export function KesimDashboard({
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-semibold">
             Kesim Kayıtları
-            {(activeCuts.length + completedCuts.length) > 0 && (
+            {records.length > 0 && (
               <span className="text-sm font-normal text-muted-foreground ml-2">
                 — {sectionLabel}
-                {" "}({activeCuts.length + completedCuts.length})
+                {" "}({records.length})
               </span>
             )}
           </h2>
@@ -123,7 +117,7 @@ export function KesimDashboard({
             </Button>
           ))}
         </div>
-        <KesimRecords activeCuts={activeCuts} completedCuts={completedCuts} />
+        <KesimRecords records={records} />
       </div>
 
       {/* FAB — Mobile */}

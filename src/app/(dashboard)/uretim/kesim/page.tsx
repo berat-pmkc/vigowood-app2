@@ -70,35 +70,19 @@ export default async function KesimPage({
 
   // Parallel fetches
   const [
-    activeBatchesRes,
-    completedBatchesRes,
-    makinelerRes,
+    allBatchesRes,
     mdfStokRes,
     machineStatusResults,
     last7DaysCutsRes,
     todayBatchesRes,
   ] = await Promise.all([
-    // Aktif kesimler (kesiliyor durumunda)
+    // Tarih aralığındaki tüm batch'ler
     supabase
       .from("cut_batches")
       .select("*")
-      .eq("durum", "kesiliyor")
-      .order("baslama_zamani", { ascending: false }),
-    // Filtered completed batches (date range)
-    supabase
-      .from("cut_batches")
-      .select("*")
-      .eq("durum", "tamamlandi")
-      .gte("bitis_zamani", rangeStart)
-      .lte("bitis_zamani", rangeEnd)
-      .order("bitis_zamani", { ascending: false }),
-    // Makineler
-    supabase
-      .from("kesim_makinesi")
-      .select("makine_id, tipi, bolum, aktif")
-      .eq("bolum", "Kesim")
-      .eq("aktif", true)
-      .order("makine_id"),
+      .gte("tarih", rangeStart)
+      .lte("tarih", rangeEnd)
+      .order("tarih", { ascending: false }),
     // MDF stok (mdf_tipi not null olan parçalar)
     supabase
       .from("all_parts")
@@ -134,9 +118,7 @@ export default async function KesimPage({
       .lte("bitis_zamani", todayEnd),
   ]);
 
-  const activeBatches = (activeBatchesRes.data ?? []) as CutBatchRow[];
-  const completedBatches = (completedBatchesRes.data ?? []) as CutBatchRow[];
-  const allBatches = [...activeBatches, ...completedBatches];
+  const allBatches = (allBatchesRes.data ?? []) as CutBatchRow[];
 
   // Enrich: plaka adları, ürün adları, operatör adları
   const plakaIds = [...new Set(allBatches.map((b) => b.plaka_id).filter(Boolean) as string[])];
@@ -172,8 +154,7 @@ export default async function KesimPage({
     operator_adi: b.operator_id ? operatorMap.get(b.operator_id) ?? undefined : undefined,
   });
 
-  const enrichedActive = activeBatches.map(enrich);
-  const enrichedCompleted = completedBatches.map(enrich);
+  const enrichedRecords = allBatches.map(enrich);
 
   // MDF stok verileri
   const mdfStok = (mdfStokRes.data ?? []) as MdfStokItem[];
@@ -181,7 +162,6 @@ export default async function KesimPage({
   // Bugünkü KPI'lar
   const todayBatches = todayBatchesRes.data ?? [];
   const todayTotalBatch = todayBatches.length;
-  const todayTotalAdet = todayBatches.reduce((sum, b) => sum + (b.adet ?? 0), 0);
 
   // Makine bazlı bugünkü kesim sayısı
   const machineCounts: MachineCounts = {};
@@ -206,12 +186,9 @@ export default async function KesimPage({
   return (
     <div className="pb-20 md:pb-6">
       <KesimDashboard
-        activeCuts={enrichedActive}
-        completedCuts={enrichedCompleted}
-        todayTotalAdet={todayTotalAdet}
+        records={enrichedRecords}
         todayTotalBatch={todayTotalBatch}
         dateFilter={dateFilter}
-        makineler={(makinelerRes.data ?? []) as { makine_id: string; tipi: string; bolum: string; aktif: boolean }[]}
         machineCounts={machineCounts}
         mdfStok={mdfStok}
         machineStatus={machineStatusResults}
