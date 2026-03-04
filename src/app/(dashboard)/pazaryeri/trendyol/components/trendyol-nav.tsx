@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ShoppingCart, Package, MessageSquareText, DollarSign, RotateCcw } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Package, MessageSquareText, DollarSign, RotateCcw, Megaphone } from "lucide-react";
 
 const tabs = [
   { title: "Dashboard", href: "/pazaryeri/trendyol", icon: LayoutDashboard, exact: true },
@@ -12,6 +12,7 @@ const tabs = [
   { title: "Ürünler", href: "/pazaryeri/trendyol/urunler", icon: Package },
   { title: "Sorular", href: "/pazaryeri/trendyol/sorular", icon: MessageSquareText },
   { title: "Finans", href: "/pazaryeri/trendyol/finans", icon: DollarSign },
+  { title: "Reklamlar", href: "/pazaryeri/trendyol/reklamlar", icon: Megaphone },
 ];
 
 export function TrendyolNav() {
