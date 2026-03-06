@@ -316,9 +316,36 @@ export function PricingTable({
         header: "Ham ₺",
         size: 90,
         cell: ({ row }) => {
-          const v = row.original.ham_fiyat;
+          const r = row.original;
+          const v = r.ham_fiyat;
           const cls = v >= 0 ? "text-green-700" : "text-red-700";
-          return <span className={`text-xs font-semibold ${cls}`}>₺{Math.round(v).toFixed(0)}</span>;
+          const vergiOrani = kdvOrani / (1 + kdvOrani);
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`text-xs font-semibold ${cls} cursor-help border-b border-dashed border-current`}>
+                  ₺{Math.round(v).toFixed(0)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs font-mono p-3 space-y-1">
+                <p className="font-semibold text-foreground mb-1.5">Ham Fiyat Hesaplama</p>
+                <p>Satış Fiyatı: ₺{r.satis_fiyati.toFixed(2)}</p>
+                <p className="text-muted-foreground">× (1 - {(r.komisyon_orani * 100).toFixed(1)}% kom - {(vergiOrani * 100).toFixed(2)}% vergi - {(r.stopaj_orani * 100).toFixed(1)}% stopaj - {(r.reklam_orani * 100).toFixed(1)}% reklam)</p>
+                <p className="text-muted-foreground">= ₺{r.satis_fiyati.toFixed(2)} × {(1 - r.komisyon_orani - vergiOrani - r.stopaj_orani - r.reklam_orani).toFixed(4)}</p>
+                <p className="text-muted-foreground">= ₺{(r.satis_fiyati * (1 - r.komisyon_orani - vergiOrani - r.stopaj_orani - r.reklam_orani)).toFixed(2)}</p>
+                <div className="border-t border-border pt-1 mt-1 space-y-0.5">
+                  <p>− Komisyon: ₺{r.komisyon_bedeli.toFixed(2)} ({(r.komisyon_orani * 100).toFixed(1)}%)</p>
+                  <p>− Vergi (KDV): ₺{r.vergi_tutari.toFixed(2)} ({(vergiOrani * 100).toFixed(2)}%)</p>
+                  <p>− Stopaj: ₺{r.stopaj_tutari.toFixed(2)} ({(r.stopaj_orani * 100).toFixed(1)}%)</p>
+                  <p>− Reklam: ₺{r.reklam_bedeli.toFixed(2)} ({(r.reklam_orani * 100).toFixed(1)}%)</p>
+                  <p>− Kargo: ₺{r.kargo_maliyeti.toFixed(2)} ({r.desi} desi)</p>
+                </div>
+                <div className="border-t border-border pt-1 mt-1">
+                  <p className={`font-bold ${cls}`}>= Ham Fiyat: ₺{v.toFixed(2)}</p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          );
         },
       },
       {

@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { SimplePagination } from "../../../fiyatlama/components/simple-pagination";
 import { toast } from "sonner";
-import { Upload, Search, Trash2, Loader2 } from "lucide-react";
+import { Upload, Download, Search, Trash2, Loader2 } from "lucide-react";
 import { upsertTargetPrice, deleteTargetPrice, bulkUpsertTargetPrices } from "../../../fiyatlama/actions";
 import * as XLSX from "xlsx";
 
@@ -348,6 +348,23 @@ export function HedefFiyatlarClient({ products, targetPrices }: Props) {
 
   const definedCount = rows.filter(r => r.has_target).length;
 
+  const handleExcelDownload = useCallback(() => {
+    const exportData = rows.map((r) => ({
+      SKU: r.sku,
+      "Ürün Adı": r.urun_adi ?? "",
+      "Hedef Fiyat": r.hedef_fiyat > 0 ? Math.round(r.hedef_fiyat) : "",
+      "Hedef +KDV": r.hedef_fiyat > 0 ? Math.round(r.hedef_fiyat * 1.1) : "",
+      "Toptan Hedef": r.toptan_hedef_fiyat > 0 ? Math.round(r.toptan_hedef_fiyat) : "",
+      "Toptan +KDV": r.toptan_hedef_fiyat > 0 ? Math.round(r.toptan_hedef_fiyat * 1.1) : "",
+      Durum: r.has_target ? "Tanımlı" : "Boş",
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws["!cols"] = [{ wch: 14 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Hedef Fiyatlar");
+    XLSX.writeFile(wb, `hedef-fiyatlar-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }, [rows]);
+
   return (
     <>
       {/* Toolbar */}
@@ -375,6 +392,14 @@ export function HedefFiyatlarClient({ products, targetPrices }: Props) {
             className="hidden"
             onChange={handleExcelUpload}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExcelDownload}
+          >
+            <Download className="mr-1 h-4 w-4" />
+            Excel İndir
+          </Button>
           <Button
             variant="outline"
             size="sm"

@@ -31,12 +31,12 @@ import {
   CommandItem,
   CommandGroup,
 } from "@/components/ui/command";
-import { Save, Download, Camera, Loader2, Plus, Megaphone, Pencil, Truck } from "lucide-react";
+import { Save, Download, Loader2, Plus, Megaphone, Pencil, Truck } from "lucide-react";
 import type { Marketplace, ShippingProvider } from "@/types/pricing";
 import {
   getListingsForMarketplace,
   updateListings,
-  saveSnapshot,
+
   createListing,
   deactivateListing,
   bulkUpdateReklamOrani,
@@ -66,8 +66,6 @@ export function PricingPanelClient({ marketplaces, allProducts }: Props) {
   const [rows, setRows] = useState<PricingRow[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
-  const [snapshotOpen, setSnapshotOpen] = useState(false);
-  const [snapshotDonem, setSnapshotDonem] = useState("");
   const [addListingOpen, setAddListingOpen] = useState(false);
   const [newListingSku, setNewListingSku] = useState("");
   const [newListingKodu, setNewListingKodu] = useState("");
@@ -291,22 +289,6 @@ export function PricingPanelClient({ marketplaces, allProducts }: Props) {
     toast.success("Excel dosyası indirildi");
   };
 
-  // Snapshot handler
-  const handleSnapshot = async () => {
-    if (!snapshotDonem.trim() || !marketplace) return;
-
-    startTransition(async () => {
-      const result = await saveSnapshot(snapshotDonem.trim(), marketplace.id);
-      if (result.success) {
-        toast.success(`Snapshot kaydedildi: ${snapshotDonem}`);
-        setSnapshotOpen(false);
-        setSnapshotDonem("");
-      } else {
-        toast.error("Snapshot hatası: " + result.error);
-      }
-    });
-  };
-
   // SKUs already in this marketplace (for filtering "Ürün Ekle" combobox)
   const existingSkus = new Set(rawListings.map((l: any) => l.sku));
 
@@ -372,18 +354,6 @@ export function PricingPanelClient({ marketplaces, allProducts }: Props) {
           >
             <Download className="mr-1.5 h-3.5 w-3.5" />
             Excel
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setSnapshotDonem(new Date().toISOString().slice(0, 7));
-              setSnapshotOpen(true);
-            }}
-            disabled={rows.length === 0}
-          >
-            <Camera className="mr-1.5 h-3.5 w-3.5" />
-            Snapshot
           </Button>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -604,36 +574,6 @@ export function PricingPanelClient({ marketplaces, allProducts }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Snapshot Dialog */}
-      <Dialog open={snapshotOpen} onOpenChange={setSnapshotOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Fiyat Snapshot&apos;ı Al</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              Mevcut fiyatların bir kopyasını kaydedin. Dönem kodu ile sonra karşılaştırabilirsiniz.
-            </p>
-            <Input
-              placeholder="Dönem kodu (ör. 2026-03)"
-              value={snapshotDonem}
-              onChange={(e) => setSnapshotDonem(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              {marketplace?.name} — {rows.length} listing kaydedilecek
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSnapshotOpen(false)}>
-              İptal
-            </Button>
-            <Button onClick={handleSnapshot} disabled={!snapshotDonem.trim() || isPending}>
-              {isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-              Kaydet
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

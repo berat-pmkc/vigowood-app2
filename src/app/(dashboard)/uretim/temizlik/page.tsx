@@ -5,26 +5,18 @@ import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
 import { TemizlikList } from "./components/temizlik-list";
 import type { TemizlikBatchRow } from "./components/temizlik-card";
-import type { CleanStatus } from "@/lib/constants";
 
 export const metadata: Metadata = { title: "Temizlik" };
 
-interface PageProps {
-  searchParams: Promise<{ durum?: string }>;
-}
-
-export default async function TemizlikPage({ searchParams }: PageProps) {
+export default async function TemizlikPage() {
   const user = await getCurrentUser();
   if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
     redirect("/");
   }
 
-  const params = await searchParams;
-  const selectedStatus = params.durum || "all";
-
   const supabase = await createClient();
 
-  // 1. Tamamlanmis cut_batches (son 30 gun — temizlik bekleyenler icin)
+  // Son 30 günün tamamlanmış kesim batch'leri
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -48,115 +40,34 @@ export default async function TemizlikPage({ searchParams }: PageProps) {
   if (batches.length === 0) {
     return (
       <div className="pb-20 md:pb-6">
-        <TemizlikList batches={[]} counts={{ bekliyor: 0, temizleniyor: 0, tamamlandi: 0 }} selectedStatus={selectedStatus} />
+        <TemizlikList batches={[]} />
       </div>
     );
   }
 
   const cutIds = batches.map((b) => b.cut_id);
 
-  // 2. Bu batch'lerin cut_lines'lari
+  // Cut lines (parça sayısı için)
   const { data: allLines } = await supabase
     .from("cut_lines")
-    .select("cut_line_id, cut_id, part_id, adet")
+    .select("cut_line_id, cut_id")
     .in("cut_id", cutIds);
 
   const lines = (allLines ?? []) as Array<{
     cut_line_id: string;
     cut_id: string;
-    part_id: string | null;
-    adet: number;
   }>;
 
-  // 3. Bu cut_lines icin clean kayitlari
-  const cutLineIds = lines.map((l) => l.cut_line_id);
-
-  const { data: cleanRecords } = cutLineIds.length > 0
-    ? await supabase
-        .from("clean")
-        .select("cutline_id, clean_batch_id, start_time, end_time, status, operator_id, operator_name")
-        .in("cutline_id", cutLineIds)
-    : { data: [] };
-
-  const cleans = (cleanRecords ?? []) as Array<{
-    cutline_id: string;
-    clean_batch_id: string;
-    start_time: string | null;
-    end_time: string | null;
-    status: string;
-    operator_id: string | null;
-    operator_name: string | null;
-  }>;
-
-  // cut_line_id → clean record map
-  const cleanMap = new Map(cleans.map((c) => [c.cutline_id, c]));
-
-  // cut_id → cut_lines map
-  const linesByBatch = new Map<string, typeof lines>();
+  // cut_id → line count
+  const lineCountMap = new Map<string, number>();
   for (const line of lines) {
-    const arr = linesByBatch.get(line.cut_id) ?? [];
-    arr.push(line);
-    linesByBatch.set(line.cut_id, arr);
+    lineCountMap.set(line.cut_id, (lineCountMap.get(line.cut_id) ?? 0) + 1);
   }
 
-  // 4. Her batch icin temizlik durumunu hesapla
-  const temizlikBatches: TemizlikBatchRow[] = batches
-    .map((batch) => {
-      const batchLines = linesByBatch.get(batch.cut_id) ?? [];
-      if (batchLines.length === 0) return null;
-
-      const lineCleans = batchLines.map((l) => cleanMap.get(l.cut_line_id));
-      const allHaveClean = lineCleans.every((c) => c !== undefined);
-      const allTamamlandi = allHaveClean && lineCleans.every((c) => c!.status === "tamamlandi");
-      const anyTemizleniyor = lineCleans.some((c) => c?.status === "temizleniyor");
-
-      let cleanStatus: CleanStatus;
-      if (allTamamlandi) {
-        cleanStatus = "tamamlandi";
-      } else if (anyTemizleniyor) {
-        cleanStatus = "temizleniyor";
-      } else {
-        cleanStatus = "bekliyor";
-      }
-
-      // Ilk clean record'dan zaman bilgisi (hepsi ayni batch)
-      const firstClean = lineCleans.find((c) => c !== undefined);
-
-      return {
-        cut_id: batch.cut_id,
-        tarih: batch.tarih,
-        sku: batch.sku,
-        plaka_id: batch.plaka_id,
-        makine_id: batch.makine_id,
-        adet: batch.adet,
-        kesim_operator_id: batch.operator_id,
-        clean_status: cleanStatus,
-        clean_batch_id: firstClean?.clean_batch_id ?? null,
-        start_time: firstClean?.start_time ?? null,
-        end_time: firstClean?.end_time ?? null,
-        operator_id: firstClean?.operator_id ?? null,
-        operator_name: firstClean?.operator_name ?? null,
-        line_count: batchLines.length,
-      } satisfies TemizlikBatchRow;
-    })
-    .filter((b): b is TemizlikBatchRow => b !== null);
-
-  // 5. Durum sayaclari
-  const counts: Record<string, number> = { bekliyor: 0, temizleniyor: 0, tamamlandi: 0 };
-  temizlikBatches.forEach((b) => {
-    if (counts[b.clean_status] !== undefined) counts[b.clean_status]++;
-  });
-
-  // 6. Durum filtrele
-  const filtered =
-    selectedStatus === "all"
-      ? temizlikBatches
-      : temizlikBatches.filter((b) => b.clean_status === selectedStatus);
-
-  // 7. Enrich: plaka adlari, urun adlari, operator adlari
-  const plakaIds = [...new Set(filtered.map((b) => b.plaka_id).filter(Boolean) as string[])];
-  const skus = [...new Set(filtered.map((b) => b.sku).filter(Boolean) as string[])];
-  const operatorIds = [...new Set(filtered.map((b) => b.kesim_operator_id).filter(Boolean) as string[])];
+  // Enrichment: plaka adları, ürün adları, operatör adları
+  const plakaIds = [...new Set(batches.map((b) => b.plaka_id).filter(Boolean) as string[])];
+  const skus = [...new Set(batches.map((b) => b.sku).filter(Boolean) as string[])];
+  const operatorIds = [...new Set(batches.map((b) => b.operator_id).filter(Boolean) as string[])];
 
   const [plakaResult, productResult, operatorResult] = await Promise.all([
     plakaIds.length > 0
@@ -180,20 +91,23 @@ export default async function TemizlikPage({ searchParams }: PageProps) {
     (operatorResult.data ?? []).map((u) => [u.user_id, u.full_name])
   );
 
-  const enriched: TemizlikBatchRow[] = filtered.map((b) => ({
-    ...b,
-    plaka_adi: b.plaka_id ? plakaMap.get(b.plaka_id) ?? undefined : undefined,
+  const enriched: TemizlikBatchRow[] = batches.map((b) => ({
+    cut_id: b.cut_id,
+    tarih: b.tarih,
+    sku: b.sku,
+    plaka_id: b.plaka_id,
+    makine_id: b.makine_id,
+    adet: b.adet,
+    operator_id: b.operator_id,
+    line_count: lineCountMap.get(b.cut_id) ?? 0,
     urun_adi: b.sku ? productMap.get(b.sku) ?? undefined : undefined,
-    kesim_operator_adi: b.kesim_operator_id ? operatorMap.get(b.kesim_operator_id) ?? undefined : undefined,
+    plaka_adi: b.plaka_id ? plakaMap.get(b.plaka_id) ?? undefined : undefined,
+    operator_adi: b.operator_id ? operatorMap.get(b.operator_id) ?? undefined : undefined,
   }));
 
   return (
     <div className="pb-20 md:pb-6">
-      <TemizlikList
-        batches={enriched}
-        counts={counts}
-        selectedStatus={selectedStatus}
-      />
+      <TemizlikList batches={enriched} />
     </div>
   );
 }
