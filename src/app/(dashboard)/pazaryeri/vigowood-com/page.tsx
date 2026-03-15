@@ -22,6 +22,7 @@ export default async function VigowoodDashboardPage({ searchParams }: PageProps)
   const params = await searchParams;
   const isMock = isUsingMockData();
 
+  try {
   // ─── Month selection ────────────────────────────────
   const currentMonth = currentMonthKey(); // e.g. "2026-02"
   const selectedMonth = params.ay && /^\d{4}-\d{2}$/.test(params.ay) ? params.ay : currentMonth;
@@ -238,4 +239,18 @@ export default async function VigowoodDashboardPage({ searchParams }: PageProps)
       isCurrentMonth={isCurrentMonth}
     />
   );
+  } catch (error) {
+    console.error("[vigowood-com/dashboard] API hatası:", error);
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-bold text-vw-dark">vigowood.com Dashboard</h1>
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-6">
+          <p className="text-sm font-medium text-destructive">İkas API Bağlantı Hatası</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {error instanceof Error ? error.message : "İkas API'ye bağlanılamadı. Lütfen daha sonra tekrar deneyin."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 }

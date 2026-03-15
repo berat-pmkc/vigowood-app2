@@ -37,54 +37,72 @@ export default async function VigowoodSiparislerPage({ searchParams }: PageProps
     endDate = ed.toISOString();
   }
 
-  const orderParams: Parameters<typeof getOrders>[0] = {
-    startDate,
-    endDate,
-    page,
-    limit: 50,
-    sort: "orderedAt:desc",
-    search: search || undefined,
-  };
-
-  // Add package status filter (not for "cancelled" group or "all")
-  if (status && status !== "all" && status !== "cancelled") {
-    orderParams.packageStatus = status as IkasPackageStatus;
-  }
-
-  const result = await getOrders(orderParams);
-  let orders = result.data;
-
-  // Client-side filter for cancelled/refunded group
-  if (status === "cancelled") {
-    const allResult = await getOrders({
+  try {
+    const orderParams: Parameters<typeof getOrders>[0] = {
       startDate,
       endDate,
-      page: 1,
-      limit: 200,
+      page,
+      limit: 50,
       sort: "orderedAt:desc",
-    });
-    orders = allResult.data.filter(
-      (o) =>
-        o.orderPackageStatus === "CANCELLED" ||
-        o.orderPackageStatus === "REFUNDED" ||
-        o.orderPackageStatus === "PARTIALLY_CANCELLED" ||
-        o.orderPackageStatus === "PARTIALLY_REFUNDED" ||
-        o.status === "CANCELLED" ||
-        o.status === "REFUNDED"
+      search: search || undefined,
+    };
+
+    // Add package status filter (not for "cancelled" group or "all")
+    if (status && status !== "all" && status !== "cancelled") {
+      orderParams.packageStatus = status as IkasPackageStatus;
+    }
+
+    const result = await getOrders(orderParams);
+    let orders = result.data;
+
+    // Client-side filter for cancelled/refunded group
+    if (status === "cancelled") {
+      const allResult = await getOrders({
+        startDate,
+        endDate,
+        page: 1,
+        limit: 200,
+        sort: "orderedAt:desc",
+      });
+      orders = allResult.data.filter(
+        (o) =>
+          o.orderPackageStatus === "CANCELLED" ||
+          o.orderPackageStatus === "REFUNDED" ||
+          o.orderPackageStatus === "PARTIALLY_CANCELLED" ||
+          o.orderPackageStatus === "PARTIALLY_REFUNDED" ||
+          o.status === "CANCELLED" ||
+          o.status === "REFUNDED"
+      );
+    }
+
+    return (
+      <SiparislerClient
+        orders={orders}
+        totalCount={result.count}
+        hasNext={result.hasNext}
+        currentPage={page}
+        currentStatus={status || "all"}
+        currentSearch={search}
+        startDate={params.startDate || ""}
+        endDate={params.endDate || ""}
+        isMock={isMock}
+      />
+    );
+  } catch (error) {
+    console.error("[vigowood-com/siparisler] API hatası:", error);
+    return (
+      <SiparislerClient
+        orders={[]}
+        totalCount={0}
+        hasNext={false}
+        currentPage={page}
+        currentStatus={status || "all"}
+        currentSearch={search}
+        startDate={params.startDate || ""}
+        endDate={params.endDate || ""}
+        isMock={isMock}
+        apiError={error instanceof Error ? error.message : "İkas API bağlantı hatası"}
+      />
     );
   }
-
-  return (
-    <SiparislerClient
-      orders={orders}
-      totalCount={result.count}
-      hasNext={result.hasNext}
-      currentPage={page}
-      currentStatus={status || "all"}
-      currentSearch={search}
-      startDate={params.startDate || ""}
-      endDate={params.endDate || ""}
-      isMock={isMock}
-    />
-  );
 }

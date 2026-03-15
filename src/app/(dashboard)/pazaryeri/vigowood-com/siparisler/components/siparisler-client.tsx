@@ -26,7 +26,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Search, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, CalendarDays, AlertTriangle } from "lucide-react";
 import type { IkasOrder } from "@/lib/ikas/types";
 import {
   ORDER_TAB_FILTERS,
@@ -93,6 +93,7 @@ interface Props {
   startDate: string;
   endDate: string;
   isMock: boolean;
+  apiError?: string;
 }
 
 export function SiparislerClient({
@@ -105,6 +106,7 @@ export function SiparislerClient({
   startDate,
   endDate,
   isMock,
+  apiError,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -197,6 +199,19 @@ export function SiparislerClient({
         </div>
         <IkasSyncButton isMock={isMock} />
       </div>
+
+      {/* API Error */}
+      {apiError && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <p className="text-sm font-medium text-destructive">İkas API Bağlantı Hatası</p>
+              <p className="text-xs text-muted-foreground">{apiError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>

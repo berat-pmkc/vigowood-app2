@@ -27,7 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-import { Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { IkasProduct } from "@/lib/ikas/types";
 import { formatTRY, getProductPrice, getProductSku } from "@/lib/ikas/helpers";
@@ -41,6 +41,7 @@ interface Props {
   currentSearch: string;
   currentFilter: string;
   isMock: boolean;
+  apiError?: string;
 }
 
 export function UrunlerClient({
@@ -51,6 +52,7 @@ export function UrunlerClient({
   currentSearch,
   currentFilter,
   isMock,
+  apiError,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -189,6 +191,19 @@ export function UrunlerClient({
           </p>
         </div>
       </div>
+
+      {/* API Error */}
+      {apiError && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <p className="text-sm font-medium text-destructive">İkas API Bağlantı Hatası</p>
+              <p className="text-xs text-muted-foreground">{apiError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>

@@ -33,7 +33,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, AlertTriangle } from "lucide-react";
 import type { IkasCustomer } from "@/lib/ikas/types";
 import {
   formatTRY,
@@ -55,6 +55,7 @@ interface Props {
   currentSort: CustomerSortField;
   currentDir: "asc" | "desc";
   isMock: boolean;
+  apiError?: string;
 }
 
 export function MusterilerClient({
@@ -66,6 +67,7 @@ export function MusterilerClient({
   currentSort,
   currentDir,
   isMock,
+  apiError,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -256,6 +258,19 @@ export function MusterilerClient({
           );
         })}
       </div>
+
+      {/* API Error */}
+      {apiError && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
+            <div>
+              <p className="text-sm font-medium text-destructive">İkas API Bağlantı Hatası</p>
+              <p className="text-xs text-muted-foreground">{apiError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search + Sort */}
       <Card>

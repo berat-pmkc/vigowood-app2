@@ -17,29 +17,45 @@ export default async function VigowoodUrunlerPage({ searchParams }: PageProps) {
   const isMock = isUsingMockData();
   const page = parseInt(params.page || "1", 10);
 
-  const result = await getProducts({
-    page,
-    limit: 50,
-    search: params.search || undefined,
-  });
+  try {
+    const result = await getProducts({
+      page,
+      limit: 50,
+      search: params.search || undefined,
+    });
 
-  // Client-side filter for stock status
-  let products = result.data;
-  if (params.filter === "active") {
-    products = products.filter((p) => p.variants.some((v) => v.isActive) && p.totalStock > 0);
-  } else if (params.filter === "outofstock") {
-    products = products.filter((p) => p.totalStock === 0);
+    // Client-side filter for stock status
+    let products = result.data;
+    if (params.filter === "active") {
+      products = products.filter((p) => p.variants.some((v) => v.isActive) && p.totalStock > 0);
+    } else if (params.filter === "outofstock") {
+      products = products.filter((p) => p.totalStock === 0);
+    }
+
+    return (
+      <UrunlerClient
+        products={products}
+        totalCount={result.count}
+        hasNext={result.hasNext}
+        currentPage={page}
+        currentSearch={params.search || ""}
+        currentFilter={params.filter || "all"}
+        isMock={isMock}
+      />
+    );
+  } catch (error) {
+    console.error("[vigowood-com/urunler] API hatası:", error);
+    return (
+      <UrunlerClient
+        products={[]}
+        totalCount={0}
+        hasNext={false}
+        currentPage={page}
+        currentSearch={params.search || ""}
+        currentFilter={params.filter || "all"}
+        isMock={isMock}
+        apiError={error instanceof Error ? error.message : "İkas API bağlantı hatası"}
+      />
+    );
   }
-
-  return (
-    <UrunlerClient
-      products={products}
-      totalCount={result.count}
-      hasNext={result.hasNext}
-      currentPage={page}
-      currentSearch={params.search || ""}
-      currentFilter={params.filter || "all"}
-      isMock={isMock}
-    />
-  );
 }
