@@ -109,14 +109,14 @@ export function MusterilerClient({
   // Client-side segment filtering (sayfadaki veriler üzerinden)
   const filteredCustomers = useMemo(() => {
     if (activeSegment === "all") return customers;
-    return customers.filter((c) => getCustomerSegment(c.orderCount).key === activeSegment);
+    return customers.filter((c) => getCustomerSegment(c).key === activeSegment);
   }, [customers, activeSegment]);
 
   // Segment counts (sayfadaki müşterilerden)
   const segmentCounts = useMemo(() => {
-    const counts: Record<CustomerSegmentKey, number> = { all: customers.length, vip: 0, sadik: 0, aktif: 0, yeni: 0 };
+    const counts: Record<CustomerSegmentKey, number> = { all: customers.length, vip: 0, sadik: 0, aktif: 0, yeni: 0, kayip: 0, potansiyel: 0 };
     for (const c of customers) {
-      const seg = getCustomerSegment(c.orderCount);
+      const seg = getCustomerSegment(c);
       if (seg.key !== "all") counts[seg.key]++;
     }
     return counts;
@@ -147,14 +147,14 @@ export function MusterilerClient({
       id: "name",
       header: () => <SortableHeader field="firstName" label="Ad Soyad" />,
       cell: ({ row }) => {
-        const seg = getCustomerSegment(row.original.orderCount);
+        const seg = getCustomerSegment(row.original);
         return (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">
               {row.original.firstName} {row.original.lastName}
             </span>
-            {seg.key !== "yeni" && seg.key !== "all" && (
-              <Badge className={`${seg.bg} ${seg.text} hover:${seg.bg} text-[10px] px-1.5 py-0`}>
+            {seg.key !== "potansiyel" && seg.key !== "all" && (
+              <Badge className={`${seg.bg} ${seg.text} ${seg.hoverBg} text-[10px] px-1.5 py-0`}>
                 {seg.label}
               </Badge>
             )}

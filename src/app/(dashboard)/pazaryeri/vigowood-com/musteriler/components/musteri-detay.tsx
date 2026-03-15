@@ -16,7 +16,16 @@ interface Props {
 }
 
 export function MusteriDetay({ customer }: Props) {
-  const segment = getCustomerSegment(customer.orderCount);
+  const segment = getCustomerSegment(customer);
+
+  const segmentLabels: Record<string, string> = {
+    vip: "VIP Müşteri",
+    sadik: "Sadık Müşteri",
+    aktif: "Aktif Müşteri",
+    yeni: "Yeni Müşteri",
+    kayip: "Kayıp Müşteri",
+    potansiyel: "Potansiyel Müşteri",
+  };
 
   return (
     <div className="mt-4 space-y-5">
@@ -86,12 +95,10 @@ export function MusteriDetay({ customer }: Props) {
 
       {/* Customer value badge */}
       <div>
-        <Badge className={`${segment.bg} ${segment.text} hover:${segment.bg}`}>
-          {segment.key === "vip" ? "VIP Müşteri" :
-           segment.key === "sadik" ? "Sadık Müşteri" :
-           segment.key === "aktif" ? "Aktif Müşteri" :
-           "Yeni Kayıt"}
+        <Badge className={`${segment.bg} ${segment.text} ${segment.hoverBg}`}>
+          {segmentLabels[segment.key] ?? segment.label}
         </Badge>
+        <p className="mt-1 text-xs text-muted-foreground">{segment.description}</p>
       </div>
     </div>
   );

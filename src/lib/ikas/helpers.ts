@@ -249,32 +249,80 @@ export function getProductSku(product: { variants: { sku: string }[] }): string 
 }
 
 // ─── Customer Segments ─────────────────────────────────
-export type CustomerSegmentKey = "all" | "vip" | "sadik" | "aktif" | "yeni";
+export type CustomerSegmentKey = "all" | "potansiyel" | "kayip" | "vip" | "yeni" | "sadik" | "aktif";
 
 export interface CustomerSegment {
   key: CustomerSegmentKey;
   label: string;
-  minOrders: number;
-  maxOrders: number | null;
+  description: string;
   bg: string;
   text: string;
+  hoverBg: string;
 }
 
 export const CUSTOMER_SEGMENTS: CustomerSegment[] = [
-  { key: "all", label: "Tümü", minOrders: 0, maxOrders: null, bg: "bg-gray-100", text: "text-gray-800" },
-  { key: "vip", label: "VIP", minOrders: 10, maxOrders: null, bg: "bg-amber-100", text: "text-amber-800" },
-  { key: "sadik", label: "Sadık", minOrders: 3, maxOrders: 9, bg: "bg-emerald-100", text: "text-emerald-800" },
-  { key: "aktif", label: "Aktif", minOrders: 1, maxOrders: 2, bg: "bg-blue-100", text: "text-blue-800" },
-  { key: "yeni", label: "Yeni", minOrders: 0, maxOrders: 0, bg: "bg-gray-100", text: "text-gray-800" },
+  { key: "all", label: "Tümü", description: "Tüm müşteriler", bg: "bg-gray-100", text: "text-gray-800", hoverBg: "hover:bg-gray-100" },
+  { key: "vip", label: "VIP", description: "10+ sipariş veya 20.000₺+ harcama, son 6 ayda aktif", bg: "bg-amber-100", text: "text-amber-800", hoverBg: "hover:bg-amber-100" },
+  { key: "yeni", label: "Yeni", description: "İlk siparişi son 3 ay içinde", bg: "bg-purple-100", text: "text-purple-800", hoverBg: "hover:bg-purple-100" },
+  { key: "sadik", label: "Sadık", description: "3+ sipariş, son 12 ayda aktif", bg: "bg-emerald-100", text: "text-emerald-800", hoverBg: "hover:bg-emerald-100" },
+  { key: "aktif", label: "Aktif", description: "1+ sipariş, son 6 ayda aktif", bg: "bg-blue-100", text: "text-blue-800", hoverBg: "hover:bg-blue-100" },
+  { key: "kayip", label: "Kayıp", description: "Son siparişi 12 aydan eski", bg: "bg-rose-100", text: "text-rose-800", hoverBg: "hover:bg-rose-100" },
+  { key: "potansiyel", label: "Potansiyel", description: "Henüz sipariş vermemiş", bg: "bg-gray-100", text: "text-gray-800", hoverBg: "hover:bg-gray-100" },
 ];
 
-/** Get customer segment based on order count */
-export function getCustomerSegment(orderCount: number | null): CustomerSegment {
-  const count = orderCount ?? 0;
-  if (count >= 10) return CUSTOMER_SEGMENTS[1]; // VIP
-  if (count >= 3) return CUSTOMER_SEGMENTS[2];  // Sadık
-  if (count >= 1) return CUSTOMER_SEGMENTS[3];  // Aktif
-  return CUSTOMER_SEGMENTS[4];                  // Yeni
+/** Lookup segment by key */
+function findSegment(key: CustomerSegmentKey): CustomerSegment {
+  return CUSTOMER_SEGMENTS.find((s) => s.key === key)!;
+}
+
+/** Check if a timestamp is within the last N months from now */
+function isWithinMonths(ts: number, months: number, now: number): boolean {
+  const d = new Date(now);
+  d.setMonth(d.getMonth() - months);
+  return ts >= d.getTime();
+}
+
+export interface CustomerSegmentInput {
+  orderCount: number | null;
+  totalOrderPrice: number | null;
+  firstOrderDate: number | null;
+  lastOrderDate: number | null;
+}
+
+/** Get customer segment based on order count, recency, and total spend */
+export function getCustomerSegment(customer: CustomerSegmentInput, now: number = Date.now()): CustomerSegment {
+  const count = customer.orderCount ?? 0;
+
+  // 1. Potansiyel — hiç siparişi yok
+  if (count === 0) return findSegment("potansiyel");
+
+  // Has orders but no lastOrderDate — edge case, treat as kayıp
+  if (!customer.lastOrderDate) return findSegment("kayip");
+
+  const last = customer.lastOrderDate;
+
+  // 2. Kayıp — siparişi var ama son sipariş > 12 ay önce
+  if (!isWithinMonths(last, 12, now)) return findSegment("kayip");
+
+  // 3. VIP — (10+ sipariş VEYA 20.000₺+ harcama) VE son 6 ayda aktif
+  const totalSpent = customer.totalOrderPrice ?? 0;
+  if ((count >= 10 || totalSpent >= 20000) && isWithinMonths(last, 6, now)) {
+    return findSegment("vip");
+  }
+
+  // 4. Yeni — ilk siparişi son 3 ay içinde
+  if (customer.firstOrderDate && isWithinMonths(customer.firstOrderDate, 3, now)) {
+    return findSegment("yeni");
+  }
+
+  // 5. Sadık — 3+ sipariş VE son 12 ayda aktif (already checked 12-month above)
+  if (count >= 3) return findSegment("sadik");
+
+  // 6. Aktif — 1+ sipariş VE son 6 ayda aktif
+  if (isWithinMonths(last, 6, now)) return findSegment("aktif");
+
+  // Fallback — siparişi var, 6-12 ay arası sessiz, VIP/Sadık/Yeni değil
+  return findSegment("kayip");
 }
 
 // ─── Customer Sort Options ─────────────────────────────
