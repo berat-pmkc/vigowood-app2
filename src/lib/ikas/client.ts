@@ -92,35 +92,61 @@ async function getAccessToken(): Promise<string> {
 }
 
 // ─── GraphQL Fetch ──────────────────────────────────────
+const MAX_RETRIES = 2;
+
 async function ikasGraphQL<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
   const token = await getAccessToken();
 
-  const response = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ query, variables }),
-    next: { revalidate: 0 },
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, variables }),
+      next: { revalidate: 0 },
+    });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new IkasError(response.status, `GraphQL hatası: ${text}`);
+    // Rate limit — retry after backoff
+    if (response.status === 429 && attempt < MAX_RETRIES) {
+      let waitMs = 6000; // default 6 seconds
+      try {
+        const body = await response.json();
+        if (body.retryAfter) waitMs = Math.ceil(body.retryAfter * 1000) + 500;
+      } catch { /* use default */ }
+      console.log(`[İkas] Rate limited, waiting ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new IkasError(response.status, `GraphQL hatası: ${text}`);
+    }
+
+    const json = await response.json();
+
+    if (json.errors && json.errors.length > 0) {
+      const errors = json.errors as IkasGraphQLError[];
+      // Rate limit can also come as GraphQL error
+      const rateLimitError = errors.find((e) => e.message.includes("Too Many Requests"));
+      if (rateLimitError && attempt < MAX_RETRIES) {
+        const waitMs = 6000;
+        console.log(`[İkas] Rate limited (GraphQL), waiting ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw new IkasError(400, errors.map((e) => e.message).join("; "));
+    }
+
+    return json.data as T;
   }
 
-  const json = await response.json();
-
-  if (json.errors && json.errors.length > 0) {
-    const errors = json.errors as IkasGraphQLError[];
-    throw new IkasError(400, errors.map((e) => e.message).join("; "));
-  }
-
-  return json.data as T;
+  throw new IkasError(429, "İkas API rate limit aşıldı, lütfen birkaç saniye sonra tekrar deneyin.");
 }
 
 export class IkasError extends Error {
@@ -370,15 +396,22 @@ export async function enrichCustomersWithOrderStats(
   );
   if (!needsEnrichment || !hasCredentials()) return customers;
 
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 5; // Small batches to avoid rate limits (İkas limit ~50 req/window)
+  const BATCH_DELAY_MS = 1500; // Pause between batches
+  const MAX_ENRICHMENTS = 20; // Cap total enrichment calls per page load
   const enriched = [...customers];
 
+  let enrichmentCount = 0;
   for (let i = 0; i < enriched.length; i += BATCH_SIZE) {
+    if (enrichmentCount >= MAX_ENRICHMENTS) break;
+
     const batch = enriched.slice(i, Math.min(i + BATCH_SIZE, enriched.length));
     const results = await Promise.all(
       batch.map(async (customer) => {
         // Skip customers that already have stats
         if (customer.orderCount != null && customer.orderCount > 0) return customer;
+        if (enrichmentCount >= MAX_ENRICHMENTS) return customer;
+        enrichmentCount++;
         try {
           const response = await ikasGraphQL<{
             listOrder: {
@@ -414,6 +447,11 @@ export async function enrichCustomersWithOrderStats(
     );
     for (let j = 0; j < results.length; j++) {
       enriched[i + j] = results[j];
+    }
+
+    // Pause between batches to respect rate limits
+    if (i + BATCH_SIZE < enriched.length && enrichmentCount < MAX_ENRICHMENTS) {
+      await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
