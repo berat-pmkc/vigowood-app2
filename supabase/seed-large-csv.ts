@@ -76,8 +76,9 @@ function parseStockDate(val: string): string | null {
   return null;
 }
 
-// YariMamulStok Format A: "02/13/2026 10:11:05" → ISO (MM/DD/YYYY — US format)
+// YariMamulStok Format A: "02/13/2026 10:11:05" → ISO (MM/DD/YYYY — US format with slashes)
 // YariMamulStok Format B: "Tue Feb 17 2026 11:36:26 GMT+0300 (GMT+03:00)" → ISO
+// YariMamulStok Format C: "1.12.2025 09:27" → ISO (D.M.YYYY HH:mm — Turkish locale, dot-separated)
 function parseYmsDate(val: string): string | null {
   if (!val || !val.trim()) return null;
   const s = val.trim();
@@ -102,6 +103,29 @@ function parseYmsDate(val: string): string | null {
     } else {
       // Both ≤ 12: default M/D/YYYY (US format, matches data evidence)
       month = n1; day = n2;
+    }
+
+    return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${h.padStart(2, "0")}:${mi}:${sec}+03:00`;
+  }
+
+  // D.M.YYYY HH:mm or D.M.YYYY HH:mm:ss (dot-separated, Turkish locale)
+  const dotMatch = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (dotMatch) {
+    const n1 = parseInt(dotMatch[1]);
+    const n2 = parseInt(dotMatch[2]);
+    const y = dotMatch[3];
+    const h = dotMatch[4];
+    const mi = dotMatch[5];
+    const sec = dotMatch[6] || "00";
+
+    let month: number, day: number;
+    if (n1 > 12) {
+      day = n1; month = n2;
+    } else if (n2 > 12) {
+      month = n1; day = n2;
+    } else {
+      // D.M.YYYY — Turkish format: first is day
+      day = n1; month = n2;
     }
 
     return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${h.padStart(2, "0")}:${mi}:${sec}+03:00`;
@@ -257,8 +281,8 @@ async function seedYariMamulStok() {
     let sourceId: string | null;
     let operator: string | null;
 
-    // Detect format: Format A has date with slash in cols[1], Format B has empty/non-date cols[1]
-    if (cols[1] && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(cols[1].trim())) {
+    // Detect format: Format A has date with slash or dot in cols[1], Format B has empty/non-date cols[1]
+    if (cols[1] && /^\d{1,2}[./]\d{1,2}[./]\d{4}/.test(cols[1].trim())) {
       // Format A: normal column order
       // YMSID, Tarih, PartID, PartAdi, SKU, Qty, Direction, Source, SourceID, Operator
       formatA++;

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Cog } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Pencil, Trash2, Cog, List, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import {
   Table,
@@ -29,6 +29,7 @@ import { MAKINE_BOLUM_COLORS, type MakineBolum } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { deleteMakine, updateMakine } from "../actions";
 import { MakineEditSheet } from "./makine-edit-sheet";
+import { BakimGecmisiTable, type BakimLogRow } from "./bakim-gecmisi-table";
 
 interface Makine {
   makine_id: string;
@@ -42,10 +43,31 @@ interface Makine {
 
 interface MakinelerTableProps {
   data: Makine[];
+  view: "liste" | "bakimlar";
+  bakimData?: BakimLogRow[];
+  bakimTotalCount?: number;
+  bakimPage?: number;
+  bakimPageSize?: number;
+  bakimMakineFilter?: string;
+  bakimDurumFilter?: string;
+  makineOptions?: string[];
+  userNames?: Record<string, string>;
 }
 
-export function MakinelerTable({ data }: MakinelerTableProps) {
+export function MakinelerTable({
+  data,
+  view,
+  bakimData = [],
+  bakimTotalCount = 0,
+  bakimPage = 0,
+  bakimPageSize = 25,
+  bakimMakineFilter = "",
+  bakimDurumFilter = "",
+  makineOptions = [],
+  userNames = {},
+}: MakinelerTableProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [editMakine, setEditMakine] = useState<Makine | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Makine | null>(null);
@@ -98,122 +120,168 @@ export function MakinelerTable({ data }: MakinelerTableProps) {
     return colors ?? { bg: "bg-gray-100", text: "text-gray-800" };
   };
 
+  const switchView = (newView: "liste" | "bakimlar") => {
+    const params = new URLSearchParams();
+    if (newView !== "liste") params.set("view", newView);
+    router.push(`?${params.toString()}`);
+  };
+
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Toplam {data.length} makine
-          </p>
+      {/* View Toggle */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div className="flex items-center gap-1 rounded-lg border p-1 bg-muted/30">
+          <Button
+            variant={view === "liste" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => switchView("liste")}
+          >
+            <List className="h-4 w-4" />
+            Makine Listesi
+          </Button>
+          <Button
+            variant={view === "bakimlar" ? "default" : "ghost"}
+            size="sm"
+            className="h-8 gap-1.5"
+            onClick={() => switchView("bakimlar")}
+          >
+            <Wrench className="h-4 w-4" />
+            Bakım Geçmişi
+          </Button>
         </div>
-        <Button onClick={handleCreate} size="sm">
-          <Plus className="h-4 w-4 mr-1.5" />
-          Yeni Makine
-        </Button>
+
+        {view === "liste" && (
+          <Button onClick={handleCreate} size="sm">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Yeni Makine
+          </Button>
+        )}
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[120px]">Makine ID</TableHead>
-              <TableHead>Tipi</TableHead>
-              <TableHead className="w-[120px]">Bölüm</TableHead>
-              <TableHead>Açıklama</TableHead>
-              <TableHead className="w-[80px] text-center">Aktif</TableHead>
-              <TableHead className="w-[100px] text-right">İşlem</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center gap-2">
-                    <Cog className="h-8 w-8 text-muted-foreground/50" />
-                    <p>Henüz makine eklenmemiş</p>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.map((makine) => {
-                const colors = bolumColors(makine.bolum);
-                return (
-                  <TableRow key={makine.makine_id} className={cn(!makine.aktif && "opacity-50")}>
-                    <TableCell className="font-mono font-semibold">
-                      {makine.makine_id}
-                    </TableCell>
-                    <TableCell>{makine.tipi}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(colors.bg, colors.text, "border-0")}>
-                        {makine.bolum}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {makine.aciklama || "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Switch
-                        checked={makine.aktif}
-                        onCheckedChange={() => handleToggleAktif(makine)}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(makine)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(makine)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+      {view === "bakimlar" ? (
+        <BakimGecmisiTable
+          data={bakimData}
+          totalCount={bakimTotalCount}
+          page={bakimPage}
+          pageSize={bakimPageSize}
+          makineFilter={bakimMakineFilter}
+          durumFilter={bakimDurumFilter}
+          makineOptions={makineOptions}
+          userNames={userNames}
+        />
+      ) : (
+        <>
+          <div className="mb-3">
+            <p className="text-sm text-muted-foreground">
+              Toplam {data.length} makine
+            </p>
+          </div>
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Makine ID</TableHead>
+                  <TableHead>Tipi</TableHead>
+                  <TableHead className="w-[120px]">Bölüm</TableHead>
+                  <TableHead>Açıklama</TableHead>
+                  <TableHead className="w-[80px] text-center">Aktif</TableHead>
+                  <TableHead className="w-[100px] text-right">İşlem</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <Cog className="h-8 w-8 text-muted-foreground/50" />
+                        <p>Henüz makine eklenmemiş</p>
                       </div>
                     </TableCell>
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                ) : (
+                  data.map((makine) => {
+                    const colors = bolumColors(makine.bolum);
+                    return (
+                      <TableRow key={makine.makine_id} className={cn(!makine.aktif && "opacity-50")}>
+                        <TableCell className="font-mono font-semibold">
+                          {makine.makine_id}
+                        </TableCell>
+                        <TableCell>{makine.tipi}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(colors.bg, colors.text, "border-0")}>
+                            {makine.bolum}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {makine.aciklama || "—"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Switch
+                            checked={makine.aktif}
+                            onCheckedChange={() => handleToggleAktif(makine)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleEdit(makine)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(makine)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      {/* Edit/Create Sheet */}
-      <MakineEditSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        makine={editMakine}
-      />
+          {/* Edit/Create Sheet */}
+          <MakineEditSheet
+            open={sheetOpen}
+            onOpenChange={setSheetOpen}
+            makine={editMakine}
+          />
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Makineyi Sil</AlertDialogTitle>
-            <AlertDialogDescription>
-              <strong>{deleteTarget?.makine_id}</strong> ({deleteTarget?.tipi}) makinesini silmek
-              istediğinize emin misiniz? Bu işlem geri alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>İptal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "Siliniyor..." : "Sil"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          {/* Delete Confirmation */}
+          <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Makineyi Sil</AlertDialogTitle>
+                <AlertDialogDescription>
+                  <strong>{deleteTarget?.makine_id}</strong> ({deleteTarget?.tipi}) makinesini silmek
+                  istediğinize emin misiniz? Bu işlem geri alınamaz.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>İptal</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? "Siliniyor..." : "Sil"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </>
   );
 }

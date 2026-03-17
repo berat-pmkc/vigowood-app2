@@ -59,9 +59,26 @@ export default function LoginPage() {
       return;
     }
 
-    // Station accounts → operator selection
+    // Station accounts → operator selection (Hat rolü hariç)
     if (isStationEmail(formData.email)) {
-      router.push("/select-operator");
+      // Hat rolü kontrolü — kişi seçimi gerekmez, direkt dashboard'a
+      const { data: stationUser } = await supabase
+        .from("users")
+        .select("user_id, full_name, role")
+        .eq("email", formData.email)
+        .single();
+
+      if (stationUser?.role === "Hat") {
+        await supabase.auth.updateUser({
+          data: {
+            selected_operator_id: stationUser.user_id,
+            selected_operator_name: stationUser.full_name,
+          },
+        });
+        router.push("/");
+      } else {
+        router.push("/select-operator");
+      }
     } else {
       router.push("/");
     }
