@@ -36,7 +36,8 @@ import {
   Tags,
   type LucideIcon,
 } from "lucide-react";
-import type { UserRole } from "@/lib/constants";
+import type { UserRole, ModuleKey } from "@/lib/constants";
+import { ALWAYS_VISIBLE_MODULES } from "@/lib/constants";
 
 export type NavItem = {
   title: string;
@@ -175,12 +176,45 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Filter nav groups by user role — returns only groups that have visible items */
-export function getFilteredNavGroups(role: UserRole): NavGroup[] {
+/** Nav group label → module key mapping */
+const GROUP_LABEL_TO_MODULE: Record<string, ModuleKey> = {
+  "Ana Sayfa": "ana_sayfa",
+  "Ops Center": "ops_center",
+  "Üretim": "uretim",
+  "Stok": "stok",
+  "Satış": "satis",
+  "Pazaryeri": "pazaryeri",
+  "Sevkiyat": "sevkiyat",
+  "Muhasebe": "muhasebe",
+  "Analiz": "analiz",
+  "Personel": "personel",
+  "Yönetim": "yonetim",
+};
+
+/**
+ * Filter nav groups by user role + optional allowed modules.
+ * - Role filter is the security boundary (always applied)
+ * - allowedModules narrows further (NULL = use role defaults, no extra filtering)
+ * - ALWAYS_VISIBLE_MODULES are never hidden
+ */
+export function getFilteredNavGroups(role: UserRole, allowedModules?: string[] | null): NavGroup[] {
   return NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
       (item) => item.roles === "all" || item.roles.includes(role)
     ),
-  })).filter((group) => group.items.length > 0);
+  }))
+    .filter((group) => group.items.length > 0)
+    .filter((group) => {
+      // If allowedModules is null/undefined, skip module filtering (role defaults)
+      if (!allowedModules) return true;
+
+      const moduleKey = GROUP_LABEL_TO_MODULE[group.label];
+      if (!moduleKey) return true;
+
+      // Always-visible modules can't be hidden
+      if (ALWAYS_VISIBLE_MODULES.includes(moduleKey)) return true;
+
+      return allowedModules.includes(moduleKey);
+    });
 }

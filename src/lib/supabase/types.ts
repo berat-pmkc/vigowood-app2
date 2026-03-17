@@ -4557,6 +4557,7 @@ export type Database = {
       }
       users: {
         Row: {
+          allowed_modules: string[] | null
           auth_id: string | null
           avatar_url: string | null
           can_be_ops_assignee: boolean
@@ -4571,6 +4572,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          allowed_modules?: string[] | null
           auth_id?: string | null
           avatar_url?: string | null
           can_be_ops_assignee?: boolean
@@ -4585,6 +4587,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          allowed_modules?: string[] | null
           auth_id?: string | null
           avatar_url?: string | null
           can_be_ops_assignee?: boolean
@@ -5053,7 +5056,6 @@ export const Constants = {
 
 // Custom type aliases
 export type Product = Database['public']['Tables']['products']['Row'];
-export type User = Database['public']['Tables']['users']['Row'];
 export type AllPart = Database['public']['Tables']['all_parts']['Row'];
 export type Plaka = Database['public']['Tables']['plakalar']['Row'];
 export type PlakaPart = Database['public']['Tables']['plaka_parts']['Row'];

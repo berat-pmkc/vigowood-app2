@@ -5,6 +5,7 @@ import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { userCreateSchema, userUpdateSchema } from "@/lib/validations";
+import { MODULE_KEYS } from "@/lib/constants";
 import type { Database } from "@/lib/supabase/types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
@@ -45,6 +46,7 @@ export async function createUser(
     role: string;
     station: string;
     password_plain?: string | null;
+    allowed_modules?: string[] | null;
   }
 ): Promise<ActionResult> {
   try {
@@ -82,6 +84,15 @@ export async function createUser(
       }
     }
 
+    // Validate allowed_modules keys
+    const allowedModules = formData.allowed_modules ?? null;
+    if (allowedModules) {
+      const invalid = allowedModules.filter((m) => !MODULE_KEYS.includes(m as any));
+      if (invalid.length > 0) {
+        return { success: false, error: `Geçersiz modül anahtarı: ${invalid.join(", ")}` };
+      }
+    }
+
     const { error } = await supabase.from("users").insert({
       user_id: parsed.data.user_id,
       full_name: parsed.data.full_name,
@@ -90,6 +101,7 @@ export async function createUser(
       station: parsed.data.station,
       is_active: true,
       password_plain: formData.password_plain || null,
+      allowed_modules: allowedModules,
     });
 
     if (error) {
@@ -116,6 +128,7 @@ export async function updateUser(
     is_active: boolean;
     password_plain?: string | null;
     can_be_ops_assignee?: boolean;
+    allowed_modules?: string[] | null;
   }
 ): Promise<ActionResult> {
   try {
@@ -148,6 +161,15 @@ export async function updateUser(
       }
     }
 
+    // Validate allowed_modules keys
+    const allowedModules = formData.allowed_modules !== undefined ? formData.allowed_modules : undefined;
+    if (allowedModules) {
+      const invalid = allowedModules.filter((m) => !MODULE_KEYS.includes(m as any));
+      if (invalid.length > 0) {
+        return { success: false, error: `Geçersiz modül anahtarı: ${invalid.join(", ")}` };
+      }
+    }
+
     const { error } = await supabase
       .from("users")
       .update({
@@ -159,6 +181,9 @@ export async function updateUser(
         password_plain: formData.password_plain ?? null,
         ...(formData.can_be_ops_assignee !== undefined
           ? { can_be_ops_assignee: formData.can_be_ops_assignee }
+          : {}),
+        ...(allowedModules !== undefined
+          ? { allowed_modules: allowedModules }
           : {}),
       })
       .eq("user_id", userId);

@@ -161,13 +161,13 @@ export default async function KesimPage({
 
   // Bugünkü KPI'lar
   const todayBatches = todayBatchesRes.data ?? [];
-  const todayTotalBatch = todayBatches.length;
+  const todayTotalBatch = todayBatches.reduce((sum, b) => sum + (b.adet ?? 1), 0);
 
   // Makine bazlı bugünkü kesim sayısı
   const machineCounts: MachineCounts = {};
   for (const b of todayBatches) {
     if (b.makine_id) {
-      machineCounts[b.makine_id] = (machineCounts[b.makine_id] ?? 0) + 1;
+      machineCounts[b.makine_id] = (machineCounts[b.makine_id] ?? 0) + (b.adet ?? 1);
     }
   }
 

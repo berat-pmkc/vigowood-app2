@@ -23,7 +23,17 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { AvatarUpload } from "@/components/shared/avatar-upload";
-import { USER_ROLES, USER_STATIONS, USER_STATION_LABELS } from "@/lib/constants";
+import {
+  USER_ROLES,
+  USER_STATIONS,
+  USER_STATION_LABELS,
+  MODULE_KEYS,
+  MODULE_LABELS,
+  ALWAYS_VISIBLE_MODULES,
+  ROLE_DEFAULT_MODULES,
+  type ModuleKey,
+  type UserRole,
+} from "@/lib/constants";
 import {
   userCreateSchema,
   type UserCreateData,
@@ -52,6 +62,8 @@ export function UserEditSheet({
   const [isActive, setIsActive] = useState(true);
   const [canBeOpsAssignee, setCanBeOpsAssignee] = useState(false);
   const [password, setPassword] = useState("");
+  const [useCustomModules, setUseCustomModules] = useState(false);
+  const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const isCreate = mode === "create";
 
   const {
@@ -80,6 +92,8 @@ export function UserEditSheet({
           station: "Kesim" as UserCreateData["station"],
         });
         setPassword("");
+        setUseCustomModules(false);
+        setAllowedModules([]);
       });
     } else if (user) {
       reset({
@@ -92,6 +106,13 @@ export function UserEditSheet({
       setIsActive(user.is_active);
       setCanBeOpsAssignee(user.can_be_ops_assignee ?? false);
       setPassword(user.password_plain || "");
+      if (user.allowed_modules) {
+        setUseCustomModules(true);
+        setAllowedModules(user.allowed_modules);
+      } else {
+        setUseCustomModules(false);
+        setAllowedModules([]);
+      }
     }
   }, [user, isCreate, reset, open]);
 
@@ -105,6 +126,7 @@ export function UserEditSheet({
           role: data.role,
           station: data.station,
           password_plain: password || null,
+          allowed_modules: useCustomModules ? allowedModules : null,
         });
         if (result.success) {
           toast.success("Kullanıcı oluşturuldu");
@@ -123,6 +145,7 @@ export function UserEditSheet({
           is_active: isActive,
           password_plain: password || null,
           can_be_ops_assignee: canBeOpsAssignee,
+          allowed_modules: useCustomModules ? allowedModules : null,
         });
         if (result.success) {
           toast.success("Kullanıcı güncellendi");
@@ -234,11 +257,15 @@ export function UserEditSheet({
               <Label htmlFor="role">Rol</Label>
               <Select
                 value={roleValue}
-                onValueChange={(v) =>
+                onValueChange={(v) => {
                   setValue("role", v as UserCreateData["role"], {
                     shouldValidate: true,
-                  })
-                }
+                  });
+                  // Rol değişince custom modules açıksa varsayılanları güncelle
+                  if (useCustomModules) {
+                    setAllowedModules([...(ROLE_DEFAULT_MODULES[v as UserRole] || [])]);
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Rol seçiniz" />
@@ -315,6 +342,67 @@ export function UserEditSheet({
                 </div>
               </div>
             )}
+
+            {/* Modül erişim yönetimi */}
+            <Separator />
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="use_custom_modules"
+                  checked={useCustomModules}
+                  onCheckedChange={(checked) => {
+                    const enabled = checked === true;
+                    setUseCustomModules(enabled);
+                    if (enabled) {
+                      // Rol varsayılanlarıyla doldur
+                      const role = (roleValue || "Üretim") as UserRole;
+                      setAllowedModules([...(ROLE_DEFAULT_MODULES[role] || [])]);
+                    } else {
+                      setAllowedModules([]);
+                    }
+                  }}
+                />
+                <Label htmlFor="use_custom_modules" className="cursor-pointer">
+                  Özel modül erişimi tanımla
+                </Label>
+              </div>
+              {!useCustomModules && (
+                <p className="text-xs text-muted-foreground">
+                  Kapalıyken rol varsayılanları kullanılır
+                </p>
+              )}
+              {useCustomModules && (
+                <div className="grid grid-cols-2 gap-2">
+                  {MODULE_KEYS.map((moduleKey) => {
+                    const isAlwaysVisible = ALWAYS_VISIBLE_MODULES.includes(moduleKey);
+                    const isChecked = isAlwaysVisible || allowedModules.includes(moduleKey);
+                    return (
+                      <div key={moduleKey} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`module_${moduleKey}`}
+                          checked={isChecked}
+                          disabled={isAlwaysVisible}
+                          onCheckedChange={(checked) => {
+                            if (isAlwaysVisible) return;
+                            if (checked) {
+                              setAllowedModules((prev) => [...prev, moduleKey]);
+                            } else {
+                              setAllowedModules((prev) => prev.filter((m) => m !== moduleKey));
+                            }
+                          }}
+                        />
+                        <Label
+                          htmlFor={`module_${moduleKey}`}
+                          className={`cursor-pointer text-sm ${isAlwaysVisible ? "text-muted-foreground" : ""}`}
+                        >
+                          {MODULE_LABELS[moduleKey]}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Read-only info — only in edit mode */}

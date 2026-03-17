@@ -1366,3 +1366,52 @@ export function hesaplaDesiFiyat(
   // Tablodaki en büyük değeri döndür
   return keys.length > 0 ? desiTablosu[String(keys[keys.length - 1])] : 0;
 }
+
+// ─── Modül Erişim Yönetimi ─────────────────────────────
+
+export const MODULE_KEYS = [
+  "ana_sayfa",
+  "ops_center",
+  "uretim",
+  "stok",
+  "satis",
+  "pazaryeri",
+  "sevkiyat",
+  "muhasebe",
+  "analiz",
+  "personel",
+  "yonetim",
+] as const;
+
+export type ModuleKey = (typeof MODULE_KEYS)[number];
+
+export const MODULE_LABELS: Record<ModuleKey, string> = {
+  ana_sayfa: "Ana Sayfa",
+  ops_center: "Ops Center",
+  uretim: "Üretim",
+  stok: "Stok",
+  satis: "Satış",
+  pazaryeri: "Pazaryeri",
+  sevkiyat: "Sevkiyat",
+  muhasebe: "Muhasebe",
+  analiz: "Analiz",
+  personel: "Personel",
+  yonetim: "Yönetim",
+};
+
+/** Her zaman görünür modüller — kapatılamaz */
+export const ALWAYS_VISIBLE_MODULES: ModuleKey[] = ["ana_sayfa"];
+
+/** Rol bazlı varsayılan modül listesi — navigation.ts'deki role mapping'den türetildi */
+export const ROLE_DEFAULT_MODULES: Record<UserRole, ModuleKey[]> = {
+  "Yönetici": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
+  "Endüstri Mühendisi": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "analiz", "personel", "yonetim"],
+  "E-Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
+  "Dış Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "analiz", "personel", "yonetim"],
+  "Üretim": ["ana_sayfa", "ops_center", "uretim", "yonetim"],
+  "Hat": ["ana_sayfa", "ops_center", "uretim", "stok", "personel", "yonetim"],
+  "Muhasebe": ["ana_sayfa", "ops_center", "stok", "satis", "muhasebe", "analiz", "yonetim"],
+  "Sevkiyat Sorumlusu": ["ana_sayfa", "ops_center", "stok", "satis", "sevkiyat", "analiz", "yonetim"],
+  "Pazaryeri Sorumlusu": ["ana_sayfa", "ops_center", "stok", "satis", "pazaryeri", "analiz", "yonetim"],
+  "Mimar": ["ana_sayfa", "ops_center", "stok", "satis", "analiz", "yonetim"],
+};

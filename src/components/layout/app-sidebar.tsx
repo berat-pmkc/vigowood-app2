@@ -32,6 +32,7 @@ type AppSidebarProps = {
   displayName: string;
   displayRole: string;
   avatarUrl?: string | null;
+  allowedModules?: string[] | null;
   onLogout: () => void;
 };
 
@@ -40,10 +41,11 @@ export function AppSidebar({
   displayName,
   displayRole,
   avatarUrl,
+  allowedModules,
   onLogout,
 }: AppSidebarProps) {
   const pathname = usePathname();
-  const navGroups = getFilteredNavGroups(userRole);
+  const navGroups = getFilteredNavGroups(userRole, allowedModules);
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";

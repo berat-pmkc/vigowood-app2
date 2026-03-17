@@ -9,15 +9,16 @@ import { LayoutDashboard, type LucideIcon } from "lucide-react";
 
 type MobileBottomNavProps = {
   userRole: UserRole;
+  allowedModules?: string[] | null;
 };
 
 /**
  * Bottom navigation for mobile/tablet (< md breakpoint).
  * Shows max 5 most relevant items based on user role.
  */
-export function MobileBottomNav({ userRole }: MobileBottomNavProps) {
+export function MobileBottomNav({ userRole, allowedModules }: MobileBottomNavProps) {
   const pathname = usePathname();
-  const navGroups = getFilteredNavGroups(userRole);
+  const navGroups = getFilteredNavGroups(userRole, allowedModules);
 
   // Flatten and pick top 5 items for bottom nav
   const allItems = navGroups.flatMap((g) => g.items);
