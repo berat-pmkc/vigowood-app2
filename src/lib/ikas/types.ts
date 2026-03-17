@@ -144,6 +144,7 @@ export interface IkasCustomer {
   totalOrderPrice: number | null;
   firstOrderDate: number | null;
   lastOrderDate: number | null;
+  acceptsMarketing: boolean | null;
 }
 
 // ─── Stock & Price Update Types ─────────────────────────

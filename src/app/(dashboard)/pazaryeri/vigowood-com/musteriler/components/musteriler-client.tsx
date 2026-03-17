@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   useReactTable,
@@ -33,28 +33,38 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, AlertTriangle } from "lucide-react";
-import type { IkasCustomer } from "@/lib/ikas/types";
 import {
-  formatTRY,
-  formatIkasDateShort,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
+  AlertTriangle,
+  Database,
+  Check,
+} from "lucide-react";
+import type { IkasCustomerDB } from "@/lib/supabase/types";
+import {
   CUSTOMER_SEGMENTS,
   CUSTOMER_SORT_OPTIONS,
-  getCustomerSegment,
   type CustomerSegmentKey,
   type CustomerSortField,
 } from "@/lib/ikas/helpers";
 import { MusteriDetay } from "./musteri-detay";
 
 interface Props {
-  customers: IkasCustomer[];
+  customers: IkasCustomerDB[];
   totalCount: number;
   hasNext: boolean;
   currentPage: number;
   currentSearch: string;
   currentSort: CustomerSortField;
   currentDir: "asc" | "desc";
-  isMock: boolean;
+  currentSegment: string;
+  segmentCounts: Record<string, number>;
+  dbEmpty?: boolean;
   apiError?: string;
 }
 
@@ -66,14 +76,16 @@ export function MusterilerClient({
   currentSearch,
   currentSort,
   currentDir,
-  isMock,
+  currentSegment,
+  segmentCounts,
+  dbEmpty,
   apiError,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(currentSearch);
-  const [selectedCustomer, setSelectedCustomer] = useState<IkasCustomer | null>(null);
-  const [activeSegment, setActiveSegment] = useState<CustomerSegmentKey>("all");
+  const [selectedCustomer, setSelectedCustomer] = useState<IkasCustomerDB | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   function updateParams(updates: Record<string, string>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -84,12 +96,13 @@ export function MusterilerClient({
         params.delete(key);
       }
     }
-    router.push(`/pazaryeri/vigowood-com/musteriler?${params.toString()}`);
+    startTransition(() => {
+      router.push(`/pazaryeri/vigowood-com/musteriler?${params.toString()}`);
+    });
   }
 
   function handleSearch() {
-    setActiveSegment("all"); // Reset segment filter — search results shouldn't be hidden by active segment
-    updateParams({ search, page: "1" });
+    updateParams({ search, page: "1", segment: "" });
   }
 
   function handleSortChange(field: CustomerSortField) {
@@ -100,29 +113,38 @@ export function MusterilerClient({
     }
   }
 
+  function handleSegmentChange(segment: string) {
+    updateParams({ segment: segment === "all" ? "" : segment, page: "1" });
+  }
+
   function handleClear() {
     setSearch("");
-    setActiveSegment("all");
     router.push("/pazaryeri/vigowood-com/musteriler");
   }
 
-  const hasActiveFilters = currentSearch || currentSort !== "lastOrderDate" || currentDir !== "desc" || activeSegment !== "all";
+  const hasActiveFilters = currentSearch || currentSort !== "lastOrderDate" || currentDir !== "desc" || currentSegment !== "all";
 
-  // Client-side segment filtering (sayfadaki veriler üzerinden)
-  const filteredCustomers = useMemo(() => {
-    if (activeSegment === "all") return customers;
-    return customers.filter((c) => getCustomerSegment(c).key === activeSegment);
-  }, [customers, activeSegment]);
+  // Format helpers for DB data (timestamps are ISO strings, not ms)
+  function formatDate(dateStr: string | null): string {
+    if (!dateStr) return "-";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
 
-  // Segment counts (sayfadaki müşterilerden)
-  const segmentCounts = useMemo(() => {
-    const counts: Record<CustomerSegmentKey, number> = { all: customers.length, vip: 0, sadik: 0, aktif: 0, yeni: 0, kayip: 0, potansiyel: 0 };
-    for (const c of customers) {
-      const seg = getCustomerSegment(c);
-      if (seg.key !== "all") counts[seg.key]++;
-    }
-    return counts;
-  }, [customers]);
+  function formatTRY(amount: number | null): string {
+    if (amount == null) return "-";
+    return new Intl.NumberFormat("tr-TR", {
+      style: "currency",
+      currency: "TRY",
+      minimumFractionDigits: 2,
+    }).format(amount);
+  }
+
+  // Get segment info for a customer
+  function getSegmentInfo(segmentKey: string | null) {
+    const seg = CUSTOMER_SEGMENTS.find((s) => s.key === segmentKey);
+    return seg || CUSTOMER_SEGMENTS.find((s) => s.key === "yeni")!;
+  }
 
   // Sortable column header
   function SortableHeader({ field, label }: { field: CustomerSortField; label: string }) {
@@ -144,16 +166,16 @@ export function MusterilerClient({
     );
   }
 
-  const columns: ColumnDef<IkasCustomer>[] = [
+  const columns: ColumnDef<IkasCustomerDB>[] = [
     {
       id: "name",
       header: () => <SortableHeader field="firstName" label="Ad Soyad" />,
       cell: ({ row }) => {
-        const seg = getCustomerSegment(row.original);
+        const seg = getSegmentInfo(row.original.customer_segment);
         return (
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">
-              {row.original.firstName} {row.original.lastName}
+              {row.original.first_name} {row.original.last_name}
             </span>
             {seg.key !== "potansiyel" && seg.key !== "all" && (
               <Badge className={`${seg.bg} ${seg.text} ${seg.hoverBg} text-[10px] px-1.5 py-0`}>
@@ -168,7 +190,7 @@ export function MusterilerClient({
       accessorKey: "email",
       header: "Email",
       cell: ({ row }) => (
-        <span className="max-w-[200px] truncate text-sm">{row.original.email}</span>
+        <span className="max-w-[200px] truncate text-sm">{row.original.email || "-"}</span>
       ),
     },
     {
@@ -179,11 +201,11 @@ export function MusterilerClient({
       ),
     },
     {
-      accessorKey: "orderCount",
+      accessorKey: "order_count",
       header: () => <SortableHeader field="orderCount" label="Sipariş" />,
       cell: ({ row }) => (
         <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-          {row.original.orderCount ?? 0}
+          {row.original.order_count ?? 0}
         </Badge>
       ),
     },
@@ -192,65 +214,89 @@ export function MusterilerClient({
       header: () => <SortableHeader field="totalOrderPrice" label="Toplam Harcama" />,
       cell: ({ row }) => (
         <span className="text-sm font-medium">
-          {row.original.totalOrderPrice ? formatTRY(row.original.totalOrderPrice) : "-"}
+          {formatTRY(row.original.total_spent)}
         </span>
       ),
+    },
+    {
+      id: "acceptsMarketing",
+      header: "İletişim İzni",
+      cell: ({ row }) => {
+        const accepts = (row.original as IkasCustomerDB & { accepts_marketing?: boolean | null }).accepts_marketing;
+        return accepts ? (
+          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+            <Check className="mr-1 h-3 w-3" />
+            Var
+          </Badge>
+        ) : (
+          <Badge className="bg-red-100 text-red-700 hover:bg-red-100">
+            <X className="mr-1 h-3 w-3" />
+            Yok
+          </Badge>
+        );
+      },
     },
     {
       id: "lastOrder",
       header: () => <SortableHeader field="lastOrderDate" label="Son Sipariş" />,
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
-          {row.original.lastOrderDate
-            ? formatIkasDateShort(row.original.lastOrderDate)
-            : "-"}
+          {formatDate(row.original.last_order_date)}
         </span>
       ),
     },
   ];
 
   const table = useReactTable({
-    data: filteredCustomers,
+    data: customers,
     columns,
     getCoreRowModel: getCoreRowModel(),
   });
 
-  // Sayfa bilgisi — segment aktifse sayfadaki veriyi, değilse toplam API verisini göster
-  const displayInfo = activeSegment !== "all"
-    ? `${filteredCustomers.length} / ${customers.length} müşteri gösteriliyor`
-    : `Toplam ${totalCount.toLocaleString("tr-TR")} müşteri`;
+  const displayInfo = `Toplam ${totalCount.toLocaleString("tr-TR")} müşteri`;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-vw-dark">Müşteriler</h1>
-          <p className="text-sm text-muted-foreground">
-            {displayInfo}
-            {isMock && " (demo veri)"}
-          </p>
+          <p className="text-sm text-muted-foreground">{displayInfo}</p>
         </div>
       </div>
+
+      {/* DB empty warning */}
+      {dbEmpty && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="flex items-center gap-3 p-4">
+            <Database className="h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">Müşteri verisi henüz senkronize edilmedi</p>
+              <p className="text-xs text-amber-600">
+                Veriler her gece otomatik senkronize edilir.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Segment Tabs */}
       <div className="flex flex-wrap gap-1.5">
         {CUSTOMER_SEGMENTS.map((seg) => {
-          const isActive = activeSegment === seg.key;
-          const count = segmentCounts[seg.key];
+          const isActive = currentSegment === seg.key || (currentSegment === "all" && seg.key === "all") || (!currentSegment && seg.key === "all");
+          const count = segmentCounts[seg.key] ?? 0;
           return (
             <Button
               key={seg.key}
               variant={isActive ? "default" : "outline"}
               size="sm"
               className={isActive ? "" : "text-muted-foreground"}
-              onClick={() => setActiveSegment(seg.key)}
+              onClick={() => handleSegmentChange(seg.key)}
+              disabled={isPending}
             >
               {seg.label}
               <Badge
                 variant="secondary"
-                className={`ml-1.5 px-1.5 py-0 text-[10px] ${
-                  isActive ? "bg-white/20 text-white" : ""
-                }`}
+                className={`ml-1.5 px-1.5 py-0 text-[10px] ${isActive ? "bg-white/20 text-white" : ""}`}
               >
                 {count}
               </Badge>
@@ -265,7 +311,7 @@ export function MusterilerClient({
           <CardContent className="flex items-center gap-3 p-4">
             <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
             <div>
-              <p className="text-sm font-medium text-destructive">İkas API Bağlantı Hatası</p>
+              <p className="text-sm font-medium text-destructive">Veritabanı Hatası</p>
               <p className="text-xs text-muted-foreground">{apiError}</p>
             </div>
           </CardContent>
@@ -344,9 +390,9 @@ export function MusterilerClient({
                 {table.getRowModel().rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                      {activeSegment !== "all"
-                        ? `Bu segmentte müşteri bulunamadı.`
-                        : `Müşteri bulunamadı.`}
+                      {dbEmpty
+                        ? "Henüz müşteri verisi yok. Veriler her gece otomatik senkronize edilir."
+                        : "Müşteri bulunamadı."}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -378,7 +424,7 @@ export function MusterilerClient({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={currentPage <= 1}
+                disabled={currentPage <= 1 || isPending}
                 onClick={() => updateParams({ page: String(currentPage - 1) })}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -386,7 +432,7 @@ export function MusterilerClient({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!hasNext}
+                disabled={!hasNext || isPending}
                 onClick={() => updateParams({ page: String(currentPage + 1) })}
               >
                 <ChevronRight className="h-4 w-4" />

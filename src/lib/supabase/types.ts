@@ -784,6 +784,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ikas_customers: {
+        Row: {
+          accepts_marketing: boolean | null
+          city: string | null
+          country: string | null
+          created_at: string
+          customer_segment: string | null
+          email: string | null
+          first_name: string | null
+          first_order_date: string | null
+          id: string
+          ikas_customer_id: string
+          ikas_synced_at: string | null
+          last_name: string | null
+          last_order_date: string | null
+          order_count: number | null
+          phone: string | null
+          total_spent: number | null
+          updated_at: string
+        }
+        Insert: {
+          accepts_marketing?: boolean | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          customer_segment?: string | null
+          email?: string | null
+          first_name?: string | null
+          first_order_date?: string | null
+          id?: string
+          ikas_customer_id: string
+          ikas_synced_at?: string | null
+          last_name?: string | null
+          last_order_date?: string | null
+          order_count?: number | null
+          phone?: string | null
+          total_spent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          accepts_marketing?: boolean | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          customer_segment?: string | null
+          email?: string | null
+          first_name?: string | null
+          first_order_date?: string | null
+          id?: string
+          ikas_customer_id?: string
+          ikas_synced_at?: string | null
+          last_name?: string | null
+          last_order_date?: string | null
+          order_count?: number | null
+          phone?: string | null
+          total_spent?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ikas_orders: {
         Row: {
           city: string | null
@@ -1279,8 +1339,7 @@ export type Database = {
           komisyon_orani: number
           listing_kodu: string
           marketplace_id: string
-          oneri_fiyat_min: number
-          oneri_fiyat_std: number
+          oneri_fiyat: number
           ozel_maliyetler: Json | null
           reklam_orani: number
           satis_fiyati: number
@@ -1301,8 +1360,7 @@ export type Database = {
           komisyon_orani?: number
           listing_kodu: string
           marketplace_id: string
-          oneri_fiyat_min?: number
-          oneri_fiyat_std?: number
+          oneri_fiyat?: number
           ozel_maliyetler?: Json | null
           reklam_orani?: number
           satis_fiyati?: number
@@ -1323,8 +1381,7 @@ export type Database = {
           komisyon_orani?: number
           listing_kodu?: string
           marketplace_id?: string
-          oneri_fiyat_min?: number
-          oneri_fiyat_std?: number
+          oneri_fiyat?: number
           ozel_maliyetler?: Json | null
           reklam_orani?: number
           satis_fiyati?: number
@@ -2499,48 +2556,36 @@ export type Database = {
           aktif: boolean
           created_at: string | null
           gecerlilik_baslangic: string | null
+          hedef_fiyat: number
+          hedef_fiyat_kdv: number
           id: string
-          perakende_min: number
-          perakende_min_kdv: number
-          perakende_standart: number
-          perakende_standart_kdv: number
           sku: string
-          toptan_min: number
-          toptan_min_kdv: number
-          toptan_standart: number
-          toptan_standart_kdv: number
+          toptan_hedef_fiyat: number
+          toptan_hedef_fiyat_kdv: number
           updated_at: string | null
         }
         Insert: {
           aktif?: boolean
           created_at?: string | null
           gecerlilik_baslangic?: string | null
+          hedef_fiyat?: number
+          hedef_fiyat_kdv?: number
           id?: string
-          perakende_min?: number
-          perakende_min_kdv?: number
-          perakende_standart?: number
-          perakende_standart_kdv?: number
           sku: string
-          toptan_min?: number
-          toptan_min_kdv?: number
-          toptan_standart?: number
-          toptan_standart_kdv?: number
+          toptan_hedef_fiyat?: number
+          toptan_hedef_fiyat_kdv?: number
           updated_at?: string | null
         }
         Update: {
           aktif?: boolean
           created_at?: string | null
           gecerlilik_baslangic?: string | null
+          hedef_fiyat?: number
+          hedef_fiyat_kdv?: number
           id?: string
-          perakende_min?: number
-          perakende_min_kdv?: number
-          perakende_standart?: number
-          perakende_standart_kdv?: number
           sku?: string
-          toptan_min?: number
-          toptan_min_kdv?: number
-          toptan_standart?: number
-          toptan_standart_kdv?: number
+          toptan_hedef_fiyat?: number
+          toptan_hedef_fiyat_kdv?: number
           updated_at?: string | null
         }
         Relationships: [
@@ -3344,6 +3389,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      shipping_snapshots: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          desi_fiyatlari: Json
+          donem_kodu: string
+          id: string
+          provider_code: string
+          provider_name: string
+          shipping_provider_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          desi_fiyatlari?: Json
+          donem_kodu: string
+          id?: string
+          provider_code: string
+          provider_name: string
+          shipping_provider_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          desi_fiyatlari?: Json
+          donem_kodu?: string
+          id?: string
+          provider_code?: string
+          provider_name?: string
+          shipping_provider_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_snapshots_shipping_provider_id_fkey"
+            columns: ["shipping_provider_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sku_mappings: {
         Row: {
@@ -4603,6 +4689,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_customer_segment: {
+        Args: {
+          p_last_order_date: string
+          p_order_count: number
+          p_total_spent: number
+        }
+        Returns: string
+      }
       get_all_users_last_sign_in: {
         Args: never
         Returns: {
@@ -4957,7 +5051,7 @@ export const Constants = {
   },
 } as const
 
-// ─── Custom Type Aliases ────────────────────────────────────
+// Custom type aliases
 export type Product = Database['public']['Tables']['products']['Row'];
 export type User = Database['public']['Tables']['users']['Row'];
 export type AllPart = Database['public']['Tables']['all_parts']['Row'];
@@ -5019,3 +5113,4 @@ export type DovizKuru = Database['public']['Tables']['doviz_kurlari']['Row'];
 export type SatisSatiri = Database['public']['Tables']['satis_satirlari']['Row'];
 export type AgentChat = Database['public']['Tables']['agent_chats']['Row'];
 export type SkuMapping = Database['public']['Tables']['sku_mappings']['Row'];
+export type IkasCustomerDB = Database['public']['Tables']['ikas_customers']['Row'];

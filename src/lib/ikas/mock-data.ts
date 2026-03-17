@@ -286,6 +286,7 @@ const MOCK_CUSTOMERS: IkasCustomer[] = CUSTOMER_PROFILES.map((p, i) => ({
   totalOrderPrice: p.totalOrderPrice,
   firstOrderDate: p.orderCount > 0 ? now - randomBetween(30, 365) * DAY : null,
   lastOrderDate: p.orderCount > 0 ? now - randomBetween(0, 30) * DAY : null,
+  acceptsMarketing: Math.random() > 0.4,
 }));
 
 // ─── Exported Mock Functions ─────────────────────────────

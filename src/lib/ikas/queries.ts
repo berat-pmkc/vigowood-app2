@@ -109,6 +109,7 @@ query ListCustomers($pagination: PaginationInput, $sort: String, $search: String
       totalOrderPrice
       firstOrderDate
       lastOrderDate
+      acceptsMarketing
     }
     count
     hasNext
