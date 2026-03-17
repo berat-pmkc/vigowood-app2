@@ -11,6 +11,17 @@ export const metadata: Metadata = { title: "Kesim" };
 function getDateRange(filter: string) {
   const now = new Date();
 
+  // Custom month: "2025-11" format
+  if (/^\d{4}-\d{2}$/.test(filter)) {
+    const [year, month] = filter.split("-").map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0); // last day of that month
+    return {
+      start: `${firstDay.toISOString().split("T")[0]}T00:00:00.000Z`,
+      end: `${lastDay.toISOString().split("T")[0]}T23:59:59.999Z`,
+    };
+  }
+
   switch (filter) {
     case "yesterday": {
       const yesterday = new Date(now);
@@ -32,6 +43,14 @@ function getDateRange(filter: string) {
       return {
         start: `${firstOfMonth.toISOString().split("T")[0]}T00:00:00.000Z`,
         end: now.toISOString(),
+      };
+    }
+    case "last_month": {
+      const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      return {
+        start: `${firstOfLastMonth.toISOString().split("T")[0]}T00:00:00.000Z`,
+        end: `${lastOfLastMonth.toISOString().split("T")[0]}T23:59:59.999Z`,
       };
     }
     default: {

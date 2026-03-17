@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { KesimSummaryCards } from "./kesim-summary-cards";
 import { MachineStatusBar } from "./machine-status-bar";
 import { KesimRecords } from "./kesim-records";
 import { YeniKesimDialog } from "./yeni-kesim-dialog";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
-import { Plus, Scissors } from "lucide-react";
+import { Plus, Scissors, CalendarDays } from "lucide-react";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 const DATE_FILTERS = [
@@ -16,14 +23,40 @@ const DATE_FILTERS = [
   { key: "yesterday", label: "Dün" },
   { key: "week", label: "Bu Hafta" },
   { key: "month", label: "Bu Ay" },
+  { key: "last_month", label: "Geçen Ay" },
 ] as const;
+
+const AY_ISIMLERI = [
+  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+];
 
 const DATE_FILTER_LABELS: Record<string, string> = {
   today: "Bugün",
   yesterday: "Dün",
   week: "Bu Hafta",
   month: "Bu Ay",
+  last_month: "Geçen Ay",
 };
+
+/** Generate month options from a start date (e.g. Jan 2025) until last month */
+function generateMonthOptions() {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  // Start from Jan 2025 up to last month
+  const startYear = 2025;
+  const startMonth = 0; // January
+  for (let y = now.getFullYear(); y >= startYear; y--) {
+    const endM = y === now.getFullYear() ? now.getMonth() - 1 : 11;
+    const startM = y === startYear ? startMonth : 0;
+    for (let m = endM; m >= startM; m--) {
+      const value = `${y}-${String(m + 1).padStart(2, "0")}`;
+      const label = `${AY_ISIMLERI[m]} ${y}`;
+      options.push({ value, label });
+    }
+  }
+  return options;
+}
 
 interface KesimDashboardProps {
   records: CutBatchRow[];
@@ -50,8 +83,16 @@ export function KesimDashboard({
   const records = useServerDataCache("kesim-records", serverRecords);
   const todayTotalBatch = useServerDataCache("kesim-batch", serverTodayTotalBatch);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const monthOptions = useMemo(() => generateMonthOptions(), []);
 
-  const sectionLabel = DATE_FILTER_LABELS[dateFilter] || "Bugün";
+  // Custom month filter label: "2025-11" → "Kasım 2025"
+  const isCustomMonth = /^\d{4}-\d{2}$/.test(dateFilter);
+  const sectionLabel = isCustomMonth
+    ? (() => {
+        const [y, m] = dateFilter.split("-").map(Number);
+        return `${AY_ISIMLERI[m - 1]} ${y}`;
+      })()
+    : DATE_FILTER_LABELS[dateFilter] || "Bugün";
 
   return (
     <div className="space-y-4">
@@ -116,6 +157,26 @@ export function KesimDashboard({
               {f.label}
             </Button>
           ))}
+          <Select
+            value={isCustomMonth ? dateFilter : ""}
+            onValueChange={(value) => {
+              if (value) {
+                router.push(`/uretim/kesim?dateFilter=${value}`);
+              }
+            }}
+          >
+            <SelectTrigger className={`h-7 text-xs w-[140px] ${isCustomMonth ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : ""}`}>
+              <CalendarDays className="w-3.5 h-3.5 mr-1" />
+              <SelectValue placeholder="Ay Seç" />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <KesimRecords records={records} />
       </div>
