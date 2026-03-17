@@ -346,61 +346,79 @@ export function UserEditSheet({
             {/* Modül erişim yönetimi */}
             <Separator />
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="use_custom_modules"
-                  checked={useCustomModules}
-                  onCheckedChange={(checked) => {
-                    const enabled = checked === true;
-                    setUseCustomModules(enabled);
-                    if (enabled) {
-                      // Rol varsayılanlarıyla doldur
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Modül Erişimi</Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !useCustomModules;
+                    setUseCustomModules(next);
+                    if (next) {
                       const role = (roleValue || "Üretim") as UserRole;
                       setAllowedModules([...(ROLE_DEFAULT_MODULES[role] || [])]);
                     } else {
                       setAllowedModules([]);
                     }
                   }}
-                />
-                <Label htmlFor="use_custom_modules" className="cursor-pointer">
-                  Özel modül erişimi tanımla
-                </Label>
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {useCustomModules ? "Varsayılana dön" : "Özelleştir"}
+                </button>
               </div>
-              {!useCustomModules && (
-                <p className="text-xs text-muted-foreground">
-                  Kapalıyken rol varsayılanları kullanılır
-                </p>
-              )}
-              {useCustomModules && (
-                <div className="grid grid-cols-2 gap-2">
-                  {MODULE_KEYS.map((moduleKey) => {
-                    const isAlwaysVisible = ALWAYS_VISIBLE_MODULES.includes(moduleKey);
-                    const isChecked = isAlwaysVisible || allowedModules.includes(moduleKey);
-                    return (
-                      <div key={moduleKey} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`module_${moduleKey}`}
-                          checked={isChecked}
-                          disabled={isAlwaysVisible}
-                          onCheckedChange={(checked) => {
-                            if (isAlwaysVisible) return;
-                            if (checked) {
-                              setAllowedModules((prev) => [...prev, moduleKey]);
-                            } else {
+
+              {(() => {
+                // Görüntülenecek modüller: custom açıksa allowedModules, değilse rol varsayılanları
+                const role = (roleValue || "Üretim") as UserRole;
+                const activeModules = useCustomModules
+                  ? allowedModules
+                  : ROLE_DEFAULT_MODULES[role] || [];
+
+                return (
+                  <div className="flex flex-wrap gap-1.5">
+                    {MODULE_KEYS.map((moduleKey) => {
+                      const isAlwaysVisible = ALWAYS_VISIBLE_MODULES.includes(moduleKey);
+                      const isActive = isAlwaysVisible || activeModules.includes(moduleKey);
+
+                      return (
+                        <button
+                          key={moduleKey}
+                          type="button"
+                          disabled={!useCustomModules || isAlwaysVisible}
+                          onClick={() => {
+                            if (!useCustomModules || isAlwaysVisible) return;
+                            if (isActive) {
                               setAllowedModules((prev) => prev.filter((m) => m !== moduleKey));
+                            } else {
+                              setAllowedModules((prev) => [...prev, moduleKey]);
                             }
                           }}
-                        />
-                        <Label
-                          htmlFor={`module_${moduleKey}`}
-                          className={`cursor-pointer text-sm ${isAlwaysVisible ? "text-muted-foreground" : ""}`}
+                          className={`
+                            inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium transition-all
+                            ${!useCustomModules
+                              ? isActive
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-muted/40 text-muted-foreground/50"
+                              : isAlwaysVisible
+                                ? "bg-vw-primary/20 text-vw-dark cursor-default"
+                                : isActive
+                                  ? "bg-vw-primary text-white hover:bg-vw-deep cursor-pointer"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
+                            }
+                            ${!useCustomModules ? "cursor-default opacity-70" : ""}
+                          `}
                         >
                           {MODULE_LABELS[moduleKey]}
-                        </Label>
-                      </div>
-                    );
-                  })}
-                </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {!useCustomModules && (
+                <p className="text-[11px] text-muted-foreground">
+                  Rol varsayılanları kullanılıyor
+                </p>
               )}
             </div>
           </div>
