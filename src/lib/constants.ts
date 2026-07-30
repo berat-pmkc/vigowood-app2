@@ -327,6 +327,17 @@ export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
   "Üretim",
 ];
 
+/**
+ * Üretim seansı iptali (yıkıcı işlem) — sadece ofis rolleri.
+ * Saha rolleri (Hat, Üretim) seans açıp kapatabilir ama iptal edemez.
+ * SQL karşılığı: is_admin_or_engineer()
+ * DİKKAT: Bu liste ile RLS politikası birlikte değiştirilmelidir.
+ */
+export const PRODUCTION_CANCEL_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+];
+
 // Sevkiyat durum sabitleri
 export const SEVKIYAT_STATUS = ["bekliyor", "hazirlaniyor", "yolda", "teslim_edildi", "iptal_edildi"] as const;
 export type SevkiyatStatus = (typeof SEVKIYAT_STATUS)[number];

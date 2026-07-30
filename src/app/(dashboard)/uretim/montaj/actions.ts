@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { montajSessionCloseSchema } from "@/lib/validations";
-import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, PRODUCTION_CANCEL_ROLES } from "@/lib/constants";
 import { parseWorkers } from "./utils";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -13,6 +13,15 @@ async function requireProductionAccess() {
   const user = await getCurrentUser();
   if (!user || !PRODUCTION_ACCESS_ROLES.includes(user.role)) {
     throw new Error("Yetkisiz erişim");
+  }
+  return user;
+}
+
+/** Seans iptali için daraltılmış kontrol — sadece ofis rolleri. */
+async function requireCancelAccess() {
+  const user = await getCurrentUser();
+  if (!user || !PRODUCTION_CANCEL_ROLES.includes(user.role)) {
+    throw new Error("Seans iptali için yetkiniz yok");
   }
   return user;
 }
@@ -749,7 +758,7 @@ export async function closeMontajSession(
 /** Aktif seansı iptal et (sil) */
 export async function cancelMontajSession(sessionId: string): Promise<ActionResult> {
   try {
-    await requireProductionAccess();
+    await requireCancelAccess();
     const supabase = await createClient();
 
     const { data } = await supabase
@@ -764,13 +773,26 @@ export async function cancelMontajSession(sessionId: string): Promise<ActionResu
       return { success: false, error: "Sadece devam eden seans iptal edilebilir" };
     }
 
-    const { error } = await supabase
+    // .select() şart: RLS bir DELETE'i engellediğinde hata DÖNMEZ, sadece
+    // 0 satır etkilenir. Dönen satırları saymazsak silinmemiş bir seans için
+    // success:true döner ve arayüz kullanıcıya yalan söyler.
+    const { data: deleted, error } = await supabase
       .from("montaj_sessions")
       .delete()
       .eq("session_id", sessionId)
-      .eq("durum", "montajda");
+      .eq("durum", "montajda")
+      .select("session_id");
 
     if (error) return { success: false, error: error.message };
+
+    if (!deleted || deleted.length === 0) {
+      return {
+        success: false,
+        error:
+          "Seans silinemedi. Bu işlem için veritabanı yetkiniz olmayabilir; " +
+          "sorun sürerse yöneticinize bildirin.",
+      };
+    }
 
     revalidatePath("/uretim/montaj");
     return { success: true };

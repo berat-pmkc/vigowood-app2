@@ -35,9 +35,12 @@ interface ProductOption {
 interface MontajDashboardProps {
   activeSessions: ActiveMontajSession[];
   productOptions: ProductOption[];
+  /** Seans iptali yalnızca ofis rolleri için (PRODUCTION_CANCEL_ROLES). */
+  canCancel: boolean;
 }
 
 export function MontajDashboard({
+  canCancel,
   activeSessions: serverActiveSessions,
   productOptions: serverProductOptions,
 }: MontajDashboardProps) {
@@ -120,6 +123,7 @@ export function MontajDashboard({
           sessions={activeSessions}
           onClose={handleClose}
           onCancel={handleCancel}
+          canCancel={canCancel}
         />
       </section>
 

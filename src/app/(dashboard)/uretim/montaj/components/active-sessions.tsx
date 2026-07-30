@@ -7,9 +7,10 @@ interface ActiveSessionsProps {
   sessions: ActiveMontajSession[];
   onClose: (session: ActiveMontajSession) => void;
   onCancel: (sessionId: string) => void;
+  canCancel: boolean;
 }
 
-export function ActiveSessions({ sessions, onClose, onCancel }: ActiveSessionsProps) {
+export function ActiveSessions({ sessions, onClose, onCancel, canCancel }: ActiveSessionsProps) {
   if (sessions.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -28,6 +29,7 @@ export function ActiveSessions({ sessions, onClose, onCancel }: ActiveSessionsPr
           session={session}
           onClose={onClose}
           onCancel={onCancel}
+          canCancel={canCancel}
         />
       ))}
     </div>

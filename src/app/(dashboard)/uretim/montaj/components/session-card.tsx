@@ -26,7 +26,8 @@ export interface ActiveMontajSession {
 interface SessionCardProps {
   session: ActiveMontajSession;
   onClose: (session: ActiveMontajSession) => void;
-  onCancel: (sessionId: string) => void;
+  onCancel: (sessionId: string) => Promise<void> | void;
+  canCancel: boolean;
 }
 
 function LiveTimer({ startTime }: { startTime: string }) {
@@ -53,7 +54,7 @@ function LiveTimer({ startTime }: { startTime: string }) {
   );
 }
 
-export function SessionCard({ session, onClose, onCancel }: SessionCardProps) {
+export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCardProps) {
   const [cancelLoading, setCancelLoading] = useState(false);
   const skuStyle = getSkuBadgeStyle(session.sku);
 
@@ -68,17 +69,25 @@ export function SessionCard({ session, onClose, onCancel }: SessionCardProps) {
           >
             {session.sku}
           </span>
-          <button
-            onClick={() => {
-              setCancelLoading(true);
-              onCancel(session.session_id);
-            }}
-            disabled={cancelLoading}
-            className="p-0.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
-            title="Seansı İptal Et"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          {canCancel && (
+            <button
+              onClick={async () => {
+                setCancelLoading(true);
+                try {
+                  // await şart: iptal başarısız olursa buton kalıcı olarak
+                  // devre dışı kalmamalı, kullanıcı tekrar deneyebilmeli.
+                  await onCancel(session.session_id);
+                } finally {
+                  setCancelLoading(false);
+                }
+              }}
+              disabled={cancelLoading}
+              className="p-0.5 rounded text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 disabled:opacity-50"
+              title="Seansı İptal Et"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Step + final badge */}
