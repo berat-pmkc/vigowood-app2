@@ -305,7 +305,7 @@ Giriş sonrası form içinde kişisel operatör seçimi yapılır (VW022 gibi Us
 
 ### Genel Bilgiler
 - **75 migration** dosyası uygulandı
-- **Supabase Pro** — West EU (Ireland), Project Ref: `qqoojonxpaufcyyzvfpo`
+- **Supabase Pro** — West EU (Ireland), Project Ref: `mdxaktebpuhlwacqcven`
 - **RLS:** Her tabloda SECURITY DEFINER fonksiyonlar (inline subquery YASAK — infinite recursion)
 - **Realtime:** Üretim ve stok tablolarında Supabase Realtime subscription
 - **Storage:** Ops Center dosya ekleri için Supabase Storage bucket
@@ -782,7 +782,7 @@ shipment-settings-types.ts (type tanımları, client-safe)
 ### Supabase (Backend)
 - **Plan:** Pro ($25/ay)
 - **Region:** West EU (Ireland)
-- **Project Ref:** `qqoojonxpaufcyyzvfpo`
+- **Project Ref:** `mdxaktebpuhlwacqcven`
 - **Özellikler:** PostgreSQL, Auth, Realtime, RLS, Storage
 
 ### Hetzner VPS (Worker)
@@ -814,7 +814,7 @@ npx supabase db push
 npx supabase migration list
 
 # Supabase types regenerate
-npx supabase gen types typescript --project-id qqoojonxpaufcyyzvfpo > src/lib/supabase/types.ts
+npx supabase gen types typescript --project-id mdxaktebpuhlwacqcven > src/lib/supabase/types.ts
 # DİKKAT: Sonuna custom alias'ları eklemeyi unutma!
 
 # shadcn/ui bileşen ekle

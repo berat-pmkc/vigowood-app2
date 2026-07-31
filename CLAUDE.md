@@ -287,7 +287,7 @@ Next.js 16 + Supabase SSR'da `setAll` callback'i her istekte cookie set eder. Ne
 
 ### Migration Kuralları — KRİTİK
 - Migration'ları **kullanıcıya SQL yapıştırmasını İSTEME** — `npx supabase db push` ile uygula
-- Supabase CLI zaten login'li ve linked (proje ref: `qqoojonxpaufcyyzvfpo`)
+- Supabase CLI zaten login'li ve linked (proje ref: `mdxaktebpuhlwacqcven`)
 - Trigger fonksiyon adı: `handle_updated_at()` — `set_updated_at()` YAZMA
 - Migration listesi kontrol: `npx supabase migration list`
 - Dosya formatı: `supabase/migrations/NNN_isim.sql` (sıralı numara)

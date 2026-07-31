@@ -6,7 +6,7 @@ name: Supabase Migrations
 # GEREKLİ SECRETS (Settings > Secrets and variables > Actions):
 #   SUPABASE_ACCESS_TOKEN  - supabase.com/dashboard/account/tokens
 #   SUPABASE_DB_PASSWORD   - Project Settings > Database > Database password
-#   SUPABASE_PROJECT_ID    - proje ref (qqoojonxpaufcyyzvfpo)
+#   SUPABASE_PROJECT_ID    - proje ref (mdxaktebpuhlwacqcven)
 #
 # Elle çalıştırmak için: Actions sekmesi > Supabase Migrations > Run workflow
 
