@@ -292,6 +292,20 @@ Next.js 16 + Supabase SSR'da `setAll` callback'i her istekte cookie set eder. Ne
 - Migration listesi kontrol: `npx supabase migration list`
 - Dosya formatı: `supabase/migrations/NNN_isim.sql` (sıralı numara)
 
+**Otomatik uygulama (CI):** `.github/workflows/supabase-migrations.yml`
+`supabase/migrations/` altındaki değişiklikler `main`'e push edildiğinde
+migration'lar otomatik uygulanır. Elle `db push` gerekmez.
+Durum: Actions sekmesi > Supabase Migrations.
+
+**RLS ↔ uygulama katmanı uyumu — DİKKAT**
+RLS politikası bir işlemi engellediğinde Supabase **hata dönmez**, sessizce
+0 satır etkiler. Bu yüzden:
+- `.delete()` / `.update()` sonrası `.select()` ile etkilenen satırı doğrula,
+  yalnızca `error`'a bakma (bkz. `cancelMontajSession`)
+- Bir action'ın rol kontrolü ile ilgili tablonun RLS politikası **aynı role
+  kümesini** kullanmalı; biri değişirse diğeri de değişmeli
+  (örn. `PRODUCTION_CANCEL_ROLES` ↔ `is_admin_or_engineer()`)
+
 ---
 
 ## ARAÇLAR
