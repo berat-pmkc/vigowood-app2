@@ -68,3 +68,5 @@ jobs:
         run: |
           echo "--- Uygulama sonrası durum ---"
           supabase migration list --linked
+
+# Hedef proje: mdxaktebpuhlwacqcven (eu-west-1)
