@@ -9,6 +9,7 @@
 -- plaka_parts.sku ürünlere FK'lı; karton plakalarda bu kolona ürün kodu yerine
 -- kutu tanımı yazılmış (ör. 'Kutu MK10 (1.09*0.69)') — NULL bırakıldı.
 -- KOSA/KOSC/KOSE/KOSM-P02 parçaları AllParts'ta yok, o satırlar atlandı.
+-- Ondalık ayracı virgül olan miktarlar (ör. '1,85') noktaya çevrildi.
 
 
 -- 1. Eksik 13 parça (adlar aynı ailenin diğer parçalarından)
@@ -651,7 +652,7 @@ INSERT INTO public.plaka_parts (ppart_id,plaka_id,part_id,default_qty,sku) VALUE
   ('PPart0307','PLK-166','HP0072',0.886,NULL),
   ('PPart0308','PLK-167','HP0073',2.05,NULL),
   ('PPart0309','PLK-168','HP0079',0.671,NULL),
-  ('PPart0310','PLK-169','HP0080',1,85,NULL),
+  ('PPart0310','PLK-169','HP0080',1.85,NULL),
   ('PPart0311','PLK-170','LS031-P07',27,'LS031'),
   ('PPart0312','PLK-171','KOSC-P01',80,'KOSCEVİZ'),
   ('PPart0314','PLK-172','KOSC-P03',80,'KOSCEVİZ'),
