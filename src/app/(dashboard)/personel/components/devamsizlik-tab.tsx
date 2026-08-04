@@ -8,7 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getDevamsizlikOzeti, type DevamsizlikSatir } from "../actions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { CalendarDays, Search, TrendingDown, Users } from "lucide-react";
+import { CalendarDays, CalendarOff, Search, Settings2, TrendingDown, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TatilYonetimiDialog } from "./tatil-yonetimi-dialog";
 
 type SiralamaAlani = "full_name" | "geldi" | "devamsiz" | "izinli" | "raporlu" | "kayitsiz";
 
@@ -31,6 +33,9 @@ export function DevamsizlikTab() {
   const [yukleniyor, setYukleniyor] = useState(true);
   const [arama, setArama] = useState("");
   const [sirala, setSirala] = useState<SiralamaAlani>("full_name");
+  const [tatiller, setTatiller] = useState<{ tarih: string; ad: string }[]>([]);
+  const [tatilDialog, setTatilDialog] = useState(false);
+  const [yenile, setYenile] = useState(0);
 
   useEffect(() => {
     let iptal = false;
@@ -40,13 +45,14 @@ export function DevamsizlikTab() {
         if (iptal) return;
         setSatirlar(d.satirlar);
         setHedefGun(d.hedef_gun);
+        setTatiller(d.tatiller);
       })
       .catch(() => toast.error("Devamsızlık özeti yüklenemedi"))
       .finally(() => !iptal && setYukleniyor(false));
     return () => {
       iptal = true;
     };
-  }, [ay]);
+  }, [ay, yenile]);
 
   const gosterilen = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr");
@@ -116,7 +122,23 @@ export function DevamsizlikTab() {
             />
           </div>
         </div>
+        <Button variant="outline" onClick={() => setTatilDialog(true)}>
+          <Settings2 className="w-4 h-4 mr-1" />
+          Resmî Tatiller
+        </Button>
       </div>
+
+      {tatiller.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <CalendarOff className="w-3.5 h-3.5" />
+          <span className="font-medium">Bu ayki tatiller:</span>
+          {tatiller.map((t) => (
+            <span key={t.tarih} className="rounded bg-muted px-1.5 py-0.5">
+              {t.tarih.slice(8, 10)}.{t.tarih.slice(5, 7)} · {t.ad}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Özet kartları */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -125,7 +147,11 @@ export function DevamsizlikTab() {
             <CalendarDays className="w-3.5 h-3.5" /> Hedef iş günü
           </div>
           <p className="text-2xl font-semibold mt-1">{hedefGun}</p>
-          <p className="text-[11px] text-muted-foreground">pazarlar hariç</p>
+          <p className="text-[11px] text-muted-foreground">
+            {tatiller.length > 0
+              ? `pazarlar ve ${tatiller.length} resmî tatil hariç`
+              : "pazarlar hariç"}
+          </p>
         </Card>
         <Card className="p-3">
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -252,9 +278,15 @@ export function DevamsizlikTab() {
       <p className="text-xs text-muted-foreground leading-relaxed">
         <span className="font-medium">Kayıtsız</span> sütunu, hedef iş günü sayısından
         yoklaması girilmiş günler düşüldüğünde kalan günleri gösterir — ne gelinmiş ne de
-        mazeret kaydedilmiş günler. Hedef gün sayısı ayın pazarları düşülerek hesaplanır,
-        resmi tatiller dahil değildir.
+        mazeret kaydedilmiş günler. Hedef gün sayısı ayın pazarları ve tanımlı resmî
+        tatilleri düşülerek hesaplanır.
       </p>
+
+      <TatilYonetimiDialog
+        open={tatilDialog}
+        onOpenChange={setTatilDialog}
+        onDegisti={() => setYenile((n) => n + 1)}
+      />
     </div>
   );
 }

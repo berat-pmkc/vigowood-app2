@@ -2804,6 +2804,33 @@ export type Database = {
           },
         ]
       }
+      resmi_tatiller: {
+        Row: {
+          aktif: boolean
+          ad: string
+          created_at: string
+          hedeften_dus: boolean
+          tarih: string
+          updated_at: string
+        }
+        Insert: {
+          aktif?: boolean
+          ad: string
+          created_at?: string
+          hedeften_dus?: boolean
+          tarih: string
+          updated_at?: string
+        }
+        Update: {
+          aktif?: boolean
+          ad?: string
+          created_at?: string
+          hedeften_dus?: boolean
+          tarih?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       satis_raporlari: {
         Row: {
           created_at: string

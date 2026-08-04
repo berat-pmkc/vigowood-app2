@@ -162,18 +162,27 @@ export interface DevamsizlikSatir {
 
 export interface DevamsizlikOzet {
   satirlar: DevamsizlikSatir[];
-  /** Ayın pazar dışındaki gün sayısı */
+  /** Ayın pazarlar ve resmî tatiller düşülmüş iş günü sayısı */
   hedef_gun: number;
   ay: string;
+  /** O ay içindeki resmî tatiller — arayüzde gösterilir */
+  tatiller: { tarih: string; ad: string }[];
 }
 
-/** Verilen ayın pazar günleri hariç gün sayısı */
-function isGunuSayisi(yil: number, ay: number): number {
+/**
+ * Verilen ayın iş günü sayısı: pazarlar ve resmî tatiller düşülür.
+ *
+ * Pazara denk gelen tatil zaten sayılmadığı için iki kez düşülmez.
+ */
+function isGunuSayisi(yil: number, ay: number, tatilTarihleri: Set<string>): number {
   const sonGun = new Date(yil, ay, 0).getDate();
   let sayi = 0;
   for (let g = 1; g <= sonGun; g++) {
-    // getDay(): 0 = Pazar
-    if (new Date(yil, ay - 1, g).getDay() !== 0) sayi++;
+    const tarih = new Date(yil, ay - 1, g);
+    if (tarih.getDay() === 0) continue; // pazar
+    const iso = `${yil}-${String(ay).padStart(2, "0")}-${String(g).padStart(2, "0")}`;
+    if (tatilTarihleri.has(iso)) continue; // resmî tatil
+    sayi++;
   }
   return sayi;
 }
@@ -197,7 +206,17 @@ export async function getDevamsizlikOzeti(ay: string): Promise<DevamsizlikOzet> 
   const ilkGun = `${ay}-01`;
   const sonGunSayisi = new Date(yil, ayNo, 0).getDate();
   const sonGun = `${ay}-${String(sonGunSayisi).padStart(2, "0")}`;
-  const hedef_gun = isGunuSayisi(yil, ayNo);
+  const { data: tatiller } = await supabase
+    .from("resmi_tatiller")
+    .select("tarih, ad")
+    .gte("tarih", ilkGun)
+    .lte("tarih", sonGun)
+    .eq("aktif", true)
+    .eq("hedeften_dus", true);
+
+  const tatilListesi = (tatiller ?? []) as { tarih: string; ad: string }[];
+  const tatilSet = new Set(tatilListesi.map((t) => t.tarih));
+  const hedef_gun = isGunuSayisi(yil, ayNo, tatilSet);
 
   const { data: personel } = await supabase
     .from("users")
@@ -252,5 +271,68 @@ export async function getDevamsizlikOzeti(ay: string): Promise<DevamsizlikOzet> 
     };
   });
 
-  return { satirlar, hedef_gun, ay };
+  return { satirlar, hedef_gun, ay, tatiller: tatilListesi };
+}
+
+
+// ─── Resmî Tatil Takvimi ────────────────────────────────────
+
+export interface ResmiTatil {
+  tarih: string;
+  ad: string;
+  hedeften_dus: boolean;
+  aktif: boolean;
+}
+
+export async function getResmiTatiller(yil: number): Promise<ResmiTatil[]> {
+  await requirePersonelAccess();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("resmi_tatiller")
+    .select("tarih, ad, hedeften_dus, aktif")
+    .gte("tarih", `${yil}-01-01`)
+    .lte("tarih", `${yil}-12-31`)
+    .order("tarih");
+  return (data ?? []) as ResmiTatil[];
+}
+
+export async function upsertResmiTatil(
+  t: ResmiTatil
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requirePersonelAccess();
+    if (!t.tarih || !t.ad.trim()) {
+      return { success: false, error: "Tarih ve tatil adı gereklidir" };
+    }
+    const supabase = await createClient();
+    const { error } = await supabase.from("resmi_tatiller").upsert(
+      {
+        tarih: t.tarih,
+        ad: t.ad.trim(),
+        hedeften_dus: t.hedeften_dus,
+        aktif: t.aktif,
+      },
+      { onConflict: "tarih" }
+    );
+    if (error) return { success: false, error: error.message };
+    revalidatePath("/personel");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export async function deleteResmiTatil(
+  tarih: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    await requirePersonelAccess();
+    const supabase = await createClient();
+    const { error } = await supabase.from("resmi_tatiller").delete().eq("tarih", tarih);
+    if (error) return { success: false, error: error.message };
+    revalidatePath("/personel");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
 }
