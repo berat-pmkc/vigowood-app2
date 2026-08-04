@@ -14,14 +14,6 @@ async function requirePersonelAccess() {
   return user;
 }
 
-async function requireAdmin() {
-  const user = await getCurrentUser();
-  if (!user || user.role !== "Yönetici") {
-    throw new Error("Bu işlem sadece yöneticiler tarafından yapılabilir");
-  }
-  return user;
-}
-
 /** Aktif Üretim/Hat kullanıcılarını getir (combobox için) */
 export async function getEmployeeList(): Promise<
   { user_id: string; full_name: string; station: string | null }[]
@@ -119,20 +111,36 @@ export async function updateAttendance(
   }
 }
 
-/** Yoklama kaydını sil (sadece Yönetici) */
+/**
+ * Yoklama kaydını siler.
+ *
+ * Eskiden yalnızca Yönetici silebiliyordu; yoklamayı girebilen rollerin
+ * yanlış kaydı geri alabilmesi gerektiği için personel erişimine açıldı.
+ *
+ * Silinen satır sayısı doğrulanıyor: RLS engellediğinde PostgREST hata
+ * döndürmüyor, sessizce 0 satır siliyor. Doğrulama olmadan uygulama
+ * başarılı sanıp kullanıcıya yanlış bilgi veriyordu.
+ */
 export async function deleteAttendance(
   att_id: string
 ): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    await requireAdmin();
+    await requirePersonelAccess();
     const supabase = await createClient();
 
-    const { error } = await supabase
+    const { data: silinen, error } = await supabase
       .from("attendance")
       .delete()
-      .eq("att_id", att_id);
+      .eq("att_id", att_id)
+      .select("att_id");
 
     if (error) throw error;
+    if (!silinen || silinen.length === 0) {
+      return {
+        success: false,
+        error: "Kayıt silinemedi — yetkiniz olmayabilir veya kayıt zaten silinmiş",
+      };
+    }
 
     revalidatePath("/personel");
     return { success: true };

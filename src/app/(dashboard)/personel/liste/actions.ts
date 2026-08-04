@@ -46,13 +46,21 @@ export async function quickToggleAttendance(
       .limit(1);
 
     if (existing && existing.length > 0) {
-      // Kaydı sil (toggle off)
-      const { error } = await supabase
+      // Kaydı sil (toggle off) — silinen satırı geri iste, RLS engellerse
+      // hata dönmediği için başarı sanılmasın
+      const { data: silinen, error } = await supabase
         .from("attendance")
         .delete()
-        .eq("att_id", existing[0].att_id);
+        .eq("att_id", existing[0].att_id)
+        .select("att_id");
 
       if (error) throw error;
+      if (!silinen || silinen.length === 0) {
+        return {
+          success: false,
+          error: "Yoklama kaldırılamadı — bu işlem için yetkiniz olmayabilir",
+        };
+      }
 
       revalidatePath("/personel/liste");
       revalidatePath("/personel");
@@ -194,16 +202,28 @@ export async function bulkRemoveAttendance(
       return { success: true, removed: 0 };
     }
 
-    const { error } = await supabase
+    // Silinen satırları geri iste — RLS engellerse hata dönmez, sessizce
+    // 0 satır silinir. Eskiden planlanan sayı döndürüldüğü için arayüz
+    // "kaldırıldı" diyor ama kayıtlar yerinde kalıyordu.
+    const { data: silinen, error } = await supabase
       .from("attendance")
       .delete()
-      .in("att_id", existing.map((r) => r.att_id));
+      .in("att_id", existing.map((r) => r.att_id))
+      .select("att_id");
 
     if (error) throw error;
 
+    const removed = silinen?.length ?? 0;
+    if (removed === 0) {
+      return {
+        success: false,
+        error: "Kayıtlar silinemedi — bu işlem için yetkiniz olmayabilir",
+      };
+    }
+
     revalidatePath("/personel/liste");
     revalidatePath("/personel");
-    return { success: true, removed: existing.length };
+    return { success: true, removed };
   } catch (err) {
     return {
       success: false,
