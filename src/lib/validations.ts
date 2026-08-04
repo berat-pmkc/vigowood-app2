@@ -553,23 +553,23 @@ export const attendanceCreateSchema = z.object({
   durum: z.enum(YOKLAMA_DURUMLARI, {
     error: "Geçerli bir durum seçiniz",
   }),
-  // İzinli/raporlu/devamsız günlerde personel işyerinde olmadığı için saat girilmez
+  // Saat alanları her zaman dolu tutulur; izinli/raporlu/devamsız günlerde
+  // form onları gizler ve sunucu tarafında NULL yazılır. Böylece zod şeması
+  // basit kalıyor — .refine() eklemek zodResolver ile giriş/çıkış tipi
+  // uyuşmazlığına yol açıyor.
   start_time: z
     .string()
-    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)")
-    .nullable(),
+    .min(1, "Giriş saati gereklidir")
+    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)"),
   end_time: z
     .string()
-    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)")
-    .nullable(),
+    .min(1, "Çıkış saati gereklidir")
+    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)"),
   not_text: z
     .string()
     .max(500, "Not en fazla 500 karakter olabilir")
     .nullable(),
-}).refine(
-  (d) => d.durum !== "geldi" || (!!d.start_time && !!d.end_time),
-  { message: "Geldi durumunda giriş ve çıkış saati zorunludur", path: ["start_time"] }
-);
+});
 
 export type AttendanceCreateData = z.infer<typeof attendanceCreateSchema>;
 
