@@ -1,38 +1,41 @@
 -- Sevkiyat planları (AppSheet 'VIGO WOOD Sevkiyat Planları' dosyası)
 --
--- 17 sevkiyat 'Sevkiyat Listesi' sayfasından, kalemler 'APP Sevkiyat Detayı'
--- sayfasından alındı. USA24 ve USA27 birleşik detayda yok, kendi plan
--- sayfalarından okundu. DE22 / USA30 / USAx2 sevkiyat listesinde hiç yok —
--- plan sayfalarından 'bekliyor' durumuyla eklendi.
+-- 17 sevkiyat 'Sevkiyat Listesi'nden, kalemler 'APP Sevkiyat Detayı'ndan.
+-- USA24 ve USA27 birleşik detayda yok, kendi plan sayfalarından okundu.
+-- DE22 / USA30 / USAx2 listede hiç yok — plan sayfalarından 'bekliyor' ile eklendi.
 --
--- Durum eşlemesi: 'Sevk Edildi' -> yolda, 'Oluşturuldu' -> bekliyor.
--- USAx2 sayfasındaki 'Tablo1-M-XL' biçimindeki kodlar 'T1-M-XL' yapıldı.
--- Etiketler kolonundaki Drive bağlantıları not alanına yazıldı.
+-- Durum: 'Sevk Edildi' -> yolda, 'Oluşturuldu' -> bekliyor.
+-- USAx2'deki 'Tablo1-M-XL' biçimli kodlar 'T1-M-XL' yapıldı.
+-- Drive bağlantıları not alanına yazıldı.
+--
+-- musteri alanı Excel'de yok; ülkeye göre sevkiyat_firmalar tablosundaki
+-- varsayılan alıcı profili kullanıldı. Alıcı/banka/ihracatçı firma
+-- referansları da bağlandı ki proforma ve paket listesi PDF'leri çalışsın.
 
 
 -- 1. Sevkiyatlar (20)
-INSERT INTO public.sevkiyat (sevkiyat_id,country_code,shipment_number,sevkiyat_adi,ulke,durum,planlanan_sevk_tarihi,not_text) VALUES
-  ('USA21','USA',21,'Amerika Tablo Sevkiyatı','Amerika','yolda','2025-11-05','https://drive.google.com/drive/u/0/folders/1SiSQiuYdL6EwwJMySFxjSAbJCPdK_Elj'),
-  ('UK26','UK',26,'İngilitere 26','İngiltere','yolda','2025-11-09','https://drive.google.com/drive/u/0/folders/1OQM0YrnnEeKTFLU5HRDmQjt0CUB6V-Ti'),
-  ('DE17','DE',17,'Almanya 17','Almanya','yolda','2025-11-02','https://drive.google.com/drive/u/0/folders/1S3T_fud3MHD4ShPYZV-LFN4-KYwaAq-q'),
-  ('UK27','UK',27,'İngilitere 27','İngiltere','yolda','2025-11-20','https://drive.google.com/drive/u/0/folders/1oS9KYWUKo5ZaH9oGJJQE0lzYpr5Xy6ES'),
-  ('USA22','USA',22,'Amerika Tablo Sevkiyatı','Amerika','yolda','2026-01-20',NULL),
-  ('DE18','DE',18,'Almanya 18','Almanya','yolda','2025-12-01','https://drive.google.com/drive/folders/1RUxc_8pauGrAbL6EWnyADUpeMWifjOJa'),
-  ('USA23','USA',23,'Amerika 23','Amerika','yolda','2025-12-22','https://drive.google.com/drive/folders/1qcntd5STjJYsMifsVg63UCiApJ-NmmVD?usp=sharing'),
-  ('USA24','USA',24,'Amerika 24','Amerika','yolda','2025-12-22','https://drive.google.com/drive/folders/16E_hgBXQa8UoaEtEJt6wd42qCo3ZOOTn'),
-  ('DE19','DE',19,'Almanya 19','Almanya','yolda','2025-12-23','https://drive.google.com/drive/folders/1wCXus3VCnS7Q1geKseciRUlaas74KdlE'),
-  ('DE20','DE',20,'Almanya 20','Almanya','yolda','2026-01-16','https://drive.google.com/drive/folders/1YaCQEeRW9S17RMtHzsHl8B1SO9rCeb6f'),
-  ('USA25','USA',25,'Amerika 25','Amerika','yolda','2026-03-27',NULL),
-  ('DE21','DE',21,'Almanya 21','Almanya','yolda','2026-03-29','https://drive.google.com/drive/folders/1HdQ6M5h0-8D-QE2oLtDIWTnigFtX2wVz'),
-  ('UK29','UK',29,'İngilitere 29','İngiltere','yolda','2026-05-21',NULL),
-  ('USA26','USA',26,'Amerika 26','Amerika','yolda','2026-06-25','https://drive.google.com/drive/folders/1fGLkB_YiUP3geaFVLGCtKYgixth795n1'),
-  ('USA27','USA',27,'Amerika Tablo Sevkiyatı','Amerika','yolda','2026-06-27','https://drive.google.com/drive/folders/1EnH6uFmlM7rooghdWgfPfzqVF3LC3J9Q'),
-  ('USA28','USA',28,'Amerika 28','Amerika','yolda','2026-07-09','https://drive.google.com/drive/folders/13fRC-JuLm5iZoiVn6vpEF0POh9xyDk2m'),
-  ('USA29','USA',29,'Amerika 29','Amerika','bekliyor','2026-08-14','https://drive.google.com/drive/folders/1uzv0QT4JmqtNSn8wWp-q9p4BhnsJo19r'),
-  ('DE22','DE',22,'DE22 planı','Almanya','bekliyor',NULL,'Sevkiyat listesinde yok — plan sayfasından alındı'),
-  ('USA30','USA',30,'USA30 planı','Amerika','bekliyor',NULL,'Sevkiyat listesinde yok — plan sayfasından alındı'),
-  ('USAx2','USA',NULL,'USAx2 planı','Amerika','bekliyor',NULL,'Sevkiyat listesinde yok — plan sayfasından alındı')
-ON CONFLICT (sevkiyat_id) DO UPDATE SET sevkiyat_adi=EXCLUDED.sevkiyat_adi, ulke=EXCLUDED.ulke, durum=EXCLUDED.durum, planlanan_sevk_tarihi=EXCLUDED.planlanan_sevk_tarihi, not_text=EXCLUDED.not_text;
+INSERT INTO public.sevkiyat (sevkiyat_id,musteri,country_code,shipment_number,sevkiyat_adi,ulke,durum,planlanan_sevk_tarihi,not_text,alici_firma_id,banka_firma_id,ihracatci_firma_id) VALUES
+  ('USA21','Hass Woodtech USA','USA',21,'Amerika Tablo Sevkiyatı','Amerika','yolda','2025-11-05','https://drive.google.com/drive/u/0/folders/1SiSQiuYdL6EwwJMySFxjSAbJCPdK_Elj',4,7,1),
+  ('UK26','HAS-MOB İngiltere','UK',26,'İngilitere 26','İngiltere','yolda','2025-11-09','https://drive.google.com/drive/u/0/folders/1OQM0YrnnEeKTFLU5HRDmQjt0CUB6V-Ti',3,6,1),
+  ('DE17','HAS-MOB Almanya','DE',17,'Almanya 17','Almanya','yolda','2025-11-02','https://drive.google.com/drive/u/0/folders/1S3T_fud3MHD4ShPYZV-LFN4-KYwaAq-q',2,5,1),
+  ('UK27','HAS-MOB İngiltere','UK',27,'İngilitere 27','İngiltere','yolda','2025-11-20','https://drive.google.com/drive/u/0/folders/1oS9KYWUKo5ZaH9oGJJQE0lzYpr5Xy6ES',3,6,1),
+  ('USA22','Hass Woodtech USA','USA',22,'Amerika Tablo Sevkiyatı','Amerika','yolda','2026-01-20',NULL,4,7,1),
+  ('DE18','HAS-MOB Almanya','DE',18,'Almanya 18','Almanya','yolda','2025-12-01','https://drive.google.com/drive/folders/1RUxc_8pauGrAbL6EWnyADUpeMWifjOJa',2,5,1),
+  ('USA23','Hass Woodtech USA','USA',23,'Amerika 23','Amerika','yolda','2025-12-22','https://drive.google.com/drive/folders/1qcntd5STjJYsMifsVg63UCiApJ-NmmVD?usp=sharing',4,7,1),
+  ('USA24','Hass Woodtech USA','USA',24,'Amerika 24','Amerika','yolda','2025-12-22','https://drive.google.com/drive/folders/16E_hgBXQa8UoaEtEJt6wd42qCo3ZOOTn',4,7,1),
+  ('DE19','HAS-MOB Almanya','DE',19,'Almanya 19','Almanya','yolda','2025-12-23','https://drive.google.com/drive/folders/1wCXus3VCnS7Q1geKseciRUlaas74KdlE',2,5,1),
+  ('DE20','HAS-MOB Almanya','DE',20,'Almanya 20','Almanya','yolda','2026-01-16','https://drive.google.com/drive/folders/1YaCQEeRW9S17RMtHzsHl8B1SO9rCeb6f',2,5,1),
+  ('USA25','Hass Woodtech USA','USA',25,'Amerika 25','Amerika','yolda','2026-03-27',NULL,4,7,1),
+  ('DE21','HAS-MOB Almanya','DE',21,'Almanya 21','Almanya','yolda','2026-03-29','https://drive.google.com/drive/folders/1HdQ6M5h0-8D-QE2oLtDIWTnigFtX2wVz',2,5,1),
+  ('UK29','HAS-MOB İngiltere','UK',29,'İngilitere 29','İngiltere','yolda','2026-05-21',NULL,3,6,1),
+  ('USA26','Hass Woodtech USA','USA',26,'Amerika 26','Amerika','yolda','2026-06-25','https://drive.google.com/drive/folders/1fGLkB_YiUP3geaFVLGCtKYgixth795n1',4,7,1),
+  ('USA27','Hass Woodtech USA','USA',27,'Amerika Tablo Sevkiyatı','Amerika','yolda','2026-06-27','https://drive.google.com/drive/folders/1EnH6uFmlM7rooghdWgfPfzqVF3LC3J9Q',4,7,1),
+  ('USA28','Hass Woodtech USA','USA',28,'Amerika 28','Amerika','yolda','2026-07-09','https://drive.google.com/drive/folders/13fRC-JuLm5iZoiVn6vpEF0POh9xyDk2m',4,7,1),
+  ('USA29','Hass Woodtech USA','USA',29,'Amerika 29','Amerika','bekliyor','2026-08-14','https://drive.google.com/drive/folders/1uzv0QT4JmqtNSn8wWp-q9p4BhnsJo19r',4,7,1),
+  ('DE22','HAS-MOB Almanya','DE',22,'DE22 planı','Almanya','bekliyor',NULL,'Sevkiyat listesinde yok — plan sayfasından alındı',2,5,1),
+  ('USA30','Hass Woodtech USA','USA',30,'USA30 planı','Amerika','bekliyor',NULL,'Sevkiyat listesinde yok — plan sayfasından alındı',4,7,1),
+  ('USAx2','Hass Woodtech USA','USA',NULL,'USAx2 planı','Amerika','bekliyor',NULL,'Sevkiyat listesinde yok — plan sayfasından alındı',4,7,1)
+ON CONFLICT (sevkiyat_id) DO UPDATE SET musteri=EXCLUDED.musteri, sevkiyat_adi=EXCLUDED.sevkiyat_adi, ulke=EXCLUDED.ulke, durum=EXCLUDED.durum, planlanan_sevk_tarihi=EXCLUDED.planlanan_sevk_tarihi, not_text=EXCLUDED.not_text, alici_firma_id=EXCLUDED.alici_firma_id, banka_firma_id=EXCLUDED.banka_firma_id, ihracatci_firma_id=EXCLUDED.ihracatci_firma_id;
 
 -- 2. Sevkiyat kalemleri (261)
 INSERT INTO public.sevkiyat_items (item_id,sevkiyat_id,sku,urun_adi,qty,palet_boyut,palet_yukseklik,en,boy,yuk,koli_adedi,palette_koli,toplam_koli,hacim,desi,koli_agirlik,agirlik,grup,palet_sayisi) VALUES
