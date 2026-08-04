@@ -299,6 +299,7 @@ export function ShipmentTable({
 
       <EditItemSheet
         item={editItem}
+        siblings={items}
         open={editItem !== null}
         onOpenChange={(o) => !o && setEditItem(null)}
         onSaved={onItemUpdated}
