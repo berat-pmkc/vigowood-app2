@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sevkiyatCreateSchema, sevkiyatItemSchema } from "@/lib/validations";
-import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { SEVKIYAT_ACCESS_ROLES, SEVKIYAT_STATUS, type SevkiyatStatus } from "@/lib/constants";
 import { getShipmentSettings, getCountryByCode } from "@/lib/shipment-settings";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -1462,5 +1462,82 @@ export async function getDefaultFirma(firmaTipi: string, countryCode?: string) {
     return { success: true as const, data: data as SevkiyatFirmaRow };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/**
+ * Sevkiyat durumunu doğrudan ayarlar.
+ *
+ * startPreparation / shipSevkiyat / deliverSevkiyat akışı tek yönlüdür ve
+ * normal kullanımda tercih edilmelidir. Bu fonksiyon veri düzeltmek için
+ * vardır: yanlış işaretlenmiş ya da dışarıdan aktarılmış kayıtları doğru
+ * duruma çekmeyi sağlar. Zaman damgaları yeni duruma göre tutarlı hale
+ * getirilir — ileri alınan adımların damgası doldurulur, geri alınanlarınki
+ * temizlenir.
+ */
+export async function setSevkiyatDurum(
+  sevkiyatId: string,
+  durum: string
+): Promise<ActionResult> {
+  try {
+    await requireSevkiyatAccess();
+
+    if (!SEVKIYAT_STATUS.includes(durum as SevkiyatStatus)) {
+      return { success: false, error: "Geçersiz durum" };
+    }
+
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("sevkiyat")
+      .select("durum, hazirlama_zamani, gonderim_zamani, teslim_zamani, gerceklesen_sevk_tarihi")
+      .eq("sevkiyat_id", sevkiyatId)
+      .single();
+
+    const row = data as {
+      durum: string;
+      hazirlama_zamani: string | null;
+      gonderim_zamani: string | null;
+      teslim_zamani: string | null;
+      gerceklesen_sevk_tarihi: string | null;
+    } | null;
+
+    if (!row) return { success: false, error: "Sevkiyat bulunamadı" };
+    if (row.durum === durum) return { success: true };
+
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { durum };
+
+    // İptal durumunda geçmiş damgalara dokunma — kayıt olduğu gibi dursun
+    if (durum !== "iptal_edildi") {
+      const hazirlandi = durum === "hazirlaniyor" || durum === "yolda" || durum === "teslim_edildi";
+      const gonderildi = durum === "yolda" || durum === "teslim_edildi";
+      const teslimEdildi = durum === "teslim_edildi";
+
+      updates.hazirlama_zamani = hazirlandi ? (row.hazirlama_zamani ?? now) : null;
+      updates.gonderim_zamani = gonderildi ? (row.gonderim_zamani ?? now) : null;
+      updates.teslim_zamani = teslimEdildi ? (row.teslim_zamani ?? now) : null;
+
+      // Sevk tarihi gönderimle birlikte oluşur, geri alınırsa temizlenir
+      if (gonderildi) {
+        updates.gerceklesen_sevk_tarihi =
+          row.gerceklesen_sevk_tarihi ?? (updates.gonderim_zamani as string).split("T")[0];
+      } else {
+        updates.gerceklesen_sevk_tarihi = null;
+      }
+    }
+
+    const { error } = await supabase
+      .from("sevkiyat")
+      .update(updates)
+      .eq("sevkiyat_id", sevkiyatId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/sevkiyat");
+    revalidatePath(`/sevkiyat/${sevkiyatId}`);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { SevkiyatStatusBadge } from "../../components/sevkiyat-status-badge";
+import { DurumSecici } from "./durum-secici";
 import type { KonteynerTipi } from "@/lib/shipment-settings-types";
 import { getKonteynerLabel } from "@/lib/shipment-settings-types";
 import { formatDate } from "@/lib/utils";
@@ -88,7 +88,7 @@ export function ShipmentHeader({ sevkiyat, konteynerTipleri }: ShipmentHeaderPro
             </span>
           </div>
         </div>
-        <SevkiyatStatusBadge durum={sevkiyat.durum} />
+        <DurumSecici sevkiyatId={sevkiyat.sevkiyat_id} durum={sevkiyat.durum} />
       </div>
 
       {/* Info card */}

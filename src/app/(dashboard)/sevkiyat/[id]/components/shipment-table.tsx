@@ -11,6 +11,7 @@ import {
 } from "../../actions";
 import type { SevkiyatItemRow } from "../../actions";
 import { X, Check, Pencil } from "lucide-react";
+import { EditItemSheet } from "./edit-item-sheet";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,7 @@ export function ShipmentTable({
   const [editingGrup, setEditingGrup] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
+  const [editItem, setEditItem] = useState<SevkiyatItemRow | null>(null);
 
   const handlePaletEdit = (itemId: string, currentValue: number | null) => {
     setEditingPalet(itemId);
@@ -125,7 +127,7 @@ export function ShipmentTable({
                 <th className="px-2 py-2 text-center font-semibold min-w-[60px]">Grup</th>
                 <th className="px-2 py-2 text-center font-semibold min-w-[60px]">Plt</th>
                 <th className="px-2 py-2 text-center font-semibold">Adet</th>
-                {isEditable && <th className="px-1 py-2 w-8" />}
+                {isEditable && <th className="px-1 py-2 w-16" />}
               </tr>
             </thead>
             <tbody>
@@ -238,15 +240,28 @@ export function ShipmentTable({
 
                   {isEditable && (
                     <td className="px-1 py-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(item.item_id)}
-                        disabled={loading === item.item_id}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          title="Kalemi düzenle"
+                          onClick={() => setEditItem(item)}
+                          disabled={loading === item.item_id}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-destructive hover:text-destructive"
+                          title="Kalemi sil"
+                          onClick={() => handleDelete(item.item_id)}
+                          disabled={loading === item.item_id}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -282,6 +297,13 @@ export function ShipmentTable({
         </Card>
       </div>
 
+      <EditItemSheet
+        item={editItem}
+        open={editItem !== null}
+        onOpenChange={(o) => !o && setEditItem(null)}
+        onSaved={onItemUpdated}
+      />
+
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {items.map((item, idx) => (
@@ -295,14 +317,26 @@ export function ShipmentTable({
                 <span className="font-medium text-sm">{item.urun_adi ?? item.sku}</span>
               </div>
               {isEditable && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-destructive"
-                  onClick={() => handleDelete(item.item_id)}
-                >
-                  <X className="w-3.5 h-3.5" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    aria-label="Kalemi düzenle"
+                    onClick={() => setEditItem(item)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-destructive"
+                    aria-label="Kalemi sil"
+                    onClick={() => handleDelete(item.item_id)}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               )}
             </div>
             <div className="grid grid-cols-3 gap-2 text-xs">
