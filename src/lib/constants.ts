@@ -1426,3 +1426,25 @@ export const ROLE_DEFAULT_MODULES: Record<UserRole, ModuleKey[]> = {
   "Pazaryeri Sorumlusu": ["ana_sayfa", "ops_center", "stok", "satis", "pazaryeri", "analiz", "yonetim"],
   "Mimar": ["ana_sayfa", "ops_center", "stok", "satis", "analiz", "yonetim"],
 };
+
+// ─── Yoklama Durumları ──────────────────────────────────────
+// Gelmeyen personelin mazeretli olup olmadığını geçmişe dönük görebilmek için.
+export const YOKLAMA_DURUMLARI = ["geldi", "izinli", "raporlu", "devamsiz"] as const;
+export type YoklamaDurum = (typeof YOKLAMA_DURUMLARI)[number];
+
+export const YOKLAMA_DURUM_LABELS: Record<YoklamaDurum, string> = {
+  geldi: "Geldi",
+  izinli: "İzinli",
+  raporlu: "Raporlu",
+  devamsiz: "Devamsız",
+};
+
+export const YOKLAMA_DURUM_COLORS: Record<YoklamaDurum, { bg: string; text: string; border: string }> = {
+  geldi: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
+  izinli: { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-300" },
+  raporlu: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-300" },
+  devamsiz: { bg: "bg-red-50", text: "text-red-700", border: "border-red-300" },
+};
+
+/** Saat girilmesi gereken tek durum — diğerlerinde personel işyerinde değil */
+export const YOKLAMA_SAAT_GEREKTIREN: YoklamaDurum[] = ["geldi"];

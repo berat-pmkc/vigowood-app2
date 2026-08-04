@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DevamsizlikTab } from "./devamsizlik-tab";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { KpiCards } from "./kpi-cards";
@@ -130,6 +131,7 @@ export function PersonelClient({
         <TabsList>
           <TabsTrigger value="liste">Yoklama Listesi</TabsTrigger>
           <TabsTrigger value="ozet">Özet</TabsTrigger>
+          <TabsTrigger value="devamsizlik">Devamsızlık</TabsTrigger>
         </TabsList>
 
         <TabsContent value="liste" className="mt-4 space-y-4">
@@ -152,6 +154,10 @@ export function PersonelClient({
 
         <TabsContent value="ozet" className="mt-4 space-y-4">
           <PersonelCharts trendData={formattedTrend} deptChartData={deptChartData} />
+        </TabsContent>
+
+        <TabsContent value="devamsizlik" className="mt-4">
+          <DevamsizlikTab />
         </TabsContent>
       </Tabs>
 

@@ -408,6 +408,7 @@ export type Database = {
           att_id: string
           created_at: string
           department: string | null
+          durum: string
           employee: string
           end_time: string | null
           not_text: string | null
@@ -419,6 +420,7 @@ export type Database = {
           att_id: string
           created_at?: string
           department?: string | null
+          durum?: string
           employee: string
           end_time?: string | null
           not_text?: string | null
@@ -430,6 +432,7 @@ export type Database = {
           att_id?: string
           created_at?: string
           department?: string | null
+          durum?: string
           employee?: string
           end_time?: string | null
           not_text?: string | null

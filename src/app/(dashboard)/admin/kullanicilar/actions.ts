@@ -322,6 +322,14 @@ export async function deleteUserAvatar(userId: string): Promise<ActionResult> {
   }
 }
 
+/**
+ * @deprecated Arayüzden kaldırıldı — yerine setUserActive kullanılıyor.
+ *
+ * Silme, kişinin Ops Center'da oluşturduğu görevleri, aktivite kayıtlarını ve
+ * yüklediği dosyaları da beraberinde siler (bu tablolarda ON DELETE CASCADE
+ * tanımlı). Üretim kayıtlarında referans varsa zaten reddediliyor. İşten
+ * ayrılan personel için pasife alma doğru yaklaşımdır.
+ */
 export async function deleteUser(userId: string): Promise<ActionResult> {
   try {
     const currentUser = await requireAdmin();
@@ -371,6 +379,49 @@ export async function deleteUser(userId: string): Promise<ActionResult> {
     }
 
     revalidatePath("/admin/kullanicilar");
+    return { success: true };
+  } catch (e) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "Bir hata oluştu",
+    };
+  }
+}
+
+/**
+ * Kullanıcıyı pasife alır ya da yeniden aktif eder.
+ *
+ * İşten ayrılan personel için silme yerine bunu kullanın. Silmek, kişinin
+ * Ops Center'da oluşturduğu görevleri, aktivite kayıtlarını ve yüklediği
+ * dosyaları da beraberinde götürür (bu tablolarda ON DELETE CASCADE var).
+ * Üretim kayıtları silinmez ama operatör alanı sahipsiz kalır, isim
+ * çözülemez hale gelir.
+ *
+ * Pasife alınan kullanıcı giriş yapamaz, personel seçim listelerinde
+ * görünmez; geçmiş kayıtları olduğu gibi durur.
+ */
+export async function setUserActive(
+  userId: string,
+  isActive: boolean
+): Promise<ActionResult> {
+  try {
+    const currentUser = await requireAdmin();
+
+    if (currentUser.user_id === userId && !isActive) {
+      return { success: false, error: "Kendi hesabınızı pasife alamazsınız" };
+    }
+
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("users")
+      .update({ is_active: isActive, updated_at: new Date().toISOString() })
+      .eq("user_id", userId);
+
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/admin/kullanicilar");
+    revalidatePath("/personel");
     return { success: true };
   } catch (e) {
     return {

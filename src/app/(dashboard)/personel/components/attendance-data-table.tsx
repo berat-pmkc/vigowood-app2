@@ -104,13 +104,32 @@ function getColumns(
       meta: { className: "hidden md:table-cell" },
     },
     {
+      accessorKey: "durum",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Durum" onSort={onSort} />
+      ),
+      cell: ({ row }) => {
+        const d = (row.original.durum ?? "geldi") as YoklamaDurum;
+        const renk = YOKLAMA_DURUM_COLORS[d] ?? YOKLAMA_DURUM_COLORS.geldi;
+        return (
+          <Badge
+            variant="outline"
+            className={`${renk.bg} ${renk.text} ${renk.border} font-medium`}
+          >
+            {YOKLAMA_DURUM_LABELS[d] ?? d}
+          </Badge>
+        );
+      },
+      size: 110,
+    },
+    {
       accessorKey: "start_time",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Giriş" onSort={onSort} />
       ),
       cell: ({ row }) => (
         <span className="font-mono text-sm">
-          {row.original.start_time?.slice(0, 5) || "—"}
+          {row.original.durum !== "geldi" ? "—" : row.original.start_time?.slice(0, 5) || "—"}
         </span>
       ),
       size: 80,
@@ -122,7 +141,7 @@ function getColumns(
       ),
       cell: ({ row }) => (
         <span className="font-mono text-sm">
-          {row.original.end_time?.slice(0, 5) || "—"}
+          {row.original.durum !== "geldi" ? "—" : row.original.end_time?.slice(0, 5) || "—"}
         </span>
       ),
       size: 80,

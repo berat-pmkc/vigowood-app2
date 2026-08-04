@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal, Trash2, Eye, EyeOff } from "lucide-react";
+import { MoreHorizontal, UserMinus, UserCheck, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +25,7 @@ import {
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
 import { UserAvatar } from "@/components/shared/user-avatar";
 import { formatDate } from "@/lib/utils";
-import { deleteUser } from "../actions";
+import { setUserActive } from "../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 type UserRole = "Yönetici" | "Endüstri Mühendisi" | "E-Ticaret Müdürü" | "Dış Ticaret Müdürü" | "Üretim" | "Hat" | "Muhasebe" | "Sevkiyat Sorumlusu" | "Pazaryeri Sorumlusu" | "Mimar";
@@ -84,15 +84,17 @@ function UserActionsCell({
   onEdit: (user: UserWithLastSignIn) => void;
 }) {
   const router = useRouter();
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [onayOpen, setOnayOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const handleDelete = () => {
+  const pasifeAlinacak = user.is_active;
+
+  const handleDurumDegistir = () => {
     startTransition(async () => {
-      const result = await deleteUser(user.user_id);
+      const result = await setUserActive(user.user_id, !user.is_active);
       if (result.success) {
-        toast.success("Kullanıcı silindi");
-        setDeleteOpen(false);
+        toast.success(pasifeAlinacak ? "Kullanıcı pasife alındı" : "Kullanıcı aktif edildi");
+        setOnayOpen(false);
         router.refresh();
       } else {
         toast.error(result.error);
@@ -117,34 +119,51 @@ function UserActionsCell({
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
-              setDeleteOpen(true);
+              setOnayOpen(true);
             }}
-            className="text-destructive focus:text-destructive"
+            className={
+              pasifeAlinacak ? "text-destructive focus:text-destructive" : ""
+            }
           >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Sil
+            {pasifeAlinacak ? (
+              <UserMinus className="mr-2 h-4 w-4" />
+            ) : (
+              <UserCheck className="mr-2 h-4 w-4" />
+            )}
+            {pasifeAlinacak ? "Pasife Al" : "Aktif Et"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialog open={onayOpen} onOpenChange={setOnayOpen}>
         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Kullanıcıyı Sil</AlertDialogTitle>
+            <AlertDialogTitle>
+              {pasifeAlinacak ? "Kullanıcıyı Pasife Al" : "Kullanıcıyı Aktif Et"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{user.user_id}</strong> — {user.full_name}{" "}
-              kullanıcısını silmek istediğinize emin misiniz? Bu işlem geri
-              alınamaz.
+              <strong>{user.user_id}</strong> — {user.full_name}
+              {pasifeAlinacak
+                ? " artık giriş yapamayacak ve personel seçim listelerinde görünmeyecek. Yoklama, üretim ve görev geçmişi olduğu gibi korunur; istediğiniz zaman yeniden aktif edebilirsiniz."
+                : " yeniden giriş yapabilecek ve personel listelerinde görünecek."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isPending}>İptal</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={handleDurumDegistir}
               disabled={isPending}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className={
+                pasifeAlinacak
+                  ? "bg-destructive text-white hover:bg-destructive/90"
+                  : ""
+              }
             >
-              {isPending ? "Siliniyor..." : "Sil"}
+              {isPending
+                ? "İşleniyor..."
+                : pasifeAlinacak
+                  ? "Pasife Al"
+                  : "Aktif Et"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

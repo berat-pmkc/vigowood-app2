@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { YOKLAMA_DURUMLARI, YOKLAMA_DURUM_LABELS } from "@/lib/constants";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -96,6 +97,7 @@ export function AttendanceFormSheet({
       employee: "",
       tarih: todayStr,
       department: "Kesim",
+      durum: "geldi",
       start_time: "08:00",
       end_time: "17:30",
       not_text: null,
@@ -104,6 +106,8 @@ export function AttendanceFormSheet({
 
   const selectedEmployee = watch("employee");
   const selectedDepartment = watch("department");
+  const selectedDurum = watch("durum");
+  const saatGerekli = selectedDurum === "geldi";
 
   // Load employees when sheet opens
   useEffect(() => {
@@ -124,6 +128,7 @@ export function AttendanceFormSheet({
           employee: editingRecord.employee,
           tarih: editingRecord.tarih,
           department: (editingRecord.department || "Kesim") as AttendanceCreateData["department"],
+          durum: (editingRecord.durum || "geldi") as AttendanceCreateData["durum"],
           start_time: editingRecord.start_time?.slice(0, 5) || "08:00",
           end_time: editingRecord.end_time?.slice(0, 5) || "17:30",
           not_text: editingRecord.not_text || null,
@@ -133,6 +138,7 @@ export function AttendanceFormSheet({
           employee: "",
           tarih: todayStr,
           department: "Kesim",
+          durum: "geldi",
           start_time: "08:00",
           end_time: "17:30",
           not_text: null,
@@ -273,7 +279,39 @@ export function AttendanceFormSheet({
             )}
           </div>
 
-          {/* Time inputs */}
+          {/* Durum — gelmeyen personelin mazeretli olup olmadığını kayda geçirir */}
+          <div className="space-y-2">
+            <Label>Durum *</Label>
+            <Select
+              value={selectedDurum}
+              onValueChange={(v) =>
+                setValue("durum", v as AttendanceCreateData["durum"], {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Durum seçiniz" />
+              </SelectTrigger>
+              <SelectContent>
+                {YOKLAMA_DURUMLARI.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {YOKLAMA_DURUM_LABELS[d]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!saatGerekli && (
+              <p className="text-xs text-muted-foreground">
+                {selectedDurum === "devamsiz"
+                  ? "Mazeretsiz gelmedi olarak kaydedilir, devamsızlık raporuna yansır."
+                  : "Personel işyerinde olmadığı için giriş/çıkış saati kaydedilmez."}
+              </p>
+            )}
+          </div>
+
+          {/* Saatler yalnızca gelinen günlerde girilir */}
+          {saatGerekli && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_time">Giriş Saati *</Label>
@@ -294,6 +332,7 @@ export function AttendanceFormSheet({
               )}
             </div>
           </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-2">

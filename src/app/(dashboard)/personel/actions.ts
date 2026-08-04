@@ -61,8 +61,10 @@ export async function createAttendance(
       employee: parsed.data.employee,
       tarih: parsed.data.tarih,
       department: parsed.data.department,
-      start_time: parsed.data.start_time,
-      end_time: parsed.data.end_time,
+      durum: parsed.data.durum,
+      // Gelinmeyen günlerde saat tutulmaz
+      start_time: parsed.data.durum === "geldi" ? parsed.data.start_time : null,
+      end_time: parsed.data.durum === "geldi" ? parsed.data.end_time : null,
       not_text: parsed.data.not_text || null,
     });
 
@@ -98,8 +100,9 @@ export async function updateAttendance(
         employee: parsed.data.employee,
         tarih: parsed.data.tarih,
         department: parsed.data.department,
-        start_time: parsed.data.start_time,
-        end_time: parsed.data.end_time,
+        durum: parsed.data.durum,
+        start_time: parsed.data.durum === "geldi" ? parsed.data.start_time : null,
+        end_time: parsed.data.durum === "geldi" ? parsed.data.end_time : null,
         not_text: parsed.data.not_text || null,
       })
       .eq("att_id", att_id);
@@ -139,4 +142,115 @@ export async function deleteAttendance(
       error: err instanceof Error ? err.message : "Bilinmeyen hata",
     };
   }
+}
+
+// ─── Devamsızlık Takibi ─────────────────────────────────────
+
+export interface DevamsizlikSatir {
+  employee: string;
+  full_name: string;
+  department: string | null;
+  station: string | null;
+  geldi: number;
+  izinli: number;
+  raporlu: number;
+  devamsiz: number;
+  /** Kayıt bulunmayan iş günleri — ne gelmiş ne de mazereti girilmiş */
+  kayitsiz: number;
+  toplam_mesai_dk: number;
+}
+
+export interface DevamsizlikOzet {
+  satirlar: DevamsizlikSatir[];
+  /** Ayın pazar dışındaki gün sayısı */
+  hedef_gun: number;
+  ay: string;
+}
+
+/** Verilen ayın pazar günleri hariç gün sayısı */
+function isGunuSayisi(yil: number, ay: number): number {
+  const sonGun = new Date(yil, ay, 0).getDate();
+  let sayi = 0;
+  for (let g = 1; g <= sonGun; g++) {
+    // getDay(): 0 = Pazar
+    if (new Date(yil, ay - 1, g).getDay() !== 0) sayi++;
+  }
+  return sayi;
+}
+
+/**
+ * Personel bazlı aylık devamsızlık özeti.
+ *
+ * Hedef gün sayısı ayın pazarları düşülerek hesaplanır (Şubat 24, Mart 26 gibi).
+ * Resmi tatiller düşülmez — gerekirse ilerde ayarlardan tanımlanabilir.
+ *
+ * "Kayıtsız" sütunu önemli: ne geldi ne de mazeret kaydı olan iş günleri.
+ * Yoklaması hiç girilmemiş günleri yakalamak için.
+ */
+export async function getDevamsizlikOzeti(ay: string): Promise<DevamsizlikOzet> {
+  await requirePersonelAccess();
+  const supabase = await createClient();
+
+  const [yilStr, ayStr] = ay.split("-");
+  const yil = Number(yilStr);
+  const ayNo = Number(ayStr);
+  const ilkGun = `${ay}-01`;
+  const sonGunSayisi = new Date(yil, ayNo, 0).getDate();
+  const sonGun = `${ay}-${String(sonGunSayisi).padStart(2, "0")}`;
+  const hedef_gun = isGunuSayisi(yil, ayNo);
+
+  const { data: personel } = await supabase
+    .from("users")
+    .select("user_id, full_name, station")
+    .eq("is_active", true)
+    .order("full_name");
+
+  const { data: kayitlar } = await supabase
+    .from("attendance")
+    .select("employee, department, durum, start_time, end_time")
+    .gte("tarih", ilkGun)
+    .lte("tarih", sonGun);
+
+  type K = {
+    employee: string;
+    department: string | null;
+    durum: string;
+    start_time: string | null;
+    end_time: string | null;
+  };
+  const kayitListe = (kayitlar ?? []) as K[];
+
+  const dakika = (bas: string | null, bit: string | null) => {
+    if (!bas || !bit) return 0;
+    const [bs, bd] = bas.split(":").map(Number);
+    const [ts, td] = bit.split(":").map(Number);
+    const fark = ts * 60 + td - (bs * 60 + bd);
+    return fark > 0 ? fark : 0;
+  };
+
+  const satirlar: DevamsizlikSatir[] = (
+    (personel ?? []) as { user_id: string; full_name: string; station: string | null }[]
+  ).map((p) => {
+    const kendi = kayitListe.filter((k) => k.employee === p.user_id);
+    const say = (d: string) => kendi.filter((k) => k.durum === d).length;
+    const geldi = say("geldi");
+    const izinli = say("izinli");
+    const raporlu = say("raporlu");
+    const devamsiz = say("devamsiz");
+
+    return {
+      employee: p.user_id,
+      full_name: p.full_name,
+      department: kendi.find((k) => k.department)?.department ?? null,
+      station: p.station,
+      geldi,
+      izinli,
+      raporlu,
+      devamsiz,
+      kayitsiz: Math.max(0, hedef_gun - (geldi + izinli + raporlu + devamsiz)),
+      toplam_mesai_dk: kendi.reduce((t, k) => t + dakika(k.start_time, k.end_time), 0),
+    };
+  });
+
+  return { satirlar, hedef_gun, ay };
 }

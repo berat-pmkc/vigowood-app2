@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, MONTAJ_SESSION_STATUS, PACK_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI, TASK_STATUSES, TASK_PRIORITIES, TASK_DEPARTMENTS, TASK_SOURCE_TYPES } from "@/lib/constants";
+import { PRODUCT_CATEGORIES, PART_TYPES, MAKINE_IDS, KESIM_MAKINE_IDS, MAKINE_BOLUMLERI, CUT_STATUS, MONTAJ_SESSION_STATUS, PACK_STATUS, IADE_DURUM, ATTENDANCE_DEPARTMENTS,
+  YOKLAMA_DURUMLARI, USER_ROLES, USER_STATIONS, ODEME_TURLERI, PARA_BIRIMLERI, ODEME_DURUMLARI, TASK_STATUSES, TASK_PRIORITIES, TASK_DEPARTMENTS, TASK_SOURCE_TYPES } from "@/lib/constants";
 
 export const loginSchema = z.object({
   email: z
@@ -549,19 +550,26 @@ export const attendanceCreateSchema = z.object({
   department: z.enum(ATTENDANCE_DEPARTMENTS, {
     error: "Geçerli bir departman seçiniz",
   }),
+  durum: z.enum(YOKLAMA_DURUMLARI, {
+    error: "Geçerli bir durum seçiniz",
+  }),
+  // İzinli/raporlu/devamsız günlerde personel işyerinde olmadığı için saat girilmez
   start_time: z
     .string()
-    .min(1, "Giriş saati gereklidir")
-    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)"),
+    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)")
+    .nullable(),
   end_time: z
     .string()
-    .min(1, "Çıkış saati gereklidir")
-    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)"),
+    .regex(/^\d{2}:\d{2}$/, "Geçerli bir saat formatı giriniz (SS:DD)")
+    .nullable(),
   not_text: z
     .string()
     .max(500, "Not en fazla 500 karakter olabilir")
     .nullable(),
-});
+}).refine(
+  (d) => d.durum !== "geldi" || (!!d.start_time && !!d.end_time),
+  { message: "Geldi durumunda giriş ve çıkış saati zorunludur", path: ["start_time"] }
+);
 
 export type AttendanceCreateData = z.infer<typeof attendanceCreateSchema>;
 
