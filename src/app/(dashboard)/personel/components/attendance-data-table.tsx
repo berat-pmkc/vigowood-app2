@@ -24,7 +24,10 @@ import { formatDate } from "@/lib/utils";
 import {
   ATTENDANCE_DEPARTMENT_LABELS,
   ATTENDANCE_DEPARTMENT_COLORS,
+  YOKLAMA_DURUM_LABELS,
+  YOKLAMA_DURUM_COLORS,
   type AttendanceDepartment,
+  type YoklamaDurum,
 } from "@/lib/constants";
 import { deleteAttendance } from "../actions";
 import { toast } from "sonner";
