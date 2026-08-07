@@ -245,18 +245,35 @@ export async function updateMontajSession(
       return { success: false, error: parsed.error.issues[0]?.message ?? "Geçersiz veri" };
     }
 
-    // Recalculate birim_montaj_dk if relevant fields changed
+    const supabase = await createClient();
+
+    // Birim montaj süresini yeniden hesapla — molalar düşülmüş net süreden.
+    // Seans kapatma akışıyla aynı mantık; elle düzeltilen kayıtlarda da
+    // aynı sonucu vermesi için.
     let birimMontajDk: number | null = null;
+    let brutDk: number | null = null;
+    let molaDk: number | null = null;
+    let netDk: number | null = null;
+
     if (parsed.data.start_time && parsed.data.end_time && parsed.data.qty && parsed.data.worker_count) {
-      const start = new Date(parsed.data.start_time).getTime();
-      const end = new Date(parsed.data.end_time).getTime();
-      const diffMinutes = (end - start) / 60000;
-      if (diffMinutes > 0 && parsed.data.qty > 0 && parsed.data.worker_count > 0) {
-        birimMontajDk = Math.round((diffMinutes / (parsed.data.qty * parsed.data.worker_count)) * 100) / 100;
+      const { data: sureData } = await supabase.rpc("montaj_sure_hesapla", {
+        p_bas: parsed.data.start_time,
+        p_bit: parsed.data.end_time,
+        p_operator_id: parsed.data.operator_id ?? null,
+      });
+
+      const sure = Array.isArray(sureData) ? sureData[0] : sureData;
+      if (sure) {
+        brutDk = Number(sure.brut);
+        molaDk = Number(sure.mola);
+        netDk = Number(sure.net);
+      }
+
+      if (netDk !== null && netDk > 0 && parsed.data.qty > 0 && parsed.data.worker_count > 0) {
+        birimMontajDk =
+          Math.round((netDk / (parsed.data.qty * parsed.data.worker_count)) * 100) / 100;
       }
     }
-
-    const supabase = await createClient();
     const { error } = await supabase
       .from("montaj_sessions")
       .update({
@@ -272,6 +289,9 @@ export async function updateMontajSession(
         end_time: parsed.data.end_time,
         is_final_step: parsed.data.is_final_step,
         ...(birimMontajDk !== null ? { birim_montaj_dk: birimMontajDk } : {}),
+        ...(netDk !== null
+          ? { brut_sure_dk: brutDk, mola_dk: molaDk, net_sure_dk: netDk }
+          : {}),
       })
       .eq("session_id", sessionId);
 

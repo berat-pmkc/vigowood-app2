@@ -719,12 +719,36 @@ export async function closeMontajSession(
     const endTime = now.toISOString();
     const { qty, workers } = parsed.data;
 
-    // Birim montaj süresi hesapla
+    // Birim montaj süresi — molalar düşülmüş net süreden hesaplanır.
+    // Seans bir çay veya öğle molasını kapsıyorsa o dakikalar işçilik
+    // sayılmamalı; standart süre analizinde bu fark birikiyor.
     let birimDk: number | null = null;
-    if (session.start_time && qty > 0 && workers.length > 0) {
-      const diffMs = now.getTime() - new Date(session.start_time).getTime();
-      const totalMinutes = diffMs / 60000;
-      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+    let brutDk: number | null = null;
+    let molaDk: number | null = null;
+    let netDk: number | null = null;
+
+    if (session.start_time) {
+      const { data: sureData } = await supabase.rpc("montaj_sure_hesapla", {
+        p_bas: session.start_time,
+        p_bit: endTime,
+        p_operator_id: session.operator_id,
+      });
+
+      const sure = Array.isArray(sureData) ? sureData[0] : sureData;
+      if (sure) {
+        brutDk = Number(sure.brut);
+        molaDk = Number(sure.mola);
+        netDk = Number(sure.net);
+      } else {
+        // Fonksiyon bir sebeple dönmezse brüt süreye düş
+        brutDk = Math.round(((now.getTime() - new Date(session.start_time).getTime()) / 60000) * 100) / 100;
+        molaDk = 0;
+        netDk = brutDk;
+      }
+
+      if (qty > 0 && workers.length > 0 && netDk !== null) {
+        birimDk = Math.round((netDk / (qty * workers.length)) * 100) / 100;
+      }
     }
 
     // Update montaj_sessions
@@ -737,6 +761,9 @@ export async function closeMontajSession(
         worker_count: workers.length,
         workers,
         birim_montaj_dk: birimDk,
+        brut_sure_dk: brutDk,
+        mola_dk: molaDk,
+        net_sure_dk: netDk,
       })
       .eq("session_id", sessionId);
 

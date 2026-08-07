@@ -1603,6 +1603,9 @@ export type Database = {
       montaj_sessions: {
         Row: {
           birim_montaj_dk: number | null
+          brut_sure_dk: number | null
+          mola_dk: number | null
+          net_sure_dk: number | null
           created_at: string | null
           durum: string
           email: string | null
@@ -1624,6 +1627,9 @@ export type Database = {
         }
         Insert: {
           birim_montaj_dk?: number | null
+          brut_sure_dk?: number | null
+          mola_dk?: number | null
+          net_sure_dk?: number | null
           created_at?: string | null
           durum?: string
           email?: string | null
@@ -1645,6 +1651,9 @@ export type Database = {
         }
         Update: {
           birim_montaj_dk?: number | null
+          brut_sure_dk?: number | null
+          mola_dk?: number | null
+          net_sure_dk?: number | null
           created_at?: string | null
           durum?: string
           email?: string | null
@@ -4800,6 +4809,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      montaj_sure_hesapla: {
+        Args: { p_bas: string; p_bit: string; p_operator_id: string | null }
+        Returns: { brut: number; mola: number; net: number }[]
+      }
+      mola_kesisim_dk: {
+        Args: { p_bas: string; p_bit: string; p_plan_id: number | null }
+        Returns: number
+      }
       calculate_customer_segment: {
         Args: {
           p_last_order_date: string
