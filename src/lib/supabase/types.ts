@@ -4585,6 +4585,78 @@ export type Database = {
         }
         Relationships: []
       }
+      mola_planlari: {
+        Row: {
+          aciklama: string | null
+          ad: string
+          aktif: boolean
+          araliklar: Json
+          created_at: string
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          aciklama?: string | null
+          ad: string
+          aktif?: boolean
+          araliklar?: Json
+          created_at?: string
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          aciklama?: string | null
+          ad?: string
+          aktif?: boolean
+          araliklar?: Json
+          created_at?: string
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      uretim_uyarilari: {
+        Row: {
+          adet: number
+          baslik: string
+          created_at: string
+          dedup_key: string
+          detay: Json
+          durum: string
+          hedef_user: string | null
+          id: string
+          tarih: string
+          tur: string
+          updated_at: string
+        }
+        Insert: {
+          adet?: number
+          baslik: string
+          created_at?: string
+          dedup_key: string
+          detay?: Json
+          durum?: string
+          hedef_user?: string | null
+          id?: string
+          tarih: string
+          tur: string
+          updated_at?: string
+        }
+        Update: {
+          adet?: number
+          baslik?: string
+          created_at?: string
+          dedup_key?: string
+          detay?: Json
+          durum?: string
+          hedef_user?: string | null
+          id?: string
+          tarih?: string
+          tur?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           allowed_modules: string[] | null
@@ -4594,6 +4666,8 @@ export type Database = {
           created_at: string
           email: string | null
           full_name: string
+          mola_plani_id: number | null
+          uretim_seansi_beklenir: boolean
           is_active: boolean
           password_plain: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -4609,6 +4683,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name: string
+          mola_plani_id?: number | null
+          uretim_seansi_beklenir?: boolean
           is_active?: boolean
           password_plain?: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -4624,6 +4700,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           full_name?: string
+          mola_plani_id?: number | null
+          uretim_seansi_beklenir?: boolean
           is_active?: boolean
           password_plain?: string | null
           role?: Database["public"]["Enums"]["user_role"]

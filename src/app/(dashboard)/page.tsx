@@ -27,6 +27,7 @@ import {
 import type { UserRole } from "@/lib/constants";
 import { DashboardRealtimeWrapper } from "./components/dashboard-realtime-wrapper";
 import { PeriodFilter } from "./components/period-filter";
+import { UretimUyariKarti, type UretimUyari } from "./components/uretim-uyari-karti";
 
 export const metadata: Metadata = { title: "Ana Sayfa" };
 
@@ -179,9 +180,23 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   const isAdmin = ["Yönetici", "Endüstri Mühendisi"].includes(userRole);
 
+  // Kullanıcıya hedeflenmiş açık üretim uyarıları.
+  // RLS zaten yalnızca kendi uyarılarını döndürüyor, ek filtre gerekmiyor.
+  const { data: uyariData } = await supabase
+    .from("uretim_uyarilari")
+    .select("id, tur, baslik, adet, detay, created_at")
+    .eq("durum", "acik")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const uyarilar = (uyariData ?? []) as unknown as UretimUyari[];
+
   return (
     <DashboardRealtimeWrapper>
     <div className="animate-fade-in space-y-6">
+      {/* Üretim uyarıları — yalnızca hedeflenen kullanıcıya görünür */}
+      <UretimUyariKarti uyarilar={uyarilar} />
+
       {/* Period Filter */}
       <PeriodFilter activePeriod={period} />
 
