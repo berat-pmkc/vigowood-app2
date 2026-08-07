@@ -170,7 +170,7 @@ export async function updateUser(
       }
     }
 
-    const { error } = await supabase
+    const { data: guncellenen, error } = await supabase
       .from("users")
       .update({
         full_name: parsed.data.full_name,
@@ -186,10 +186,18 @@ export async function updateUser(
           ? { allowed_modules: allowedModules }
           : {}),
       })
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .select("user_id");
 
     if (error) {
       return { success: false, error: error.message };
+    }
+    // RLS engellerse hata dönmez, 0 satır güncellenir
+    if (!guncellenen || guncellenen.length === 0) {
+      return {
+        success: false,
+        error: "Kullanıcı güncellenemedi — bu işlem için yetkiniz olmayabilir",
+      };
     }
 
     // If password changed and user has an auth account, update Supabase Auth password
@@ -413,12 +421,22 @@ export async function setUserActive(
 
     const supabase = await createClient();
 
-    const { error } = await supabase
+    // Güncellenen satırı geri iste — RLS engellediğinde PostgREST hata
+    // döndürmüyor, sessizce 0 satır güncelliyor. Doğrulama olmadan arayüz
+    // başarı sanıp kullanıcıya yanlış bilgi veriyordu.
+    const { data: guncellenen, error } = await supabase
       .from("users")
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .select("user_id");
 
     if (error) return { success: false, error: error.message };
+    if (!guncellenen || guncellenen.length === 0) {
+      return {
+        success: false,
+        error: "Kullanıcı güncellenemedi — bu işlem için yetkiniz olmayabilir",
+      };
+    }
 
     revalidatePath("/admin/kullanicilar");
     revalidatePath("/personel");
