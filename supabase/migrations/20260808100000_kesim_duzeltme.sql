@@ -92,6 +92,13 @@ BEGIN
                 WHEN GREATEST(0, kesilen_adet + fark) = 0 THEN 'bekliyor'
                 ELSE 'kesimde'
               END,
+      -- Talep artık karşılanmıyorsa kapanış zamanı da temizlenmeli;
+      -- ilk sürümde unutulmuştu, test sırasında yakalandı
+      tamamlanma_zamani = CASE
+                WHEN GREATEST(0, kesilen_adet + fark) >= talep_adet
+                  THEN COALESCE(tamamlanma_zamani, now())
+                ELSE NULL
+              END,
       updated_at = now()
   WHERE talep_id = NEW.talep_id;
 
