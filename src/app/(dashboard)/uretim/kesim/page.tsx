@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS } from "@/lib/constants";
 import { KesimDashboard } from "./components/kesim-dashboard";
 import { getKesimTalepleri } from "./actions";
-import { AcikTalepSeridi } from "./components/acik-talep-seridi";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "./types";
 
 export const metadata: Metadata = { title: "Kesim" };
@@ -208,9 +207,9 @@ export default async function KesimPage({
   const acikTalepler = await getKesimTalepleri(true);
 
   return (
-    <div className="space-y-4 pb-20 md:pb-6">
-      <AcikTalepSeridi talepler={acikTalepler} />
+    <div className="pb-20 md:pb-6">
       <KesimDashboard
+        acikTalepler={acikTalepler}
         records={enrichedRecords}
         todayTotalBatch={todayTotalBatch}
         dateFilter={dateFilter}

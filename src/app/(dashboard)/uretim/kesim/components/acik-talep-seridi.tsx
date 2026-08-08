@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +12,13 @@ import { ClipboardList, Flame, ArrowRight } from "lucide-react";
  * Detay ve işlem talepler sayfasında; burada amaç "ne bekliyor" sorusunu
  * ekrana girer girmez cevaplamak.
  */
-export function AcikTalepSeridi({ talepler }: { talepler: KesimTalebi[] }) {
+interface Props {
+  talepler: KesimTalebi[];
+  /** Bir talep seçilince kesim formunu o talep için açar */
+  onKesimeBasla?: (t: KesimTalebi) => void;
+}
+
+export function AcikTalepSeridi({ talepler, onKesimeBasla }: Props) {
   if (talepler.length === 0) return null;
 
   const acilSayisi = talepler.filter((t) => t.oncelik === "acil").length;
@@ -37,20 +45,35 @@ export function AcikTalepSeridi({ talepler }: { talepler: KesimTalebi[] }) {
             )}
           </p>
 
+          {onKesimeBasla && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Kesime başlamak için plakaya tıklayın — form talep bilgileriyle dolu açılır.
+            </p>
+          )}
+
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {talepler.slice(0, 6).map((t) => (
-              <Badge
+              <button
                 key={t.talep_id}
-                variant="outline"
-                className={
-                  t.oncelik === "acil"
-                    ? "border-red-300 bg-white font-normal text-red-700"
-                    : "bg-white font-normal"
-                }
+                type="button"
+                onClick={() => onKesimeBasla?.(t)}
+                disabled={!onKesimeBasla}
+                title={onKesimeBasla ? "Bu talep için kesim başlat" : undefined}
+                className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
               >
-                {t.plaka_adi ?? t.plaka_id}
-                <span className="ml-1 font-semibold tabular-nums">{t.kalan_adet}</span>
-              </Badge>
+                <Badge
+                  variant="outline"
+                  className={
+                    (t.oncelik === "acil"
+                      ? "border-red-300 bg-white font-normal text-red-700"
+                      : "bg-white font-normal") +
+                    (onKesimeBasla ? " cursor-pointer hover:bg-amber-100" : "")
+                  }
+                >
+                  {t.plaka_adi ?? t.plaka_id}
+                  <span className="ml-1 font-semibold tabular-nums">{t.kalan_adet}</span>
+                </Badge>
+              </button>
             ))}
             {talepler.length > 6 && (
               <Badge variant="outline" className="bg-white font-normal">

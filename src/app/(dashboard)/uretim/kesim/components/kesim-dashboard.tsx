@@ -14,6 +14,8 @@ import { KesimSummaryCards } from "./kesim-summary-cards";
 import { MachineStatusBar } from "./machine-status-bar";
 import { KesimRecords } from "./kesim-records";
 import { YeniKesimDialog } from "./yeni-kesim-dialog";
+import { AcikTalepSeridi } from "./acik-talep-seridi";
+import type { KesimTalebi } from "../actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
 import { Plus, Scissors, CalendarDays } from "lucide-react";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
@@ -67,6 +69,8 @@ interface KesimDashboardProps {
   machineStatus: MachineStatusEntry[];
   stokTahminiGun: number | null;
   dailyAvgConsumption: number;
+  /** Bekleyen kesim talepleri — üstteki şeritte gösterilir */
+  acikTalepler: KesimTalebi[];
 }
 
 export function KesimDashboard({
@@ -78,11 +82,19 @@ export function KesimDashboard({
   machineStatus,
   stokTahminiGun,
   dailyAvgConsumption,
+
+  acikTalepler,
 }: KesimDashboardProps) {
   const router = useRouter();
   const records = useServerDataCache("kesim-records", serverRecords);
   const todayTotalBatch = useServerDataCache("kesim-batch", serverTodayTotalBatch);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [aktifTalep, setAktifTalep] = useState<KesimTalebi | null>(null);
+
+  const talepBaslat = (t: KesimTalebi) => {
+    setAktifTalep(t);
+    setDialogOpen(true);
+  };
   const monthOptions = useMemo(() => generateMonthOptions(), []);
 
   // Custom month filter label: "2025-11" → "Kasım 2025"
@@ -96,6 +108,8 @@ export function KesimDashboard({
 
   return (
     <div className="space-y-4">
+      <AcikTalepSeridi talepler={acikTalepler} onKesimeBasla={talepBaslat} />
+
       {/* Header + Machine Status */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -193,7 +207,14 @@ export function KesimDashboard({
       </div>
 
       {/* Yeni Kesim Dialog */}
-      <YeniKesimDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <YeniKesimDialog
+        open={dialogOpen}
+        onOpenChange={(o) => {
+          setDialogOpen(o);
+          if (!o) setAktifTalep(null);
+        }}
+        talep={aktifTalep}
+      />
     </div>
   );
 }

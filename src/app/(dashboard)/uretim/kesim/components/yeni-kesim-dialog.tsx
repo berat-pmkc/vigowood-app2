@@ -38,6 +38,17 @@ import { toast } from "sonner";
 interface YeniKesimDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Bir kesim talebinden başlatıldıysa form önceden doldurulur ve kesim
+   * kaydı talebe bağlanır — trigger kalan adedi talepten düşer.
+   */
+  talep?: {
+    talep_id: string;
+    sku: string;
+    plaka_id: string;
+    kalan_adet: number;
+    plaka_adi: string | null;
+  } | null;
 }
 
 interface ProductOption {
@@ -74,7 +85,7 @@ const MAKINE_CARD_COLORS: Record<string, { bg: string; border: string; activeBg:
   "MAK-3": { bg: "hover:bg-purple-50", border: "border-purple-200", activeBg: "bg-purple-100 border-purple-400" },
 };
 
-export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
+export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogProps) {
   // Step 1: Seçimler (makine, ürün, plaka) → Step 2: Adet, operatör, kaydet
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -107,10 +118,10 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
     if (open) {
       setStep(1);
       setSelectedMakine(null);
-      setSelectedSku(null);
-      setSelectedSkuLabel("");
+      setSelectedSku(talep?.sku ?? null);
+      setSelectedSkuLabel(talep?.sku ?? "");
       setSelectedPlaka(null);
-      setAdet(1);
+      setAdet(talep?.kalan_adet && talep.kalan_adet > 0 ? talep.kalan_adet : 1);
       setSelectedOperator(null);
       setSelectedOperatorName("");
       setSkuSearch("");
@@ -131,7 +142,7 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
         setOperatorsLoading(false);
       });
     }
-  }, [open]);
+  }, [open, talep]);
 
   // When sku selected, load plakalar (plakalar makineye bağlı değil, sadece SKU'ya bağlı)
   useEffect(() => {
@@ -139,13 +150,20 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
       setPlakalarLoading(true);
       setSelectedPlaka(null);
       getPlakalarForKesim(selectedSku).then((res) => {
-        if (res.success) setPlakalar(res.data);
+        if (res.success) {
+          setPlakalar(res.data);
+          // Talepten gelindiyse ilgili plakayı otomatik seç
+          if (talep && talep.sku === selectedSku) {
+            const eslesen = res.data.find((p) => p.plaka_id === talep.plaka_id);
+            if (eslesen) setSelectedPlaka(eslesen);
+          }
+        }
         setPlakalarLoading(false);
       });
     } else {
       setPlakalar([]);
     }
-  }, [selectedSku]);
+  }, [selectedSku, talep]);
 
   // Auto-advance to step 2 when all selections made
   useEffect(() => {
@@ -165,6 +183,7 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
 
     setSaving(true);
     const result = await createCutBatch({
+      talep_id: talep?.talep_id ?? null,
       makine_id: selectedMakine,
       sku: selectedSku,
       plaka_id: selectedPlaka.plaka_id,
@@ -196,11 +215,22 @@ export function YeniKesimDialog({ open, onOpenChange }: YeniKesimDialogProps) {
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Scissors className="w-5 h-5" />
-            Yeni Kesim
+            {talep ? "Talep İçin Kesim" : "Yeni Kesim"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="px-6 pb-6 space-y-5">
+          {/* Hangi talebin karşılandığı görünsün — yanlış talebe kesim yapılmasın */}
+          {talep && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
+              <p className="text-xs text-amber-900">
+                <span className="font-mono font-semibold">{talep.talep_id}</span> talebi
+                karşılanıyor — <strong>{talep.plaka_adi ?? talep.plaka_id}</strong>, kalan{" "}
+                <strong>{talep.kalan_adet} plaka</strong>. Ürün ve plaka önceden seçildi,
+                adet gerekirse değiştirilebilir.
+              </p>
+            </div>
+          )}
           {step === 1 && (
             <>
               {/* 1. Makine Seçimi */}
