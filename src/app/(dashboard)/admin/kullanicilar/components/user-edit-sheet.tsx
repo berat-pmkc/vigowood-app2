@@ -39,7 +39,7 @@ import {
   type UserCreateData,
 } from "@/lib/validations";
 import { formatDate } from "@/lib/utils";
-import { createUser, updateUser, getNextUserId, uploadUserAvatar, deleteUserAvatar } from "../actions";
+import { createUser, updateUser, getNextUserId, uploadUserAvatar, deleteUserAvatar, getMolaPlanlari } from "../actions";
 import { toast } from "sonner";
 import type { UserWithLastSignIn } from "../page";
 
@@ -61,6 +61,20 @@ export function UserEditSheet({
   const [isPending, startTransition] = useTransition();
   const [isActive, setIsActive] = useState(true);
   const [canBeOpsAssignee, setCanBeOpsAssignee] = useState(false);
+  const [molaPlaniId, setMolaPlaniId] = useState<number | null>(null);
+  const [seansBeklenir, setSeansBeklenir] = useState(true);
+  const [molaPlanlari, setMolaPlanlari] = useState<
+    { id: number; ad: string; aciklama: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    if (!open || molaPlanlari.length > 0) return;
+    getMolaPlanlari()
+      .then(setMolaPlanlari)
+      .catch(() => {
+        /* plan listesi kritik değil, sessizce geç */
+      });
+  }, [open, molaPlanlari.length]);
   const [password, setPassword] = useState("");
   const [useCustomModules, setUseCustomModules] = useState(false);
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
@@ -105,6 +119,8 @@ export function UserEditSheet({
       });
       setIsActive(user.is_active);
       setCanBeOpsAssignee(user.can_be_ops_assignee ?? false);
+      setMolaPlaniId(user.mola_plani_id ?? null);
+      setSeansBeklenir(user.uretim_seansi_beklenir ?? true);
       setPassword(user.password_plain || "");
       if (user.allowed_modules) {
         setUseCustomModules(true);
@@ -146,6 +162,8 @@ export function UserEditSheet({
           password_plain: password || null,
           can_be_ops_assignee: canBeOpsAssignee,
           allowed_modules: useCustomModules ? allowedModules : null,
+          mola_plani_id: molaPlaniId,
+          uretim_seansi_beklenir: seansBeklenir,
         });
         if (result.success) {
           toast.success("Kullanıcı güncellendi");
@@ -339,6 +357,44 @@ export function UserEditSheet({
                   <Label htmlFor="can_be_ops_assignee" className="cursor-pointer">
                     OPS Center&apos;da görev atanabilir
                   </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="uretim_seansi_beklenir"
+                    checked={seansBeklenir}
+                    onCheckedChange={(checked) => {
+                      setSeansBeklenir(checked === true);
+                    }}
+                  />
+                  <Label htmlFor="uretim_seansi_beklenir" className="cursor-pointer">
+                    Sabah üretim seansı açması beklenir
+                  </Label>
+                </div>
+                <p className="pl-6 text-[11px] text-muted-foreground">
+                  Kapatılırsa bu kişi &quot;seans açmadı&quot; uyarısında listelenmez.
+                </p>
+
+                <div className="space-y-1.5 pt-2">
+                  <Label htmlFor="mola_plani">Mola planı</Label>
+                  <Select
+                    value={molaPlaniId != null ? String(molaPlaniId) : ""}
+                    onValueChange={(v) => setMolaPlaniId(v ? Number(v) : null)}
+                  >
+                    <SelectTrigger id="mola_plani">
+                      <SelectValue placeholder="Plan seçiniz" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {molaPlanlari.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.ad}
+                          {p.aciklama ? ` — ${p.aciklama}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Montaj seans süresinden düşülecek mola aralıklarını belirler.
+                  </p>
                 </div>
               </div>
             )}

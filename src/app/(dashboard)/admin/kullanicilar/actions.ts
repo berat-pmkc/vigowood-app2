@@ -129,6 +129,8 @@ export async function updateUser(
     password_plain?: string | null;
     can_be_ops_assignee?: boolean;
     allowed_modules?: string[] | null;
+    mola_plani_id?: number | null;
+    uretim_seansi_beklenir?: boolean;
   }
 ): Promise<ActionResult> {
   try {
@@ -184,6 +186,12 @@ export async function updateUser(
           : {}),
         ...(allowedModules !== undefined
           ? { allowed_modules: allowedModules }
+          : {}),
+        ...(formData.mola_plani_id !== undefined
+          ? { mola_plani_id: formData.mola_plani_id }
+          : {}),
+        ...(formData.uretim_seansi_beklenir !== undefined
+          ? { uretim_seansi_beklenir: formData.uretim_seansi_beklenir }
           : {}),
       })
       .eq("user_id", userId)
@@ -447,4 +455,19 @@ export async function setUserActive(
       error: e instanceof Error ? e.message : "Bir hata oluştu",
     };
   }
+}
+
+
+/** Mola planları — kullanıcı düzenleme ekranındaki seçim listesi için */
+export async function getMolaPlanlari(): Promise<
+  { id: number; ad: string; aciklama: string | null }[]
+> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("mola_planlari")
+    .select("id, ad, aciklama")
+    .eq("aktif", true)
+    .order("ad");
+  return (data ?? []) as { id: number; ad: string; aciklama: string | null }[];
 }
