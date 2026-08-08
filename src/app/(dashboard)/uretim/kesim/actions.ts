@@ -113,6 +113,8 @@ export async function createCutBatch(formData: {
   adet: number;
   operator_id: string;
   plk_notu: string | null;
+  /** Bu kesim bir talebi karşılıyorsa talep numarası — trigger kalan adedi düşer */
+  talep_id?: string | null;
 }): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -168,6 +170,7 @@ export async function createCutBatch(formData: {
       durum: "tamamlandi",
       baslama_zamani: now,
       bitis_zamani: now,
+      talep_id: formData.talep_id ?? null,
     });
 
     if (batchError) return { success: false, error: batchError.message };
@@ -482,6 +485,190 @@ export async function getMdfStokLevels(): Promise<{
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: (data ?? []) as MdfStokItem[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// ─── Kesim Talepleri ────────────────────────────────────────
+
+export interface KesimTalebi {
+  talep_id: string;
+  sku: string;
+  urun_adi: string | null;
+  plaka_id: string;
+  plaka_adi: string | null;
+  plaka_tipi: string | null;
+  plaka_renk: string | null;
+  talep_adet: number;
+  kesilen_adet: number;
+  kalan_adet: number;
+  durum: string;
+  oncelik: string;
+  talep_eden: string;
+  talep_eden_adi: string | null;
+  talep_notu: string | null;
+  created_at: string;
+}
+
+/**
+ * Açık kesim taleplerini getirir — acil olanlar üstte, sonra geliş sırası.
+ * Kesimhane ekranı ve talep listesi bu fonksiyonu kullanır.
+ */
+export async function getKesimTalepleri(
+  sadeceAcik: boolean = true
+): Promise<KesimTalebi[]> {
+  await requireProductionAccess();
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("kesim_talepleri")
+    .select(
+      "talep_id, sku, plaka_id, talep_adet, kesilen_adet, durum, oncelik, talep_eden, talep_notu, created_at"
+    )
+    .order("oncelik", { ascending: false })
+    .order("created_at", { ascending: true });
+
+  if (sadeceAcik) query = query.in("durum", ["bekliyor", "kesimde"]);
+  else query = query.limit(200);
+
+  const { data } = await query;
+  const talepler = (data ?? []) as {
+    talep_id: string;
+    sku: string;
+    plaka_id: string;
+    talep_adet: number;
+    kesilen_adet: number;
+    durum: string;
+    oncelik: string;
+    talep_eden: string;
+    talep_notu: string | null;
+    created_at: string;
+  }[];
+
+  if (talepler.length === 0) return [];
+
+  // Ürün, plaka ve kullanıcı adlarını tek seferde çek — satır başına
+  // sorgu atmak yerine toplu eşleştirme
+  const [urunler, plakalar, kisiler] = await Promise.all([
+    supabase.from("products").select("sku, urun_adi").in("sku", [...new Set(talepler.map((t) => t.sku))]),
+    supabase.from("plakalar").select("plaka_id, plaka_adi, tipi, renk").in("plaka_id", [...new Set(talepler.map((t) => t.plaka_id))]),
+    supabase.from("users").select("user_id, full_name").in("user_id", [...new Set(talepler.map((t) => t.talep_eden))]),
+  ]);
+
+  const urunMap = new Map((urunler.data ?? []).map((u) => [u.sku, u.urun_adi]));
+  const plakaMap = new Map(
+    (plakalar.data ?? []).map((p) => [p.plaka_id, p])
+  );
+  const kisiMap = new Map((kisiler.data ?? []).map((k) => [k.user_id, k.full_name]));
+
+  return talepler.map((t) => {
+    const p = plakaMap.get(t.plaka_id);
+    return {
+      ...t,
+      urun_adi: urunMap.get(t.sku) ?? null,
+      plaka_adi: p?.plaka_adi ?? null,
+      plaka_tipi: p?.tipi ?? null,
+      plaka_renk: p?.renk ?? null,
+      kalan_adet: Math.max(0, t.talep_adet - t.kesilen_adet),
+      talep_eden_adi: kisiMap.get(t.talep_eden) ?? null,
+    };
+  });
+}
+
+/** Aynı plaka için açık talep var mı — mükerrer uyarısı için */
+export async function getAcikTalepOzeti(
+  plakaId: string
+): Promise<{ adet: number; toplam: number }> {
+  await requireProductionAccess();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("kesim_talepleri")
+    .select("talep_adet, kesilen_adet")
+    .eq("plaka_id", plakaId)
+    .in("durum", ["bekliyor", "kesimde"]);
+
+  const rows = (data ?? []) as { talep_adet: number; kesilen_adet: number }[];
+  return {
+    adet: rows.length,
+    toplam: rows.reduce((s, r) => s + Math.max(0, r.talep_adet - r.kesilen_adet), 0),
+  };
+}
+
+export async function createKesimTalebi(formData: {
+  sku: string;
+  plaka_id: string;
+  talep_adet: number;
+  oncelik: "normal" | "acil";
+  talep_notu: string | null;
+}): Promise<ActionResult & { talep_id?: string }> {
+  try {
+    const user = await requireProductionAccess();
+
+    if (!formData.sku || !formData.plaka_id) {
+      return { success: false, error: "Ürün ve plaka seçimi gereklidir" };
+    }
+    if (!Number.isFinite(formData.talep_adet) || formData.talep_adet < 1) {
+      return { success: false, error: "Plaka adedi en az 1 olmalıdır" };
+    }
+
+    const supabase = await createClient();
+
+    // TAL-YYYYMMDD-HHMMSS
+    const now = new Date();
+    const p = (n: number, l = 2) => String(n).padStart(l, "0");
+    const talepId = `TAL-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}${p(now.getSeconds())}`;
+
+    const { data, error } = await supabase
+      .from("kesim_talepleri")
+      .insert({
+        talep_id: talepId,
+        sku: formData.sku,
+        plaka_id: formData.plaka_id,
+        talep_adet: Math.trunc(formData.talep_adet),
+        oncelik: formData.oncelik,
+        talep_eden: user.user_id,
+        talep_notu: formData.talep_notu?.trim() || null,
+      })
+      .select("talep_id");
+
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) {
+      return { success: false, error: "Talep kaydedilemedi — yetkiniz olmayabilir" };
+    }
+
+    revalidatePath("/uretim/kesim");
+    revalidatePath("/uretim/kesim/talepler");
+    return { success: true, talep_id: talepId };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Talebi iptal eder — kesilen adet varsa kayıt kalır, sadece durumu değişir */
+export async function iptalKesimTalebi(talepId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from("kesim_talepleri")
+      .update({ durum: "iptal" })
+      .eq("talep_id", talepId)
+      .in("durum", ["bekliyor", "kesimde"])
+      .select("talep_id");
+
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) {
+      return {
+        success: false,
+        error: "Talep iptal edilemedi — tamamlanmış olabilir veya yetkiniz yok",
+      };
+    }
+
+    revalidatePath("/uretim/kesim");
+    revalidatePath("/uretim/kesim/talepler");
+    return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

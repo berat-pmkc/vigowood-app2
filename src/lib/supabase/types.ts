@@ -1183,6 +1183,51 @@ export type Database = {
         }
         Relationships: []
       }
+      kesim_talepleri: {
+        Row: {
+          created_at: string
+          durum: string
+          kesilen_adet: number
+          oncelik: string
+          plaka_id: string
+          sku: string
+          talep_adet: number
+          talep_eden: string
+          talep_id: string
+          talep_notu: string | null
+          tamamlanma_zamani: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          durum?: string
+          kesilen_adet?: number
+          oncelik?: string
+          plaka_id: string
+          sku: string
+          talep_adet: number
+          talep_eden: string
+          talep_id: string
+          talep_notu?: string | null
+          tamamlanma_zamani?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          durum?: string
+          kesilen_adet?: number
+          oncelik?: string
+          plaka_id?: string
+          sku?: string
+          talep_adet?: number
+          talep_eden?: string
+          talep_id?: string
+          talep_notu?: string | null
+          tamamlanma_zamani?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       kutu_uretim: {
         Row: {
           bitis_zamani: string | null

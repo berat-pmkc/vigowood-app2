@@ -100,6 +100,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Üretim",
     items: [
       { title: "Kesim", href: "/uretim/kesim", icon: Scissors, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Kesim Talepleri", href: "/uretim/kesim/talepler", icon: ClipboardList, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Temizlik", href: "/uretim/temizlik", icon: SprayCan, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Montaj", href: "/uretim/montaj", icon: Wrench, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Paketleme", href: "/uretim/paketleme", icon: Package, roles: [...ALL_INTERNAL, "Üretim"] },
