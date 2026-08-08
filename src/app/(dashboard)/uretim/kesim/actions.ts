@@ -673,3 +673,286 @@ export async function iptalKesimTalebi(talepId: string): Promise<ActionResult> {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
+
+// ─── Kesim Düzeltme / Silme ─────────────────────────────────
+
+/**
+ * Bir kesim kaydının bıraktığı tüm izleri geri alır.
+ *
+ * Kesim oluşturmak beş yerde etki bırakıyor:
+ *   1. cut_lines            — çıkan parça satırları
+ *   2. yari_mamul_stok      — parçalar için IN kayıtları
+ *   3. all_parts            — MDF stoğundan düşüm
+ *   4. hazir_eleman_akis    — MDF hareket kaydı
+ *   5. kesim_talepleri      — talebe işlenen adet (trigger)
+ *
+ * Sadece cut_batches satırını silmek stoğu bozar; bu yüzden hepsi
+ * sırayla geri alınıyor. Talep geri alma trigger ile yapılıyor.
+ */
+async function kesimEtkileriniGeriAl(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cutId: string,
+  plakaId: string | null,
+  adet: number,
+  operatorId: string | null
+): Promise<string | null> {
+  // 1. Yarı mamül IN kayıtlarını sil
+  const { error: ymsError } = await supabase
+    .from("yari_mamul_stok")
+    .delete()
+    .eq("source", "Kesim")
+    .eq("source_id", cutId);
+  if (ymsError) return `Yarı mamül hareketleri geri alınamadı: ${ymsError.message}`;
+
+  // 2. Kesim satırlarını sil
+  const { error: linesError } = await supabase
+    .from("cut_lines")
+    .delete()
+    .eq("cut_id", cutId);
+  if (linesError) return `Kesim satırları silinemedi: ${linesError.message}`;
+
+  // 3. MDF stoğunu iade et
+  if (plakaId && adet > 0) {
+    const { data: plakaData } = await supabase
+      .from("plakalar")
+      .select("tipi, renk")
+      .eq("plaka_id", plakaId)
+      .maybeSingle();
+
+    if (plakaData?.tipi && plakaData?.renk) {
+      const { data: mdfPart } = await supabase
+        .from("all_parts")
+        .select("part_id, hazir_eleman_aktif_stok")
+        .eq("mdf_tipi", plakaData.tipi)
+        .eq("mdf_renk", plakaData.renk)
+        .maybeSingle();
+
+      if (mdfPart) {
+        await supabase
+          .from("all_parts")
+          .update({ hazir_eleman_aktif_stok: mdfPart.hazir_eleman_aktif_stok + adet })
+          .eq("part_id", mdfPart.part_id);
+
+        // İade hareketi — denetim izi kalsın, sessizce düzeltilmesin
+        const n = new Date();
+        const p = (v: number) => String(v).padStart(2, "0");
+        await supabase.from("hazir_eleman_akis").insert({
+          hakis_id: `HA-IADE-${n.getFullYear()}${p(n.getMonth() + 1)}${p(n.getDate())}-${p(n.getHours())}${p(n.getMinutes())}${p(n.getSeconds())}-${cutId}`,
+          tarih: n.toISOString(),
+          part_id: mdfPart.part_id,
+          qty: adet,
+          operator: operatorId,
+          not_text: `Kesim iptali — ${cutId} silindi, MDF iade edildi`,
+        });
+      }
+    }
+  }
+
+  return null;
+}
+
+/** Kesim kaydını ve tüm yan etkilerini siler */
+export async function deleteCutBatch(cutId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("cut_batches")
+      .select("cut_id, plaka_id, adet, operator_id")
+      .eq("cut_id", cutId)
+      .maybeSingle();
+
+    const batch = data as {
+      cut_id: string;
+      plaka_id: string | null;
+      adet: number;
+      operator_id: string | null;
+    } | null;
+    if (!batch) return { success: false, error: "Kesim kaydı bulunamadı" };
+
+    const hata = await kesimEtkileriniGeriAl(
+      supabase,
+      cutId,
+      batch.plaka_id,
+      Number(batch.adet) || 0,
+      batch.operator_id
+    );
+    if (hata) return { success: false, error: hata };
+
+    // Talep geri alma AFTER DELETE trigger ile yapılıyor
+    const { data: silinen, error } = await supabase
+      .from("cut_batches")
+      .delete()
+      .eq("cut_id", cutId)
+      .select("cut_id");
+
+    if (error) return { success: false, error: error.message };
+    if (!silinen || silinen.length === 0) {
+      return {
+        success: false,
+        error: "Kesim silinemedi — bu işlem için yetkiniz olmayabilir",
+      };
+    }
+
+    revalidatePath("/uretim/kesim");
+    revalidatePath("/uretim/kesim/talepler");
+    revalidatePath("/stok/yari-mamul");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/**
+ * Kesim kaydını günceller.
+ *
+ * Adet değişirse çıkan parçalar, yarı mamül girişleri ve MDF düşümü
+ * yeniden hesaplanır. Ürün veya plaka değişimi desteklenmiyor — o
+ * durumda kayıt silinip yeniden oluşturulmalı, çünkü çıkan parça
+ * kümesi tamamen değişir.
+ */
+export async function updateCutBatch(
+  cutId: string,
+  formData: {
+    adet: number;
+    makine_id: string;
+    operator_id: string;
+    plk_notu: string | null;
+  }
+): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    if (!Number.isFinite(formData.adet) || formData.adet < 1) {
+      return { success: false, error: "Adet en az 1 olmalıdır" };
+    }
+    if (!KESIM_MAKINE_IDS.includes(formData.makine_id as (typeof KESIM_MAKINE_IDS)[number])) {
+      return { success: false, error: "Geçersiz makine" };
+    }
+
+    const { data } = await supabase
+      .from("cut_batches")
+      .select("cut_id, sku, plaka_id, adet, operator_id, email")
+      .eq("cut_id", cutId)
+      .maybeSingle();
+
+    const batch = data as {
+      cut_id: string;
+      sku: string;
+      plaka_id: string | null;
+      adet: number;
+      operator_id: string | null;
+      email: string | null;
+    } | null;
+    if (!batch) return { success: false, error: "Kesim kaydı bulunamadı" };
+
+    const eskiAdet = Number(batch.adet) || 0;
+    const yeniAdet = Math.trunc(formData.adet);
+
+    // Adet değiştiyse türetilen kayıtları yeniden üret
+    if (yeniAdet !== eskiAdet && batch.plaka_id) {
+      const hata = await kesimEtkileriniGeriAl(
+        supabase,
+        cutId,
+        batch.plaka_id,
+        eskiAdet,
+        batch.operator_id
+      );
+      if (hata) return { success: false, error: hata };
+
+      const { data: plakaParts } = await supabase
+        .from("plaka_parts")
+        .select("part_id, default_qty")
+        .eq("plaka_id", batch.plaka_id);
+
+      const parcalar = (plakaParts ?? []) as { part_id: string; default_qty: number | null }[];
+      const now = new Date().toISOString();
+
+      if (parcalar.length > 0) {
+        const { data: adlar } = await supabase
+          .from("all_parts")
+          .select("part_id, part_adi")
+          .in("part_id", parcalar.map((p) => p.part_id));
+        const adMap = new Map((adlar ?? []).map((a) => [a.part_id, a.part_adi]));
+
+        await supabase.from("cut_lines").insert(
+          parcalar.map((pp, i) => ({
+            cut_line_id: `K-${cutId}-${String(i + 1).padStart(3, "0")}`,
+            cut_id: cutId,
+            tarih: now,
+            part_id: pp.part_id,
+            adet: (pp.default_qty ?? 0) * yeniAdet,
+            email: batch.email,
+          }))
+        );
+
+        await supabase.from("yari_mamul_stok").insert(
+          parcalar.map((pp, i) => ({
+            yms_id: `YMS-${cutId}-${String(i + 1).padStart(3, "0")}`,
+            tarih: now,
+            part_id: pp.part_id,
+            part_adi: adMap.get(pp.part_id) ?? null,
+            sku: batch.sku,
+            qty: (pp.default_qty ?? 0) * yeniAdet,
+            direction: "IN",
+            source: "Kesim",
+            source_id: cutId,
+            operator: formData.operator_id,
+          }))
+        );
+      }
+
+      // MDF'yi yeni adete göre tekrar düş
+      const { data: plakaData } = await supabase
+        .from("plakalar")
+        .select("tipi, renk")
+        .eq("plaka_id", batch.plaka_id)
+        .maybeSingle();
+
+      if (plakaData?.tipi && plakaData?.renk) {
+        const { data: mdfPart } = await supabase
+          .from("all_parts")
+          .select("part_id, hazir_eleman_aktif_stok")
+          .eq("mdf_tipi", plakaData.tipi)
+          .eq("mdf_renk", plakaData.renk)
+          .maybeSingle();
+
+        if (mdfPart) {
+          await supabase
+            .from("all_parts")
+            .update({ hazir_eleman_aktif_stok: mdfPart.hazir_eleman_aktif_stok - yeniAdet })
+            .eq("part_id", mdfPart.part_id);
+        }
+      }
+    }
+
+    // Talep adet düzeltmesi UPDATE OF adet trigger'ı ile yapılıyor
+    const { data: guncellenen, error } = await supabase
+      .from("cut_batches")
+      .update({
+        adet: yeniAdet,
+        makine_id: formData.makine_id,
+        operator_id: formData.operator_id,
+        plk_notu: formData.plk_notu?.trim() || null,
+      })
+      .eq("cut_id", cutId)
+      .select("cut_id");
+
+    if (error) return { success: false, error: error.message };
+    if (!guncellenen || guncellenen.length === 0) {
+      return {
+        success: false,
+        error: "Kesim güncellenemedi — bu işlem için yetkiniz olmayabilir",
+      };
+    }
+
+    revalidatePath("/uretim/kesim");
+    revalidatePath("/uretim/kesim/talepler");
+    revalidatePath("/stok/yari-mamul");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
