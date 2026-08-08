@@ -15,6 +15,7 @@ import { MachineStatusBar } from "./machine-status-bar";
 import { KesimRecords } from "./kesim-records";
 import { YeniKesimDialog } from "./yeni-kesim-dialog";
 import { AcikTalepSeridi } from "./acik-talep-seridi";
+import { PlakaStokPaneli } from "./plaka-stok-paneli";
 import type { KesimTalebi } from "../actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
 import { Plus, Scissors, CalendarDays } from "lucide-react";
@@ -108,7 +109,12 @@ export function KesimDashboard({
 
   return (
     <div className="space-y-4">
-      <AcikTalepSeridi talepler={acikTalepler} onKesimeBasla={talepBaslat} />
+      <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+        <div className="space-y-4">
+          <AcikTalepSeridi talepler={acikTalepler} onKesimeBasla={talepBaslat} />
+        </div>
+        <PlakaStokPaneli mdfStok={mdfStok} />
+      </div>
 
       {/* Header + Machine Status */}
       <div className="flex flex-col gap-3">
