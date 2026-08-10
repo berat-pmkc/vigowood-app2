@@ -127,7 +127,8 @@ export function PlanlamaClient({
       const girilen = Number(s.hedef.replace(",", "."));
       // Hedef girilmemişse serbest ürün için üst sınır olarak geniş bir değer;
       // konteynere sığdığı kadarı yüklenir
-      const hedef = Number.isFinite(girilen) && girilen > 0 ? Math.trunc(girilen) : 2000;
+      // 0 = "sistem belirlesin"; packer eşit hacim payı hesaplar
+      const hedef = Number.isFinite(girilen) && girilen > 0 ? Math.trunc(girilen) : 0;
       return {
         sku: u.sku,
         ad: u.urun_adi,
@@ -137,7 +138,7 @@ export function PlanlamaClient({
         hedef,
         kilitli: s.kilitli && Number.isFinite(girilen) && girilen > 0,
         // Her seçilen ürün plana girsin; kilitli ürünlerde asgari zaten hedeftir
-        enAz: s.kilitli ? hedef : Math.max(0, Number(enAzKoli) || 0),
+        enAz: s.kilitli && hedef > 0 ? hedef : Math.max(0, Number(enAzKoli) || 0),
         renk: RENKLER[i % RENKLER.length],
       };
     });

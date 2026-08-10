@@ -205,13 +205,42 @@ export function planla(
 ): PackSonuc {
   const ayar = { ...VARSAYILAN_AYAR, ...ayarKismi };
 
+  const gecerli = urunListesi.filter((u) => u.boy > 0 && u.en > 0 && u.yuk > 0);
+
+  /**
+   * Hedef girilmemiş ürünlere eşit hacim payı verilir.
+   *
+   * Keşif modunda tüm ürünler serbest bırakılınca algoritma konteyneri en
+   * sıkı yerleşen ürünle dolduruyordu — 8 üründen biri 1239 koli alıyor,
+   * kalanlar asgari payda kalıyordu. Konteynerin serbest hacmi seçili ürün
+   * sayısına bölünüp her birinin koli hacmine göre adede çevriliyor.
+   */
+  const kontHacimTop = kont.uzunluk * kont.genislik * kont.yukseklik;
+  const kilitliHacim = gecerli
+    .filter((u) => u.kilitli && u.hedef > 0)
+    .reduce((t, u) => t + u.hedef * u.boy * u.en * u.yuk, 0);
+  const serbestler = gecerli.filter((u) => !(u.kilitli && u.hedef > 0));
+  const paySayisi = Math.max(1, serbestler.length);
+  // Yerleşim kayıpları için pay biraz geniş tutulur; üst sınır olduğu için
+  // fazlası zaten yerleşmez
+  const payHacim = (Math.max(0, kontHacimTop - kilitliHacim) / paySayisi) * 1.25;
+
   const urunler = new Map(
-    urunListesi
-      .filter((u) => u.boy > 0 && u.en > 0 && u.yuk > 0 && u.hedef > 0)
-      .map((u) => [
-        u.sku,
-        { ...u, hacim: u.boy * u.en * u.yuk, durus: durusler(u.boy, u.en, u.yuk) },
-      ]),
+    gecerli
+      .map((u) => {
+        const hacim = u.boy * u.en * u.yuk;
+        const kilitliMi = u.kilitli && u.hedef > 0;
+        const hedef = kilitliMi
+          ? u.hedef
+          : u.hedef > 0
+            ? u.hedef
+            : Math.max(1, Math.floor(payHacim / hacim));
+        return [
+          u.sku,
+          { ...u, hedef, kilitli: kilitliMi, hacim, durus: durusler(u.boy, u.en, u.yuk) },
+        ] as const;
+      })
+      .filter(([, u]) => u.hedef > 0),
   );
   if (urunler.size === 0) {
     return bosSonuc(kont);
