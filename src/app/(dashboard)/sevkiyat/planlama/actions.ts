@@ -95,6 +95,54 @@ export async function urunOlcuKaydet(
   }
 }
 
+/** Kayıtta tutulan blok — özet hesabı için gereken alanlar */
+interface OzetBlok { l: number; w: number; h: number; n?: number; count?: number; x: number; dx: number }
+
+/**
+ * Plan özetini bloklardan türetir ve kolon sınırlarına göre kırpar.
+ * İstemciden gelen doluluk/hacim/koli/boy değerleri yok sayılır.
+ */
+function planOzeti(veri: {
+  ic_uzunluk: number; ic_genislik: number; ic_yukseklik: number;
+  sonuc: Record<string, unknown>;
+  doluluk_yuzde: number; toplam_koli: number; toplam_hacim: number; kullanilan_boy: number;
+}) {
+  const bloklar = (veri.sonuc?.bloklar as OzetBlok[] | undefined) ?? [];
+  if (bloklar.length === 0) {
+    // Blok yoksa istemci değerlerine düşülür, ama yine de sınırlanır
+    return {
+      doluluk_yuzde: kirp(veri.doluluk_yuzde, 999.99),
+      toplam_koli: Math.round(veri.toplam_koli ?? 0),
+      toplam_hacim: kirp(veri.toplam_hacim, 9999999.999),
+      kullanilan_boy: kirp(veri.kullanilan_boy, 9999999.9),
+    };
+  }
+
+  let hacimCm3 = 0;
+  let koli = 0;
+  let boy = 0;
+  for (const b of bloklar) {
+    const n = b.n ?? b.count ?? 0;
+    hacimCm3 += n * b.l * b.w * b.h;
+    koli += n;
+    boy = Math.max(boy, b.x + b.dx);
+  }
+
+  const kontHacim = veri.ic_uzunluk * veri.ic_genislik * veri.ic_yukseklik;
+  return {
+    doluluk_yuzde: kirp(kontHacim > 0 ? (hacimCm3 / kontHacim) * 100 : 0, 999.99),
+    toplam_koli: koli,
+    toplam_hacim: kirp(hacimCm3 / 1e6, 9999999.999),  // cm³ → m³
+    kullanilan_boy: kirp(boy, 9999999.9),
+  };
+}
+
+/** Kolon taşmasını imkânsız kılar */
+function kirp(deger: number, ustSinir: number): number {
+  if (!Number.isFinite(deger)) return 0;
+  return Math.min(Math.max(deger, 0), ustSinir);
+}
+
 export async function planKaydet(veri: {
   ad: string;
   konteyner_tipi: string;
@@ -113,10 +161,23 @@ export async function planKaydet(veri: {
     const user = await yetkiKontrol();
     const supabase = await createClient();
 
+    // Özet sayıları istemciden geldiği gibi yazmıyoruz; blokların kendisinden
+    // yeniden hesaplıyoruz.
+    //
+    // Neden: toplam_hacim NUMERIC(10,3), yani 9.999.999,999'u aşamaz. Motor
+    // hacmi cm³ üretiyor, kolon m³ bekliyor. İstemcide dönüşüm atlandığında
+    // 70.597.038 gönderiliyor ve insert "numeric field overflow" ile
+    // düşüyordu — plan kaydedilemediği için rapor da açılamıyordu.
+    //
+    // Bloklar zaten kayıtta tutulduğu için doğru kaynak onlar. Böylece
+    // tarayıcıda eski bir paket çalışsa bile kayıt tutarlı oluyor.
+    const ozet = planOzeti(veri);
+
     const { data, error } = await supabase
       .from("yukleme_planlari")
       .insert({
         ...veri,
+        ...ozet,
         girdi: veri.girdi as never,
         sonuc: veri.sonuc as never,
         olusturan: user.user_id,

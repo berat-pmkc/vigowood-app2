@@ -292,6 +292,17 @@ export function PlanlamaClient({
     () => (sonuc ? dizilimTablosu(sonuc.bloklar) : []),
     [sonuc],
   );
+  /**
+   * Hacim, motorun döndürdüğü toplamHacim yerine blokların kendisinden
+   * hesaplanır. Motor cm³ üretiyor, ekran m³ gösteriyor; dönüşüm bir yerde
+   * atlandığında "70597038.00 m³" gibi bir değer çıkıyordu. Bloklar her
+   * durumda cm cinsinden olduğu için tek doğru kaynak onlar.
+   */
+  const hacimM3 = useMemo(
+    () => (sonuc?.bloklar ?? []).reduce((t, b) => t + b.n * b.l * b.w * b.h, 0) / 1e6,
+    [sonuc],
+  );
+
   const renkMap = useMemo(() => {
     const m = new Map<string, string>();
     secili.forEach((u, i) => m.set(u.sku, RENKLER[i % RENKLER.length]));
@@ -399,7 +410,7 @@ export function PlanlamaClient({
             {[
               ["Doluluk", `%${sonuc.dolulukYuzde}`],
               ["Koli", sonuc.toplamKoli.toLocaleString("tr-TR")],
-              ["Hacim", `${sonuc.toplamHacim.toFixed(2)} m³`],
+              ["Hacim", `${hacimM3.toFixed(2)} m³`],
               ["Ağırlık", `${Math.round(sonuc.toplamAgirlik).toLocaleString("tr-TR")} kg`],
               ["Kullanılan boy", `${sonuc.kullanilanBoy} / ${kont.uzunluk} cm`],
             ].map(([b, d]) => (
