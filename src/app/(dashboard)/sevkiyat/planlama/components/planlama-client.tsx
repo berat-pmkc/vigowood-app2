@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Container, Lock, LockOpen, Play, Ruler, Search, Settings2, TriangleAlert, Loader2, Truck,
+  Container, ExternalLink, Lock, LockOpen, Play, Ruler, Search, Settings2, TriangleAlert, Loader2, Truck,
 } from "lucide-react";
 
 const RENKLER = ["#9e9e9e", "#4fc3f7", "#d7bb91", "#a1887f", "#ffb74d", "#81c784",
@@ -54,6 +54,7 @@ export function PlanlamaClient({
   const [calisiyor, setCalisiyor] = useState(false);
   const [ilerleme, setIlerleme] = useState(0);
   const [sonuc, setSonuc] = useState<PackSonuc | null>(null);
+  const [raporAciliyor, setRaporAciliyor] = useState(false);
   const [uyarilar, setUyarilar] = useState<string[]>([]);
   const workerRef = useRef<Worker | null>(null);
   const router = useRouter();
@@ -186,6 +187,69 @@ export function PlanlamaClient({
     });
   };
 
+  /**
+   * Plan kaydının gövdesi.
+   *
+   * girdi.urunler'e ölçü/renk/hedef de yazılıyor: rapor sayfası planı
+   * yeniden çizerken bunlara ihtiyaç duyuyor ve ürün tablosu sonradan
+   * değişse bile rapor kaydedildiği günkü haliyle açılabiliyor.
+   */
+  const planKaydiGovdesi = (s: PackSonuc) => ({
+    ad: `${tip} planı`,
+    konteyner_tipi: tip,
+    ic_uzunluk: kont.uzunluk,
+    ic_genislik: kont.genislik,
+    ic_yukseklik: kont.yukseklik,
+    girdi: {
+      urunler: secili.map((u) => ({
+        sku: u.sku,
+        ad: u.urun_adi,
+        boy: u.boy!, en: u.en!, yuk: u.yuk!,
+        renk: renkMap.get(u.sku),
+        hedef: s.yuklenen[u.sku] ?? 0,
+      })),
+      secimler: [...secimler.values()],
+    },
+    sonuc: {
+      bloklar: s.bloklar,
+      yuklenen: s.yuklenen,
+      eksik: s.eksik,
+      toplamKoli: s.toplamKoli,
+      toplamHacim: s.toplamHacim,
+      kullanilanBoy: s.kullanilanBoy,
+    },
+    doluluk_yuzde: s.dolulukYuzde,
+    toplam_koli: s.toplamKoli,
+    toplam_hacim: s.toplamHacim,
+    toplam_agirlik: s.toplamAgirlik,
+    kullanilan_boy: s.kullanilanBoy,
+  });
+
+  /** Planı kaydedip ayrıntılı HTML raporunu yeni sekmede açar */
+  const raporAc = async () => {
+    if (!sonuc) return;
+    setRaporAciliyor(true);
+    // Sekme, kullanıcı hareketiyle aynı anda açılmalı; sonradan açılırsa
+    // tarayıcı açılır pencere engelleyicisi bunu bloklar.
+    const sekme = window.open("", "_blank");
+    const kayit = await planKaydet(planKaydiGovdesi(sonuc));
+    setRaporAciliyor(false);
+
+    if (!kayit.success) {
+      sekme?.close();
+      toast.error(kayit.error);
+      return;
+    }
+    if (!kayit.id) {
+      sekme?.close();
+      toast.error("Plan kaydedildi ama kimliği alınamadı");
+      return;
+    }
+    const adres = `/sevkiyat/planlama/rapor/${kayit.id}`;
+    if (sekme) sekme.location.href = adres;
+    else window.open(adres, "_blank");
+  };
+
   const sevkiyataDonustur = async () => {
     if (!sonuc) return;
     setDonusturuluyor(true);
@@ -205,20 +269,7 @@ export function PlanlamaClient({
       .filter((k) => k.koli > 0);
 
     // Plan kaydı — sevkiyatla ilişkilendirilsin, sonradan geri bakılabilsin
-    const kayit = await planKaydet({
-      ad: `${tip} planı`,
-      konteyner_tipi: tip,
-      ic_uzunluk: kont.uzunluk,
-      ic_genislik: kont.genislik,
-      ic_yukseklik: kont.yukseklik,
-      girdi: { urunler: secili.map((u) => u.sku), secimler: [...secimler.values()] },
-      sonuc: { bloklar: sonuc.bloklar, yuklenen: sonuc.yuklenen },
-      doluluk_yuzde: sonuc.dolulukYuzde,
-      toplam_koli: sonuc.toplamKoli,
-      toplam_hacim: sonuc.toplamHacim,
-      toplam_agirlik: sonuc.toplamAgirlik,
-      kullanilan_boy: sonuc.kullanilanBoy,
-    });
+    const kayit = await planKaydet(planKaydiGovdesi(sonuc));
 
     const r = await plandanSevkiyatOlustur({
       planId: kayit.success ? (kayit.id ?? null) : null,
@@ -358,6 +409,22 @@ export function PlanlamaClient({
               </Card>
             ))}
           </div>
+
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-3">
+            <div>
+              <p className="text-sm font-medium">Ayrıntılı yükleme raporu</p>
+              <p className="text-xs text-muted-foreground">
+                Bölge kesitleri, koli duruşları ve depo talimatı — yeni sekmede açılır,
+                yazdırılabilir.
+              </p>
+            </div>
+            <Button variant="outline" onClick={raporAc} disabled={raporAciliyor}>
+              {raporAciliyor
+                ? <Loader2 className="mr-2 size-4 animate-spin" />
+                : <ExternalLink className="mr-2 size-4" />}
+              Raporu Aç
+            </Button>
+          </Card>
 
           {sonuc.agirlikAsimi && (
             <Card className="border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
