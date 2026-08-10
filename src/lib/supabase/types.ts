@@ -2664,6 +2664,7 @@ export type Database = {
           gecen_ay_uretim: number
           gunluk_satis: number
           ilk_satis_tarihi: string | null
+          koli_adedi: number | null
           kategori: Database["public"]["Enums"]["product_category"] | null
           kutu_agirlik_kg: number | null
           kutu_boy_cm: number | null
@@ -2687,6 +2688,7 @@ export type Database = {
           gecen_ay_uretim?: number
           gunluk_satis?: number
           ilk_satis_tarihi?: string | null
+          koli_adedi?: number | null
           kategori?: Database["public"]["Enums"]["product_category"] | null
           kutu_agirlik_kg?: number | null
           kutu_boy_cm?: number | null
@@ -2710,6 +2712,7 @@ export type Database = {
           gecen_ay_uretim?: number
           gunluk_satis?: number
           ilk_satis_tarihi?: string | null
+          koli_adedi?: number | null
           kategori?: Database["public"]["Enums"]["product_category"] | null
           kutu_agirlik_kg?: number | null
           kutu_boy_cm?: number | null
