@@ -64,6 +64,7 @@ function bolgeDoldur(
   topK: number,
   ayar: PackAyar,
   derinlik: number,
+  oncekiSku: string | null,
 ): number {
   if (dx <= EPS || dy <= EPS || dz <= EPS || derinlik > ayar.maxDerinlik) return 0;
 
@@ -92,14 +93,39 @@ function bolgeDoldur(
       const n = Math.min(rem, nx2 * ny2 * nz);
 
       // Çok küçük blok kurma — sahada dağınık üç beş koli olmasın
-      if (n < Math.min(ayar.minBlok, rem)) continue;
+      // Asgari blok boyu YALNIZCA ana duvarda (derinlik 0) geçerli.
+      //
+      // Her seviyede uygulanınca artık bölgelere sadece 2-3 koli sığdığı
+      // için hepsi reddediliyor, o boşluk boş kalıyordu. Örnek: 40.5 cm
+      // yüksek ürünün 6 katı 243 cm, tepede 26 cm şerit kalıyor — oraya
+      // 3 koli sığıyor ama minBlok=6 yüzünden hiç konmuyordu.
+      // Küçük bloğa yalnızca artık bölgede VE duvarın kendi ürünüyse izin
+      // verilir. Serbest bırakılınca (her ürüne izin) doluluk aynı kaldı
+      // ama parçalanma 2.3'ten 2.9'a çıktı: farklı ürünler duvar
+      // aralarına serpiştiriliyordu. Aynı ürün şartı, tepedeki artık
+      // şeridi doldurmayı sağlarken sahada karışıklık yaratmıyor.
+      const ayniUrun = oncekiSku !== null && sku === oncekiSku;
+      const buSeviyeMin = derinlik > 0 && ayniUrun ? 1 : ayar.minBlok;
+      if (n < Math.min(buSeviyeMin, rem)) continue;
 
-      // Asgari payı henüz karşılanmamış ürün öne alınır — böylece seçilen
-      // her ürün plana giriyor, konteyner tek tip ürünle dolmuyor
+      // Asgari payı dolmamış ürüne çarpan uygulanır, sabit bir öncelik
+      // eklenmez.
+      //
+      // Önce +1e9 ekleniyordu; bu, asgarisi dolmamış ürünü hangi duruşta
+      // olursa olsun diğerlerinin önüne geçiriyordu. 14 ürün seçilince ilk
+      // 14 duvar sırf asgariyi doldurmak için kuruluyor, yerleşim kalitesi
+      // tamamen göz ardı ediliyordu — 20-25 kolilik cılız duvarlar çıkıyordu.
+      //
+      // Çarpan, hacim karşılaştırmasını korur: kötü oturan bir duruş
+      // asgari uğruna seçilmez, ama eşit koşulda eksik ürün öne geçer.
       const minEksik = kalanMin.get(sku) ?? 0;
-      const oncelik = minEksik > 0 ? 1e9 : 0;
+      let puan = n * u.hacim;
+      if (minEksik > 0) puan *= 4;
+      // Bir önceki duvarla aynı ürün: aynı ürünü konteynerin dört ayrı
+      // yerine dağıtmak yerine bir arada tutar
+      if (oncekiSku && sku === oncekiSku) puan *= 1.35;
       adaylar.push({
-        hacim: oncelik + n * u.hacim,
+        hacim: puan,
         sku, l: dl, w: dw, h: dh, nx: nx2, ny: ny2, nz, n,
       });
     }
@@ -121,9 +147,21 @@ function bolgeDoldur(
   });
 
   let tot = sec.hacim;
-  tot += bolgeDoldur(x0 + bx, y0, z0, dx - bx, by, bz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1);
-  tot += bolgeDoldur(x0, y0 + by, z0, dx, dy - by, dz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1);
-  tot += bolgeDoldur(x0, y0, z0 + bz, bx, by, dz - bz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1);
+  // Artık bölgeler — blok yerleştikten sonra kalan üç dilim.
+  //
+  // Eskiden birinci dilim yalnızca blok yüksekliği kadardı (bz). O yüzden
+  // x∈[bx,dx], y∈[0,by], z∈[bz,dz] bölgesi hiçbir dilime girmiyor,
+  // algoritma oraya hiç bakmıyordu — her duvarın sağ üst köşesi boşa
+  // gidiyordu. Birinci dilime tam yükseklik (dz) verilerek kapatıldı.
+  //
+  // Kapsama kontrolü (kesişimsiz, eksiksiz):
+  //   blok  x[0,bx]  y[0,by]  z[0,bz]
+  //   A     x[bx,dx] y[0,by]  z[0,dz]   ← tam yükseklik
+  //   B     x[0,dx]  y[by,dy] z[0,dz]
+  //   C     x[0,bx]  y[0,by]  z[bz,dz]
+  tot += bolgeDoldur(x0 + bx, y0, z0, dx - bx, by, dz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1, sec.sku);
+  tot += bolgeDoldur(x0, y0 + by, z0, dx, dy - by, dz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1, sec.sku);
+  tot += bolgeDoldur(x0, y0, z0 + bz, bx, by, dz - bz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1, sec.sku);
   return tot;
 }
 
@@ -143,6 +181,7 @@ function tekDeneme(
   const bloklar: Blok[] = [];
   let x = 0;
   let toplam = 0;
+  let oncekiSku: string | null = null;
 
   // Aday duvar derinlikleri: ürün ölçülerinin kendisi. Böylece duvar tam
   // bir koli boyutuna oturur, arada ölü boşluk kalmaz.
@@ -167,7 +206,7 @@ function tekDeneme(
         const k2 = new Map(kalan);
         const km2 = new Map(kalanMin);
         const o: Blok[] = [];
-        const v = bolgeDoldur(0, 0, 0, Lz, kont.genislik, kont.yukseklik, k2, km2, urunler, o, rnd, topK, ayar, 0);
+        const v = bolgeDoldur(0, 0, 0, Lz, kont.genislik, kont.yukseklik, k2, km2, urunler, o, rnd, topK, ayar, 0, oncekiSku);
         if (v <= 0) continue;
         const skor = (v - ayar.blokCezasi * o.length) / Lz;
         if (enIyi === null || skor > enIyi.skor) {
@@ -183,6 +222,36 @@ function tekDeneme(
     for (const [s, v] of enIyi.kalanMin) kalanMin.set(s, v);
     x += enIyi.boy;
     toplam += enIyi.hacim;
+    // Bu duvarın en çok koli koyan ürünü, sonraki duvarda tercih edilsin
+    const sayac = new Map<string, number>();
+    for (const b of enIyi.bloklar) sayac.set(b.sku, (sayac.get(b.sku) ?? 0) + b.n);
+    oncekiSku = [...sayac.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  }
+
+  // ── Kuyruk dolgusu ────────────────────────────────────────────────
+  // Ana döngü, kalan boya minBlok'u karşılayan bir duvar sığmadığında
+  // duruyor ve konteynerin sonunda 20-30 cm boş kalıyordu (yaklaşık
+  // 2 m³). Burada aynı boşluk minBlok=1 ile bir kez daha denenir:
+  // dağınık blok riski yalnızca son duvarda, karşılığında ölü boy sıfıra
+  // yaklaşıyor.
+  const kuyruk = kont.uzunluk - x;
+  if (kuyruk > EPS) {
+    let kalanToplam = 0;
+    for (const v of kalan.values()) kalanToplam += v;
+    if (kalanToplam > 0) {
+      const o: Blok[] = [];
+      const v = bolgeDoldur(
+        0, 0, 0, kuyruk, kont.genislik, kont.yukseklik,
+        kalan, kalanMin, urunler, o, rnd, topK,
+        { ...ayar, minBlok: 1 }, 0, oncekiSku,
+      );
+      if (v > 0) {
+        for (const b of o) b.x += x;
+        bloklar.push(...o);
+        toplam += v;
+        x += Math.max(...o.map((b) => b.x + b.l * b.nx)) - x;
+      }
+    }
   }
 
   return { bloklar, kalan, kalanMin, hacim: toplam, boy: x };
