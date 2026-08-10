@@ -22,6 +22,12 @@ export interface PaletAyarlari {
 export interface KonteynerTipi {
   type: string;
   label: string;
+  /** İç net ölçüler (cm) — yükleme planlaması bunları kullanır */
+  ic_uzunluk?: number;
+  ic_genislik?: number;
+  ic_yukseklik?: number;
+  /** Azami net yük (kg) */
+  max_yuk_kg?: number;
 }
 
 export interface AracTipi {
