@@ -34,6 +34,7 @@ import {
   FileOutput,
   Activity,
   Tags,
+  Container,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole, ModuleKey } from "@/lib/constants";
@@ -139,6 +140,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Sevkiyat",
     items: [
       { title: "Sevkiyatlar", href: "/sevkiyat", icon: Truck, roles: SEVK_ROLES },
+      { title: "Planlama", href: "/sevkiyat/planlama", icon: Container, roles: SEVK_ROLES },
       { title: "Şablonlar", href: "/sevkiyat/sablonlar", icon: LayoutTemplate, roles: SEVK_ROLES },
       { title: "Fiyatlar", href: "/sevkiyat/fiyatlar", icon: DollarSign, roles: SEVK_ROLES },
       { title: "Maliyetler", href: "/sevkiyat/maliyetler", icon: Receipt, roles: ["Yönetici", "Endüstri Mühendisi"] },

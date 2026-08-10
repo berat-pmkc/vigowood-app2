@@ -4714,6 +4714,69 @@ export type Database = {
         }
         Relationships: []
       }
+      yukleme_planlari: {
+        Row: {
+          ad: string
+          created_at: string
+          doluluk_yuzde: number | null
+          durum: string
+          girdi: Json
+          ic_genislik: number
+          ic_uzunluk: number
+          ic_yukseklik: number
+          id: string
+          konteyner_tipi: string
+          kullanilan_boy: number | null
+          olusturan: string | null
+          sevkiyat_id: string | null
+          sonuc: Json
+          toplam_agirlik: number | null
+          toplam_hacim: number | null
+          toplam_koli: number | null
+          updated_at: string
+        }
+        Insert: {
+          ad: string
+          created_at?: string
+          doluluk_yuzde?: number | null
+          durum?: string
+          girdi?: Json
+          ic_genislik: number
+          ic_uzunluk: number
+          ic_yukseklik: number
+          id?: string
+          konteyner_tipi: string
+          kullanilan_boy?: number | null
+          olusturan?: string | null
+          sevkiyat_id?: string | null
+          sonuc?: Json
+          toplam_agirlik?: number | null
+          toplam_hacim?: number | null
+          toplam_koli?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ad?: string
+          created_at?: string
+          doluluk_yuzde?: number | null
+          durum?: string
+          girdi?: Json
+          ic_genislik?: number
+          ic_uzunluk?: number
+          ic_yukseklik?: number
+          id?: string
+          konteyner_tipi?: string
+          kullanilan_boy?: number | null
+          olusturan?: string | null
+          sevkiyat_id?: string | null
+          sonuc?: Json
+          toplam_agirlik?: number | null
+          toplam_hacim?: number | null
+          toplam_koli?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           allowed_modules: string[] | null
