@@ -27,6 +27,10 @@ export function KonteynerGorunum({
     dikeyUzunluk: number,
     konum: (b: Blok) => { x: number; y: number; w: number; h: number },
   ) => {
+    // Çizim yüksekliğini genişlik belirler (className'de h-auto w-full).
+    // Önce maxHeight:170 kısıtı vardı; görünümün oranı ~5:1 olduğu için
+    // kapsayıcı genişledikçe preserveAspectRatio içeriği ortalayıp sağa
+    // sola boş şerit bırakıyordu.
     const H = 150;
     const olcek = H / dikeyUzunluk;
     const W = yatayUzunluk * olcek;
@@ -35,8 +39,7 @@ export function KonteynerGorunum({
         <p className="mb-1 text-xs font-medium text-muted-foreground">{baslik}</p>
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="w-full rounded border bg-muted/20"
-          style={{ maxHeight: 170 }}
+          className="block h-auto w-full rounded border bg-muted/20"
           preserveAspectRatio="xMidYMid meet"
         >
           {bloklar.map((b, i) => {

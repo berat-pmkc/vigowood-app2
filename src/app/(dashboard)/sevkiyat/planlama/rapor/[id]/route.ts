@@ -123,8 +123,10 @@ export async function GET(
     color: u.renk,
   }));
 
-  const hacim = sonuc.toplamHacim
-    ?? bloklar.reduce((t, b) => t + b.count * b.l * b.w * b.h, 0);
+  // sonuc.toplamHacim m³ olarak kaydediliyor; renderReportHtml cm³ bekliyor
+  const hacim = sonuc.toplamHacim !== undefined
+    ? sonuc.toplamHacim * 1e6
+    : bloklar.reduce((t, b) => t + b.count * b.l * b.w * b.h, 0);
   const kontHacim = container.length * container.width * container.height;
 
   const plan: PackResult = {

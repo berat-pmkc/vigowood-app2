@@ -142,7 +142,10 @@ export function planla(
     eksik: plan.shortfall,
     yuklenen: plan.placed,
     kullanilanBoy: plan.usedLength,
-    toplamHacim: plan.volume,
+    // Motor cm³ döndürür; arayüz ve yukleme_planlari.toplam_hacim m³ bekliyor.
+    // Dönüştürmeyi atlayınca ekranda "70597038.00 m³" yazıyor ve
+    // NUMERIC(10,3) kolonuna yazarken "numeric field overflow" alınıyordu.
+    toplamHacim: plan.volume / 1e6,
     toplamAgirlik,
     toplamKoli: plan.totalUnits,
     dolulukYuzde: Math.round(plan.fillRatio * 1000) / 10,
