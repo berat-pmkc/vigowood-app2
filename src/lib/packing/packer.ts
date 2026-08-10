@@ -74,7 +74,14 @@ function bolgeDoldur(
 
     for (const [dl, dw, dh] of u.durus) {
       if (dl > dx + EPS || dw > dy + EPS || dh > dz + EPS) continue;
-      const nx = Math.floor((dx + EPS) / dl);
+      // Duvar tek koli derinliğinde kurulur.
+      //
+      // Referans planda bölgeler 43, 98, 57.5 cm gibi tam bir koli
+      // ölçüsündeydi; derinlik hep 1 sıraydı. Bu sınır olmadan serbest
+      // ürünlerde tek blok 18 sıra derinliğe gidip konteyner boyunca
+      // uzanıyor, duvar mantığı bozuluyordu — sahada da yüklenemez.
+      const nxHam = Math.floor((dx + EPS) / dl);
+      const nx = derinlik === 0 ? Math.min(1, nxHam) : nxHam;
       const ny = Math.floor((dy + EPS) / dw);
       const nz = Math.floor((dz + EPS) / dh);
       if (nx * ny * nz <= 0) continue;
