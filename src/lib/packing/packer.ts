@@ -35,12 +35,22 @@ import {
  * Keşif modunda tüm ürünler serbest bırakılınca algoritma konteyneri en sıkı
  * yerleşen ürünle dolduruyor, seçilen diğer ürünler plana hiç girmiyordu.
  * Konteynerin serbest hacmi ürün sayısına bölünüp her birinin koli hacmine
- * göre adede çevriliyor. Çarpan 1,25: pay biraz esnek olsun ama eşitlik
- * bozulmasın. (2,2'ye çıkarınca doluluk %88,8 → %90 oluyor, buna karşılık
- * ürünler arası hacim farkı 3 kattan 5 kata çıkıyor — eşit hacim istendiği
- * için 1,25'te bırakıldı.)
+ * göre adede çevriliyor.
+ *
+ * ÇARPAN NEDEN 1'İN ALTINDA:
+ * Motor qty'yi karşılanması zorunlu hedef sayar ve planları önce "eksik koli
+ * yok" ölçütüyle sıralar. Çarpan 1,25 iken toplam talep konteynerin 1,25 katı
+ * oluyordu; hiçbir plan hedefleri tutturamadığı için motor toplam eksiği
+ * azaltmaya çalışıp en hacimli ürünleri tamamen atıyordu (LS024 ve LS025
+ * sıfır kalmıştı). Talep konteynerle uyumlu olunca motor hepsini
+ * karşılayabiliyor; dağılım eşit, doluluk yüksek ve sıfır kalan ürün yok.
+ *
+ * 14 ürünlü gerçek testte (butçe 4 sn):
+ *   0,80 → %91,7   0,95 → %92,3   1,10 → %92,7 ama dağılım bozuluyor
+ * 0,95'te ürün başına hacim 4,3-5,1 m³ arasında (1,2 kat fark).
+ * Önceki kurulumda bu fark 3 kattı.
  */
-const PAY_CARPANI = 1.25;
+const PAY_CARPANI = 0.95;
 
 function esitHacimPayi(gecerli: PackUrun[], kont: Konteyner): Map<string, number> {
   const kontHacim = kont.uzunluk * kont.genislik * kont.yukseklik;
@@ -83,15 +93,37 @@ export function planla(
     // Kilitli ürün: tam olarak hedef kadar, artırma yok.
     // Serbest ürün: eşit hacim payı kadar hedef, enAz altına düşmesin.
     const kilitli = u.kilitli && u.hedef > 0;
-    const hedef = kilitli ? u.hedef : Math.max(u.enAz, pay.get(u.sku) ?? u.enAz);
+    if (kilitli) {
+      return {
+        id: u.sku,
+        name: u.ad ?? u.sku,
+        dims: [u.boy, u.en, u.yuk] as [number, number, number],
+        qty: u.hedef,
+        color: u.renk,
+      };
+    }
+
+    /*
+     * Serbest ürün: qty = güvence altındaki taban, maxQty = eşit hacim payı.
+     *
+     * Önce tam tersi yapılmıştı — qty'ye eşit hacim payı veriliyor, enAz
+     * motora hiç iletilmiyordu. Motor qty'yi karşılanması ZORUNLU hedef
+     * sayar; 14 ürünün payı toplamı konteyneri kat kat aştığı için toplam
+     * eksiği azaltmaya çalışıp en hacimli ürünleri tamamen atıyordu
+     * (LS024 ve LS025 sıfır kalmıştı).
+     *
+     * Motorun birincil sıralama ölçütü "eksik koli yok" olduğundan, taban
+     * qty'ye konunca her üründen en az o kadarı garanti ediliyor; kalan
+     * boşluk ilave kapasite geçişinde paya doğru büyütülüyor.
+     */
+    const taban = Math.max(1, u.enAz);
+    const payAdet = Math.max(taban, pay.get(u.sku) ?? taban);
     return {
       id: u.sku,
       name: u.ad ?? u.sku,
       dims: [u.boy, u.en, u.yuk] as [number, number, number],
-      qty: hedef,
-      // Kilitli ürün büyümez; serbest ürün boşluk kalırsa payının 2 katına
-      // kadar artabilir — konteynerin sonundaki ölü boyu bu kapatıyor
-      ...(kilitli ? {} : { maxQty: hedef * 2 }),
+      qty: payAdet,
+      maxQty: Math.round(payAdet * 2),
       color: u.renk,
     };
   });
