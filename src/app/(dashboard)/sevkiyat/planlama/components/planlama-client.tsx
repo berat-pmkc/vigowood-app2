@@ -64,6 +64,7 @@ export function PlanlamaClient({
   const [butce, setButce] = useState("15");
   const [minBlok, setMinBlok] = useState("6");
   const [blokCezasi, setBlokCezasi] = useState("80000");
+  const [enAzKoli, setEnAzKoli] = useState("24");
 
   const kont = useMemo(() => {
     const k = konteynerTipleri.find((x) => x.type === tip);
@@ -135,6 +136,8 @@ export function PlanlamaClient({
         koliAgirlik: u.koli_agirlik ?? 0,
         hedef,
         kilitli: s.kilitli && Number.isFinite(girilen) && girilen > 0,
+        // Her seçilen ürün plana girsin; kilitli ürünlerde asgari zaten hedeftir
+        enAz: s.kilitli ? hedef : Math.max(0, Number(enAzKoli) || 0),
         renk: RENKLER[i % RENKLER.length],
       };
     });
@@ -301,7 +304,12 @@ export function PlanlamaClient({
             <Settings2 className="size-3.5" />
             Gelişmiş ayarlar
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2 grid grid-cols-3 gap-3">
+          <CollapsibleContent className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="space-y-1">
+              <Label className="text-[11px]">Her üründen en az (koli)</Label>
+              <Input value={enAzKoli} onChange={(e) => setEnAzKoli(e.target.value)} className="h-8" />
+              <p className="text-[10px] text-muted-foreground">Seçilen her ürün bu kadar yer alır</p>
+            </div>
             <div className="space-y-1">
               <Label className="text-[11px]">Arama süresi (sn)</Label>
               <Input value={butce} onChange={(e) => setButce(e.target.value)} className="h-8" />
@@ -510,8 +518,9 @@ export function PlanlamaClient({
           <div className="p-3 pb-0">
             <p className="text-sm font-medium">Dizilim Tablosu</p>
             <p className="text-[11px] text-muted-foreground">
-              Her satır bir blok. Kolinin hangi kenarının boya, ene ve diğe geleceğini
-              gösterir — görselden anlaşılmayan kısım budur.
+              Sıra numarası yükleme sırasıdır: dipten kapıya, alttan üste. Üç orta
+              sütun kolinin duruşunu verir — o koliyi koyduğunuzda hangi ölçüsünün
+              hangi yöne bakacağı. Konum sütunları aynı bölgedeki blokları ayırır.
             </p>
           </div>
           <table className="mt-2 w-full text-xs">
@@ -519,7 +528,9 @@ export function PlanlamaClient({
               <tr className="border-y bg-muted/50 text-left">
                 <th className="px-2 py-2">#</th>
                 <th className="px-2 py-2">Ürün</th>
-                <th className="px-2 py-2">Konum (cm)</th>
+                <th className="px-2 py-2">Boy aralığı</th>
+                <th className="px-2 py-2 text-center">Sol duvardan</th>
+                <th className="px-2 py-2 text-center">Tabandan</th>
                 <th className="px-2 py-2 text-center">Boya</th>
                 <th className="px-2 py-2 text-center">Ene</th>
                 <th className="px-2 py-2 text-center">Diğe</th>
@@ -541,6 +552,8 @@ export function PlanlamaClient({
                   <td className="px-2 py-1.5 tabular-nums text-muted-foreground">
                     {d.bas}–{d.bit}
                   </td>
+                  <td className="px-2 py-1.5 text-center tabular-nums text-muted-foreground">{d.y}</td>
+                  <td className="px-2 py-1.5 text-center tabular-nums text-muted-foreground">{d.z}</td>
                   <td className="px-2 py-1.5 text-center tabular-nums">{d.boya}</td>
                   <td className="px-2 py-1.5 text-center tabular-nums">{d.ene}</td>
                   <td className="px-2 py-1.5 text-center tabular-nums font-semibold">{d.dike}</td>

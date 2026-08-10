@@ -25,6 +25,14 @@ export interface PackUrun {
    */
   hedef: number;
   kilitli: boolean;
+  /**
+   * Bu üründen en az kaç koli konmalı.
+   *
+   * Olmadığında algoritma konteyneri en sıkı yerleşen iki üç ürünle
+   * dolduruyor; seçilen diğer ürünler plana hiç girmiyordu. Bu alan
+   * karşılanana kadar o ürün aday seçiminde öncelikli sayılır.
+   */
+  enAz: number;
   renk: string;
 }
 

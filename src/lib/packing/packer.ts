@@ -57,6 +57,7 @@ function bolgeDoldur(
   x0: number, y0: number, z0: number,
   dx: number, dy: number, dz: number,
   kalan: Map<string, number>,
+  kalanMin: Map<string, number>,
   urunler: Map<string, PackUrun & { hacim: number; durus: [number, number, number][] }>,
   cikti: Blok[],
   rnd: () => number,
@@ -86,7 +87,14 @@ function bolgeDoldur(
       // Çok küçük blok kurma — sahada dağınık üç beş koli olmasın
       if (n < Math.min(ayar.minBlok, rem)) continue;
 
-      adaylar.push({ hacim: n * u.hacim, sku, l: dl, w: dw, h: dh, nx: nx2, ny: ny2, nz, n });
+      // Asgari payı henüz karşılanmamış ürün öne alınır — böylece seçilen
+      // her ürün plana giriyor, konteyner tek tip ürünle dolmuyor
+      const minEksik = kalanMin.get(sku) ?? 0;
+      const oncelik = minEksik > 0 ? 1e9 : 0;
+      adaylar.push({
+        hacim: oncelik + n * u.hacim,
+        sku, l: dl, w: dw, h: dh, nx: nx2, ny: ny2, nz, n,
+      });
     }
   }
   if (adaylar.length === 0) return 0;
@@ -99,15 +107,16 @@ function bolgeDoldur(
   const by = sec.ny * sec.w;
   const bz = sec.nz * sec.h;
   kalan.set(sec.sku, (kalan.get(sec.sku) ?? 0) - sec.n);
+  kalanMin.set(sec.sku, Math.max(0, (kalanMin.get(sec.sku) ?? 0) - sec.n));
   cikti.push({
     sku: sec.sku, x: x0, y: y0, z: z0, dx: bx, dy: by, dz: bz,
     l: sec.l, w: sec.w, h: sec.h, nx: sec.nx, ny: sec.ny, nz: sec.nz, n: sec.n,
   });
 
   let tot = sec.hacim;
-  tot += bolgeDoldur(x0 + bx, y0, z0, dx - bx, by, bz, kalan, urunler, cikti, rnd, topK, ayar, derinlik + 1);
-  tot += bolgeDoldur(x0, y0 + by, z0, dx, dy - by, dz, kalan, urunler, cikti, rnd, topK, ayar, derinlik + 1);
-  tot += bolgeDoldur(x0, y0, z0 + bz, bx, by, dz - bz, kalan, urunler, cikti, rnd, topK, ayar, derinlik + 1);
+  tot += bolgeDoldur(x0 + bx, y0, z0, dx - bx, by, bz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1);
+  tot += bolgeDoldur(x0, y0 + by, z0, dx, dy - by, dz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1);
+  tot += bolgeDoldur(x0, y0, z0 + bz, bx, by, dz - bz, kalan, kalanMin, urunler, cikti, rnd, topK, ayar, derinlik + 1);
   return tot;
 }
 
@@ -118,10 +127,12 @@ function tekDeneme(
   kont: Konteyner,
   urunler: Map<string, PackUrun & { hacim: number; durus: [number, number, number][] }>,
   hedefler: Map<string, number>,
+  asgariler: Map<string, number>,
   ayar: PackAyar,
-): { bloklar: Blok[]; kalan: Map<string, number>; hacim: number; boy: number } {
+): { bloklar: Blok[]; kalan: Map<string, number>; kalanMin: Map<string, number>; hacim: number; boy: number } {
   const rnd = rastgele(tohum);
   const kalan = new Map(hedefler);
+  const kalanMin = new Map(asgariler);
   const bloklar: Blok[] = [];
   let x = 0;
   let toplam = 0;
@@ -140,19 +151,20 @@ function tekDeneme(
     for (const v of kalan.values()) kalanToplam += v;
     if (kalanToplam <= 0) break;
 
-    let enIyi: { skor: number; boy: number; bloklar: Blok[]; kalan: Map<string, number>; hacim: number } | null = null;
+    let enIyi: { skor: number; boy: number; bloklar: Blok[]; kalan: Map<string, number>; kalanMin: Map<string, number>; hacim: number } | null = null;
     const adayBoylar = olculer.filter((o) => o <= kont.uzunluk - x + EPS);
     adayBoylar.push(kont.uzunluk - x);
 
     for (const Lz of adayBoylar) {
       for (let t = 0; t < 2; t++) {
         const k2 = new Map(kalan);
+        const km2 = new Map(kalanMin);
         const o: Blok[] = [];
-        const v = bolgeDoldur(0, 0, 0, Lz, kont.genislik, kont.yukseklik, k2, urunler, o, rnd, topK, ayar, 0);
+        const v = bolgeDoldur(0, 0, 0, Lz, kont.genislik, kont.yukseklik, k2, km2, urunler, o, rnd, topK, ayar, 0);
         if (v <= 0) continue;
         const skor = (v - ayar.blokCezasi * o.length) / Lz;
         if (enIyi === null || skor > enIyi.skor) {
-          enIyi = { skor, boy: Lz, bloklar: o, kalan: k2, hacim: v };
+          enIyi = { skor, boy: Lz, bloklar: o, kalan: k2, kalanMin: km2, hacim: v };
         }
       }
     }
@@ -161,11 +173,12 @@ function tekDeneme(
     for (const b of enIyi.bloklar) b.x += x;
     bloklar.push(...enIyi.bloklar);
     for (const [s, v] of enIyi.kalan) kalan.set(s, v);
+    for (const [s, v] of enIyi.kalanMin) kalanMin.set(s, v);
     x += enIyi.boy;
     toplam += enIyi.hacim;
   }
 
-  return { bloklar, kalan, hacim: toplam, boy: x };
+  return { bloklar, kalan, kalanMin, hacim: toplam, boy: x };
 }
 
 /**
@@ -198,12 +211,21 @@ export function planla(
   }
 
   const hedefler = new Map([...urunler].map(([s, u]) => [s, u.hedef]));
+  // Asgari pay hedefi aşamaz — kullanıcı 5 koli istediyse asgari de 5 olur
+  const asgariler = new Map(
+    [...urunler].map(([s, u]) => [s, Math.min(u.enAz ?? 0, u.hedef)]),
+  );
   const kilitli = new Set([...urunler].filter(([, u]) => u.kilitli).map(([s]) => s));
 
-  const skorla = (r: { bloklar: Blok[]; kalan: Map<string, number>; boy: number }) => {
+  // Sıralama: önce karşılanmayan asgari paylar, sonra kilitli talep,
+  // sonra kullanılan boy, sonra blok sayısı. Asgari en üstte çünkü
+  // seçilen ürünün plana hiç girmemesi doluluktan daha rahatsız edici.
+  const skorla = (r: { bloklar: Blok[]; kalan: Map<string, number>; kalanMin: Map<string, number>; boy: number }) => {
+    let minEksik = 0;
+    for (const v of r.kalanMin.values()) minEksik += v;
     let kilitliEksik = 0;
     for (const s of kilitli) kilitliEksik += r.kalan.get(s) ?? 0;
-    return [-kilitliEksik, -Math.round(r.boy * 10) / 10, -r.bloklar.length];
+    return [-minEksik, -kilitliEksik, -Math.round(r.boy * 10) / 10, -r.bloklar.length];
   };
   const dahaIyi = (a: number[], b: number[]) => {
     for (let i = 0; i < a.length; i++) {
@@ -217,7 +239,7 @@ export function planla(
   let tohum = 0;
   while (Date.now() - t0 < ayar.butceMs) {
     for (const tk of [1, 2, 3]) {
-      const r = tekDeneme(tohum, tk, kont, urunler, hedefler, ayar);
+      const r = tekDeneme(tohum, tk, kont, urunler, hedefler, asgariler, ayar);
       if (enIyi === null || dahaIyi(skorla(r), skorla(enIyi))) enIyi = r;
     }
     tohum++;
