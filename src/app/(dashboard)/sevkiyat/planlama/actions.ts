@@ -134,3 +134,108 @@ export async function planKaydet(veri: {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
+
+export interface PlanKalem {
+  sku: string;
+  urun_adi: string | null;
+  koli: number;
+  adet: number;
+  boy: number;
+  en: number;
+  yuk: number;
+  koli_agirlik: number;
+}
+
+/**
+ * Planı sevkiyata dönüştürür.
+ *
+ * Kalemler koli bazında yazılır; palet planlaması yapılmadığı için
+ * palet_sayisi 1, palette_koli toplam koli olarak kaydedilir — böylece
+ * toplam koli ve adet doğru kalır. Palet dizilimi gerekiyorsa sevkiyat
+ * detayından düzenlenebilir.
+ */
+export async function plandanSevkiyatOlustur(veri: {
+  planId: string | null;
+  country_code: string;
+  sevkiyat_adi: string;
+  konteyner_tipi: string;
+  kalemler: PlanKalem[];
+}): Promise<Sonuc & { sevkiyat_id?: string }> {
+  try {
+    await yetkiKontrol();
+    const supabase = await createClient();
+
+    if (veri.kalemler.length === 0) {
+      return { success: false, error: "Planda kalem yok" };
+    }
+
+    // Ülkeye göre sıradaki sevkiyat numarası: DE21, USA30 gibi
+    const { data: mevcut } = await supabase
+      .from("sevkiyat")
+      .select("shipment_number")
+      .eq("country_code", veri.country_code)
+      .order("shipment_number", { ascending: false })
+      .limit(1);
+
+    const sonNo = (mevcut?.[0] as { shipment_number: number | null } | undefined)?.shipment_number ?? 0;
+    const yeniNo = sonNo + 1;
+    const sevkiyatId = `${veri.country_code}${yeniNo}`;
+
+    const ULKE: Record<string, string> = { DE: "Almanya", UK: "İngiltere", USA: "Amerika" };
+    const { data: alici } = await supabase
+      .from("sevkiyat_firmalar")
+      .select("id, profil_adi")
+      .eq("firma_tipi", "alici")
+      .eq("country_code", veri.country_code)
+      .eq("varsayilan", true)
+      .maybeSingle();
+
+    const { error: sevkError } = await supabase.from("sevkiyat").insert({
+      sevkiyat_id: sevkiyatId,
+      country_code: veri.country_code,
+      shipment_number: yeniNo,
+      sevkiyat_adi: veri.sevkiyat_adi,
+      ulke: ULKE[veri.country_code] ?? veri.country_code,
+      musteri: (alici as { profil_adi: string } | null)?.profil_adi ?? veri.country_code,
+      alici_firma_id: (alici as { id: number } | null)?.id ?? null,
+      konteyner_tipi: veri.konteyner_tipi,
+      durum: "bekliyor",
+      not_text: "Planlama ekranından oluşturuldu",
+    });
+    if (sevkError) return { success: false, error: sevkError.message };
+
+    const kalemler = veri.kalemler.map((k, i) => ({
+      item_id: `${sevkiyatId}-${String(i + 1).padStart(3, "0")}`,
+      sevkiyat_id: sevkiyatId,
+      sku: k.sku,
+      urun_adi: k.urun_adi,
+      qty: k.adet,
+      en: k.en,
+      boy: k.boy,
+      yuk: k.yuk,
+      koli_adedi: k.koli > 0 ? Math.round(k.adet / k.koli) : null,
+      palette_koli: k.koli,
+      palet_sayisi: 1,
+      toplam_koli: k.koli,
+      koli_agirlik: k.koli_agirlik,
+      agirlik: Math.round(k.koli * k.koli_agirlik * 100) / 100,
+      hacim: Math.round((k.koli * k.boy * k.en * k.yuk) / 1e6 * 1000) / 1000,
+    }));
+
+    const { error: kalemError } = await supabase.from("sevkiyat_items").insert(kalemler);
+    if (kalemError) return { success: false, error: kalemError.message };
+
+    if (veri.planId) {
+      await supabase
+        .from("yukleme_planlari")
+        .update({ durum: "sevkiyata_donustu", sevkiyat_id: sevkiyatId })
+        .eq("id", veri.planId);
+    }
+
+    revalidatePath("/sevkiyat");
+    revalidatePath("/sevkiyat/planlama");
+    return { success: true, sevkiyat_id: sevkiyatId };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}

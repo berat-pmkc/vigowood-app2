@@ -15,15 +15,16 @@ import {
 } from "@/components/ui/collapsible";
 import { OlcuEkleDialog } from "./olcu-ekle-dialog";
 import { KonteynerGorunum } from "./konteyner-gorunum";
-import type { PlanlamaUrun } from "../actions";
+import { plandanSevkiyatOlustur, planKaydet, type PlanlamaUrun } from "../actions";
 import type { KonteynerTipi } from "@/lib/shipment-settings-types";
 import type { PackSonuc, PackUrun } from "@/lib/packing/types";
 import type { WorkerCikti } from "@/lib/packing/worker";
 import { dizilimTablosu } from "@/lib/packing/dizilim";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Container, Lock, LockOpen, Play, Ruler, Search, Settings2, TriangleAlert, Loader2,
+  Container, Lock, LockOpen, Play, Ruler, Search, Settings2, TriangleAlert, Loader2, Truck,
 } from "lucide-react";
 
 const RENKLER = ["#9e9e9e", "#4fc3f7", "#d7bb91", "#a1887f", "#ffb74d", "#81c784",
@@ -55,6 +56,9 @@ export function PlanlamaClient({
   const [sonuc, setSonuc] = useState<PackSonuc | null>(null);
   const [uyarilar, setUyarilar] = useState<string[]>([]);
   const workerRef = useRef<Worker | null>(null);
+  const router = useRouter();
+  const [ulke, setUlke] = useState("USA");
+  const [donusturuluyor, setDonusturuluyor] = useState(false);
 
   // Gelişmiş ayarlar — sahadaki tercihe göre oynanabilsin
   const [butce, setButce] = useState("15");
@@ -176,6 +180,57 @@ export function PlanlamaClient({
         blokCezasi: Math.max(0, Number(blokCezasi) || 80000),
       },
     });
+  };
+
+  const sevkiyataDonustur = async () => {
+    if (!sonuc) return;
+    setDonusturuluyor(true);
+
+    const kalemler = secili
+      .map((u) => {
+        const koli = sonuc.yuklenen[u.sku] ?? 0;
+        return {
+          sku: u.sku,
+          urun_adi: u.urun_adi,
+          koli,
+          adet: koli * (u.koli_adedi ?? 1),
+          boy: u.boy!, en: u.en!, yuk: u.yuk!,
+          koli_agirlik: u.koli_agirlik ?? 0,
+        };
+      })
+      .filter((k) => k.koli > 0);
+
+    // Plan kaydı — sevkiyatla ilişkilendirilsin, sonradan geri bakılabilsin
+    const kayit = await planKaydet({
+      ad: `${tip} planı`,
+      konteyner_tipi: tip,
+      ic_uzunluk: kont.uzunluk,
+      ic_genislik: kont.genislik,
+      ic_yukseklik: kont.yukseklik,
+      girdi: { urunler: secili.map((u) => u.sku), secimler: [...secimler.values()] },
+      sonuc: { bloklar: sonuc.bloklar, yuklenen: sonuc.yuklenen },
+      doluluk_yuzde: sonuc.dolulukYuzde,
+      toplam_koli: sonuc.toplamKoli,
+      toplam_hacim: sonuc.toplamHacim,
+      toplam_agirlik: sonuc.toplamAgirlik,
+      kullanilan_boy: sonuc.kullanilanBoy,
+    });
+
+    const r = await plandanSevkiyatOlustur({
+      planId: kayit.success ? (kayit.id ?? null) : null,
+      country_code: ulke,
+      sevkiyat_adi: `${ulke} konteyner planı`,
+      konteyner_tipi: tip,
+      kalemler,
+    });
+    setDonusturuluyor(false);
+
+    if (!r.success) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success(`${r.sevkiyat_id} oluşturuldu`);
+    router.push(`/sevkiyat/${r.sevkiyat_id}`);
   };
 
   const dizilim = useMemo(
@@ -303,6 +358,35 @@ export function PlanlamaClient({
           )}
 
           <KonteynerGorunum bloklar={sonuc.bloklar} kont={kont} renkler={renkMap} />
+
+          {/* Planı sevkiyata çevir */}
+          <Card className="flex flex-wrap items-end gap-3 p-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Ülke</Label>
+              <Select value={ulke} onValueChange={setUlke}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DE">Almanya</SelectItem>
+                  <SelectItem value="UK">İngiltere</SelectItem>
+                  <SelectItem value="USA">Amerika</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="pb-2 flex-1 text-xs text-muted-foreground">
+              Sevkiyat numarası ülkeye göre sıradan verilir. Kalemler koli bazında
+              yazılır; palet dizilimi gerekiyorsa sevkiyat detayından düzenlersiniz.
+            </p>
+            <Button onClick={sevkiyataDonustur} disabled={donusturuluyor}>
+              {donusturuluyor ? (
+                <Loader2 className="mr-1 size-4 animate-spin" />
+              ) : (
+                <Truck className="mr-1 size-4" />
+              )}
+              Sevkiyata Dönüştür
+            </Button>
+          </Card>
         </>
       )}
 

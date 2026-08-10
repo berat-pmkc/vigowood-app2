@@ -47,6 +47,7 @@ import {
   Loader2,
   Package,
   Container,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -408,6 +409,31 @@ export function YeniSevkiyatForm({ products, ulkeler, konteynerTipleri, aracTipl
             </div>
           </CardContent>
         </Card>
+
+        {/* Konteyner sevkiyatlarında planlama ekranı yönlendirmesi.
+            Bu form palet şablonu üzerinden çalışıyor; konteyner dizilimini
+            ürün ölçülerinden hesaplayan ekran ayrı. */}
+        {aracTipi === "konteyner" && (
+          <Card className="mb-4 border-amber-300 bg-amber-50/50">
+            <CardContent className="flex flex-wrap items-center gap-3 py-3">
+              <Container className="size-5 shrink-0 text-amber-600" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Konteyner dizilimini sistem hesaplasın mı?</p>
+                <p className="text-xs text-muted-foreground">
+                  Planlama ekranında ürünleri seçersiniz, adetleri konteynere sığacak
+                  şekilde sistem belirler. Aşağıdaki form palet bilgisi ister; onu
+                  elle yükleme yaptığınızda kullanın.
+                </p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="shrink-0 bg-white">
+                <Link href="/sevkiyat/planlama">
+                  Planlama ekranına git
+                  <ArrowRight className="ml-1 size-3.5" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* --- Ürünler --- */}
         <Card className="mb-4">
