@@ -12,7 +12,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader,
   DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { sayimOlustur, KAPSAM_SECENEKLERI } from "../actions";
+import { sayimOlustur } from "../actions";
+import { KAPSAM_SECENEKLERI } from "../kapsam";
 import { Loader2, Plus } from "lucide-react";
 
 export function YeniSayimDialog() {

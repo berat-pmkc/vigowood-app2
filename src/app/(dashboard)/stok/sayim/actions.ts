@@ -15,14 +15,6 @@ async function yetkiKontrol() {
   return user;
 }
 
-export const KAPSAM_SECENEKLERI = [
-  { deger: "YARIMAMUL", etiket: "Yarı mamül (kesilmiş parçalar)" },
-  { deger: "HAZIR", etiket: "Hazır eleman (menteşe, vida, mıknatıs)" },
-  { deger: "KUTU", etiket: "Kutu" },
-  { deger: "KARTON", etiket: "Karton" },
-  { deger: "MAMUL", etiket: "Mamül (bitmiş ürün)" },
-] as const;
-
 /** Yeni sayım açar ve kapsamdaki kalemleri satır olarak üretir */
 export async function sayimOlustur(veri: {
   ad: string;
