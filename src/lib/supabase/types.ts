@@ -3566,6 +3566,88 @@ export type Database = {
         }
         Relationships: []
       }
+      stok_sayimlari: {
+        Row: {
+          ad: string
+          created_at: string
+          durum: string
+          kapsam: string[]
+          notlar: string | null
+          olusturan: string | null
+          sayim_id: string
+          sayim_tarihi: string
+          tamamlanma_zamani: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad: string
+          created_at?: string
+          durum?: string
+          kapsam?: string[]
+          notlar?: string | null
+          olusturan?: string | null
+          sayim_id: string
+          sayim_tarihi?: string
+          tamamlanma_zamani?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad?: string
+          created_at?: string
+          durum?: string
+          kapsam?: string[]
+          notlar?: string | null
+          olusturan?: string | null
+          sayim_id?: string
+          sayim_tarihi?: string
+          tamamlanma_zamani?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stok_sayim_satirlari: {
+        Row: {
+          created_at: string
+          fark: number | null
+          id: string
+          kalem_adi: string | null
+          kalem_id: string
+          kalem_tipi: string
+          kategori: string
+          not_text: string | null
+          sayilan_miktar: number | null
+          sayim_id: string
+          sistem_miktar: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kalem_adi?: string | null
+          kalem_id: string
+          kalem_tipi: string
+          kategori: string
+          not_text?: string | null
+          sayilan_miktar?: number | null
+          sayim_id: string
+          sistem_miktar?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kalem_adi?: string | null
+          kalem_id?: string
+          kalem_tipi?: string
+          kategori?: string
+          not_text?: string | null
+          sayilan_miktar?: number | null
+          sayim_id?: string
+          sistem_miktar?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       step_bom: {
         Row: {
           created_at: string
@@ -4920,6 +5002,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      stok_sayimi_satirlari_olustur: {
+        Args: { p_sayim_id: string }
+        Returns: number
+      }
+      stok_sayimi_uygula: {
+        Args: { p_sayim_id: string; p_operator?: string | null }
+        Returns: { guncellenen: number; hareket: number }[]
+      }
+
       montaj_sure_hesapla: {
         Args: { p_bas: string; p_bit: string; p_operator_id: string | null }
         Returns: { brut: number; mola: number; net: number }[]

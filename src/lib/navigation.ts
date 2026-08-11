@@ -115,6 +115,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Yarı Mamül", href: "/stok/yari-mamul", icon: Layers, roles: ALL_INTERNAL },
       { title: "Hazır Eleman", href: "/stok/hazir-eleman", icon: Component, roles: ALL_INTERNAL },
       { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: ALL_INTERNAL },
+      { title: "Stok Sayımı", href: "/stok/sayim", icon: ClipboardList, roles: ALL_INTERNAL },
     ],
   },
   {
