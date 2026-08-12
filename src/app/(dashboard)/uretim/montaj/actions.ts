@@ -831,7 +831,7 @@ export async function cancelMontajSession(sessionId: string): Promise<ActionResu
 /** Tamamlanan seansı düzenle (qty, workers) + stok güncelle */
 export async function updateCompletedMontajSession(
   sessionId: string,
-  formData: { qty: number; workers: { id: string; name: string }[] }
+  formData: { qty: number; start_time?: string; workers: { id: string; name: string }[] }
 ): Promise<ActionResult> {
   try {
     await requireProductionAccess();
@@ -885,6 +885,8 @@ export async function updateCompletedMontajSession(
         worker_count: workers.length,
         workers,
         birim_montaj_dk: birimDk,
+        // Operatör yanlış saatte başlatmış olabilir; verilmezse mevcut korunur
+        ...(formData.start_time ? { start_time: formData.start_time } : {}),
       })
       .eq("session_id", sessionId);
 
@@ -1064,5 +1066,36 @@ async function reverseHazirStockForSession(
         .update({ hazir_eleman_aktif_stok: newStock })
         .eq("part_id", part.part_id);
     }
+  }
+}
+
+/**
+ * Tamamlanmış montaj seansını siler.
+ *
+ * İş veritabanı fonksiyonunda (montaj_seansi_sil). Sebebi paketlemedekiyle
+ * aynı: yari_mamul_stok ve all_parts üzerinde dar yetki var, üretim rolü
+ * doğrudan silemiyor. Tabloya geniş yetki açmak yerine yalnızca o seansa
+ * bağlı kayıtları temizleyen yetkili fonksiyon kullanılıyor.
+ *
+ * Fonksiyon kapanışın simetriğini yapar: hazır eleman bakiyeleri reçeteye
+ * göre geri eklenir, yarı mamül defter kayıtları silinir, sonra seans.
+ * Hepsi tek işlemde — yarım kalmaz.
+ */
+export async function deleteCompletedMontajSession(sessionId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("montaj_seansi_sil", {
+      p_session_id: sessionId,
+    });
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/uretim/montaj");
+    revalidatePath("/stok/yari-mamul");
+    revalidatePath("/stok/hazir-eleman");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

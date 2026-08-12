@@ -221,6 +221,8 @@ export const montajSessionCloseSchema = z.object({
     .int("Tam sayı olmalıdır")
     .min(1, "En az 1 adet olmalıdır")
     .max(9999, "En fazla 9999 adet olabilir"),
+  /** Tamamlanmış seansı düzenlerken başlangıç saati düzeltilebilir */
+  start_time: z.string().optional(),
   workers: z
     .array(
       z.object({
