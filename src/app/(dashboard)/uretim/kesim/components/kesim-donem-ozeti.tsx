@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import type { CutBatchRow } from "../types";
+import { cn } from "@/lib/utils";
 import { Layers, Search, Clock, Boxes, X } from "lucide-react";
 
 /**
@@ -26,6 +26,8 @@ export function KesimDonemOzeti({
   donemEtiketi: string;
 }) {
   const [arama, setArama] = useState("");
+  /** Rozetlerden seçilen proje; null ise hepsi */
+  const [seciliProje, setSeciliProje] = useState<string | null>(null);
 
   const ozet = useMemo(() => {
     let plaka = 0;
@@ -39,7 +41,7 @@ export function KesimDonemOzeti({
     return { plaka, sureDk, parti: records.length, proje: projeler.size };
   }, [records]);
 
-  /** Aramaya uyan kayıtlar, güne göre grupl+anmış */
+  /** Aramaya uyan kayıtlar; proje rozeti seçiliyse ona daraltılır */
   const sonuc = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr");
     if (q.length < 2) return null;
@@ -50,6 +52,18 @@ export function KesimDonemOzeti({
     );
     if (uyan.length === 0) return { bos: true as const };
 
+    const projeAdi = (r: CutBatchRow) => r.plaka_adi ?? r.plaka_id ?? "—";
+
+    // Rozetler aramanın TAMAMINDAN çıkar; seçim yapılınca listeden kaybolmasın
+    const projeler = new Map<string, number>();
+    for (const r of uyan) {
+      const ad = projeAdi(r);
+      projeler.set(ad, (projeler.get(ad) ?? 0) + (r.adet ?? 0));
+    }
+
+    const secili = seciliProje && projeler.has(seciliProje) ? seciliProje : null;
+    const kapsam = secili ? uyan.filter((r) => projeAdi(r) === secili) : uyan;
+
     const gunler = new Map<string, {
       tarih: string; adet: number; sureDk: number;
       makineler: Set<string>; operatorler: Set<string>;
@@ -57,9 +71,8 @@ export function KesimDonemOzeti({
 
     let toplamAdet = 0;
     let toplamSure = 0;
-    const projeAdlari = new Set<string>();
 
-    for (const r of uyan) {
+    for (const r of kapsam) {
       const gun = r.tarih.slice(0, 10);
       const g = gunler.get(gun) ?? {
         tarih: gun, adet: 0, sureDk: 0,
@@ -74,17 +87,16 @@ export function KesimDonemOzeti({
 
       toplamAdet += r.adet ?? 0;
       toplamSure += sure;
-      if (r.plaka_adi) projeAdlari.add(r.plaka_adi);
-      else if (r.plaka_id) projeAdlari.add(r.plaka_id);
     }
 
     return {
       bos: false as const,
       gunler: [...gunler.values()].sort((a, b) => b.tarih.localeCompare(a.tarih)),
-      toplamAdet, toplamSure, parti: uyan.length,
-      projeAdlari: [...projeAdlari],
+      toplamAdet, toplamSure, parti: kapsam.length,
+      projeler: [...projeler.entries()].sort((a, b) => b[1] - a[1]),
+      secili,
     };
-  }, [records, arama]);
+  }, [records, arama, seciliProje]);
 
   const sureYaz = (dk: number) => {
     if (!dk) return "—";
@@ -128,14 +140,14 @@ export function KesimDonemOzeti({
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={arama}
-            onChange={(e) => setArama(e.target.value)}
+            onChange={(e) => { setArama(e.target.value); setSeciliProje(null); }}
             placeholder="Proje veya plaka ara — ör. KD50C, PLK-318, kitaplık"
             className="pl-8 pr-8"
           />
           {arama && (
             <button
               type="button"
-              onClick={() => setArama("")}
+              onClick={() => { setArama(""); setSeciliProje(null); }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               aria-label="Aramayı temizle"
             >
@@ -173,16 +185,36 @@ export function KesimDonemOzeti({
               </span>
             </div>
 
-            {sonuc.projeAdlari.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {sonuc.projeAdlari.slice(0, 4).map((p) => (
-                  <Badge key={p} variant="secondary" className="text-[11px]">{p}</Badge>
+            {sonuc.projeler.length > 1 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSeciliProje(null)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
+                    sonuc.secili === null
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "bg-background hover:bg-muted",
+                  )}
+                >
+                  Tümü
+                </button>
+                {sonuc.projeler.map(([ad, adet]) => (
+                  <button
+                    key={ad}
+                    type="button"
+                    onClick={() => setSeciliProje(sonuc.secili === ad ? null : ad)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
+                      sonuc.secili === ad
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted",
+                    )}
+                  >
+                    {ad}
+                    <span className="ml-1.5 opacity-70 tabular-nums">{adet}</span>
+                  </button>
                 ))}
-                {sonuc.projeAdlari.length > 4 && (
-                  <Badge variant="outline" className="text-[11px]">
-                    +{sonuc.projeAdlari.length - 4}
-                  </Badge>
-                )}
               </div>
             )}
 
