@@ -16,6 +16,7 @@ import { KesimRecords } from "./kesim-records";
 import { YeniKesimDialog } from "./yeni-kesim-dialog";
 import { AcikTalepSeridi } from "./acik-talep-seridi";
 import { PlakaStokPaneli } from "./plaka-stok-paneli";
+import { KesimDonemOzeti } from "./kesim-donem-ozeti";
 import type { KesimTalebi } from "../actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
 import { Plus, Scissors, CalendarDays } from "lucide-react";
@@ -198,7 +199,11 @@ export function KesimDashboard({
             </SelectContent>
           </Select>
         </div>
-        <KesimRecords records={records} />
+        <KesimDonemOzeti records={records} donemEtiketi={sectionLabel} />
+
+        <div className="mt-3">
+          <KesimRecords records={records} />
+        </div>
       </div>
 
       {/* FAB — Mobile */}

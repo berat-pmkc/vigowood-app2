@@ -13,6 +13,8 @@ export interface CutBatchRow {
   created_at: string;
   // Enriched fields
   plaka_adi?: string;
+  /** Bu partinin makinesinde plaka başına kesim süresi (dk) — plakalar.kesim_sureleri'nden */
+  kesim_suresi_dk?: number | null;
   urun_adi?: string;
   operator_adi?: string;
 }

@@ -147,7 +147,7 @@ export default async function KesimPage({
 
   const [plakaResult, productResult, operatorResult] = await Promise.all([
     plakaIds.length > 0
-      ? supabase.from("plakalar").select("plaka_id, plaka_adi").in("plaka_id", plakaIds)
+      ? supabase.from("plakalar").select("plaka_id, plaka_adi, kesim_sureleri").in("plaka_id", plakaIds)
       : { data: [] },
     skus.length > 0
       ? supabase.from("products").select("sku, urun_adi").in("sku", skus)
@@ -159,6 +159,13 @@ export default async function KesimPage({
 
   const plakaMap = new Map(
     (plakaResult.data ?? []).map((p) => [p.plaka_id, p.plaka_adi])
+  );
+  // Makine bazlı kesim süresi: { "MAK-1": 70, "MAK-2": 60, ... } dakika/plaka
+  const sureMap = new Map(
+    (plakaResult.data ?? []).map((p) => [
+      p.plaka_id,
+      (p as { kesim_sureleri?: Record<string, number | null> | null }).kesim_sureleri ?? null,
+    ])
   );
   const productMap = new Map(
     (productResult.data ?? []).map((p) => [p.sku, p.urun_adi])
@@ -172,6 +179,10 @@ export default async function KesimPage({
     plaka_adi: b.plaka_id ? plakaMap.get(b.plaka_id) ?? undefined : undefined,
     urun_adi: b.sku ? productMap.get(b.sku) ?? undefined : undefined,
     operator_adi: b.operator_id ? operatorMap.get(b.operator_id) ?? undefined : undefined,
+    kesim_suresi_dk:
+      b.plaka_id && b.makine_id
+        ? (sureMap.get(b.plaka_id)?.[b.makine_id] ?? null)
+        : null,
   });
 
   const enrichedRecords = allBatches.map(enrich);
