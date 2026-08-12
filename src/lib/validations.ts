@@ -254,6 +254,12 @@ export const packSessionCloseSchema = z.object({
     .int("Tam sayı olmalıdır")
     .min(1, "En az 1 adet olmalıdır")
     .max(9999, "En fazla 9999 adet olabilir"),
+  /**
+   * Paketlenen ürün hangi depoya girecek.
+   * Şema'da opsiyonel: seans KAPATIRKEN zorunlu (kodda kontrol ediliyor),
+   * tamamlanmış seansı DÜZENLERKEN boş bırakılırsa mevcut depo korunur.
+   */
+  depo_id: z.string().min(1, "Depo seçmelisiniz").optional(),
   workers: z
     .array(
       z.object({

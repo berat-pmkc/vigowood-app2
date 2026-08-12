@@ -11,9 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, Users, Package, Clock } from "lucide-react";
-import { closePackSession, getPackOperators } from "../actions";
+import { Loader2, Users, Package, Clock, Warehouse } from "lucide-react";
+import { closePackSession, getPackOperators, getDepolar, type DepoSecenegi } from "../actions";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { ActiveSession } from "./session-card";
 
 interface Operator {
@@ -44,6 +45,8 @@ function ElapsedBadge({ startTime }: { startTime: string }) {
 
 export function CloseSessionDialog({ session, open, onOpenChange }: CloseSessionDialogProps) {
   const [operators, setOperators] = useState<Operator[]>([]);
+  const [depolar, setDepolar] = useState<DepoSecenegi[]>([]);
+  const [seciliDepo, setSeciliDepo] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [qty, setQty] = useState("");
@@ -56,10 +59,12 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
         if (result.success) setOperators(result.data);
         setLoading(false);
       });
+      getDepolar().then(setDepolar);
     }
     if (!open) {
       setQty("");
       setSelectedWorkers(new Set());
+      setSeciliDepo("");
     }
   }, [open, operators.length]);
 
@@ -84,6 +89,10 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
       toast.error("En az 1 çalışan seçiniz");
       return;
     }
+    if (!seciliDepo) {
+      toast.error("Ürünün gireceği depoyu seçiniz");
+      return;
+    }
 
     const workers = Array.from(selectedWorkers).map((id) => {
       const op = operators.find((o) => o.user_id === id);
@@ -91,7 +100,7 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
     });
 
     setSubmitting(true);
-    const result = await closePackSession(session.session_id, { qty: numQty, workers });
+    const result = await closePackSession(session.session_id, { qty: numQty, depo_id: seciliDepo, workers });
     if (result.success) {
       toast.success(`${numQty} adet paketleme tamamlandı`);
       onOpenChange(false);
@@ -141,6 +150,34 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
               className="text-lg h-12"
               autoFocus
             />
+          </div>
+
+          {/* Depo seçimi — ürün hangi depoya girecek */}
+          <div>
+            <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+              <Warehouse className="w-4 h-4" />
+              Hangi depoya girecek?
+            </Label>
+            <div className="grid gap-2">
+              {depolar.map((d) => (
+                <button
+                  key={d.depo_id}
+                  type="button"
+                  onClick={() => setSeciliDepo(d.depo_id)}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-colors",
+                    seciliDepo === d.depo_id
+                      ? "border-primary bg-primary/10"
+                      : "hover:bg-muted/60",
+                  )}
+                >
+                  <p className="text-sm font-medium">{d.ad}</p>
+                  {d.aciklama && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{d.aciklama}</p>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Worker selection */}

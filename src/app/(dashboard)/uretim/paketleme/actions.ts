@@ -241,7 +241,7 @@ export async function createPackSession(sku: string): Promise<ActionResult> {
 /** Seansı kapat: paketlemede → tamamlandi + stock_movements IN */
 export async function closePackSession(
   sessionId: string,
-  formData: { qty: number; workers: { id: string; name: string }[] }
+  formData: { qty: number; depo_id: string; workers: { id: string; name: string }[] }
 ): Promise<ActionResult> {
   try {
     await requireProductionAccess();
@@ -273,7 +273,8 @@ export async function closePackSession(
 
     const now = new Date();
     const endTime = now.toISOString();
-    const { qty, workers } = parsed.data;
+    const { qty, workers, depo_id } = parsed.data;
+    if (!depo_id) return { success: false, error: "Ürünün gireceği depoyu seçiniz" };
 
     // Birim paketleme süresi hesapla
     let birimDk: number | null = null;
@@ -294,6 +295,7 @@ export async function closePackSession(
         worker_count: workers.length,
         workers: workers,
         birim_paketleme_dk: birimDk,
+        depo_id,
       })
       .eq("session_id", sessionId);
 
@@ -335,6 +337,7 @@ export async function closePackSession(
       source: "Paketleme",
       source_row_id: sessionId,
       batch_id: sessionId,
+      depo_id,
     });
 
     if (movError) return { success: false, error: movError.message };
@@ -402,7 +405,7 @@ export async function cancelSession(sessionId: string): Promise<ActionResult> {
 /** Tamamlanmış seansı düzenle (qty, workers) */
 export async function updateCompletedSession(
   sessionId: string,
-  formData: { qty: number; workers: { id: string; name: string }[] }
+  formData: { qty: number; depo_id?: string; workers: { id: string; name: string }[] }
 ): Promise<ActionResult> {
   try {
     await requireProductionAccess();
@@ -418,7 +421,7 @@ export async function updateCompletedSession(
     // Seans bilgileri
     const { data } = await supabase
       .from("pack_events")
-      .select("session_id, durum, sku, start_time, end_time, qty")
+      .select("session_id, durum, sku, start_time, end_time, qty, depo_id")
       .eq("session_id", sessionId)
       .single();
 
@@ -429,6 +432,7 @@ export async function updateCompletedSession(
       start_time: string | null;
       end_time: string | null;
       qty: number;
+      depo_id: string | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -455,6 +459,8 @@ export async function updateCompletedSession(
         worker_count: workers.length,
         workers: workers,
         birim_paketleme_dk: birimDk,
+        // Depo değiştirilmediyse mevcut kalsın
+        depo_id: parsed.data.depo_id ?? session.depo_id,
       })
       .eq("session_id", sessionId);
 
@@ -547,7 +553,7 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
 
     const { data } = await supabase
       .from("pack_events")
-      .select("session_id, durum, sku, qty, operator_id")
+      .select("session_id, durum, sku, qty, operator_id, depo_id")
       .eq("session_id", sessionId)
       .single();
 
@@ -557,6 +563,7 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
       sku: string | null;
       qty: number;
       operator_id: string | null;
+      depo_id: string | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -609,6 +616,8 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
       source: "Paketleme",
       source_row_id: sessionId,
       batch_id: sessionId,
+      // Hızlı tamamlamada depo sorulmuyor; seansta kayıtlıysa o kullanılır
+      depo_id: session.depo_id,
     });
 
     if (movError) return { success: false, error: movError.message };
@@ -618,4 +627,22 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
+}
+
+export interface DepoSecenegi {
+  depo_id: string;
+  ad: string;
+  aciklama: string | null;
+}
+
+/** Paketleme kapatma ekranında gösterilecek aktif depolar */
+export async function getDepolar(): Promise<DepoSecenegi[]> {
+  await requireProductionAccess();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("depolar")
+    .select("depo_id, ad, aciklama")
+    .eq("aktif", true)
+    .order("sira");
+  return (data ?? []) as DepoSecenegi[];
 }

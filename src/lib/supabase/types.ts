@@ -2351,6 +2351,7 @@ export type Database = {
         Row: {
           birim_paketleme_dk: number | null
           created_at: string
+          depo_id: string | null
           durum: string
           email: string | null
           end_time: string | null
@@ -2370,6 +2371,7 @@ export type Database = {
         Insert: {
           birim_paketleme_dk?: number | null
           created_at?: string
+          depo_id?: string | null
           durum?: string
           email?: string | null
           end_time?: string | null
@@ -2389,6 +2391,7 @@ export type Database = {
         Update: {
           birim_paketleme_dk?: number | null
           created_at?: string
+          depo_id?: string | null
           durum?: string
           email?: string | null
           end_time?: string | null
@@ -3648,6 +3651,36 @@ export type Database = {
         }
         Relationships: []
       }
+      depolar: {
+        Row: {
+          aciklama: string | null
+          ad: string
+          aktif: boolean
+          created_at: string
+          depo_id: string
+          sira: number
+          updated_at: string
+        }
+        Insert: {
+          aciklama?: string | null
+          ad: string
+          aktif?: boolean
+          created_at?: string
+          depo_id: string
+          sira?: number
+          updated_at?: string
+        }
+        Update: {
+          aciklama?: string | null
+          ad?: string
+          aktif?: boolean
+          created_at?: string
+          depo_id?: string
+          sira?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       step_bom: {
         Row: {
           created_at: string
@@ -3690,6 +3723,7 @@ export type Database = {
         Row: {
           batch_id: string | null
           created_at: string
+          depo_id: string | null
           id: string
           mov_id: string | null
           qty: number
@@ -3701,6 +3735,7 @@ export type Database = {
         Insert: {
           batch_id?: string | null
           created_at?: string
+          depo_id?: string | null
           id?: string
           mov_id?: string | null
           qty?: number
@@ -3712,6 +3747,7 @@ export type Database = {
         Update: {
           batch_id?: string | null
           created_at?: string
+          depo_id?: string | null
           id?: string
           mov_id?: string | null
           qty?: number
@@ -4999,7 +5035,25 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      urun_depo_stok: {
+        Row: {
+          depo_adi: string | null
+          depo_id: string | null
+          depo_sira: number | null
+          miktar: number | null
+          sku: string | null
+          son_hareket: string | null
+        }
+        Relationships: []
+      }
+      urun_toplam_stok: {
+        Row: {
+          miktar: number | null
+          sku: string | null
+          son_hareket: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       stok_sayimi_satirlari_olustur: {
