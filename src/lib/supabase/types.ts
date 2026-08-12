@@ -5131,6 +5131,15 @@ export type Database = {
       }
     }
     Functions: {
+      paketleme_seansi_sil: {
+        Args: { p_session_id: string }
+        Returns: { silinen_hareket: number; geri_alinan_adet: number }[]
+      }
+      depo_transfer: {
+        Args: { p_sku: string; p_kaynak: string; p_hedef: string; p_miktar: number; p_not?: string | null }
+        Returns: string
+      }
+
       stok_sayimi_satirlari_olustur: {
         Args: { p_sayim_id: string }
         Returns: number

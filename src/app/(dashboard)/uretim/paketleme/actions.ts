@@ -653,84 +653,25 @@ export async function getDepolar(): Promise<DepoSecenegi[]> {
 /**
  * Tamamlanmış paketleme seansını siler.
  *
- * Seans silinirken stok hareketi de geri alınır. Aksi halde ürün stoğu
- * silinen seansın adedi kadar şişik kalırdı — yanlış girilen bir seansı
- * silmenin amacı tam olarak bunu düzeltmek.
+ * İş veritabanı fonksiyonunda (paketleme_seansi_sil) yapılıyor, burada
+ * değil. İki sebep:
  *
- * Sıra önemli: önce stok hareketi ve bakiye, en son seans. Ortada hata
- * olursa seans yerinde kalır ve işlem tekrar denenebilir; tersi olsaydı
- * seans silinip stok düzeltilmeden kalabilirdi.
+ * 1) stock_movements'a DELETE yetkisi yalnızca yöneticide. Üretim rolü
+ *    hareketi silemediği için silme işlemi yarıda kalıyordu. Yetkiyi
+ *    herkese açmak yerine, sadece o seansa bağlı hareketleri silen
+ *    yetkili bir fonksiyon kullanılıyor — etki alanı tek seans.
+ * 2) Hareket silme, bakiye düzeltme ve seans silme tek işlemde oluyor;
+ *    ortada hata olsa bile yarım kalmıyor.
  */
 export async function deleteCompletedSession(sessionId: string): Promise<ActionResult> {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    const { data } = await supabase
-      .from("pack_events")
-      .select("session_id, durum, sku, qty")
-      .eq("session_id", sessionId)
-      .single();
-
-    const session = data as {
-      session_id: string; durum: string; sku: string | null; qty: number;
-    } | null;
-
-    if (!session) return { success: false, error: "Seans bulunamadı" };
-    if (session.durum !== "tamamlandi") {
-      return { success: false, error: "Sadece tamamlanmış seanslar bu şekilde silinir" };
-    }
-
-    // 1) Bu seansın yazdığı stok hareketlerini bul ve sil
-    const { data: hareketler, error: harErr } = await supabase
-      .from("stock_movements")
-      .select("id, qty")
-      .eq("source_row_id", sessionId);
-    if (harErr) return { success: false, error: harErr.message };
-
-    const geriAlinacak = (hareketler ?? []).reduce((t, h) => t + (h.qty ?? 0), 0);
-
-    if ((hareketler ?? []).length > 0) {
-      const { data: silinen, error: silErr } = await supabase
-        .from("stock_movements")
-        .delete()
-        .eq("source_row_id", sessionId)
-        .select("id");
-      if (silErr) return { success: false, error: silErr.message };
-      // RLS engellerse PostgREST hata döndürmez, sessizce 0 satır siler
-      if (!silinen || silinen.length === 0) {
-        return {
-          success: false,
-          error: "Stok hareketi silinemedi (yetki sorunu olabilir). Seans silinmedi.",
-        };
-      }
-    }
-
-    // 2) products.stok_aktif'i düş
-    if (session.sku && geriAlinacak !== 0) {
-      const { data: urun } = await supabase
-        .from("products")
-        .select("stok_aktif")
-        .eq("sku", session.sku)
-        .single();
-      if (urun) {
-        await supabase
-          .from("products")
-          .update({ stok_aktif: (urun.stok_aktif ?? 0) - geriAlinacak })
-          .eq("sku", session.sku);
-      }
-    }
-
-    // 3) Seansı sil
-    const { data: silinenSeans, error: seansErr } = await supabase
-      .from("pack_events")
-      .delete()
-      .eq("session_id", sessionId)
-      .select("session_id");
-    if (seansErr) return { success: false, error: seansErr.message };
-    if (!silinenSeans || silinenSeans.length === 0) {
-      return { success: false, error: "Seans silinemedi (yetki veya kayıt bulunamadı)" };
-    }
+    const { error } = await supabase.rpc("paketleme_seansi_sil", {
+      p_session_id: sessionId,
+    });
+    if (error) return { success: false, error: error.message };
 
     revalidatePath("/uretim/paketleme");
     revalidatePath("/stok/mamul");
