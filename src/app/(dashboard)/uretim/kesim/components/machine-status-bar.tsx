@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { MAKINE_LABELS, MAKINE_DURUM_COLORS, type KesimMakineId, type MakineDurum } from "@/lib/constants";
+import { MAKINE_TIPLERI, MAKINE_LABELS, MAKINE_DURUM_COLORS, type KesimMakineId, type MakineDurum } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { toggleMachineStatus } from "../actions";
 import type { MachineStatusEntry } from "../types";
@@ -96,6 +96,7 @@ export function MachineStatusBar({ machineStatus: initialStatus }: MachineStatus
         {statuses.map((s) => {
           const colors = MAKINE_DURUM_COLORS[s.durum];
           const label = MAKINE_LABELS[s.makine_id as KesimMakineId] ?? s.makine_id;
+          const tip = MAKINE_TIPLERI[s.makine_id as KesimMakineId];
           const isLoading = loading === s.makine_id;
 
           return (
@@ -113,7 +114,8 @@ export function MachineStatusBar({ machineStatus: initialStatus }: MachineStatus
               onClick={() => handleToggle(s.makine_id, s.durum)}
             >
               <span className={cn("w-2 h-2 rounded-full shrink-0", colors.dot)} />
-              <span className="truncate">{label}</span>
+              <span className="truncate font-medium">{label}</span>
+              {tip && <span className="hidden text-[10px] opacity-60 sm:inline">{tip}</span>}
               {s.durum === "bakim" && (
                 <span className="text-[10px] opacity-70">
                   {formatDuration(s.created_at)}

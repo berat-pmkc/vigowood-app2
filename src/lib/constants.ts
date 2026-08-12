@@ -109,7 +109,22 @@ export const MAKINE_IDS = ["MAK-1", "MAK-2", "MAK-3", "KUTU"] as const;
 
 export type MakineId = (typeof MAKINE_IDS)[number];
 
+/**
+ * Ekranlarda görünen makine etiketi.
+ *
+ * Sahada makineler numarayla anılıyor ("MAK-2'de kesildi"), lazer gücüyle
+ * değil. Etiket olarak kimlik kullanılıyor; güç bilgisi MAKINE_TIPLERI'nde
+ * duruyor ve gerektiği yerde alt satır olarak gösteriliyor.
+ */
 export const MAKINE_LABELS: Record<MakineId, string> = {
+  "MAK-1": "MAK-1",
+  "MAK-2": "MAK-2",
+  "MAK-3": "MAK-3",
+  KUTU: "KUTU",
+};
+
+/** Makinenin teknik tipi — kesim_makinesi.tipi ile aynı */
+export const MAKINE_TIPLERI: Record<MakineId, string> = {
   "MAK-1": "300W Lazer",
   "MAK-2": "600W Lazer",
   "MAK-3": "600W Yeni Lazer",
