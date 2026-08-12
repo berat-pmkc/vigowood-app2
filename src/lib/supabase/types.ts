@@ -3681,6 +3681,66 @@ export type Database = {
         }
         Relationships: []
       }
+      kutu_sablonlari: {
+        Row: {
+          ad: string
+          aktif: boolean
+          alan_m2: number | null
+          created_at: string
+          fefco_kodu: string
+          hesaplanan_boy: number | null
+          hesaplanan_en: number | null
+          ic_genislik: number
+          ic_uzunluk: number
+          ic_yukseklik: number
+          notlar: string | null
+          oluk_tipi: string | null
+          olusturan: string | null
+          part_id: string | null
+          sablon_id: string
+          sku: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad: string
+          aktif?: boolean
+          alan_m2?: number | null
+          created_at?: string
+          fefco_kodu?: string
+          hesaplanan_boy?: number | null
+          hesaplanan_en?: number | null
+          ic_genislik: number
+          ic_uzunluk: number
+          ic_yukseklik: number
+          notlar?: string | null
+          oluk_tipi?: string | null
+          olusturan?: string | null
+          part_id?: string | null
+          sablon_id: string
+          sku?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad?: string
+          aktif?: boolean
+          alan_m2?: number | null
+          created_at?: string
+          fefco_kodu?: string
+          hesaplanan_boy?: number | null
+          hesaplanan_en?: number | null
+          ic_genislik?: number
+          ic_uzunluk?: number
+          ic_yukseklik?: number
+          notlar?: string | null
+          oluk_tipi?: string | null
+          olusturan?: string | null
+          part_id?: string | null
+          sablon_id?: string
+          sku?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       step_bom: {
         Row: {
           created_at: string
@@ -5035,6 +5095,21 @@ export type Database = {
       }
     }
     Views: {
+      kutu_aylik_tuketim: {
+        Row: {
+          adet: number | null
+          ay: string | null
+          fefco_kodu: string | null
+          part_adi: string | null
+          part_id: string | null
+          sablon_adi: string | null
+          sablon_id: string | null
+          seans: number | null
+          toplam_m2: number | null
+        }
+        Relationships: []
+      }
+
       urun_depo_stok: {
         Row: {
           depo_adi: string | null

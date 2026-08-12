@@ -14,6 +14,7 @@ import {
   BarChart3,
   Users,
   ClipboardList,
+  Ruler,
   Settings,
   Bell,
   LayoutTemplate,
@@ -106,6 +107,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Montaj", href: "/uretim/montaj", icon: Wrench, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Paketleme", href: "/uretim/paketleme", icon: Package, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Kutu-Koli", href: "/uretim/kutu", icon: Box, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Kutu Şablonları", href: "/uretim/kutu/sablonlar", icon: Ruler, roles: ALL_INTERNAL },
     ],
   },
   {
