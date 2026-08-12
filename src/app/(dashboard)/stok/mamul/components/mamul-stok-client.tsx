@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -20,6 +21,8 @@ interface KpiData {
 }
 
 interface MamulStokClientProps {
+  depolar: { depo_id: string; ad: string }[];
+  seciliDepo: string;
   activeTab: string;
   kpiData: KpiData;
   // Stock table
@@ -44,6 +47,8 @@ interface MamulStokClientProps {
 
 export function MamulStokClient({
   activeTab,
+  depolar,
+  seciliDepo,
   kpiData,
   stokData,
   stokTotalCount,
@@ -76,6 +81,18 @@ export function MamulStokClient({
     });
   };
 
+  /** Depo değişince sayfalama sıfırlanır, diğer filtreler korunur */
+  const handleDepoChange = (depoId: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (depoId) params.set("depo", depoId);
+    else params.delete("depo");
+    params.delete("page");
+    params.delete("mPage");
+    startTransition(() => {
+      router.push(`/stok/mamul?${params.toString()}`);
+    });
+  };
+
   return (
     <div className="space-y-4 pb-20 md:pb-6">
       <div className="flex items-start justify-between">
@@ -94,6 +111,38 @@ export function MamulStokClient({
           </Button>
           <LastUpdatedBadge lastUpdated={lastUpdated} />
         </div>
+      </div>
+
+      {/* Depo seçimi — KPI'lar, tablo ve hareketler seçili depoya göre */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-xs text-muted-foreground">Depo:</span>
+        <button
+          type="button"
+          onClick={() => handleDepoChange("")}
+          className={cn(
+            "rounded-full border px-3 py-1 text-xs transition-colors",
+            seciliDepo === ""
+              ? "border-primary bg-primary text-primary-foreground"
+              : "bg-background hover:bg-muted",
+          )}
+        >
+          Ana Depo (tümü)
+        </button>
+        {depolar.map((d) => (
+          <button
+            key={d.depo_id}
+            type="button"
+            onClick={() => handleDepoChange(d.depo_id)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs transition-colors",
+              seciliDepo === d.depo_id
+                ? "border-primary bg-primary text-primary-foreground"
+                : "bg-background hover:bg-muted",
+            )}
+          >
+            {d.ad}
+          </button>
+        ))}
       </div>
 
       <KpiCards data={kpiData} />

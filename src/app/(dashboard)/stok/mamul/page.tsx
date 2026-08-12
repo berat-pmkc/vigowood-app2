@@ -10,6 +10,7 @@ type Product = Database["public"]["Tables"]["products"]["Row"];
 interface PageProps {
   searchParams: Promise<{
     tab?: string;
+    depo?: string;
     // Stok table params
     page?: string;
     pageSize?: string;
@@ -34,6 +35,8 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   const supabase = await createClient();
 
   const activeTab = params.tab === "hareketler" ? "hareketler" : "ozet";
+  // "" = tüm depolar (ana depo)
+  const seciliDepo = params.depo?.trim() || "";
 
   // ---------- STOK TABLE PARAMS ----------
   const stokPage = Math.max(0, Number(params.page || "0"));
@@ -87,6 +90,9 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     .from("stock_movements")
     .select("*", { count: "exact" });
 
+  if (seciliDepo) {
+    movementsQuery = movementsQuery.eq("depo_id", seciliDepo);
+  }
   if (mSearch) {
     movementsQuery = movementsQuery.or(`sku.ilike.%${mSearch}%,source_row_id.ilike.%${mSearch}%`);
   }
@@ -107,10 +113,28 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     .eq("aktif_mi", true);
 
   // 4. Today's movements
-  const todayMovementsQuery = supabase
+  let todayMovementsQuery = supabase
     .from("stock_movements")
     .select("qty")
     .gte("tarih", todayStr);
+  if (seciliDepo) todayMovementsQuery = todayMovementsQuery.eq("depo_id", seciliDepo);
+
+  // 5. Depo listesi
+  const depolarQuery = supabase
+    .from("depolar")
+    .select("depo_id, ad")
+    .eq("aktif", true)
+    .order("sira");
+
+  /**
+   * 6. Bakiyeler görünümden geliyor, products.stok_aktif'ten değil.
+   * Görünüm hareketlerin toplamı olduğu için ekrandaki sayı ile hareket
+   * listesi hep birbirini tutar; ayrı tutulan bir bakiye kolonunda bu
+   * garanti yok (yarı mamülde tam bu yüzden eksiye düşmüştü).
+   */
+  const stokKaynagiQuery = seciliDepo
+    ? supabase.from("urun_depo_stok").select("sku, miktar").eq("depo_id", seciliDepo)
+    : supabase.from("urun_toplam_stok").select("sku, miktar");
 
   // Execute all in parallel
   const [
@@ -118,18 +142,30 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     movementsResult,
     kpiResult,
     todayResult,
+    depolarResult,
+    stokKaynagiResult,
   ] = await Promise.all([
     productsQuery,
     movementsQuery,
     kpiQuery,
     todayMovementsQuery,
+    depolarQuery,
+    stokKaynagiQuery,
   ]);
+
+  const depolar = (depolarResult.data ?? []) as { depo_id: string; ad: string }[];
+  const stokHaritasi = new Map<string, number>(
+    ((stokKaynagiResult.data ?? []) as { sku: string | null; miktar: number | null }[])
+      .filter((r): r is { sku: string; miktar: number | null } => !!r.sku)
+      .map((r) => [r.sku, Number(r.miktar ?? 0)]),
+  );
 
   // ---------- PROCESS KPI DATA ----------
   const allActiveProducts = (kpiResult.data || []) as { sku: string; stok_aktif: number; mamul_stok_kritik: number }[];
-  const totalStock = allActiveProducts.reduce((sum, p) => sum + (p.stok_aktif || 0), 0);
+  const depoStogu = (sku: string) => stokHaritasi.get(sku) ?? 0;
+  const totalStock = allActiveProducts.reduce((sum, p) => sum + depoStogu(p.sku), 0);
   const criticalCount = allActiveProducts.filter(
-    (p) => p.mamul_stok_kritik > 0 && p.stok_aktif < p.mamul_stok_kritik
+    (p) => p.mamul_stok_kritik > 0 && depoStogu(p.sku) < p.mamul_stok_kritik
   ).length;
 
   const todayMovements = (todayResult.data || []) as { qty: number }[];
@@ -142,11 +178,13 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   const pageSkus = ((productsResult.data || []) as Product[]).map((p) => p.sku);
   const lastMovementMap = new Map<string, string>();
   if (pageSkus.length > 0) {
-    const { data: lastMovements } = await supabase
+    let lastMovQuery = supabase
       .from("stock_movements")
       .select("sku, tarih")
       .in("sku", pageSkus)
       .order("tarih", { ascending: false });
+    if (seciliDepo) lastMovQuery = lastMovQuery.eq("depo_id", seciliDepo);
+    const { data: lastMovements } = await lastMovQuery;
 
     ((lastMovements || []) as { sku: string | null; tarih: string | null }[]).forEach((m) => {
       if (m.sku && m.tarih && !lastMovementMap.has(m.sku)) {
@@ -158,6 +196,8 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   // ---------- ENRICH PRODUCTS WITH LAST MOVEMENT DATE ----------
   const products = ((productsResult.data || []) as Product[]).map((p): StokProduct => ({
     ...p,
+    // Seçili depodaki (veya tüm depolardaki) miktar
+    stok_aktif: stokHaritasi.get(p.sku) ?? 0,
     son_hareket_tarihi: lastMovementMap.get(p.sku) || null,
   }));
 
@@ -205,6 +245,8 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     <div className="px-4 sm:px-6">
       <MamulStokClient
         activeTab={activeTab}
+        depolar={depolar}
+        seciliDepo={seciliDepo}
         kpiData={{
           totalStock,
           criticalCount,
