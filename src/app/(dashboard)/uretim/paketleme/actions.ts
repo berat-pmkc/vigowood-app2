@@ -405,7 +405,7 @@ export async function cancelSession(sessionId: string): Promise<ActionResult> {
 /** Tamamlanmış seansı düzenle (qty, workers) */
 export async function updateCompletedSession(
   sessionId: string,
-  formData: { qty: number; depo_id?: string; workers: { id: string; name: string }[] }
+  formData: { qty: number; depo_id?: string; start_time?: string; workers: { id: string; name: string }[] }
 ): Promise<ActionResult> {
   try {
     await requireProductionAccess();
@@ -442,11 +442,13 @@ export async function updateCompletedSession(
 
     const { qty, workers } = parsed.data;
     const oldQty = session.qty;
+    // Operatör yanlış saatte başlatmış olabilir; verilmezse mevcut korunur
+    const yeniBaslangic = formData.start_time || session.start_time;
 
     // Birim paketleme süresi yeniden hesapla
     let birimDk: number | null = null;
-    if (session.start_time && session.end_time && qty > 0 && workers.length > 0) {
-      const diffMs = new Date(session.end_time).getTime() - new Date(session.start_time).getTime();
+    if (yeniBaslangic && session.end_time && qty > 0 && workers.length > 0) {
+      const diffMs = new Date(session.end_time).getTime() - new Date(yeniBaslangic).getTime();
       const totalMinutes = diffMs / 60000;
       birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
     }
@@ -461,6 +463,7 @@ export async function updateCompletedSession(
         birim_paketleme_dk: birimDk,
         // Depo değiştirilmediyse mevcut kalsın
         depo_id: parsed.data.depo_id ?? session.depo_id,
+        start_time: yeniBaslangic,
       })
       .eq("session_id", sessionId);
 
@@ -645,4 +648,94 @@ export async function getDepolar(): Promise<DepoSecenegi[]> {
     .eq("aktif", true)
     .order("sira");
   return (data ?? []) as DepoSecenegi[];
+}
+
+/**
+ * Tamamlanmış paketleme seansını siler.
+ *
+ * Seans silinirken stok hareketi de geri alınır. Aksi halde ürün stoğu
+ * silinen seansın adedi kadar şişik kalırdı — yanlış girilen bir seansı
+ * silmenin amacı tam olarak bunu düzeltmek.
+ *
+ * Sıra önemli: önce stok hareketi ve bakiye, en son seans. Ortada hata
+ * olursa seans yerinde kalır ve işlem tekrar denenebilir; tersi olsaydı
+ * seans silinip stok düzeltilmeden kalabilirdi.
+ */
+export async function deleteCompletedSession(sessionId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("pack_events")
+      .select("session_id, durum, sku, qty")
+      .eq("session_id", sessionId)
+      .single();
+
+    const session = data as {
+      session_id: string; durum: string; sku: string | null; qty: number;
+    } | null;
+
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "tamamlandi") {
+      return { success: false, error: "Sadece tamamlanmış seanslar bu şekilde silinir" };
+    }
+
+    // 1) Bu seansın yazdığı stok hareketlerini bul ve sil
+    const { data: hareketler, error: harErr } = await supabase
+      .from("stock_movements")
+      .select("id, qty")
+      .eq("source_row_id", sessionId);
+    if (harErr) return { success: false, error: harErr.message };
+
+    const geriAlinacak = (hareketler ?? []).reduce((t, h) => t + (h.qty ?? 0), 0);
+
+    if ((hareketler ?? []).length > 0) {
+      const { data: silinen, error: silErr } = await supabase
+        .from("stock_movements")
+        .delete()
+        .eq("source_row_id", sessionId)
+        .select("id");
+      if (silErr) return { success: false, error: silErr.message };
+      // RLS engellerse PostgREST hata döndürmez, sessizce 0 satır siler
+      if (!silinen || silinen.length === 0) {
+        return {
+          success: false,
+          error: "Stok hareketi silinemedi (yetki sorunu olabilir). Seans silinmedi.",
+        };
+      }
+    }
+
+    // 2) products.stok_aktif'i düş
+    if (session.sku && geriAlinacak !== 0) {
+      const { data: urun } = await supabase
+        .from("products")
+        .select("stok_aktif")
+        .eq("sku", session.sku)
+        .single();
+      if (urun) {
+        await supabase
+          .from("products")
+          .update({ stok_aktif: (urun.stok_aktif ?? 0) - geriAlinacak })
+          .eq("sku", session.sku);
+      }
+    }
+
+    // 3) Seansı sil
+    const { data: silinenSeans, error: seansErr } = await supabase
+      .from("pack_events")
+      .delete()
+      .eq("session_id", sessionId)
+      .select("session_id");
+    if (seansErr) return { success: false, error: seansErr.message };
+    if (!silinenSeans || silinenSeans.length === 0) {
+      return { success: false, error: "Seans silinemedi (yetki veya kayıt bulunamadı)" };
+    }
+
+    revalidatePath("/uretim/paketleme");
+    revalidatePath("/stok/mamul");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
 }

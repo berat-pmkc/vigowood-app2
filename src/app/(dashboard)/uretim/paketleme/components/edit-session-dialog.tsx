@@ -8,11 +8,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Loader2, Users, Package, Pencil } from "lucide-react";
-import { updateCompletedSession, getPackOperators } from "../actions";
+import { Loader2, Users, Package, Pencil, Clock, Trash2 } from "lucide-react";
+import { deleteCompletedSession, updateCompletedSession, getPackOperators } from "../actions";
 import { toast } from "sonner";
 import type { CompletedSession } from "./completed-sessions";
 import { formatDuration } from "@/lib/utils";
@@ -34,6 +39,8 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [qty, setQty] = useState("");
+  const [baslangic, setBaslangic] = useState("");
+  const [siliniyor, setSiliniyor] = useState(false);
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -50,6 +57,12 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
   useEffect(() => {
     if (open && session) {
       setQty(String(session.qty));
+      // datetime-local yerel saat bekliyor; ISO'daki Z'yi doğrudan veremeyiz
+      if (session.start_time) {
+        const d = new Date(session.start_time);
+        const p = (n: number) => String(n).padStart(2, "0");
+        setBaslangic(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`);
+      }
       const workerIds = new Set<string>();
       if (session.workers && Array.isArray(session.workers)) {
         session.workers.forEach((w) => workerIds.add(w.id));
@@ -71,6 +84,19 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
     });
   };
 
+  const handleDelete = async () => {
+    if (!session) return;
+    setSiliniyor(true);
+    const result = await deleteCompletedSession(session.session_id);
+    setSiliniyor(false);
+    if (result.success) {
+      toast.success("Seans silindi, stok geri alındı");
+      onOpenChange(false);
+    } else {
+      toast.error(result.error);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!session) return;
 
@@ -90,7 +116,11 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
     });
 
     setSubmitting(true);
-    const result = await updateCompletedSession(session.session_id, { qty: numQty, workers });
+    const result = await updateCompletedSession(session.session_id, {
+      qty: numQty,
+      workers,
+      start_time: baslangic ? new Date(baslangic).toISOString() : undefined,
+    });
     if (result.success) {
       toast.success("Seans güncellendi");
       onOpenChange(false);
@@ -145,6 +175,23 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
             />
           </div>
 
+          {/* Başlangıç saati — operatör yanlış saatte başlatmış olabilir */}
+          <div>
+            <Label htmlFor="edit-start" className="text-sm font-medium flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4" />
+              Başlangıç saati
+            </Label>
+            <Input
+              id="edit-start"
+              type="datetime-local"
+              value={baslangic}
+              onChange={(e) => setBaslangic(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Değiştirirseniz birim paketleme süresi yeniden hesaplanır.
+            </p>
+          </div>
+
           {/* Worker selection */}
           <div>
             <Label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -182,7 +229,46 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" disabled={submitting || siliniyor}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                  {siliniyor
+                    ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    : <Trash2 className="w-4 h-4 mr-1.5" />}
+                  Seansı Sil
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Seans silinsin mi?</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2 text-sm">
+                      <p>
+                        <b>{session.sku ?? "—"}</b> · {session.qty} adet paketleme
+                        kaydı silinecek.
+                      </p>
+                      <p className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900">
+                        Bu seansın yazdığı stok hareketi de geri alınacak, ürün
+                        stoğu {session.qty} adet düşecek.
+                      </p>
+                      <p className="text-muted-foreground">Bu işlem geri alınamaz.</p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}
+                                     className="bg-destructive hover:bg-destructive/90">
+                    Sil
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <div className="flex-1" />
+
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Vazgeç
             </Button>

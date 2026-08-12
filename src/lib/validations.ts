@@ -260,6 +260,8 @@ export const packSessionCloseSchema = z.object({
    * tamamlanmış seansı DÜZENLERKEN boş bırakılırsa mevcut depo korunur.
    */
   depo_id: z.string().min(1, "Depo seçmelisiniz").optional(),
+  /** Tamamlanmış seansı düzenlerken başlangıç saati düzeltilebilir */
+  start_time: z.string().optional(),
   workers: z
     .array(
       z.object({
