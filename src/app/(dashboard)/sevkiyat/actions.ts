@@ -1541,3 +1541,33 @@ export async function setSevkiyatDurum(
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
+
+/**
+ * Sevkiyatı tamamen siler.
+ *
+ * İptal etmekten farkı: iptal kaydı bırakır, listede durmaya devam eder.
+ * Silme kaydı ortadan kaldırır — yanlışlıkla açılmış sevkiyatlar için.
+ *
+ * İş veritabanı fonksiyonunda (sevkiyat_sil): sevkiyat tablosunda DELETE
+ * yetkisi yalnızca yöneticide, sevkiyat sorumlusu silemiyordu. Tabloya
+ * geniş yetki açmak yerine yetkiyi içinde kontrol eden fonksiyon
+ * kullanılıyor. Kalemler ve maliyetler FK CASCADE ile, yükleme planı
+ * SET NULL ile otomatik hallediliyor.
+ */
+export async function deleteSevkiyat(sevkiyatId: string): Promise<ActionResult> {
+  try {
+    await requireSevkiyatAccess();
+    const supabase = await createClient();
+
+    const { error } = await supabase.rpc("sevkiyat_sil", {
+      p_sevkiyat_id: sevkiyatId,
+    });
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/sevkiyat");
+    revalidatePath("/uretim/kesim/ihtiyac");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}

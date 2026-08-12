@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +20,7 @@ import {
   shipSevkiyat,
   deliverSevkiyat,
   cancelSevkiyat,
+  deleteSevkiyat,
   voidSevkiyat,
 } from "../../actions";
 import type { SevkiyatRow } from "../../actions";
@@ -31,6 +34,7 @@ import {
   ClipboardList,
   Loader2,
   Ban,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,6 +49,7 @@ export function ShipmentActions({
   hasItems,
   onStatusChanged,
 }: ShipmentActionsProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const durum = sevkiyat.durum as SevkiyatStatus;
 
@@ -147,6 +152,63 @@ export function ShipmentActions({
             </AlertDialogContent>
           </AlertDialog>
         )}
+
+        {/* Sil — iptalden farkı: kayıt tamamen kalkar */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-red-600 hover:bg-red-50 hover:text-red-700"
+              disabled={loading === "delete"}
+            >
+              {loading === "delete" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              Sil
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Sevkiyat silinsin mi?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    <b>{sevkiyat.sevkiyat_id}</b> sevkiyatı ve içindeki tüm
+                    kalemler kalıcı olarak silinecek.
+                  </p>
+                  <p className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900">
+                    İptal etmekten farkı: iptal kaydı listede bırakır, silme
+                    tamamen kaldırır. Geçmişe dönük kayıt tutmak istiyorsanız
+                    silmek yerine iptal edin.
+                  </p>
+                  <p className="text-muted-foreground">Bu işlem geri alınamaz.</p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={async () => {
+                  setLoading("delete");
+                  const r = await deleteSevkiyat(sevkiyat.sevkiyat_id);
+                  setLoading(null);
+                  if (r.success) {
+                    toast.success("Sevkiyat silindi");
+                    router.push("/sevkiyat");
+                  } else {
+                    toast.error(r.error);
+                  }
+                }}
+              >
+                Sil
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {durum === "bekliyor" && (
           <Button

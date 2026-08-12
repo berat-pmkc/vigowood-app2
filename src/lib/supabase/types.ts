@@ -5131,6 +5131,10 @@ export type Database = {
       }
     }
     Functions: {
+      sevkiyat_sil: {
+        Args: { p_sevkiyat_id: string }
+        Returns: { silinen_kalem: number; kopan_plan: number }[]
+      }
       montaj_seansi_sil: {
         Args: { p_session_id: string }
         Returns: { silinen_hareket: number; geri_alinan_parca: number }[]
