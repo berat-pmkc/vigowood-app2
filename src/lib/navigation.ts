@@ -13,6 +13,7 @@ import {
   Truck,
   BarChart3,
   Users,
+  Calculator,
   ClipboardList,
   Ruler,
   Settings,
@@ -103,6 +104,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Kesim", href: "/uretim/kesim", icon: Scissors, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Kesim Talepleri", href: "/uretim/kesim/talepler", icon: ClipboardList, roles: [...ALL_INTERNAL, "Üretim"] },
+      { title: "Kesim İhtiyacı", href: "/uretim/kesim/ihtiyac", icon: Calculator, roles: ALL_INTERNAL },
       { title: "Temizlik", href: "/uretim/temizlik", icon: SprayCan, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Montaj", href: "/uretim/montaj", icon: Wrench, roles: [...ALL_INTERNAL, "Üretim"] },
       { title: "Paketleme", href: "/uretim/paketleme", icon: Package, roles: [...ALL_INTERNAL, "Üretim"] },
