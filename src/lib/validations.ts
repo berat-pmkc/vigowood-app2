@@ -34,11 +34,20 @@ export const productUpdateSchema = z.object({
 export type ProductUpdateData = z.infer<typeof productUpdateSchema>;
 
 export const productCreateSchema = z.object({
+  /**
+   * SKU serbest metin. Karakter kısıtı kaldırıldı: gerçek kodlarda boşluk
+   * ve nokta geçebiliyor (ör. "MATIS3D P01"), kısıt kullanıcıyı boşuna
+   * engelliyordu.
+   *
+   * trim() korunuyor — SKU birincil anahtar ve reçete, sevkiyat, stok
+   * kayıtlarından referans veriliyor. Baştaki/sondaki boşluk gözle
+   * ayırt edilemeyen ikiz kayıtlar üretirdi.
+   */
   sku: z
     .string()
+    .trim()
     .min(1, "SKU gereklidir")
-    .max(50, "SKU en fazla 50 karakter olabilir")
-    .regex(/^[A-Za-z0-9\-_]+$/, "Geçersiz SKU formatı (harf, rakam, tire, alt çizgi)"),
+    .max(50, "SKU en fazla 50 karakter olabilir"),
   urun_adi: z
     .string()
     .min(1, "Ürün adı gereklidir")
@@ -68,11 +77,16 @@ export const partUpdateSchema = z.object({
 export type PartUpdateData = z.infer<typeof partUpdateSchema>;
 
 export const partCreateSchema = z.object({
+  /**
+   * Parça ID serbest metin — SKU ile aynı gerekçe. Sınır 30'dan 60'a
+   * çıkarıldı; açıklayıcı parça adları ID olarak kullanılabiliyor
+   * (ör. "Sünger 27*37*2.5").
+   */
   part_id: z
     .string()
+    .trim()
     .min(1, "Parça ID gereklidir")
-    .max(30, "Parça ID en fazla 30 karakter olabilir")
-    .regex(/^[A-Za-z0-9\-_]+$/, "Geçersiz ID formatı (harf, rakam, tire, alt çizgi)"),
+    .max(60, "Parça ID en fazla 60 karakter olabilir"),
   part_adi: z
     .string()
     .min(1, "Parça adı gereklidir")
