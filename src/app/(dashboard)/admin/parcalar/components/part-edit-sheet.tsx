@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
+import { useEffect, useTransition, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -21,14 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Trash2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { PART_TYPES, PART_TYPE_LABELS } from "@/lib/constants";
 import {
   partCreateSchema,
   type PartCreateData,
 } from "@/lib/validations";
 import { formatNumber } from "@/lib/utils";
-import { updatePart, createPart } from "../actions";
+import { updatePart, createPart, deletePart } from "../actions";
 import { toast } from "sonner";
 import type { Database, PartType } from "@/lib/supabase/types";
 
@@ -95,6 +101,23 @@ export function PartEditSheet({
       });
     }
   }, [part, isCreate, reset, open]);
+
+  const [siliniyor, setSiliniyor] = useState(false);
+
+  /** Parçayı siler. Reçetede veya kesimde kullanılıyorsa sunucu reddeder. */
+  const handleDelete = async () => {
+    if (!part) return;
+    setSiliniyor(true);
+    const result = await deletePart(part.part_id);
+    setSiliniyor(false);
+    if (result.success) {
+      toast.success("Parça silindi");
+      onOpenChange(false);
+      onSaved();
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   const onSubmit = (data: PartCreateData) => {
     startTransition(async () => {
@@ -296,7 +319,40 @@ export function PartEditSheet({
           <Separator />
 
           {/* Actions */}
-          <div className="flex gap-2 justify-end">
+          <div className="flex items-center gap-2">
+            {!isCreate && part && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" disabled={siliniyor}
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+                    <Trash2 className="mr-1.5 h-4 w-4" />
+                    Sil
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Parça silinsin mi?</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-2 text-sm">
+                        <p><b>{part.part_id}</b> — {part.part_adi}</p>
+                        <p className="text-muted-foreground">
+                          Parça bir reçetede, plakada veya kesim kaydında
+                          kullanılıyorsa silinmez; sistem uyarır.
+                        </p>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}
+                                       className="bg-destructive hover:bg-destructive/90">
+                      Sil
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <div className="flex-1" />
             <Button
               type="button"
               variant="outline"
