@@ -819,6 +819,11 @@ export async function updateCutBatch(
     makine_id: string;
     operator_id: string;
     plk_notu: string | null;
+    /**
+     * Kesimin gerçekte yapıldığı gün (ISO). Kayıt çoğu zaman birkaç gün
+     * sonra giriliyor; verilmezse mevcut tarih korunur.
+     */
+    tarih?: string;
   }
 ): Promise<ActionResult> {
   try {
@@ -834,7 +839,7 @@ export async function updateCutBatch(
 
     const { data } = await supabase
       .from("cut_batches")
-      .select("cut_id, sku, plaka_id, adet, operator_id, email")
+      .select("cut_id, sku, plaka_id, adet, operator_id, email, tarih")
       .eq("cut_id", cutId)
       .maybeSingle();
 
@@ -845,8 +850,13 @@ export async function updateCutBatch(
       adet: number;
       operator_id: string | null;
       email: string | null;
+      tarih: string;
     } | null;
     if (!batch) return { success: false, error: "Kesim kaydı bulunamadı" };
+
+    // Yeni tarih verilmediyse mevcut korunur
+    const yeniTarih = formData.tarih || batch.tarih;
+    const tarihDegisti = yeniTarih !== batch.tarih;
 
     const eskiAdet = Number(batch.adet) || 0;
     const yeniAdet = Math.trunc(formData.adet);
@@ -868,7 +878,12 @@ export async function updateCutBatch(
         .eq("plaka_id", batch.plaka_id);
 
       const parcalar = (plakaParts ?? []) as { part_id: string; default_qty: number | null }[];
-      const now = new Date().toISOString();
+      /**
+       * Türetilen satırlar kaydın girildiği ana değil, kesimin yapıldığı
+       * güne yazılıyor. Aksi halde parti 12 Ağustos'ta görünürken satırları
+       * 14 Ağustos'ta çıkar ve analizler ikiye bölünür.
+       */
+      const now = yeniTarih;
 
       if (parcalar.length > 0) {
         const { data: adlar } = await supabase
@@ -936,6 +951,9 @@ export async function updateCutBatch(
         makine_id: formData.makine_id,
         operator_id: formData.operator_id,
         plk_notu: formData.plk_notu?.trim() || null,
+        tarih: yeniTarih,
+        baslama_zamani: yeniTarih,
+        bitis_zamani: yeniTarih,
       })
       .eq("cut_id", cutId)
       .select("cut_id");
@@ -946,6 +964,17 @@ export async function updateCutBatch(
         success: false,
         error: "Kesim güncellenemedi — bu işlem için yetkiniz olmayabilir",
       };
+    }
+
+    /**
+     * Tarih değiştiyse bağlı kayıtlar da taşınır. Kesim satırı partisinden
+     * farklı bir güne düşerse üretim raporları tutarsız olur — satırın
+     * partisiyle aynı günde olması korunması gereken bir kural.
+     * Adet değiştiyse satırlar zaten yeni tarihle yeniden üretildi.
+     */
+    if (tarihDegisti && yeniAdet === eskiAdet) {
+      await supabase.from("cut_lines").update({ tarih: yeniTarih }).eq("cut_id", cutId);
+      await supabase.from("yari_mamul_stok").update({ tarih: yeniTarih }).eq("source_id", cutId);
     }
 
     revalidatePath("/uretim/kesim");

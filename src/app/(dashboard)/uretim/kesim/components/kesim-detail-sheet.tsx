@@ -57,6 +57,14 @@ interface CutLine {
   not_text: string | null;
 }
 
+/** ISO damgayı datetime-local alanının beklediği yerel biçime çevirir */
+function yerelDamga(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheetProps) {
   const router = useRouter();
   const [lines, setLines] = useState<CutLine[]>([]);
@@ -66,6 +74,7 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
   const [adet, setAdet] = useState(String(batch.adet ?? 1));
   const [makine, setMakine] = useState(batch.makine_id ?? "");
   const [notu, setNotu] = useState(batch.plk_notu ?? "");
+  const [tarih, setTarih] = useState(yerelDamga(batch.tarih));
   const [isliyor, setIsliyor] = useState(false);
   const [silOnay, setSilOnay] = useState(false);
 
@@ -74,8 +83,9 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
     setAdet(String(batch.adet ?? 1));
     setMakine(batch.makine_id ?? "");
     setNotu(batch.plk_notu ?? "");
+    setTarih(yerelDamga(batch.tarih));
     setDuzenle(false);
-  }, [batch.cut_id, batch.adet, batch.makine_id, batch.plk_notu]);
+  }, [batch.cut_id, batch.adet, batch.makine_id, batch.plk_notu, batch.tarih]);
 
   const kaydet = async () => {
     setIsliyor(true);
@@ -84,6 +94,7 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
       makine_id: makine,
       operator_id: batch.operator_id ?? "",
       plk_notu: notu || null,
+      tarih: tarih ? new Date(tarih).toISOString() : undefined,
     });
     setIsliyor(false);
     if (!r.success) {
@@ -247,6 +258,24 @@ export function KesimDetailSheet({ batch, open, onOpenChange }: KesimDetailSheet
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="d-tarih" className="text-xs">
+                  Kesim tarihi
+                </Label>
+                <Input
+                  id="d-tarih"
+                  type="datetime-local"
+                  value={tarih}
+                  onChange={(e) => setTarih(e.target.value)}
+                  className="h-9"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Kesimin gerçekte yapıldığı gün. Kayıt sonradan girildiyse
+                  buradan düzeltin; kesim satırları ve stok hareketi de aynı
+                  güne taşınır.
+                </p>
               </div>
 
               <div className="space-y-1.5">
