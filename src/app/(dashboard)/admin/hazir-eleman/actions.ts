@@ -19,10 +19,17 @@ async function requireAdmin() {
 export async function getNextHPCode(): Promise<string> {
   const supabase = await createClient();
 
+  /**
+   * TÜR FİLTRESİ YOK — bilerek.
+   *
+   * HP öneki yalnız HAZIR'da değil, KUTU ve KARTON parçalarında da
+   * kullanılıyor (HP0123 bir KUTU parçası). Yalnızca HAZIR'a bakıldığında
+   * diğer türlerdeki numaralar boş sanılıyor ve üretilen kod "zaten
+   * kullanılıyor" hatasına düşüyordu.
+   */
   const { data } = await supabase
     .from("all_parts")
     .select("part_id")
-    .eq("part_type", "HAZIR")
     .like("part_id", "HP%")
     .order("part_id", { ascending: false });
 
@@ -44,10 +51,10 @@ export async function getNextHPCode(): Promise<string> {
 export async function getNextMDFCode(): Promise<string> {
   const supabase = await createClient();
 
+  // HP'deki gerekçenin aynısı: önek türe göre değil, önekin kendisine bakılır
   const { data } = await supabase
     .from("all_parts")
     .select("part_id")
-    .eq("part_type", "HAZIR")
     .like("part_id", "MDF%")
     .order("part_id", { ascending: false });
 
