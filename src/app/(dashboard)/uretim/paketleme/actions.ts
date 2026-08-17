@@ -58,27 +58,41 @@ export async function getPackOperators() {
 }
 
 /** Analiz verisi */
-export async function getAnalytics(period: "today" | "week" | "month") {
+export async function getAnalytics(period: "today" | "week" | "month" | "last_month") {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
+    /**
+     * Dönemler TAKVİM bazlı.
+     *
+     * Önce "ay" bugünden geriye 1 ay demekti; 17 Ağustos'ta bakınca
+     * 17.07-17.08 aralığı çıkıyor ve Temmuz üretimi 12.872 yerine 10.305
+     * görünüyordu. Üretim raporu takvim ayı bekler.
+     */
     const now = new Date();
     let since: Date;
+    let until: Date | null = null;
     if (period === "today") {
       since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     } else if (period === "week") {
-      since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+      const gun = now.getDay() || 7; // pazartesi başlangıç
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - gun + 1);
+    } else if (period === "last_month") {
+      since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      until = new Date(now.getFullYear(), now.getMonth(), 1);
     } else {
-      since = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+      since = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("pack_events")
       .select("session_id, qty, start_time, end_time, worker_count, workers, birim_paketleme_dk")
       .eq("durum", "tamamlandi")
       .gte("end_time", since.toISOString());
+    if (until) query = query.lt("end_time", until.toISOString());
 
+    const { data, error } = await query;
     if (error) return { success: false as const, error: error.message };
 
     const sessions = data ?? [];
@@ -678,5 +692,133 @@ export async function deleteCompletedSession(sessionId: string): Promise<ActionR
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export interface ParetoSatiri {
+  sku: string;
+  adet: number;
+  /** Toplam işçilik dakikası = geçen süre × kişi sayısı */
+  iscilikDk: number;
+  birimDk: number;
+  seans: number;
+  /** Bu ürüne kadarki kümülatif işçilik payı (%) */
+  kumulatif: number;
+}
+
+export interface KisiSatiri {
+  kisi: number;
+  seans: number;
+  adet: number;
+  /** dk / (adet × kişi) — kişi arttıkça matematiksel olarak düşer */
+  birimDk: number;
+  /** dk / adet — duvar saati hızı, asıl ölçüt */
+  gercekDk: number;
+}
+
+export interface AnalizVerisi {
+  pareto: ParetoSatiri[];
+  kisiEtkisi: KisiSatiri[];
+}
+
+/**
+ * Paketleme analizi. Ürün seçmeye gerek kalmadan tüm resmi verir.
+ *
+ * İşçilik dakikası bilerek "geçen süre × kişi" olarak hesaplanıyor;
+ * birim süreyle adet çarpımı değil. İkincisi kişi sayısını iki kez
+ * hesaba katardı çünkü birim süre zaten kişiye bölünmüş bir değer.
+ */
+export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const now = new Date();
+    let query = supabase
+      .from("pack_events")
+      .select("sku, qty, start_time, end_time, worker_count, birim_paketleme_dk")
+      .eq("durum", "tamamlandi")
+      .not("end_time", "is", null)
+      .not("sku", "is", null);
+
+    if (donem === "month") {
+      query = query.gte("tarih", new Date(now.getFullYear(), now.getMonth(), 1).toISOString());
+    } else if (donem === "last_month") {
+      query = query
+        .gte("tarih", new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString())
+        .lt("tarih", new Date(now.getFullYear(), now.getMonth(), 1).toISOString());
+    }
+
+    const { data, error } = await query;
+    if (error) return { success: false as const, error: error.message };
+
+    const seanslar = (data ?? []) as {
+      sku: string | null; qty: number; start_time: string | null;
+      end_time: string | null; worker_count: number | null;
+      birim_paketleme_dk: number | null;
+    }[];
+
+    const gecenDk = (s: (typeof seanslar)[number]) =>
+      s.start_time && s.end_time
+        ? (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000
+        : 0;
+
+    // ── Ürün bazlı ──
+    const urun = new Map<string, { adet: number; iscilik: number; birimTop: number; birimAdet: number; seans: number }>();
+    for (const s of seanslar) {
+      if (!s.sku) continue;
+      const kisi = s.worker_count ?? 1;
+      const u = urun.get(s.sku) ?? { adet: 0, iscilik: 0, birimTop: 0, birimAdet: 0, seans: 0 };
+      u.adet += s.qty ?? 0;
+      u.iscilik += gecenDk(s) * kisi;
+      if (s.birim_paketleme_dk != null) { u.birimTop += s.birim_paketleme_dk; u.birimAdet++; }
+      u.seans++;
+      urun.set(s.sku, u);
+    }
+
+    const sirali = [...urun.entries()].sort((a, b) => b[1].iscilik - a[1].iscilik);
+    const toplamIscilik = sirali.reduce((t, [, u]) => t + u.iscilik, 0);
+    let birikimli = 0;
+    const pareto: ParetoSatiri[] = sirali.map(([sku, u]) => {
+      birikimli += u.iscilik;
+      return {
+        sku,
+        adet: Math.round(u.adet),
+        iscilikDk: Math.round(u.iscilik),
+        birimDk: u.birimAdet > 0 ? Number((u.birimTop / u.birimAdet).toFixed(3)) : 0,
+        seans: u.seans,
+        kumulatif: toplamIscilik > 0 ? Number(((birikimli / toplamIscilik) * 100).toFixed(1)) : 0,
+      };
+    });
+
+    // ── Kişi sayısı etkisi ──
+    const kisi = new Map<number, { seans: number; adet: number; birimTop: number; birimAdet: number; gercekTop: number; gercekAdet: number }>();
+    for (const s of seanslar) {
+      const k = s.worker_count ?? 0;
+      if (k <= 0 || !s.qty) continue;
+      const g = kisi.get(k) ?? { seans: 0, adet: 0, birimTop: 0, birimAdet: 0, gercekTop: 0, gercekAdet: 0 };
+      g.seans++;
+      g.adet += s.qty;
+      if (s.birim_paketleme_dk != null) { g.birimTop += s.birim_paketleme_dk; g.birimAdet++; }
+      const gec = gecenDk(s);
+      if (gec > 0) { g.gercekTop += gec / s.qty; g.gercekAdet++; }
+      kisi.set(k, g);
+    }
+
+    const kisiEtkisi: KisiSatiri[] = [...kisi.entries()]
+      .sort((a, b) => a[0] - b[0])
+      // Tek tük seansla ortalama yanıltıcı olur
+      .filter(([, g]) => g.seans >= 3)
+      .map(([k, g]) => ({
+        kisi: k,
+        seans: g.seans,
+        adet: Math.round(g.adet),
+        birimDk: g.birimAdet > 0 ? Number((g.birimTop / g.birimAdet).toFixed(3)) : 0,
+        gercekDk: g.gercekAdet > 0 ? Number((g.gercekTop / g.gercekAdet).toFixed(3)) : 0,
+      }));
+
+    return { success: true as const, data: { pareto, kisiEtkisi } satisfies AnalizVerisi };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

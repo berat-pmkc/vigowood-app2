@@ -7,7 +7,7 @@ import { Package, Users, Clock, TrendingUp, Loader2 } from "lucide-react";
 import { getAnalytics } from "../actions";
 import { cn } from "@/lib/utils";
 
-type Period = "today" | "week" | "month";
+type Period = "today" | "week" | "month" | "last_month";
 
 interface AnalyticsData {
   totalQty: number;
@@ -17,14 +17,17 @@ interface AnalyticsData {
   avgBirimDk: number;
 }
 
+// Takvim bazlı — "Ay" artık son 30 gün değil, içinde bulunulan ay
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Bugün",
-  week: "Hafta",
-  month: "Ay",
+  week: "Bu Hafta",
+  month: "Bu Ay",
+  last_month: "Geçen Ay",
 };
 
 export function SummaryCards() {
-  const [period, setPeriod] = useState<Period>("today");
+  // Varsayılan "Bu Ay": bugün üretim olmayabilir, ekran sıfır açılmasın
+  const [period, setPeriod] = useState<Period>("month");
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
