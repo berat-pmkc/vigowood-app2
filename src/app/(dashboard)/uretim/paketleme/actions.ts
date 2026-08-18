@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { packSessionCloseSchema } from "@/lib/validations";
-import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, URETIM_ANALIZ_ROLES } from "@/lib/constants";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -745,13 +745,20 @@ export async function getPaketlemeAnaliz(
   kirilim: "sku" | "grup" = "sku",
 ) {
   try {
-    await requireProductionAccess();
+    /**
+     * Arayüzde gizlemek yeterli değil — saha hesabı bu aksiyonu doğrudan
+     * çağırabilir. Yetki burada da kontrol ediliyor.
+     */
+    const user = await getCurrentUser();
+    if (!user || !URETIM_ANALIZ_ROLES.includes(user.role)) {
+      return { success: false as const, error: "Bu analizi görme yetkiniz yok" };
+    }
     const supabase = await createClient();
 
     const now = new Date();
     let query = supabase
       .from("pack_events")
-      .select("sku, qty, start_time, end_time, worker_count, birim_paketleme_dk, personel")
+      .select("sku, qty, start_time, end_time, worker_count, birim_paketleme_dk, personel, operator_name")
       .eq("durum", "tamamlandi")
       .not("end_time", "is", null)
       .not("sku", "is", null);
@@ -771,6 +778,7 @@ export async function getPaketlemeAnaliz(
       sku: string | null; qty: number; start_time: string | null;
       end_time: string | null; worker_count: number | null;
       birim_paketleme_dk: number | null; personel: string | null;
+      operator_name: string | null;
     }[];
 
     /**
@@ -881,7 +889,8 @@ export async function getPaketlemeAnaliz(
     const ekipMap = new Map<string, { kisi: number; seans: number; adet: number; iscilikTop: number; endeksTop: number; endeksN: number }>();
     for (const s of seanslar) {
       const kisi = s.worker_count ?? 0;
-      const ekipAdi = (s as { personel?: string | null }).personel;
+      // Kod yerine isim: operator_name dolu, yoksa personel koduna düşülür
+      const ekipAdi = s.operator_name || s.personel;
       if (!ekipAdi || !s.sku || !s.qty || kisi <= 0) continue;
       const ia = (gecenDk(s) * kisi) / s.qty;
       if (!(ia > 0)) continue;

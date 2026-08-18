@@ -30,12 +30,15 @@ interface ProductOption {
 }
 
 interface PaketlemeDashboardProps {
+  /** Saha hesapları analizleri görmez — kişi bazlı karşılaştırma içeriyor */
+  analizGorebilir: boolean;
   activeSessions: ActiveSession[];
   completedSessions: CompletedSession[];
   productOptions: ProductOption[];
 }
 
 export function PaketlemeDashboard({
+  analizGorebilir,
   activeSessions: serverActiveSessions,
   completedSessions: serverCompletedSessions,
   productOptions: serverProductOptions,
@@ -144,8 +147,8 @@ export function PaketlemeDashboard({
 
       {/* Product Trend Chart */}
       <section>
-        {/* Genel analiz — ürün seçmeden bütün resmi verir */}
-        <PaketlemeAnaliz />
+        {/* Genel analiz — yalnızca yönetim rolleri */}
+        {analizGorebilir && <PaketlemeAnaliz />}
 
         {/* Tek ürünün birim süre seyri — detaya inmek isteyene */}
         <ProductTrendChart products={productOptions} />

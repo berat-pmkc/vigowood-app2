@@ -348,6 +348,19 @@ export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
  * SQL karşılığı: is_admin_or_engineer()
  * DİKKAT: Bu liste ile RLS politikası birlikte değiştirilmelidir.
  */
+/**
+ * Üretim analizlerini kimler görebilir.
+ *
+ * Saha rolleri (Hat, Üretim) kendi seanslarını açıp kapatır ama ekip
+ * performansı, işçilik Pareto'su gibi analizleri görmez — bunlar kişi
+ * bazlı karşılaştırma içeriyor ve istasyon tabletleri ortak hesapla
+ * kullanılıyor.
+ */
+export const URETIM_ANALIZ_ROLES: UserRole[] = [
+  "Yönetici",
+  "Endüstri Mühendisi",
+];
+
 export const PRODUCTION_CANCEL_ROLES: UserRole[] = [
   "Yönetici",
   "Endüstri Mühendisi",

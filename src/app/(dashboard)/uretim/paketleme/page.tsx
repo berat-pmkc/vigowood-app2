@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, URETIM_ANALIZ_ROLES } from "@/lib/constants";
 import { PaketlemeDashboard } from "./components/paketleme-dashboard";
 import type { ActiveSession } from "./components/session-card";
 import type { CompletedSession } from "./components/completed-sessions";
@@ -79,6 +79,7 @@ export default async function PaketlemePage() {
   return (
     <div className="pb-20 md:pb-6">
       <PaketlemeDashboard
+        analizGorebilir={URETIM_ANALIZ_ROLES.includes(user.role)}
         activeSessions={activeSessions}
         completedSessions={completedSessions}
         productOptions={productOptions}
