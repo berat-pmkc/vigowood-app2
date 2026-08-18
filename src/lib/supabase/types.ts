@@ -2681,6 +2681,7 @@ export type Database = {
           toplam_satis: number
           updated_at: string
           urun_adi: string | null
+          urun_grubu: string | null
           urun_agirlik_kg: number | null
         }
         Insert: {
@@ -2705,6 +2706,7 @@ export type Database = {
           toplam_satis?: number
           updated_at?: string
           urun_adi?: string | null
+          urun_grubu?: string | null
           urun_agirlik_kg?: number | null
         }
         Update: {
@@ -2729,6 +2731,7 @@ export type Database = {
           toplam_satis?: number
           updated_at?: string
           urun_adi?: string | null
+          urun_grubu?: string | null
           urun_agirlik_kg?: number | null
         }
         Relationships: []

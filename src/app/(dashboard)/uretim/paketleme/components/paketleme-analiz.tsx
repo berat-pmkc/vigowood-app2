@@ -24,19 +24,21 @@ const DONEM_ETIKET: Record<Donem, string> = {
 
 export function PaketlemeAnaliz() {
   const [donem, setDonem] = useState<Donem>("month");
+  // Ürün grubu varsayılan: tek tek SKU yerine model bazında bakmak daha okunur
+  const [kirilim, setKirilim] = useState<"sku" | "grup">("grup");
   const [veri, setVeri] = useState<AnalizVerisi | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
 
   useEffect(() => {
     let iptal = false;
     setYukleniyor(true);
-    getPaketlemeAnaliz(donem).then((r) => {
+    getPaketlemeAnaliz(donem, kirilim).then((r) => {
       if (iptal) return;
       setVeri(r.success ? r.data : null);
       setYukleniyor(false);
     });
     return () => { iptal = true; };
-  }, [donem]);
+  }, [donem, kirilim]);
 
   /** 80% eşiğini geçen ilk ürün — Pareto'nun kritik azınlığı */
   const paretoEsik = useMemo(() => {
@@ -58,7 +60,22 @@ export function PaketlemeAnaliz() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold">Paketleme Analizi</h2>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          <div className="mr-2 flex gap-1.5 rounded-full border p-0.5">
+            {([["grup", "Ürün grubu"], ["sku", "Tek tek ürün"]] as const).map(([k, e]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKirilim(k)}
+                className={cn(
+                  "rounded-full px-2.5 py-0.5 text-xs transition-colors",
+                  kirilim === k ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                )}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
           {(Object.keys(DONEM_ETIKET) as Donem[]).map((d) => (
             <button
               key={d}

@@ -23,6 +23,8 @@ export const productUpdateSchema = z.object({
   kategori: z.enum(PRODUCT_CATEGORIES, {
     error: "Geçerli bir kategori seçiniz",
   }),
+  /** Üretim/model seviyesi grup — analizlerde SKU yerine bunun üzerinden toplanır */
+  urun_grubu: z.string().trim().max(40, "En fazla 40 karakter").optional(),
   aktif_mi: z.boolean(),
   kutu_boy_cm: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
   kutu_en_cm: z.number().min(0, "0 veya üzeri olmalı").nullable().optional(),
@@ -55,6 +57,8 @@ export const productCreateSchema = z.object({
   kategori: z.enum(PRODUCT_CATEGORIES, {
     error: "Geçerli bir kategori seçiniz",
   }),
+  /** Üretim/model seviyesi grup — analizlerde SKU yerine bunun üzerinden toplanır */
+  urun_grubu: z.string().trim().max(40, "En fazla 40 karakter").optional(),
   aktif_mi: z.boolean(),
 });
 

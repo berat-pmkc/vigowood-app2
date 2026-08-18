@@ -22,6 +22,7 @@ export async function createProduct(
     sku: string;
     urun_adi: string;
     kategori: string;
+    urun_grubu?: string;
     aktif_mi: boolean;
   }
 ): Promise<ActionResult> {
@@ -51,6 +52,7 @@ export async function createProduct(
       sku: parsed.data.sku,
       urun_adi: parsed.data.urun_adi,
       kategori: parsed.data.kategori as ProductCategory,
+      urun_grubu: parsed.data.urun_grubu || null,
       aktif_mi: parsed.data.aktif_mi,
       stok_aktif: 0,
       gunluk_satis: 0,
@@ -81,6 +83,7 @@ export async function updateProduct(
   formData: {
     urun_adi: string;
     kategori: string;
+    urun_grubu?: string;
     aktif_mi: boolean;
     kutu_boy_cm?: number | null;
     kutu_en_cm?: number | null;
@@ -110,6 +113,7 @@ export async function updateProduct(
       .update({
         urun_adi: parsed.data.urun_adi,
         kategori: parsed.data.kategori as ProductCategory,
+        urun_grubu: parsed.data.urun_grubu || null,
         aktif_mi: parsed.data.aktif_mi,
         kutu_boy_cm: boy,
         kutu_en_cm: en,

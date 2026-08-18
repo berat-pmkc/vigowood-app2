@@ -740,7 +740,10 @@ export interface AnalizVerisi {
  * birim süreyle adet çarpımı değil. İkincisi kişi sayısını iki kez
  * hesaba katardı çünkü birim süre zaten kişiye bölünmüş bir değer.
  */
-export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") {
+export async function getPaketlemeAnaliz(
+  donem: "month" | "last_month" | "all",
+  kirilim: "sku" | "grup" = "sku",
+) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
@@ -770,6 +773,25 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
       birim_paketleme_dk: number | null; personel: string | null;
     }[];
 
+    /**
+     * Kırılım "grup" ise SKU yerine ürün grubu kullanılır. Grup boşsa
+     * SKU'ya düşülür — ürün analizden kaybolmasın.
+     */
+    let grupHarita = new Map<string, string>();
+    if (kirilim === "grup") {
+      const skular = [...new Set(seanslar.map((x) => x.sku).filter(Boolean) as string[])];
+      for (let i = 0; i < skular.length; i += 200) {
+        const { data: urunler } = await supabase
+          .from("products")
+          .select("sku, urun_grubu")
+          .in("sku", skular.slice(i, i + 200));
+        for (const u of urunler ?? []) {
+          if (u.urun_grubu) grupHarita.set(u.sku, u.urun_grubu);
+        }
+      }
+    }
+    const etiket = (sku: string) => grupHarita.get(sku) ?? sku;
+
     const gecenDk = (s: (typeof seanslar)[number]) =>
       s.start_time && s.end_time
         ? (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000
@@ -780,12 +802,13 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
     for (const s of seanslar) {
       if (!s.sku) continue;
       const kisi = s.worker_count ?? 1;
-      const u = urun.get(s.sku) ?? { adet: 0, iscilik: 0, birimTop: 0, birimAdet: 0, seans: 0 };
+      const anahtar = etiket(s.sku);
+      const u = urun.get(anahtar) ?? { adet: 0, iscilik: 0, birimTop: 0, birimAdet: 0, seans: 0 };
       u.adet += s.qty ?? 0;
       u.iscilik += gecenDk(s) * kisi;
       if (s.birim_paketleme_dk != null) { u.birimTop += s.birim_paketleme_dk; u.birimAdet++; }
       u.seans++;
-      urun.set(s.sku, u);
+      urun.set(anahtar, u);
     }
 
     const sirali = [...urun.entries()].sort((a, b) => b[1].iscilik - a[1].iscilik);
@@ -849,9 +872,10 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
       if (!s.sku || !s.qty || kisi <= 0) continue;
       const ia = (gecenDk(s) * kisi) / s.qty;
       if (!(ia > 0)) continue;
-      const u = urunIscilikOrt.get(s.sku) ?? { top: 0, n: 0 };
+      const a = etiket(s.sku);
+      const u = urunIscilikOrt.get(a) ?? { top: 0, n: 0 };
       u.top += ia; u.n++;
-      urunIscilikOrt.set(s.sku, u);
+      urunIscilikOrt.set(a, u);
     }
 
     const ekipMap = new Map<string, { kisi: number; seans: number; adet: number; iscilikTop: number; endeksTop: number; endeksN: number }>();
@@ -861,7 +885,7 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
       if (!ekipAdi || !s.sku || !s.qty || kisi <= 0) continue;
       const ia = (gecenDk(s) * kisi) / s.qty;
       if (!(ia > 0)) continue;
-      const uo = urunIscilikOrt.get(s.sku);
+      const uo = urunIscilikOrt.get(etiket(s.sku));
       // Tek seanslık ürünler ortalama oluşturmaz, endekse katılmaz
       if (!uo || uo.n < 3) continue;
 

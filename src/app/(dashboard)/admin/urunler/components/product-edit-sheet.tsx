@@ -73,6 +73,7 @@ export function ProductEditSheet({
         sku: "",
         urun_adi: "",
         kategori: PRODUCT_CATEGORIES[0],
+        urun_grubu: "",
         aktif_mi: true,
       } as ProductUpdateData);
     } else if (product) {
@@ -80,6 +81,7 @@ export function ProductEditSheet({
         sku: product.sku,
         urun_adi: product.urun_adi || "",
         kategori: product.kategori || PRODUCT_CATEGORIES[0],
+        urun_grubu: product.urun_grubu ?? "",
         aktif_mi: product.aktif_mi,
         kutu_boy_cm: product.kutu_boy_cm ?? null,
         kutu_en_cm: product.kutu_en_cm ?? null,
@@ -111,6 +113,7 @@ export function ProductEditSheet({
         const result = await updateProduct(product.sku, {
           urun_adi: data.urun_adi,
           kategori: data.kategori,
+          urun_grubu: data.urun_grubu,
           aktif_mi: data.aktif_mi,
           kutu_boy_cm: data.kutu_boy_cm,
           kutu_en_cm: data.kutu_en_cm,
@@ -198,6 +201,16 @@ export function ProductEditSheet({
               {errors.kategori && (
                 <p className="text-sm text-destructive">{errors.kategori.message}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="urun_grubu">Ürün Grubu</Label>
+              <Input id="urun_grubu" {...register("urun_grubu")}
+                     placeholder="KD50, MKOS, TABLO…" />
+              <p className="text-xs text-muted-foreground">
+                Analizlerde ürünler bu gruba göre toplanır. Kategoriden daha
+                ince: KD50C ve KD50M ayrı ürün ama aynı grup.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
