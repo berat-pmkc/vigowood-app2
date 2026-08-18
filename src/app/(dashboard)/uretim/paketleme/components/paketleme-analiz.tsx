@@ -47,15 +47,13 @@ export function PaketlemeAnaliz() {
     return i >= 0 ? i + 1 : null;
   }, [veri]);
 
-  /** Ürünlerin ne kadarında 3 kişi daha hızlı + ortalama kazanç */
-  const kisiBulgu = useMemo(() => {
-    if (!veri || veri.kisiEtkisi.length < 3) return null;
-    const d = veri.kisiEtkisi;
-    const hizli = d.filter((x) => x.hiz3 < x.hiz2).length;
-    const hizKazanc = (d.reduce((t, x) => t + (x.hiz2 - x.hiz3) / x.hiz2, 0) / d.length) * 100;
-    const iscilikArtis =
-      (d.reduce((t, x) => t + (x.iscilik3 - x.iscilik2) / x.iscilik2, 0) / d.length) * 100;
-    return { toplam: d.length, hizli, hizKazanc, iscilikArtis };
+  /** Son haftanın karışım düzeltmeli durumu */
+  const haftaBulgu = useMemo(() => {
+    if (!veri || veri.haftalik.length < 2) return null;
+    const son = veri.haftalik[veri.haftalik.length - 1];
+    const oncekiler = veri.haftalik.slice(0, -1);
+    const ortOran = oncekiler.reduce((t, h) => t + h.oran, 0) / oncekiler.length;
+    return { son, ortOran };
   }, [veri]);
 
   return (
@@ -201,66 +199,75 @@ export function PaketlemeAnaliz() {
             </Card>
           )}
 
-          {/* 3. Kişi sayısı etkisi */}
-          {veri.kisiEtkisi.length > 0 && (
+          {/* 3. Haftalık tempo ve verimlilik */}
+          {veri.haftalik.length > 0 && (
             <Card className="p-4">
               <div className="mb-1 flex items-center gap-2">
                 <Users className="size-4 text-muted-foreground" />
-                <h3 className="text-sm font-medium">Kişi sayısı gerçekten hızlandırıyor mu?</h3>
+                <h3 className="text-sm font-medium">Haftalık tempo ve verimlilik</h3>
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                <b>Aynı ürün</b> üzerinde 2 kişi ile 3 kişi karşılaştırılıyor —
-                ürün sabitlenmeden bakmak yanıltıcıydı, çünkü ekipler farklı
-                ürünlere atanıyor. Çubuklar adet başına <b>gerçek süre</b>
-                (duvar saati); kısa olan daha hızlı.
+                Çubuk haftalık <b>paketlenen adet</b>. Mavi çizgi{" "}
+                <b>verimlilik oranı</b>: gerçekleşen işçiliğin, o haftaki ürün
+                karışımına göre beklenen işçiliğe oranı. <b>1,00 normal</b>;
+                üstü beklenenden kötü, altı iyi. Ham dk/adet bakmak yanıltıcı —
+                ağır ürün paketlenen hafta kendiliğinden yükselir.
               </p>
-              <Grafik tip="kisi" veri={veri.kisiEtkisi} />
+              <Grafik tip="hafta" veri={veri.haftalik} />
 
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/60">
                     <tr>
-                      <th className="px-2 py-1.5 text-left font-medium">Ürün</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Hız 2 kişi</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Hız 3 kişi</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Hız kazancı</th>
-                      <th className="px-2 py-1.5 text-right font-medium">İşçilik 2 / 3</th>
+                      <th className="px-2 py-1.5 text-left font-medium">Hafta</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Adet</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Seans</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Gerçekleşen</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Beklenen</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Oran</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {veri.kisiEtkisi.map((x) => {
-                      const kazanc = ((x.hiz2 - x.hiz3) / x.hiz2) * 100;
-                      return (
-                        <tr key={x.sku} className="border-t">
-                          <td className="px-2 py-1.5 font-mono">{x.sku}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{x.hiz2.toFixed(2)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums">{x.hiz3.toFixed(2)}</td>
-                          <td className={cn("px-2 py-1.5 text-right font-medium tabular-nums",
-                            kazanc > 0 ? "text-emerald-700" : "text-red-700")}>
-                            %{kazanc.toFixed(0)}
-                          </td>
-                          <td className={cn("px-2 py-1.5 text-right tabular-nums",
-                            x.iscilik3 > x.iscilik2 ? "text-red-700" : "text-emerald-700")}>
-                            {x.iscilik2.toFixed(2)} / {x.iscilik3.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {veri.haftalik.map((h) => (
+                      <tr key={h.hafta} className="border-t">
+                        <td className="px-2 py-1.5">{h.etiket}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {h.adet.toLocaleString("tr-TR")}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{h.seans}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{h.gerceklesen.toFixed(2)}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
+                          {h.beklenen.toFixed(2)}
+                        </td>
+                        <td className={cn("px-2 py-1.5 text-right font-medium tabular-nums",
+                          h.oran <= 1 ? "text-emerald-700" : "text-red-700")}>
+                          {h.oran.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
 
-              {kisiBulgu && (
-                <div className="mt-2 rounded border border-blue-300 bg-blue-50 p-2 text-xs leading-relaxed text-blue-900">
-                  <b>{kisiBulgu.toplam} üründen {kisiBulgu.hizli}&apos;inde</b> 3 kişi
-                  daha hızlı — ortalama <b>%{kisiBulgu.hizKazanc.toFixed(0)}</b> hız
-                  kazancı. Buna karşılık adet başına işçilik ortalama{" "}
-                  <b>%{Math.abs(kisiBulgu.iscilikArtis).toFixed(0)}</b>{" "}
-                  {kisiBulgu.iscilikArtis > 0 ? "artıyor" : "azalıyor"}.
-                  <br />
-                  Yani 3. kişi işe yarıyor ama bedava değil: <b>termin baskısı
-                  varsa</b> 3 kişi doğru, <b>maliyet önceliğinizse</b> 2 kişi daha
-                  verimli.
+              {haftaBulgu && (
+                <div className={cn("mt-2 rounded border p-2 text-xs leading-relaxed",
+                  haftaBulgu.son.oran > 1.1
+                    ? "border-red-300 bg-red-50 text-red-900"
+                    : "border-emerald-300 bg-emerald-50 text-emerald-900")}>
+                  {haftaBulgu.son.oran > 1.1 ? (
+                    <>
+                      <TriangleAlert className="mr-1 inline size-3.5" />
+                      Son hafta oranı <b>{haftaBulgu.son.oran.toFixed(2)}</b> — karışıma
+                      göre beklenenden kötü. Sebebi ürün değil, süreçte bir şey.
+                    </>
+                  ) : (
+                    <>
+                      Verimlilik beklenen seviyede (son hafta{" "}
+                      <b>{haftaBulgu.son.oran.toFixed(2)}</b>, önceki haftaların
+                      ortalaması <b>{haftaBulgu.ortOran.toFixed(2)}</b>). Ham
+                      dk/adet oynasa bile bu oran sabitse süreç bozulmamıştır.
+                    </>
+                  )}
                 </div>
               )}
             </Card>

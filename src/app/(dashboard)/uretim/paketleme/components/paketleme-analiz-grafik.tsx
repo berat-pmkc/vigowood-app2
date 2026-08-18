@@ -4,7 +4,8 @@ import {
   Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts";
-import type { ParetoSatiri, KisiSatiri, PotansiyelSatiri } from "../actions";
+import { ReferenceLine } from "recharts";
+import type { ParetoSatiri, HaftaSatiri, PotansiyelSatiri } from "../actions";
 
 /**
  * Analiz grafikleri tek dosyada — hepsi recharts kullanıyor ve bu dosya
@@ -55,7 +56,7 @@ function Ipucu({
   active?: boolean;
   payload?: Array<{ name?: string; value?: number; color?: string; dataKey?: string }>;
   label?: string | number;
-  birim: "dk" | "adet" | "endeks";
+  birim: "dk" | "adet" | "endeks" | "hafta";
   etiketOn?: string;
 }) {
   if (!active || !payload?.length) return null;
@@ -66,7 +67,11 @@ function Ipucu({
         <p key={i} style={{ color: p.color }}>
           {p.name}:{" "}
           <b>
-            {p.dataKey === "kumulatif"
+            {p.dataKey === "oran"
+              ? Number(p.value ?? 0).toFixed(2)
+              : birim === "hafta"
+                ? Number(p.value ?? 0).toLocaleString("tr-TR")
+                : p.dataKey === "kumulatif"
               ? `%${Number(p.value ?? 0).toFixed(1)}`
               : birim === "endeks"
                 ? Number(p.value ?? 0).toFixed(2)
@@ -83,8 +88,8 @@ function Ipucu({
 export function PaketlemeAnalizGrafik({
   tip, veri,
 }: {
-  tip: "pareto" | "adet" | "kisi" | "potansiyel";
-  veri: ParetoSatiri[] | KisiSatiri[] | PotansiyelSatiri[];
+  tip: "pareto" | "adet" | "hafta" | "potansiyel";
+  veri: ParetoSatiri[] | HaftaSatiri[] | PotansiyelSatiri[];
 }) {
   if (tip === "potansiyel") {
     const d = (veri as PotansiyelSatiri[]).slice(0, 10);
@@ -107,22 +112,24 @@ export function PaketlemeAnalizGrafik({
     );
   }
 
-  if (tip === "kisi") {
-    const d = (veri as KisiSatiri[]).slice(0, 10);
+  if (tip === "hafta") {
+    const d = veri as HaftaSatiri[];
     return (
-      <ResponsiveContainer width="100%" height={Math.max(240, d.length * 40)}>
-        <ComposedChart data={d} layout="vertical"
-                       margin={{ top: 8, right: 28, left: 96, bottom: 16 }}>
+      <ResponsiveContainer width="100%" height={300}>
+        <ComposedChart data={d} margin={{ top: 8, right: 16, left: -8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e3dc" />
-          <XAxis type="number" tick={{ fontSize: 12 }} stroke="#474237"
-                 label={{ value: "dk / adet (kısa olan hızlı)", position: "insideBottom",
-                          offset: -6, fontSize: 11 }} />
-          <YAxis type="category" dataKey="sku" width={92}
-                 tick={{ fontSize: 11 }} stroke="#474237" />
-          <Tooltip content={<Ipucu birim="dk" />} />
+          <XAxis dataKey="etiket" tick={{ fontSize: 12 }} stroke="#474237" />
+          <YAxis yAxisId="l" tick={{ fontSize: 12 }} stroke="#474237" />
+          <YAxis yAxisId="r" orientation="right" domain={[0.7, 1.3]}
+                 tick={{ fontSize: 12 }} stroke="#a99c7d" />
+          <Tooltip content={<Ipucu birim="hafta" />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="hiz2" name="2 kişi" fill="#a99c7d" radius={[0, 4, 4, 0]} />
-          <Bar dataKey="hiz3" name="3 kişi" fill="#3368b1" radius={[0, 4, 4, 0]} />
+          {/* 1,0 = karışıma göre beklenen seviye */}
+          <ReferenceLine yAxisId="r" y={1} stroke="#a99c7d" strokeDasharray="4 4" />
+          <Bar yAxisId="l" dataKey="adet" name="Paketlenen adet"
+               fill="#cdbd9d" radius={[4, 4, 0, 0]} />
+          <Line yAxisId="r" type="monotone" dataKey="oran" name="Verimlilik oranı"
+                stroke="#3368b1" strokeWidth={2.5} dot={{ r: 4 }} />
         </ComposedChart>
       </ResponsiveContainer>
     );

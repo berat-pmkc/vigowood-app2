@@ -706,17 +706,17 @@ export interface ParetoSatiri {
   kumulatif: number;
 }
 
-export interface KisiSatiri {
-  /** Ürün adı — karşılaştırma AYNI ürün üzerinde yapılır */
-  sku: string;
-  /** 2 kişilik seansların ortalama hızı (dk/adet, duvar saati) */
-  hiz2: number;
-  hiz3: number;
-  /** Adet başına işçilik (dk × kişi) */
-  iscilik2: number;
-  iscilik3: number;
-  seans2: number;
-  seans3: number;
+export interface HaftaSatiri {
+  hafta: string;
+  etiket: string;
+  adet: number;
+  seans: number;
+  /** Gerçekleşen işçilik (dk/adet), hacim ağırlıklı */
+  gerceklesen: number;
+  /** O haftanın ürün karışımına göre beklenen işçilik */
+  beklenen: number;
+  /** gerçekleşen / beklenen. 1 = normal, üstü kötü, altı iyi */
+  oran: number;
 }
 
 export interface PotansiyelSatiri {
@@ -735,7 +735,7 @@ export interface PotansiyelSatiri {
 
 export interface AnalizVerisi {
   pareto: ParetoSatiri[];
-  kisiEtkisi: KisiSatiri[];
+  haftalik: HaftaSatiri[];
   potansiyel: PotansiyelSatiri[];
 }
 
@@ -806,7 +806,8 @@ export async function getPaketlemeAnaliz(
     }
     const etiket = (sku: string) => grupHarita.get(sku) ?? sku;
 
-    const gecenDk = (s: (typeof seanslar)[number]) =>
+    // Yalnız iki alana bakar; hem ana sorgu hem haftalık sorgu kullanabilsin
+    const gecenDk = (s: { start_time: string | null; end_time: string | null }) =>
       s.start_time && s.end_time
         ? (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000
         : 0;
@@ -841,50 +842,79 @@ export async function getPaketlemeAnaliz(
     });
 
     /**
-     * ── Kişi sayısı etkisi ──
+     * ── Haftalık tempo ve verimlilik ──
      *
-     * AYNI ÜRÜN üzerinde 2 kişi ile 3 kişi karşılaştırılır. Kişi sayısını
-     * ürün ayrımı olmadan kıyaslamak yanıltıcı: 3 kişilik ekipler adet
-     * başına daha yavaş ürünlere atandığı için avantajları gizleniyordu.
-     * Ürün sabitlenmeden bakınca 3. kişinin katkısı yok gibi görünüyor,
-     * sabitlenince %28 hız kazancı ortaya çıkıyor.
+     * Ham işçilik/adet yanıltıcı: ürün karışımı değişince kendiliğinden
+     * oynuyor. Veride 3,85'ten 8,33'e çıkmış görünüyor ama bunun tamamı
+     * karışımdan; gerçek verimlilik sabit.
      *
-     * İki ölçüt birlikte veriliyor çünkü cevap tek değil:
-     *   hız     = dk/adet (duvar saati) → iş ne kadar çabuk biter
-     *   işçilik = dk×kişi/adet          → maliyet ne olur
-     * 3. kişi hızı artırır ama işçiliği de artırır; hangisinin önemli
-     * olduğu duruma göre değişir.
+     * Bu yüzden iki değer birlikte veriliyor:
+     *   beklenen = o haftaki ürünlerin kendi normlarına göre olması
+     *              gereken işçilik
+     *   oran     = gerçekleşen / beklenen (1 = normal)
+     * Oran karışımdan bağımsızdır; asıl izlenecek çizgi odur.
+     *
+     * Dönem filtresinden bağımsız: trend görmek için son 12 hafta.
      */
-    const kisiUrun = new Map<string, {
-      h2: number[]; h3: number[]; w2: number[]; w3: number[];
-    }>();
-    for (const s of seanslar) {
+    const { data: haftaHam } = await supabase
+      .from("pack_events")
+      .select("tarih, sku, qty, start_time, end_time, worker_count")
+      .eq("durum", "tamamlandi")
+      .not("end_time", "is", null)
+      .not("sku", "is", null)
+      .gte("tarih", new Date(Date.now() - 84 * 24 * 3600 * 1000).toISOString());
+
+    const hamSeans = (haftaHam ?? []) as {
+      tarih: string | null; sku: string | null; qty: number;
+      start_time: string | null; end_time: string | null; worker_count: number | null;
+    }[];
+
+    // Ürün normu: kendi tüm geçmişindeki hacim ağırlıklı işçilik
+    const norm = new Map<string, { isc: number; adet: number }>();
+    for (const s of hamSeans) {
       const k = s.worker_count ?? 0;
-      if (!s.sku || !s.qty || (k !== 2 && k !== 3)) continue;
-      const gecen = gecenDk(s);
-      if (gecen <= 1) continue;
-      const hiz = gecen / s.qty;
-      const isc = (gecen * k) / s.qty;
-      const g = kisiUrun.get(s.sku) ?? { h2: [], h3: [], w2: [], w3: [] };
-      if (k === 2) { g.h2.push(hiz); g.w2.push(isc); }
-      else { g.h3.push(hiz); g.w3.push(isc); }
-      kisiUrun.set(s.sku, g);
+      if (!s.sku || !s.qty || k <= 0) continue;
+      const isc = gecenDk(s) * k;
+      if (!(isc > 0)) continue;
+      const n = norm.get(s.sku) ?? { isc: 0, adet: 0 };
+      n.isc += isc; n.adet += s.qty;
+      norm.set(s.sku, n);
     }
 
-    const ort = (a: number[]) => a.reduce((t, v) => t + v, 0) / a.length;
-    const kisiEtkisi: KisiSatiri[] = [...kisiUrun.entries()]
-      // Her iki grupta da en az 2 seans olmalı, yoksa tek seans belirler
-      .filter(([, g]) => g.h2.length >= 2 && g.h3.length >= 2)
-      .map(([sku, g]) => ({
-        sku,
-        hiz2: Number(ort(g.h2).toFixed(2)),
-        hiz3: Number(ort(g.h3).toFixed(2)),
-        iscilik2: Number(ort(g.w2).toFixed(2)),
-        iscilik3: Number(ort(g.w3).toFixed(2)),
-        seans2: g.h2.length,
-        seans3: g.h3.length,
-      }))
-      .sort((a, b) => (b.hiz2 - b.hiz3) / b.hiz2 - (a.hiz2 - a.hiz3) / a.hiz2);
+    const haftaMap = new Map<string, { adet: number; seans: number; isc: number; bek: number }>();
+    for (const s of hamSeans) {
+      const k = s.worker_count ?? 0;
+      if (!s.sku || !s.qty || k <= 0 || !s.tarih) continue;
+      const isc = gecenDk(s) * k;
+      if (!(isc > 0)) continue;
+      const n = norm.get(s.sku);
+      if (!n || n.adet <= 0) continue;
+
+      // Pazartesi başlangıçlı hafta
+      const d = new Date(s.tarih);
+      const gun = d.getDay() || 7;
+      const pzt = new Date(d.getFullYear(), d.getMonth(), d.getDate() - gun + 1);
+      const anahtar = pzt.toISOString().slice(0, 10);
+
+      const h = haftaMap.get(anahtar) ?? { adet: 0, seans: 0, isc: 0, bek: 0 };
+      h.adet += s.qty;
+      h.seans++;
+      h.isc += isc;
+      h.bek += (n.isc / n.adet) * s.qty;
+      haftaMap.set(anahtar, h);
+    }
+
+    const haftalik: HaftaSatiri[] = [...haftaMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([hafta, h]) => ({
+        hafta,
+        etiket: new Date(hafta).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" }),
+        adet: Math.round(h.adet),
+        seans: h.seans,
+        gerceklesen: Number((h.isc / h.adet).toFixed(2)),
+        beklenen: Number((h.bek / h.adet).toFixed(2)),
+        oran: Number((h.isc / h.bek).toFixed(2)),
+      }));
 
     /**
      * ── İyileştirme potansiyeli ──
@@ -944,7 +974,7 @@ export async function getPaketlemeAnaliz(
       .filter((x) => x.kazanilabilirSaat > 0)
       .sort((a, b) => b.kazanilabilirSaat - a.kazanilabilirSaat);
 
-    return { success: true as const, data: { pareto, kisiEtkisi, potansiyel } satisfies AnalizVerisi };
+    return { success: true as const, data: { pareto, haftalik, potansiyel } satisfies AnalizVerisi };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
