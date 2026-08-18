@@ -4,8 +4,7 @@ import {
   Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Cell } from "recharts";
-import type { ParetoSatiri, KisiSatiri, EkipSatiri } from "../actions";
+import type { ParetoSatiri, KisiSatiri, PotansiyelSatiri } from "../actions";
 
 /**
  * Analiz grafikleri tek dosyada — hepsi recharts kullanıyor ve bu dosya
@@ -84,26 +83,25 @@ function Ipucu({
 export function PaketlemeAnalizGrafik({
   tip, veri,
 }: {
-  tip: "pareto" | "adet" | "kisi" | "ekip";
-  veri: ParetoSatiri[] | KisiSatiri[] | EkipSatiri[];
+  tip: "pareto" | "adet" | "kisi" | "potansiyel";
+  veri: ParetoSatiri[] | KisiSatiri[] | PotansiyelSatiri[];
 }) {
-  if (tip === "ekip") {
-    const d = veri as EkipSatiri[];
+  if (tip === "potansiyel") {
+    const d = (veri as PotansiyelSatiri[]).slice(0, 10);
     return (
-      <ResponsiveContainer width="100%" height={Math.max(240, d.length * 42)}>
+      <ResponsiveContainer width="100%" height={Math.max(240, d.length * 44)}>
         <ComposedChart data={d} layout="vertical"
-                       margin={{ top: 8, right: 28, left: 150, bottom: 4 }}>
+                       margin={{ top: 8, right: 28, left: 140, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e3dc" />
-          <XAxis type="number" domain={[0, "auto"]} tick={{ fontSize: 12 }} stroke="#474237" />
-          <YAxis type="category" dataKey="ekip" width={146}
+          <XAxis type="number" tick={{ fontSize: 12 }} stroke="#474237"
+                 label={{ value: "dk / adet", position: "insideBottom", offset: -2, fontSize: 11 }} />
+          <YAxis type="category" dataKey="grup" width={136}
                  tick={{ fontSize: 11 }} stroke="#474237" />
-          <Tooltip content={<Ipucu birim="endeks" />} />
-          <Bar dataKey="endeks" name="İşçilik endeksi" radius={[0, 4, 4, 0]}>
-            {d.map((e, i) => (
-              // 1'in altı ortalamadan verimli, üstü değil
-              <Cell key={i} fill={e.endeks <= 1 ? "#70c1aa" : "#ee7683"} />
-            ))}
-          </Bar>
+          <Tooltip content={<Ipucu birim="dk" />} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {/* Hedef altta, farkı üstte istifleyerek "kazanılabilir" kısım görünür olur */}
+          <Bar dataKey="hedef" name="Ulaşılabilir" stackId="a" fill="#70c1aa" radius={[0, 0, 0, 0]} />
+          <Bar dataKey="fark" name="Kazanılabilir" stackId="a" fill="#f28a19" radius={[0, 4, 4, 0]} />
         </ComposedChart>
       </ResponsiveContainer>
     );

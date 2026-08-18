@@ -716,21 +716,24 @@ export interface KisiSatiri {
   gercekDk: number;
 }
 
-export interface EkipSatiri {
-  ekip: string;
-  kisi: number;
-  seans: number;
+export interface PotansiyelSatiri {
+  grup: string;
+  skuSayisi: number;
   adet: number;
-  /** (geçen süre × kişi) / adet — kişi sayısına göre adil ölçüt */
-  iscilikAdet: number;
-  /** Ürün ortalamasına oran. 1'in altı = ortalamadan verimli */
-  endeks: number;
+  /** Mevcut ortalama işçilik (dk/adet) */
+  ortalama: number;
+  /** Kendi en iyi %20 diliminin ortalaması — zaten ulaşılmış hız */
+  hedef: number;
+  /** (ortalama - hedef) × adet, saate çevrilmiş */
+  kazanilabilirSaat: number;
+  /** ortalama - hedef; grafikte hedefin üstüne istiflenir */
+  fark: number;
 }
 
 export interface AnalizVerisi {
   pareto: ParetoSatiri[];
   kisiEtkisi: KisiSatiri[];
-  ekipler: EkipSatiri[];
+  potansiyel: PotansiyelSatiri[];
 }
 
 /**
@@ -861,67 +864,64 @@ export async function getPaketlemeAnaliz(
       }));
 
     /**
-     * ── Ekip performansı ──
+     * ── İyileştirme potansiyeli ──
      *
-     * Ölçüt: (geçen süre × kişi) / adet — yani adet başına harcanan
-     * İŞÇİLİK dakikası.
+     * Hedef = ürünün KENDİ en iyi %20 dilimi (P20). Neden en iyi tek
+     * seans değil: tek bir hatalı kayıt (ör. yanlışlıkla sıfır süre)
+     * ulaşılmaz bir hedef üretiyordu. P20 defalarca ulaşılmış hızdır.
      *
-     * birim_paketleme_dk KULLANILMIYOR; o değer zaten kişi sayısına
-     * bölünmüş olduğu için 3 kişilik ekipleri haksız yere avantajlı
-     * gösteriyor. Veride 3. kişinin hıza katkısı olmadığı görüldüğünden
-     * bölmek gerçek bir kazanç değil, aritmetik.
+     * Hesap SKU seviyesinde yapılıp gruba toplanır. Grup seviyesinde
+     * yapılsaydı TABLO içinde XXL ile L aynı hızda olmalıymış gibi
+     * davranılır, ürün farkı israp gibi görünürdü.
      *
-     * Endeks, seansı kendi ürününün ortalamasına oranlar; böylece zor
-     * ürün paketleyen ekip cezalandırılmaz.
+     * Bir dakikadan kısa seanslar dışlanır — hatalı giriş olma ihtimali
+     * yüksek ve hedefi aşağı çekiyorlar.
      */
-    const urunIscilikOrt = new Map<string, { top: number; n: number }>();
+    const skuOlcum = new Map<string, { grup: string; adet: number; olcumler: number[] }>();
     for (const s of seanslar) {
       const kisi = s.worker_count ?? 0;
       if (!s.sku || !s.qty || kisi <= 0) continue;
-      const ia = (gecenDk(s) * kisi) / s.qty;
+      const gecen = gecenDk(s);
+      if (gecen <= 1) continue;
+      const ia = (gecen * kisi) / s.qty;
       if (!(ia > 0)) continue;
-      const a = etiket(s.sku);
-      const u = urunIscilikOrt.get(a) ?? { top: 0, n: 0 };
-      u.top += ia; u.n++;
-      urunIscilikOrt.set(a, u);
+      const k = skuOlcum.get(s.sku) ?? { grup: etiket(s.sku), adet: 0, olcumler: [] };
+      k.adet += s.qty;
+      k.olcumler.push(ia);
+      skuOlcum.set(s.sku, k);
     }
 
-    const ekipMap = new Map<string, { kisi: number; seans: number; adet: number; iscilikTop: number; endeksTop: number; endeksN: number }>();
-    for (const s of seanslar) {
-      const kisi = s.worker_count ?? 0;
-      // Kod yerine isim: operator_name dolu, yoksa personel koduna düşülür
-      const ekipAdi = s.operator_name || s.personel;
-      if (!ekipAdi || !s.sku || !s.qty || kisi <= 0) continue;
-      const ia = (gecenDk(s) * kisi) / s.qty;
-      if (!(ia > 0)) continue;
-      const uo = urunIscilikOrt.get(etiket(s.sku));
-      // Tek seanslık ürünler ortalama oluşturmaz, endekse katılmaz
-      if (!uo || uo.n < 3) continue;
+    const grupTop = new Map<string, { sku: number; adet: number; ortTop: number; hedefTop: number }>();
+    for (const [, k] of skuOlcum) {
+      // 4 ölçümün altında P20 anlamlı değil
+      if (k.olcumler.length < 4) continue;
+      const sirali = [...k.olcumler].sort((a, b) => a - b);
+      const p20i = Math.max(0, Math.floor(sirali.length * 0.2) - 1);
+      const hedef = sirali.slice(0, p20i + 1).reduce((t, v) => t + v, 0) / (p20i + 1);
+      const ort = sirali.reduce((t, v) => t + v, 0) / sirali.length;
 
-      const g = ekipMap.get(ekipAdi) ?? { kisi, seans: 0, adet: 0, iscilikTop: 0, endeksTop: 0, endeksN: 0 };
-      g.kisi = Math.max(g.kisi, kisi);
-      g.seans++;
-      g.adet += s.qty;
-      g.iscilikTop += ia;
-      g.endeksTop += ia / (uo.top / uo.n);
-      g.endeksN++;
-      ekipMap.set(ekipAdi, g);
+      const g = grupTop.get(k.grup) ?? { sku: 0, adet: 0, ortTop: 0, hedefTop: 0 };
+      g.sku++;
+      g.adet += k.adet;
+      g.ortTop += ort * k.adet;
+      g.hedefTop += hedef * k.adet;
+      grupTop.set(k.grup, g);
     }
 
-    const ekipler: EkipSatiri[] = [...ekipMap.entries()]
-      // 4 seansın altında ortalama gürültülü
-      .filter(([, g]) => g.seans >= 4 && g.endeksN > 0)
-      .map(([ekip, g]) => ({
-        ekip,
-        kisi: g.kisi,
-        seans: g.seans,
+    const potansiyel: PotansiyelSatiri[] = [...grupTop.entries()]
+      .map(([grup, g]) => ({
+        grup,
+        skuSayisi: g.sku,
         adet: Math.round(g.adet),
-        iscilikAdet: Number((g.iscilikTop / g.seans).toFixed(2)),
-        endeks: Number((g.endeksTop / g.endeksN).toFixed(3)),
+        ortalama: Number((g.ortTop / g.adet).toFixed(2)),
+        hedef: Number((g.hedefTop / g.adet).toFixed(2)),
+        fark: Number(((g.ortTop - g.hedefTop) / g.adet).toFixed(2)),
+        kazanilabilirSaat: Math.round((g.ortTop - g.hedefTop) / 60),
       }))
-      .sort((a, b) => a.endeks - b.endeks);
+      .filter((x) => x.kazanilabilirSaat > 0)
+      .sort((a, b) => b.kazanilabilirSaat - a.kazanilabilirSaat);
 
-    return { success: true as const, data: { pareto, kisiEtkisi, ekipler } satisfies AnalizVerisi };
+    return { success: true as const, data: { pareto, kisiEtkisi, potansiyel } satisfies AnalizVerisi };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
