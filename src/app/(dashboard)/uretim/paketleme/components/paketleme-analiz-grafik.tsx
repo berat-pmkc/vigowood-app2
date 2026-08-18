@@ -4,7 +4,8 @@ import {
   Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts";
-import type { ParetoSatiri, KisiSatiri } from "../actions";
+import { Cell } from "recharts";
+import type { ParetoSatiri, KisiSatiri, EkipSatiri } from "../actions";
 
 /**
  * Analiz grafikleri tek dosyada — hepsi recharts kullanıyor ve bu dosya
@@ -21,7 +22,7 @@ function Ipucu({
   active?: boolean;
   payload?: Array<{ name?: string; value?: number; color?: string; dataKey?: string }>;
   label?: string | number;
-  birim: "dk" | "adet";
+  birim: "dk" | "adet" | "endeks";
   etiketOn?: string;
 }) {
   if (!active || !payload?.length) return null;
@@ -34,7 +35,9 @@ function Ipucu({
           <b>
             {p.dataKey === "kumulatif"
               ? `%${Number(p.value ?? 0).toFixed(1)}`
-              : birim === "dk"
+              : birim === "endeks"
+                ? Number(p.value ?? 0).toFixed(2)
+                : birim === "dk"
                 ? `${Number(p.value ?? 0).toLocaleString("tr-TR")} dk`
                 : Number(p.value ?? 0).toLocaleString("tr-TR")}
           </b>
@@ -47,9 +50,31 @@ function Ipucu({
 export function PaketlemeAnalizGrafik({
   tip, veri,
 }: {
-  tip: "pareto" | "adet" | "kisi";
-  veri: ParetoSatiri[] | KisiSatiri[];
+  tip: "pareto" | "adet" | "kisi" | "ekip";
+  veri: ParetoSatiri[] | KisiSatiri[] | EkipSatiri[];
 }) {
+  if (tip === "ekip") {
+    const d = veri as EkipSatiri[];
+    return (
+      <ResponsiveContainer width="100%" height={Math.max(220, d.length * 34)}>
+        <ComposedChart data={d} layout="vertical"
+                       margin={{ top: 8, right: 24, left: 108, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e3dc" />
+          <XAxis type="number" domain={[0, "auto"]} tick={{ fontSize: 11 }} stroke="#5e5747" />
+          <YAxis type="category" dataKey="ekip" width={104}
+                 tick={{ fontSize: 10 }} stroke="#5e5747" />
+          <Tooltip content={<Ipucu birim="endeks" />} />
+          <Bar dataKey="endeks" name="İşçilik endeksi" radius={[0, 4, 4, 0]}>
+            {d.map((e, i) => (
+              // 1'in altı ortalamadan verimli, üstü değil
+              <Cell key={i} fill={e.endeks <= 1 ? "#70c1aa" : "#ee7683"} />
+            ))}
+          </Bar>
+        </ComposedChart>
+      </ResponsiveContainer>
+    );
+  }
+
   if (tip === "kisi") {
     const d = veri as KisiSatiri[];
     return (

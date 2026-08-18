@@ -716,9 +716,21 @@ export interface KisiSatiri {
   gercekDk: number;
 }
 
+export interface EkipSatiri {
+  ekip: string;
+  kisi: number;
+  seans: number;
+  adet: number;
+  /** (geçen süre × kişi) / adet — kişi sayısına göre adil ölçüt */
+  iscilikAdet: number;
+  /** Ürün ortalamasına oran. 1'in altı = ortalamadan verimli */
+  endeks: number;
+}
+
 export interface AnalizVerisi {
   pareto: ParetoSatiri[];
   kisiEtkisi: KisiSatiri[];
+  ekipler: EkipSatiri[];
 }
 
 /**
@@ -736,7 +748,7 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
     const now = new Date();
     let query = supabase
       .from("pack_events")
-      .select("sku, qty, start_time, end_time, worker_count, birim_paketleme_dk")
+      .select("sku, qty, start_time, end_time, worker_count, birim_paketleme_dk, personel")
       .eq("durum", "tamamlandi")
       .not("end_time", "is", null)
       .not("sku", "is", null);
@@ -755,7 +767,7 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
     const seanslar = (data ?? []) as {
       sku: string | null; qty: number; start_time: string | null;
       end_time: string | null; worker_count: number | null;
-      birim_paketleme_dk: number | null;
+      birim_paketleme_dk: number | null; personel: string | null;
     }[];
 
     const gecenDk = (s: (typeof seanslar)[number]) =>
@@ -817,7 +829,66 @@ export async function getPaketlemeAnaliz(donem: "month" | "last_month" | "all") 
         gercekDk: g.gercekAdet > 0 ? Number((g.gercekTop / g.gercekAdet).toFixed(3)) : 0,
       }));
 
-    return { success: true as const, data: { pareto, kisiEtkisi } satisfies AnalizVerisi };
+    /**
+     * ── Ekip performansı ──
+     *
+     * Ölçüt: (geçen süre × kişi) / adet — yani adet başına harcanan
+     * İŞÇİLİK dakikası.
+     *
+     * birim_paketleme_dk KULLANILMIYOR; o değer zaten kişi sayısına
+     * bölünmüş olduğu için 3 kişilik ekipleri haksız yere avantajlı
+     * gösteriyor. Veride 3. kişinin hıza katkısı olmadığı görüldüğünden
+     * bölmek gerçek bir kazanç değil, aritmetik.
+     *
+     * Endeks, seansı kendi ürününün ortalamasına oranlar; böylece zor
+     * ürün paketleyen ekip cezalandırılmaz.
+     */
+    const urunIscilikOrt = new Map<string, { top: number; n: number }>();
+    for (const s of seanslar) {
+      const kisi = s.worker_count ?? 0;
+      if (!s.sku || !s.qty || kisi <= 0) continue;
+      const ia = (gecenDk(s) * kisi) / s.qty;
+      if (!(ia > 0)) continue;
+      const u = urunIscilikOrt.get(s.sku) ?? { top: 0, n: 0 };
+      u.top += ia; u.n++;
+      urunIscilikOrt.set(s.sku, u);
+    }
+
+    const ekipMap = new Map<string, { kisi: number; seans: number; adet: number; iscilikTop: number; endeksTop: number; endeksN: number }>();
+    for (const s of seanslar) {
+      const kisi = s.worker_count ?? 0;
+      const ekipAdi = (s as { personel?: string | null }).personel;
+      if (!ekipAdi || !s.sku || !s.qty || kisi <= 0) continue;
+      const ia = (gecenDk(s) * kisi) / s.qty;
+      if (!(ia > 0)) continue;
+      const uo = urunIscilikOrt.get(s.sku);
+      // Tek seanslık ürünler ortalama oluşturmaz, endekse katılmaz
+      if (!uo || uo.n < 3) continue;
+
+      const g = ekipMap.get(ekipAdi) ?? { kisi, seans: 0, adet: 0, iscilikTop: 0, endeksTop: 0, endeksN: 0 };
+      g.kisi = Math.max(g.kisi, kisi);
+      g.seans++;
+      g.adet += s.qty;
+      g.iscilikTop += ia;
+      g.endeksTop += ia / (uo.top / uo.n);
+      g.endeksN++;
+      ekipMap.set(ekipAdi, g);
+    }
+
+    const ekipler: EkipSatiri[] = [...ekipMap.entries()]
+      // 4 seansın altında ortalama gürültülü
+      .filter(([, g]) => g.seans >= 4 && g.endeksN > 0)
+      .map(([ekip, g]) => ({
+        ekip,
+        kisi: g.kisi,
+        seans: g.seans,
+        adet: Math.round(g.adet),
+        iscilikAdet: Number((g.iscilikTop / g.seans).toFixed(2)),
+        endeks: Number((g.endeksTop / g.endeksN).toFixed(3)),
+      }))
+      .sort((a, b) => a.endeks - b.endeks);
+
+    return { success: true as const, data: { pareto, kisiEtkisi, ekipler } satisfies AnalizVerisi };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

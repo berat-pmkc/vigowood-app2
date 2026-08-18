@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPaketlemeAnaliz, type AnalizVerisi } from "../actions";
 import { cn } from "@/lib/utils";
-import { TrendingUp, Users, Package, TriangleAlert } from "lucide-react";
+import { TrendingUp, Users, Package, TriangleAlert, UsersRound } from "lucide-react";
 
 // Recharts ağır; sayfa açılışını bekletmesin
 const Grafik = dynamic(() => import("./paketleme-analiz-grafik").then((m) => m.PaketlemeAnalizGrafik), {
@@ -123,6 +123,66 @@ export function PaketlemeAnaliz() {
               <Grafik tip="adet" veri={veri.pareto} />
             </Card>
           </div>
+
+
+          {/* 4. Ekip performansı */}
+          {veri.ekipler.length > 0 && (
+            <Card className="p-4">
+              <div className="mb-1 flex items-center gap-2">
+                <UsersRound className="size-4 text-muted-foreground" />
+                <h3 className="text-sm font-medium">Ekip performansı</h3>
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Ölçüt: adet başına harcanan <b>işçilik dakikası</b>, ürün
+                ortalamasına oranlanmış. <b>1&apos;in altı</b> ortalamadan verimli.
+                Her seans kendi ürününe göre değerlendirilir, zor ürün paketleyen
+                ekip cezalandırılmaz.
+              </p>
+              <Grafik tip="ekip" veri={veri.ekipler} />
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/60">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium">Ekip</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Kişi</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Seans</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Adet</th>
+                      <th className="px-2 py-1.5 text-right font-medium">İşçilik dk/adet</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Endeks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {veri.ekipler.map((e) => (
+                      <tr key={e.ekip} className="border-t">
+                        <td className="px-2 py-1.5 font-mono">{e.ekip}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{e.kisi}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">{e.seans}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {e.adet.toLocaleString("tr-TR")}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {e.iscilikAdet.toFixed(2)}
+                        </td>
+                        <td className={cn("px-2 py-1.5 text-right font-medium tabular-nums",
+                          e.endeks <= 1 ? "text-emerald-700" : "text-red-700")}>
+                          {e.endeks.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="mt-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs leading-relaxed text-amber-900">
+                <TriangleAlert className="mr-1 inline size-3.5" />
+                <b>Birim süreye (dk/adet/kişi) göre sıralamayın.</b> O değer zaten
+                kişi sayısına bölünmüş olduğu için kalabalık ekipleri haksız yere
+                önde gösterir. Burada kullanılan işçilik ölçütü kişi sayısına göre
+                adildir.
+              </p>
+            </Card>
+          )}
 
           {/* 3. Kişi sayısı etkisi */}
           <Card className="p-4">
