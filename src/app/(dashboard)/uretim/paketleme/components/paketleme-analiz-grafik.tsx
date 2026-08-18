@@ -108,24 +108,21 @@ export function PaketlemeAnalizGrafik({
   }
 
   if (tip === "kisi") {
-    const d = veri as KisiSatiri[];
+    const d = (veri as KisiSatiri[]).slice(0, 10);
     return (
-      <ResponsiveContainer width="100%" height={260}>
-        <ComposedChart data={d} margin={{ top: 8, right: 12, left: -8, bottom: 4 }}>
+      <ResponsiveContainer width="100%" height={Math.max(240, d.length * 40)}>
+        <ComposedChart data={d} layout="vertical"
+                       margin={{ top: 8, right: 28, left: 96, bottom: 16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e3dc" />
-          <XAxis
-            dataKey="kisi" tickFormatter={(v) => `${v} kişi`}
-            tick={{ fontSize: 12 }} stroke="#474237"
-          />
-          <YAxis yAxisId="l" tick={{ fontSize: 12 }} stroke="#474237"
-                 label={{ value: "dk", angle: -90, position: "insideLeft", fontSize: 11 }} />
-          <Tooltip content={<Ipucu birim="dk" etiketOn="kişi" />} />
+          <XAxis type="number" tick={{ fontSize: 12 }} stroke="#474237"
+                 label={{ value: "dk / adet (kısa olan hızlı)", position: "insideBottom",
+                          offset: -6, fontSize: 11 }} />
+          <YAxis type="category" dataKey="sku" width={92}
+                 tick={{ fontSize: 11 }} stroke="#474237" />
+          <Tooltip content={<Ipucu birim="dk" />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar yAxisId="l" dataKey="birimDk" name="Birim süre (dk/adet/kişi)"
-               fill="#3368b1" radius={[4, 4, 0, 0]} />
-          <Line yAxisId="l" type="monotone" dataKey="gercekDk"
-                name="Gerçek süre (dk/adet)" stroke="#f28a19" strokeWidth={2.5}
-                dot={{ r: 4 }} />
+          <Bar dataKey="hiz2" name="2 kişi" fill="#a99c7d" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="hiz3" name="3 kişi" fill="#3368b1" radius={[0, 4, 4, 0]} />
         </ComposedChart>
       </ResponsiveContainer>
     );
