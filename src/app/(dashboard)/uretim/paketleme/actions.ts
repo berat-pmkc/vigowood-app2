@@ -791,7 +791,7 @@ export async function getPaketlemeAnaliz(
      * Kırılım "grup" ise SKU yerine ürün grubu kullanılır. Grup boşsa
      * SKU'ya düşülür — ürün analizden kaybolmasın.
      */
-    let grupHarita = new Map<string, string>();
+    const grupHarita = new Map<string, string>();
     if (kirilim === "grup") {
       const skular = [...new Set(seanslar.map((x) => x.sku).filter(Boolean) as string[])];
       for (let i = 0; i < skular.length; i += 200) {
@@ -975,6 +975,283 @@ export async function getPaketlemeAnaliz(
       .sort((a, b) => b.kazanilabilirSaat - a.kazanilabilirSaat);
 
     return { success: true as const, data: { pareto, haftalik, potansiyel } satisfies AnalizVerisi };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PERSONEL ANALİZİ
+// ═══════════════════════════════════════════════════════════════
+
+export interface PersonelSatiri {
+  id: string;
+  ad: string;
+  seans: number;
+  /** Ekip payına düşen adet. Ham qty toplanırsa 3 kişilik seans 3 kez sayılır. */
+  adet: number;
+  /** Kişinin kendi saat kaydı — seans süresi (kişiyle ÇARPILMAZ). */
+  sureSaat: number;
+  grupSayisi: number;
+  ortEkip: number;
+  sonCalisma: string | null;
+  /**
+   * Karışım düzeltmeli performans endeksi: beklenen ÷ gerçek.
+   * 1.00 = tesis standardı. Yetersiz veri varsa null.
+   */
+  endeks: number | null;
+  /** İşinin yüzde kaçı standardı olan ürünlerden — endeksin güvenilirliği. */
+  kapsam: number;
+  yeterli: boolean;
+}
+
+export interface PersonelAnalizi {
+  satirlar: PersonelSatiri[];
+  /** Matris kolonları — hacme göre sıralı ürün grupları */
+  gruplar: string[];
+  /** personel adı → grup → pay adedi */
+  matris: Record<string, Record<string, number>>;
+  toplamSeans: number;
+  /** Standardı hesaplanabilen ürünlerin seans içindeki payı (%) */
+  standartKapsami: number;
+}
+
+/** Sıralamaya girmek için alt sınırlar. Küçük örneklem uç değer üretir. */
+const MIN_SEANS = 10;
+const MIN_KAPSAM = 50;
+/** Bir ürünün standardı için gereken en az ölçüm sayısı */
+const MIN_OLCUM = 3;
+
+function medyan(xs: number[]): number {
+  const s = [...xs].sort((a, b) => a - b);
+  const o = Math.floor(s.length / 2);
+  return s.length % 2 ? s[o] : (s[o - 1] + s[o]) / 2;
+}
+
+/**
+ * Kişi bazlı paketleme performansı.
+ *
+ * NEDEN HAM "adet/saat" KULLANILMIYOR: bu veri setinde ürünler arası
+ * paketleme süresi kat kat fark ediyor. Ham hız sıralaması, kimin hızlı
+ * olduğunu değil kime kolay ürün düştüğünü ölçer. Bu yüzden her ürün için
+ * tesis standardı çıkarılıp kişinin SEPETİNE göre beklenen süre
+ * hesaplanıyor; endeks = beklenen ÷ gerçek.
+ *
+ * NEDEN birim_paketleme_dk KULLANILMIYOR: o kolon seans kapanışında
+ * geçen_süre / (adet × kişi) olarak yazılıyor — kişi sayısına bölünmüş
+ * bir değer, yani kalabalık ekipler otomatik iyi görünür. Standart burada
+ * geçen_süre × kişi / adet (gerçek işçilik) olarak yeniden hesaplanıyor.
+ */
+export async function getPaketlemePersonelAnaliz(
+  donem: "month" | "last_month" | "all",
+  kirilim: "sku" | "grup" = "grup",
+) {
+  try {
+    // Arayüzde gizlemek yetmez; saha hesabı aksiyonu doğrudan çağırabilir.
+    const user = await getCurrentUser();
+    if (!user || !URETIM_ANALIZ_ROLES.includes(user.role)) {
+      return { success: false as const, error: "Bu analizi görme yetkiniz yok" };
+    }
+    const supabase = await createClient();
+
+    const now = new Date();
+    let query = supabase
+      .from("pack_events")
+      .select("sku, qty, start_time, end_time, worker_count, workers, operator_id, operator_name")
+      .eq("durum", "tamamlandi")
+      .not("end_time", "is", null)
+      .not("sku", "is", null);
+
+    if (donem === "month") {
+      query = query.gte("tarih", new Date(now.getFullYear(), now.getMonth(), 1).toISOString());
+    } else if (donem === "last_month") {
+      query = query
+        .gte("tarih", new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString())
+        .lt("tarih", new Date(now.getFullYear(), now.getMonth(), 1).toISOString());
+    }
+
+    const { data, error } = await query;
+    if (error) return { success: false as const, error: error.message };
+
+    type Ham = {
+      sku: string | null; qty: number; start_time: string | null; end_time: string | null;
+      worker_count: number | null; workers: unknown;
+      operator_id: string | null; operator_name: string | null;
+    };
+    const ham = (data ?? []) as Ham[];
+
+    // ── Ekip listesini çöz ────────────────────────────────────
+    // workers JSONB; eski kayıtlarda string olarak saklanmış olabilir.
+    // Boşsa seansı başlatan operatöre düşülür ki kayıt kaybolmasın.
+    const ekipCoz = (s: Ham): { id: string; ad: string }[] => {
+      let w: unknown = s.workers;
+      if (typeof w === "string") {
+        try { w = JSON.parse(w); } catch { w = null; }
+      }
+      if (Array.isArray(w) && w.length > 0) {
+        const liste = w
+          .map((x) => {
+            const o = x as { id?: unknown; name?: unknown };
+            const id = o?.id != null ? String(o.id) : null;
+            return id ? { id, ad: o?.name ? String(o.name) : id } : null;
+          })
+          .filter(Boolean) as { id: string; ad: string }[];
+        if (liste.length > 0) return liste;
+      }
+      if (s.operator_id) {
+        return [{ id: String(s.operator_id), ad: s.operator_name ?? String(s.operator_id) }];
+      }
+      return [];
+    };
+
+    const gecenDk = (s: Ham) =>
+      s.start_time && s.end_time
+        ? (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000
+        : 0;
+
+    // Bir dakikadan kısa seanslar hatalı giriş kabul edilip dışlanıyor —
+    // hem standardı hem endeksi bozuyorlar.
+    const seanslar = ham.filter((s) => s.sku && (s.qty ?? 0) > 0 && gecenDk(s) > 1);
+
+    // ── Ürün grubu eşlemesi ───────────────────────────────────
+    const grupHarita = new Map<string, string>();
+    if (kirilim === "grup") {
+      const skular = [...new Set(seanslar.map((x) => x.sku!) )];
+      for (let i = 0; i < skular.length; i += 200) {
+        const { data: urunler } = await supabase
+          .from("products")
+          .select("sku, urun_grubu")
+          .in("sku", skular.slice(i, i + 200));
+        for (const u of urunler ?? []) if (u.urun_grubu) grupHarita.set(u.sku, u.urun_grubu);
+      }
+    }
+    const grupAdi = (sku: string) => grupHarita.get(sku) ?? sku;
+
+    // ── 1) Ürün standartları (SKU seviyesinde) ────────────────
+    // Grup seviyesinde yapılsaydı TABLO içinde XXL ile L aynı hızda
+    // olmalıymış gibi davranılırdı; ürün farkı kişi farkı gibi görünürdü.
+    const olcum = new Map<string, number[]>();
+    for (const s of seanslar) {
+      const kisi = s.worker_count ?? ekipCoz(s).length ?? 1;
+      if (kisi <= 0) continue;
+      const isciligiBirim = (gecenDk(s) * kisi) / s.qty; // gerçek işçilik dk/adet
+      if (!(isciligiBirim > 0) || !Number.isFinite(isciligiBirim)) continue;
+      const liste = olcum.get(s.sku!) ?? [];
+      liste.push(isciligiBirim);
+      olcum.set(s.sku!, liste);
+    }
+
+    // Medyan — daha önce 0.00'lık hatalı kayıtlar ortalamayı bozmuştu.
+    const standart = new Map<string, number>();
+    for (const [sku, xs] of olcum) {
+      if (xs.length >= MIN_OLCUM) standart.set(sku, medyan(xs));
+    }
+
+    // ── 2) Kişi bazlı toplama ─────────────────────────────────
+    type Birikim = {
+      ad: string; seans: number; adet: number; sureDk: number;
+      ekipTop: number; gruplar: Set<string>; son: string | null;
+      beklenenDk: number; kapsananDk: number;
+      matris: Map<string, number>;
+    };
+    const kisiler = new Map<string, Birikim>();
+    let standartliSeans = 0;
+
+    for (const s of seanslar) {
+      const ekip = ekipCoz(s);
+      if (ekip.length === 0) continue;
+
+      const gecen = gecenDk(s);
+      const grup = grupAdi(s.sku!);
+      const std = standart.get(s.sku!);
+      if (std !== undefined) standartliSeans++;
+
+      for (const k of ekip) {
+        const b = kisiler.get(k.id) ?? {
+          ad: k.ad, seans: 0, adet: 0, sureDk: 0, ekipTop: 0,
+          gruplar: new Set<string>(), son: null,
+          beklenenDk: 0, kapsananDk: 0, matris: new Map<string, number>(),
+        };
+        // İsim zamanla düzeltilmiş olabilir; en son görüleni kullan.
+        if (k.ad && k.ad !== k.id) b.ad = k.ad;
+
+        b.seans++;
+        // Ekip payı: ham qty toplanırsa tesis toplamı kat kat şişer.
+        const pay = s.qty / ekip.length;
+        b.adet += pay;
+        // Kişinin kendi saati — kişiyle çarpılmaz, o çift sayım olur.
+        b.sureDk += gecen;
+        b.ekipTop += ekip.length;
+        b.gruplar.add(grup);
+        b.matris.set(grup, (b.matris.get(grup) ?? 0) + pay);
+        if (!b.son || (s.end_time && s.end_time > b.son)) b.son = s.end_time;
+
+        if (std !== undefined) {
+          // Sepetin standarda göre olması gereken süresi, kişi payına bölünmüş
+          b.beklenenDk += (s.qty * std) / ekip.length;
+          // Endeks yalnızca standardı olan işler üzerinden kurulsun
+          b.kapsananDk += gecen;
+        }
+        kisiler.set(k.id, b);
+      }
+    }
+
+    // ── 3) Satırlar ───────────────────────────────────────────
+    const satirlar: PersonelSatiri[] = [...kisiler.entries()].map(([id, b]) => {
+      const kapsam = b.sureDk > 0 ? (b.kapsananDk / b.sureDk) * 100 : 0;
+      const yeterli = b.seans >= MIN_SEANS && kapsam >= MIN_KAPSAM && b.kapsananDk > 0;
+      return {
+        id,
+        ad: b.ad,
+        seans: b.seans,
+        adet: Math.round(b.adet),
+        sureSaat: Number((b.sureDk / 60).toFixed(1)),
+        grupSayisi: b.gruplar.size,
+        ortEkip: Number((b.ekipTop / b.seans).toFixed(1)),
+        sonCalisma: b.son,
+        endeks: yeterli ? Number((b.beklenenDk / b.kapsananDk).toFixed(2)) : null,
+        kapsam: Math.round(kapsam),
+        yeterli,
+      };
+    });
+
+    // Sıralanabilir olanlar endekse göre, olmayanlar hacme göre sonda
+    satirlar.sort((a, b) => {
+      if (a.yeterli !== b.yeterli) return a.yeterli ? -1 : 1;
+      if (a.yeterli && b.yeterli) return (b.endeks ?? 0) - (a.endeks ?? 0);
+      return b.adet - a.adet;
+    });
+
+    // ── 4) Çok yönlülük matrisi ───────────────────────────────
+    const grupHacim = new Map<string, number>();
+    for (const [, b] of kisiler) {
+      for (const [g, adet] of b.matris) grupHacim.set(g, (grupHacim.get(g) ?? 0) + adet);
+    }
+    const gruplar = [...grupHacim.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 14)
+      .map(([g]) => g);
+
+    const matris: Record<string, Record<string, number>> = {};
+    for (const s of satirlar) {
+      const b = kisiler.get(s.id)!;
+      matris[s.ad] = Object.fromEntries(
+        gruplar.map((g) => [g, Math.round(b.matris.get(g) ?? 0)]),
+      );
+    }
+
+    return {
+      success: true as const,
+      data: {
+        satirlar,
+        gruplar,
+        matris,
+        toplamSeans: seanslar.length,
+        standartKapsami: seanslar.length
+          ? Math.round((standartliSeans / seanslar.length) * 100)
+          : 0,
+      } satisfies PersonelAnalizi,
+    };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

@@ -12,6 +12,7 @@ import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { SummaryCards } from "./summary-cards";
 
 import { PaketlemeAnaliz } from "./paketleme-analiz";
+import { PaketlemePersonel } from "./paketleme-personel";
 
 const ProductTrendChart = dynamic(
   () => import("./product-trend-chart").then(mod => ({ default: mod.ProductTrendChart })),
@@ -149,6 +150,9 @@ export function PaketlemeDashboard({
       <section>
         {/* Genel analiz — yalnızca yönetim rolleri */}
         {analizGorebilir && <PaketlemeAnaliz />}
+
+        {/* Kişi bazlı performans — aynı yetki kapısı (Yönetici + End. Mühendisi) */}
+        {analizGorebilir && <PaketlemePersonel />}
 
         {/* Tek ürünün birim süre seyri — detaya inmek isteyene */}
         <ProductTrendChart products={productOptions} />
