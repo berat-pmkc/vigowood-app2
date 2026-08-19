@@ -37,6 +37,7 @@ import {
   Activity,
   Tags,
   Container,
+  PlugZap,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole, ModuleKey } from "@/lib/constants";
@@ -129,6 +130,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Raporlar", href: "/satis/raporlar", icon: FileText, roles: MANAGEMENT_ROLES },
       { title: "Pazarlama", href: "/satis/pazarlama", icon: Target, roles: MANAGEMENT_ROLES },
       { title: "Kampanyalar", href: "/satis/kampanyalar", icon: Megaphone, roles: MANAGEMENT_ROLES },
+      { title: "DİA Entegrasyonu", href: "/satis/dia", icon: PlugZap, roles: MANAGEMENT_ROLES },
       { title: "Ayarlar", href: "/satis/ayarlar", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
     ],
   },
