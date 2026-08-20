@@ -145,6 +145,11 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
     [products, selectedSku],
   );
 
+  const secilenAdim = useMemo(
+    () => steps.find((s) => s.step_id === selectedStepId) ?? null,
+    [steps, selectedStepId],
+  );
+
   const listelenen = useMemo(() => {
     if (!arama.trim()) return products;
     const q = normalize(arama);
@@ -202,9 +207,12 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
       */}
       <DialogContent
         className={cn(
+          // Yükseklik BELİRLİ olmalı: yalnızca max-h verilirse iç flex
+          // zinciri yüksekliği çözemiyor, liste taşıp alt buton diyaloğun
+          // dışında kalıyordu.
           "flex flex-col gap-0 overflow-hidden p-0",
-          "max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:border-0",
-          "sm:max-w-lg sm:max-h-[85vh]",
+          "max-sm:h-[100dvh] max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:border-0",
+          "sm:h-[min(85vh,44rem)] sm:max-w-lg",
         )}
         showCloseButton={false}
       >
@@ -232,9 +240,9 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
         </DialogHeader>
 
         {/* ── Kaydırmalı gövde ───────────────────────────── */}
-        <div className="relative flex-1 overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {activeStep === 1 ? (
-            <div className="flex h-full flex-col animate-in fade-in slide-in-from-left-4 duration-200">
+            <div className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-left-4 duration-200">
               {/* Arama — her zaman görünür, popover içinde değil */}
               <div className="shrink-0 space-y-3 border-b p-4">
                 <div className="relative">
@@ -324,7 +332,7 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
             </div>
           ) : (
             /* ── Adım 2: yandan kayarak gelir ── */
-            <div className="flex h-full flex-col animate-in fade-in slide-in-from-right-6 duration-200">
+            <div className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-right-6 duration-200">
               {/* Seçilen ürün */}
               <div
                 className="shrink-0 border-b px-4 py-3"
@@ -348,72 +356,89 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                   <p className="py-10 text-center text-sm text-muted-foreground">
                     Bu ürüne ait montaj adımı bulunamadı.
                   </p>
-                ) : (
-                  <ul className="divide-y">
-                    {steps.map((step) => {
-                      const secili = selectedStepId === step.step_id;
-                      return (
-                        <li key={step.step_id}>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedStepId(step.step_id)}
-                            className={cn(
-                              "flex w-full items-center gap-3 px-4 py-3.5 text-left",
-                              secili ? "bg-vw-primary/10" : "active:bg-muted/60 hover:bg-muted/40",
-                            )}
-                          >
-                            <span className={cn(
-                              "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                              secili ? "bg-vw-primary text-white" : "bg-muted text-muted-foreground",
-                            )}>
-                              {secili ? <Check className="size-4" /> : step.seq_no}
-                            </span>
-                            <span className="min-w-0 flex-1 text-sm font-medium">
-                              {step.step_name || step.step_id}
-                            </span>
-                            {step.is_final_step && (
-                              <Badge variant="outline" className="shrink-0 border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
-                                Son
-                              </Badge>
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-
-                {/* Çalışanlar — burada seçiliyor, seans kapanışında tekrar sorulmuyor */}
-                {selectedStepId && (
-                  <div className="border-t p-4">
-                    <p className="mb-2 flex items-center gap-2 text-sm font-medium">
-                      <Users className="size-4" />
-                      Çalışanlar ({selectedWorkers.size} kişi)
-                    </p>
-                    <p className="mb-2 text-xs text-muted-foreground">
-                      Seansı kapatırken tekrar sorulmayacak — burada seçin.
-                    </p>
-                    <div className="space-y-0.5 rounded-lg border p-1">
-                      {operators.map((op) => (
-                        <label
-                          key={op.user_id}
-                          className="flex cursor-pointer items-center gap-3 rounded-md p-2.5 hover:bg-muted/50"
-                        >
-                          <Checkbox
-                            checked={selectedWorkers.has(op.user_id)}
-                            onCheckedChange={() => toggleWorker(op.user_id)}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm">{op.full_name}</span>
-                          <span className="shrink-0 text-[10px] text-muted-foreground">{op.user_id}</span>
-                        </label>
-                      ))}
-                      {operators.length === 0 && (
-                        <p className="py-2 text-center text-sm text-muted-foreground">
-                          Operatör bulunamadı
+                ) : secilenAdim ? (
+                  /*
+                   * Adım seçilince liste katlanıyor. Açık bırakılsaydı
+                   * kullanıcının çalışan seçimine ulaşmak için 14 adımı
+                   * kaydırması gerekiyordu — küçük ekranda kaybolan bir akış.
+                   */
+                  <div className="p-4">
+                    <div className="flex items-center gap-3 rounded-lg border border-vw-primary bg-vw-primary/10 p-3">
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-vw-primary text-white">
+                        <Check className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {secilenAdim.step_name || secilenAdim.step_id}
                         </p>
-                      )}
+                        <p className="text-xs text-muted-foreground">
+                          Adım {secilenAdim.seq_no}
+                          {secilenAdim.is_final_step ? " · Son adım" : ""}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost" size="sm" className="shrink-0"
+                        onClick={() => setSelectedStepId("")}
+                      >
+                        Değiştir
+                      </Button>
+                    </div>
+
+                    {/* Çalışanlar — seans kapanışında tekrar sorulmuyor */}
+                    <div className="mt-4">
+                      <p className="mb-1 flex items-center gap-2 text-sm font-medium">
+                        <Users className="size-4" />
+                        Çalışanlar ({selectedWorkers.size} kişi)
+                      </p>
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        Seansı kapatırken tekrar sorulmayacak — burada seçin.
+                      </p>
+                      <div className="space-y-0.5 rounded-lg border p-1">
+                        {operators.map((op) => (
+                          <label
+                            key={op.user_id}
+                            className="flex cursor-pointer items-center gap-3 rounded-md p-2.5 hover:bg-muted/50"
+                          >
+                            <Checkbox
+                              checked={selectedWorkers.has(op.user_id)}
+                              onCheckedChange={() => toggleWorker(op.user_id)}
+                            />
+                            <span className="min-w-0 flex-1 truncate text-sm">{op.full_name}</span>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">{op.user_id}</span>
+                          </label>
+                        ))}
+                        {operators.length === 0 && (
+                          <p className="py-2 text-center text-sm text-muted-foreground">
+                            Operatör bulunamadı
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
+                ) : (
+                  <ul className="divide-y">
+                    {steps.map((step) => (
+                      <li key={step.step_id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStepId(step.step_id)}
+                          className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/40 active:bg-muted/60"
+                        >
+                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                            {step.seq_no}
+                          </span>
+                          <span className="min-w-0 flex-1 text-sm font-medium">
+                            {step.step_name || step.step_id}
+                          </span>
+                          {step.is_final_step && (
+                            <Badge variant="outline" className="shrink-0 border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
+                              Son
+                            </Badge>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
 
