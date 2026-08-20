@@ -43,18 +43,53 @@ export async function getActiveProductsWithSteps() {
     if (pErr) return { success: false as const, error: pErr.message };
     if (!products || products.length === 0) return { success: true as const, data: [] };
 
+    /**
+     * Burada tek bir .in() sorgusu vardı. PostgREST varsayılanı 1000 satır;
+     * bugünkü veride (622 adım) sınır aşılmıyor, yani LS011'in görünmemesinin
+     * sebebi BU DEĞİLDİ — o istemci tarafındaki bulanık aramaydı. Ancak ürün
+     * başına ~9 adımla 110 ürünü geçtiğimizde liste sessizce kesilecekti:
+     * hata vermeyen, fark edilmesi zor bir kesilme. Şimdiden parçalanıyor ve
+     * limit açıkça veriliyor.
+     */
     const skus = products.map((p) => p.sku);
-    const { data: steps } = await supabase
-      .from("assembly_steps")
-      .select("sku")
-      .in("sku", skus);
-
-    const skusWithSteps = new Set((steps ?? []).map((s) => s.sku));
+    const skusWithSteps = new Set<string>();
+    for (let i = 0; i < skus.length; i += 100) {
+      const { data: steps, error: sErr } = await supabase
+        .from("assembly_steps")
+        .select("sku")
+        .in("sku", skus.slice(i, i + 100))
+        .limit(5000);
+      if (sErr) return { success: false as const, error: sErr.message };
+      for (const st of steps ?? []) if (st.sku) skusWithSteps.add(st.sku);
+    }
     const filtered = products.filter((p) => skusWithSteps.has(p.sku));
     return { success: true as const, data: filtered };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
+}
+
+/**
+ * montaj_sessions.workers alanını çözer. JSONB ya da (eski kayıtlarda)
+ * string olabilir; boşsa seansı açan operatöre düşülür.
+ */
+function parseSessionWorkers(
+  ham: unknown,
+  operatorId: string | null,
+  operatorName: string | null,
+): { id: string; name: string }[] {
+  let w: unknown = ham;
+  if (typeof w === "string") { try { w = JSON.parse(w); } catch { w = null; } }
+  if (Array.isArray(w)) {
+    const liste = w.map((x) => {
+      const o = x as { id?: unknown; name?: unknown };
+      const id = o?.id != null ? String(o.id) : null;
+      return id ? { id, name: o?.name ? String(o.name) : id } : null;
+    }).filter(Boolean) as { id: string; name: string }[];
+    if (liste.length > 0) return liste;
+  }
+  if (operatorId) return [{ id: operatorId, name: operatorName ?? operatorId }];
+  return [];
 }
 
 /** Bir ürünün montaj adımlarını getir (seq_no sıralı, bom_count ile) */
@@ -683,23 +718,17 @@ export async function createMontajSession(
 /** Seans kapat: montajda → tamamlandi + stok düşümü */
 export async function closeMontajSession(
   sessionId: string,
-  formData: { qty: number; workers: { id: string; name: string }[] }
+  formData: { qty: number; workers?: { id: string; name: string }[] }
 ): Promise<ActionResult> {
   try {
     await requireProductionAccess();
-
-    const parsed = montajSessionCloseSchema.safeParse(formData);
-    if (!parsed.success) {
-      const firstError = parsed.error.issues[0]?.message ?? "Geçersiz veri";
-      return { success: false, error: firstError };
-    }
 
     const supabase = await createClient();
 
     // Seans bilgileri
     const { data } = await supabase
       .from("montaj_sessions")
-      .select("session_id, durum, sku, step_id, start_time, operator_id")
+      .select("session_id, durum, sku, step_id, start_time, operator_id, operator_name, workers")
       .eq("session_id", sessionId)
       .single();
 
@@ -710,6 +739,8 @@ export async function closeMontajSession(
       step_id: string;
       start_time: string | null;
       operator_id: string | null;
+      operator_name: string | null;
+      workers: unknown;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -717,7 +748,24 @@ export async function closeMontajSession(
 
     const now = new Date();
     const endTime = now.toISOString();
-    const { qty, workers } = parsed.data;
+
+    const qty = Number(formData.qty);
+    if (!Number.isFinite(qty) || qty < 1 || qty > 99999) {
+      return { success: false, error: "Geçerli bir adet giriniz" };
+    }
+
+    /**
+     * Çalışanlar seans AÇILIŞINDA seçiliyor; kapanışta tekrar sorulmuyor.
+     * İki kez seçtirmek hem gereksiz hem de iki listenin çelişme riski
+     * taşıyordu. Kapanışta liste gelirse (eski istemci) o kullanılır.
+     */
+    const workers = (formData.workers && formData.workers.length > 0)
+      ? formData.workers
+      : parseSessionWorkers(session.workers, session.operator_id, session.operator_name);
+
+    if (workers.length === 0) {
+      return { success: false, error: "Seansta kayıtlı çalışan bulunamadı" };
+    }
 
     // Birim montaj süresi — molalar düşülmüş net süreden hesaplanır.
     // Seans bir çay veya öğle molasını kapsıyorsa o dakikalar işçilik
@@ -831,7 +879,12 @@ export async function cancelMontajSession(sessionId: string): Promise<ActionResu
 /** Tamamlanan seansı düzenle (qty, workers) + stok güncelle */
 export async function updateCompletedMontajSession(
   sessionId: string,
-  formData: { qty: number; start_time?: string; workers: { id: string; name: string }[] }
+  formData: {
+    qty: number;
+    start_time?: string;
+    end_time?: string;
+    workers: { id: string; name: string }[];
+  }
 ): Promise<ActionResult> {
   try {
     await requireProductionAccess();
@@ -869,12 +922,49 @@ export async function updateCompletedMontajSession(
     const { qty, workers } = parsed.data;
     const oldQty = Number(session.qty) || 0;
 
-    // Birim montaj süresi yeniden hesapla
+    /**
+     * Gecikmeli kapatma / geç başlatma düzeltmesi: hem başlangıç hem bitiş
+     * elle değiştirilebiliyor. Verilmeyen taraf mevcut değerini korur.
+     */
+    const yeniBas = formData.start_time ?? session.start_time;
+    const yeniBit = formData.end_time ?? session.end_time;
+
+    if (yeniBas && yeniBit && new Date(yeniBit) <= new Date(yeniBas)) {
+      return { success: false, error: "Bitiş saati başlangıçtan sonra olmalı" };
+    }
+    if (yeniBit && new Date(yeniBit).getTime() > Date.now() + 60_000) {
+      return { success: false, error: "Bitiş saati gelecekte olamaz" };
+    }
+
+    /**
+     * Süre, seans kapanışıyla AYNI yoldan hesaplanıyor: molalar düşülmüş net
+     * süre. Burada ham fark kullanılsaydı elle düzeltilen bir seans, normal
+     * kapatılan seanslarla kıyaslanamaz hale gelirdi.
+     */
     let birimDk: number | null = null;
-    if (session.start_time && session.end_time && qty > 0 && workers.length > 0) {
-      const diffMs = new Date(session.end_time).getTime() - new Date(session.start_time).getTime();
-      const totalMinutes = diffMs / 60000;
-      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+    let brutDk: number | null = null;
+    let molaDk: number | null = null;
+    let netDk: number | null = null;
+
+    if (yeniBas && yeniBit) {
+      const { data: sureData } = await supabase.rpc("montaj_sure_hesapla", {
+        p_bas: yeniBas,
+        p_bit: yeniBit,
+        p_operator_id: session.operator_id,
+      });
+      const sure = Array.isArray(sureData) ? sureData[0] : sureData;
+      if (sure) {
+        brutDk = Number(sure.brut);
+        molaDk = Number(sure.mola);
+        netDk = Number(sure.net);
+      } else {
+        brutDk = Math.round(((new Date(yeniBit).getTime() - new Date(yeniBas).getTime()) / 60000) * 100) / 100;
+        molaDk = 0;
+        netDk = brutDk;
+      }
+      if (qty > 0 && workers.length > 0 && netDk !== null) {
+        birimDk = Math.round((netDk / (qty * workers.length)) * 100) / 100;
+      }
     }
 
     // Update montaj_sessions
@@ -885,8 +975,12 @@ export async function updateCompletedMontajSession(
         worker_count: workers.length,
         workers,
         birim_montaj_dk: birimDk,
-        // Operatör yanlış saatte başlatmış olabilir; verilmezse mevcut korunur
+        brut_sure_dk: brutDk,
+        mola_dk: molaDk,
+        net_sure_dk: netDk,
+        // Operatör yanlış saatte başlatmış/kapatmış olabilir
         ...(formData.start_time ? { start_time: formData.start_time } : {}),
+        ...(formData.end_time ? { end_time: formData.end_time } : {}),
       })
       .eq("session_id", sessionId);
 

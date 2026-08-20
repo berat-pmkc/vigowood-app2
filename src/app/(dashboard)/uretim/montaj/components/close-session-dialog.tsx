@@ -9,20 +9,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Users, Package, Clock } from "lucide-react";
-import { closeMontajSession, getMontajOperators } from "../actions";
+import { closeMontajSession } from "../actions";
 import { toast } from "sonner";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
+import { parseWorkers } from "../utils";
 import type { ActiveMontajSession } from "./session-card";
-
-interface Operator {
-  user_id: string;
-  full_name: string;
-  role: string;
-}
 
 interface CloseSessionDialogProps {
   session: ActiveMontajSession | null;
@@ -45,34 +39,12 @@ function ElapsedBadge({ startTime }: { startTime: string }) {
 }
 
 export function CloseSessionDialog({ session, open, onOpenChange }: CloseSessionDialogProps) {
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [qty, setQty] = useState("");
-  const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (open && operators.length === 0) {
-      setLoading(true);
-      getMontajOperators().then((result) => {
-        if (result.success) setOperators(result.data);
-        setLoading(false);
-      });
-    }
-    if (!open) {
-      setQty("");
-      setSelectedWorkers(new Set());
-    }
-  }, [open, operators.length]);
-
-  const toggleWorker = (id: string) => {
-    setSelectedWorkers((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+    if (!open) setQty("");
+  }, [open]);
 
   const handleSubmit = async () => {
     if (!session) return;
@@ -82,18 +54,10 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
       toast.error("Geçerli bir adet giriniz");
       return;
     }
-    if (selectedWorkers.size === 0) {
-      toast.error("En az 1 çalışan seçiniz");
-      return;
-    }
 
-    const workers = Array.from(selectedWorkers).map((id) => {
-      const op = operators.find((o) => o.user_id === id);
-      return { id, name: op?.full_name ?? id };
-    });
-
+    // Çalışanlar seans açılışında seçildi; sunucu seanstan okuyor.
     setSubmitting(true);
-    const result = await closeMontajSession(session.session_id, { qty: numQty, workers });
+    const result = await closeMontajSession(session.session_id, { qty: numQty });
     if (result.success) {
       toast.success(`${numQty} adet montaj tamamlandı`);
       onOpenChange(false);
@@ -104,6 +68,8 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
   };
 
   if (!session) return null;
+
+  const seansCalisanlari = parseWorkers(session.workers) ?? [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,41 +121,31 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
             />
           </div>
 
-          {/* Worker selection */}
+          {/* Çalışanlar — seans açılışında seçildi, burada yalnızca gösteriliyor */}
           <div>
             <Label className="text-sm font-medium flex items-center gap-2 mb-2">
               <Users className="w-4 h-4" />
-              Kim görev yaptı? ({selectedWorkers.size} kişi)
+              Çalışanlar
             </Label>
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Operatörler yükleniyor...
-              </div>
-            ) : (
-              <div className="max-h-48 overflow-y-auto border rounded-lg p-2 space-y-1">
-                {operators.map((op) => (
-                  <label
-                    key={op.user_id}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={selectedWorkers.has(op.user_id)}
-                      onCheckedChange={() => toggleWorker(op.user_id)}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm truncate">{op.full_name}</span>
-                      <span className="text-xs text-muted-foreground">{op.user_id}</span>
-                    </div>
-                  </label>
-                ))}
-                {operators.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-2">
-                    Operatör bulunamadı
-                  </p>
-                )}
-              </div>
-            )}
+            <div className="rounded-lg border bg-muted/30 p-3">
+              {seansCalisanlari.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {seansCalisanlari.map((w) => (
+                    <Badge key={w.id} variant="secondary" className="text-xs font-normal">
+                      {w.name}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {session.operator_name ?? "Operatör bilgisi yok"}
+                </p>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Seans başlatılırken seçildi. Değiştirmek için seansı kapattıktan
+                sonra &quot;Düzenle&quot;yi kullanın.
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -198,7 +154,7 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!qty || selectedWorkers.size === 0 || submitting}
+              disabled={!qty || submitting}
               className="bg-vw-success hover:bg-vw-success/90 text-white"
             >
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

@@ -20,7 +20,7 @@ import {
 import { Loader2, Users, Package, Pencil, Clock, Trash2 } from "lucide-react";
 import { deleteCompletedMontajSession, updateCompletedMontajSession, getMontajOperators } from "../actions";
 import { toast } from "sonner";
-import { formatDuration } from "@/lib/utils";
+import { formatDuration, cn } from "@/lib/utils";
 import type { CompletedMontajSession } from "./completed-sessions-sheet";
 
 interface Operator {
@@ -41,6 +41,7 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
   const [submitting, setSubmitting] = useState(false);
   const [qty, setQty] = useState("");
   const [baslangic, setBaslangic] = useState("");
+  const [bitis, setBitis] = useState("");
   const [siliniyor, setSiliniyor] = useState(false);
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
 
@@ -58,11 +59,13 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
     if (open && session) {
       setQty(String(session.qty));
       // datetime-local yerel saat bekliyor; ISO'yu doğrudan veremeyiz
-      if (session.start_time) {
-        const d = new Date(session.start_time);
+      const yerel = (iso: string) => {
+        const d = new Date(iso);
         const p = (n: number) => String(n).padStart(2, "0");
-        setBaslangic(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`);
-      }
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+      };
+      setBaslangic(session.start_time ? yerel(session.start_time) : "");
+      setBitis(session.end_time ? yerel(session.end_time) : "");
       const workerIds = new Set<string>();
       if (session.workers && Array.isArray(session.workers)) {
         session.workers.forEach((w) => workerIds.add(w.id));
@@ -71,6 +74,8 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
     }
     if (!open) {
       setQty("");
+      setBaslangic("");
+      setBitis("");
       setSelectedWorkers(new Set());
     }
   }, [open, session]);
@@ -115,11 +120,17 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
       return { id, name: op?.full_name ?? id };
     });
 
+    if (baslangic && bitis && new Date(bitis) <= new Date(baslangic)) {
+      toast.error("Bitiş saati başlangıçtan sonra olmalı");
+      return;
+    }
+
     setSubmitting(true);
     const result = await updateCompletedMontajSession(session.session_id, {
       qty: numQty,
       workers,
       start_time: baslangic ? new Date(baslangic).toISOString() : undefined,
+      end_time: bitis ? new Date(bitis).toISOString() : undefined,
     });
     if (result.success) {
       toast.success("Seans güncellendi");
@@ -131,6 +142,12 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
   };
 
   if (!session) return null;
+
+  /** Kullanıcı yazarken anında geri bildirim — sunucu ayrıca doğruluyor */
+  const hesaplananDk =
+    baslangic && bitis
+      ? (new Date(bitis).getTime() - new Date(baslangic).getTime()) / 60000
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,22 +195,42 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
             />
           </div>
 
-          {/* Worker selection */}
-          {/* Başlangıç saati — operatör yanlış saatte başlatmış olabilir */}
+          {/* Saat düzeltme — geç başlatma / geç kapatma düzeltilebilsin */}
           <div>
-            <Label htmlFor="montaj-start" className="text-sm font-medium flex items-center gap-2 mb-2">
+            <Label className="text-sm font-medium flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4" />
-              Başlangıç saati
+              Çalışma saatleri
             </Label>
-            <Input
-              id="montaj-start"
-              type="datetime-local"
-              value={baslangic}
-              onChange={(e) => setBaslangic(e.target.value)}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Değiştirirseniz birim montaj süresi yeniden hesaplanır.
-            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <span className="mb-1 block text-xs text-muted-foreground">Başlangıç</span>
+                <Input
+                  id="montaj-start"
+                  type="datetime-local"
+                  value={baslangic}
+                  onChange={(e) => setBaslangic(e.target.value)}
+                />
+              </div>
+              <div>
+                <span className="mb-1 block text-xs text-muted-foreground">Bitiş</span>
+                <Input
+                  id="montaj-end"
+                  type="datetime-local"
+                  value={bitis}
+                  onChange={(e) => setBitis(e.target.value)}
+                />
+              </div>
+            </div>
+            {hesaplananDk !== null && (
+              <p className={cn(
+                "mt-1.5 text-xs",
+                hesaplananDk <= 0 ? "text-destructive" : "text-muted-foreground",
+              )}>
+                {hesaplananDk <= 0
+                  ? "Bitiş saati başlangıçtan sonra olmalı."
+                  : `Yeni süre: ${Math.floor(hesaplananDk / 60)}sa ${Math.round(hesaplananDk % 60)}dk (brüt). Molalar sunucuda düşülür, birim süre yeniden hesaplanır.`}
+              </p>
+            )}
           </div>
 
           <div>
@@ -274,7 +311,7 @@ export function EditSessionDialog({ session, open, onOpenChange }: EditSessionDi
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!qty || selectedWorkers.size === 0 || submitting}
+              disabled={!qty || selectedWorkers.size === 0 || submitting || (hesaplananDk !== null && hesaplananDk <= 0)}
               className="bg-vw-primary hover:bg-vw-deep text-white"
             >
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
