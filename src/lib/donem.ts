@@ -2,7 +2,7 @@
  * Özet dönem kodları.
  *
  * Etiketin kendisi aynı zamanda değer: "2026_08.2" = 2026 Ağustos'un 2.
- * haftası, "2026_08" = 2026 Ağustos'un tamamı, "bugun" = bugün. Ayrı bir
+ * haftası, "2026_08" = 2026 Ağustos'un tamamı, "bugun" / "dun" = o gün. Ayrı bir
  * etiket/değer eşlemesi tutulmuyor; ekranda ne görünüyorsa sunucuya o
  * gidiyor, böylece ikisinin ayrışma ihtimali yok.
  *
@@ -40,12 +40,13 @@ export interface DonemAraligi {
 
 /** Kod → tarih aralığı. Tanınmayan kod için null. */
 export function donemAraligi(kod: string): DonemAraligi | null {
-  if (kod === "bugun") {
+  if (kod === "bugun" || kod === "dun") {
     const bas = new Date();
     bas.setHours(0, 0, 0, 0);
+    if (kod === "dun") bas.setDate(bas.getDate() - 1);
     const bit = new Date(bas);
     bit.setDate(bit.getDate() + 1);
-    return { bas, bit, etiket: "Bugün" };
+    return { bas, bit, etiket: kod === "dun" ? "Dün" : "Bugün" };
   }
 
   const hafta = kod.match(/^(\d{4})_(\d{2})\.(\d)$/);
@@ -102,6 +103,7 @@ const AYLAR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
 
 export function donemAciklama(kod: string): string {
   if (kod === "bugun") return "Bugün";
+  if (kod === "dun") return "Dün";
   const h = kod.match(/^(\d{4})_(\d{2})\.(\d)$/);
   if (h) return `${AYLAR[Number(h[2]) - 1]} ${h[1]} · ${h[3]}. hafta`;
   const a = kod.match(/^(\d{4})_(\d{2})$/);

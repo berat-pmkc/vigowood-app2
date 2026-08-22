@@ -21,46 +21,17 @@ import type { KesimTalebi } from "../actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
 import { Plus, Scissors, CalendarDays } from "lucide-react";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
+import { sonHaftalar, sonAylar, donemAciklama } from "@/lib/donem";
 
-const DATE_FILTERS = [
-  { key: "today", label: "Bugün" },
-  { key: "yesterday", label: "Dün" },
-  { key: "week", label: "Bu Hafta" },
-  { key: "month", label: "Bu Ay" },
-  { key: "last_month", label: "Geçen Ay" },
+/**
+ * Hızlı gün seçimleri. Hafta ve ay artık tek tek seçiliyor (montaj
+ * ekranıyla aynı mantık): "bu hafta / bu ay" gibi kayan aralıklar,
+ * iki gün sonra bakıldığında farklı sonuç veriyordu.
+ */
+const GUN_FILTRELERI = [
+  { key: "bugun", label: "Bugün" },
+  { key: "dun", label: "Dün" },
 ] as const;
-
-const AY_ISIMLERI = [
-  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
-];
-
-const DATE_FILTER_LABELS: Record<string, string> = {
-  today: "Bugün",
-  yesterday: "Dün",
-  week: "Bu Hafta",
-  month: "Bu Ay",
-  last_month: "Geçen Ay",
-};
-
-/** Generate month options from a start date (e.g. Jan 2025) until last month */
-function generateMonthOptions() {
-  const now = new Date();
-  const options: { value: string; label: string }[] = [];
-  // Start from Jan 2025 up to last month
-  const startYear = 2025;
-  const startMonth = 0; // January
-  for (let y = now.getFullYear(); y >= startYear; y--) {
-    const endM = y === now.getFullYear() ? now.getMonth() - 1 : 11;
-    const startM = y === startYear ? startMonth : 0;
-    for (let m = endM; m >= startM; m--) {
-      const value = `${y}-${String(m + 1).padStart(2, "0")}`;
-      const label = `${AY_ISIMLERI[m]} ${y}`;
-      options.push({ value, label });
-    }
-  }
-  return options;
-}
 
 interface KesimDashboardProps {
   records: CutBatchRow[];
@@ -93,20 +64,24 @@ export function KesimDashboard({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [aktifTalep, setAktifTalep] = useState<KesimTalebi | null>(null);
 
+  /** Dönem değişimi URL'e yazılıyor; sunucu tarafı yeniden sorguluyor */
+  const donemSec = (kod: string) => {
+    if (!kod) return;
+    const params = new URLSearchParams();
+    if (kod !== "bugun") params.set("dateFilter", kod);
+    router.push(`/uretim/kesim${params.toString() ? `?${params}` : ""}`);
+  };
+
   const talepBaslat = (t: KesimTalebi) => {
     setAktifTalep(t);
     setDialogOpen(true);
   };
-  const monthOptions = useMemo(() => generateMonthOptions(), []);
+  const haftalar = useMemo(() => sonHaftalar(12), []);
+  const aylar = useMemo(() => sonAylar(12), []);
+  const haftaSecili = dateFilter.includes(".");
+  const aySecili = /^\d{4}_\d{2}$/.test(dateFilter);
 
-  // Custom month filter label: "2025-11" → "Kasım 2025"
-  const isCustomMonth = /^\d{4}-\d{2}$/.test(dateFilter);
-  const sectionLabel = isCustomMonth
-    ? (() => {
-        const [y, m] = dateFilter.split("-").map(Number);
-        return `${AY_ISIMLERI[m - 1]} ${y}`;
-      })()
-    : DATE_FILTER_LABELS[dateFilter] || "Bugün";
+  const sectionLabel = donemAciklama(dateFilter);
 
   return (
     <div className="space-y-4">
@@ -162,42 +137,44 @@ export function KesimDashboard({
             )}
           </h2>
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap mb-3">
-          {DATE_FILTERS.map((f) => (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {GUN_FILTRELERI.map((f) => (
             <Button
               key={f.key}
               variant={dateFilter === f.key ? "default" : "outline"}
               size="sm"
               className="h-7 text-xs"
-              onClick={() => {
-                const params = new URLSearchParams();
-                if (f.key !== "today") params.set("dateFilter", f.key);
-                router.push(`/uretim/kesim${params.toString() ? `?${params}` : ""}`);
-              }}
+              onClick={() => donemSec(f.key)}
             >
               {f.label}
             </Button>
           ))}
-          <Select
-            value={isCustomMonth ? dateFilter : ""}
-            onValueChange={(value) => {
-              if (value) {
-                router.push(`/uretim/kesim?dateFilter=${value}`);
-              }
-            }}
-          >
-            <SelectTrigger className={`h-7 text-xs w-[140px] ${isCustomMonth ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90" : ""}`}>
-              <CalendarDays className="w-3.5 h-3.5 mr-1" />
-              <SelectValue placeholder="Ay Seç" />
+
+          <Select value={haftaSecili ? dateFilter : ""} onValueChange={donemSec}>
+            <SelectTrigger className={`h-7 w-[130px] text-xs ${haftaSecili ? "border-primary bg-primary text-primary-foreground" : ""}`}>
+              <CalendarDays className="mr-1 h-3.5 w-3.5" />
+              <SelectValue placeholder="Hafta" />
             </SelectTrigger>
             <SelectContent>
-              {monthOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
+              {haftalar.map((h) => (
+                <SelectItem key={h} value={h} className="text-xs">{h}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={aySecili ? dateFilter : ""} onValueChange={donemSec}>
+            <SelectTrigger className={`h-7 w-[120px] text-xs ${aySecili ? "border-primary bg-primary text-primary-foreground" : ""}`}>
+              <CalendarDays className="mr-1 h-3.5 w-3.5" />
+              <SelectValue placeholder="Ay" />
+            </SelectTrigger>
+            <SelectContent>
+              {aylar.map((a) => (
+                <SelectItem key={a} value={a} className="text-xs">{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <span className="text-xs text-muted-foreground">{sectionLabel}</span>
         </div>
         <KesimDonemOzeti records={records} donemEtiketi={sectionLabel} />
 

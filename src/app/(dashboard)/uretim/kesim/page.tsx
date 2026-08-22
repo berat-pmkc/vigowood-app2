@@ -6,58 +6,70 @@ import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS } from "@/lib/constants";
 import { KesimDashboard } from "./components/kesim-dashboard";
 import { getKesimTalepleri } from "./actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "./types";
+import { donemAraligi } from "@/lib/donem";
 
 export const metadata: Metadata = { title: "Kesim" };
 
+/**
+ * Dönem kodunu tarih aralığına çevirir.
+ *
+ * Yeni kodlar (montaj ekranıyla ortak): "bugun", "dun", "2026_08.3"
+ * (ayın 3. haftası), "2026_08" (ayın tamamı).
+ *
+ * Eski kodlar (yesterday/week/month/last_month ve "2026-08") hâlâ
+ * destekleniyor: tabletlerde ve yer imlerinde eski bağlantılar var,
+ * onlar bozulmasın.
+ */
 function getDateRange(filter: string) {
   const now = new Date();
 
-  // Custom month: "2025-11" format
-  if (/^\d{4}-\d{2}$/.test(filter)) {
-    const [year, month] = filter.split("-").map(Number);
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0); // last day of that month
-    return {
-      start: `${firstDay.toISOString().split("T")[0]}T00:00:00.000Z`,
-      end: `${lastDay.toISOString().split("T")[0]}T23:59:59.999Z`,
-    };
+  const yeni = donemAraligi(filter);
+  if (yeni) {
+    return { start: yeni.bas.toISOString(), end: yeni.bit.toISOString() };
   }
+
+  // ── Geriye dönük uyumluluk ────────────────────────────────
+  const eskiAy = filter.match(/^(\d{4})-(\d{2})$/);
+  if (eskiAy) {
+    const bas = new Date(Number(eskiAy[1]), Number(eskiAy[2]) - 1, 1);
+    const bit = new Date(Number(eskiAy[1]), Number(eskiAy[2]), 1);
+    return { start: bas.toISOString(), end: bit.toISOString() };
+  }
+
+  const gunBasi = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
 
   switch (filter) {
     case "yesterday": {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = yesterday.toISOString().split("T")[0];
-      return { start: `${yStr}T00:00:00.000Z`, end: `${yStr}T23:59:59.999Z` };
+      const bas = gunBasi(now);
+      bas.setDate(bas.getDate() - 1);
+      const bit = new Date(bas);
+      bit.setDate(bit.getDate() + 1);
+      return { start: bas.toISOString(), end: bit.toISOString() };
     }
     case "week": {
-      const monday = new Date(now);
-      const dayOfWeek = monday.getDay() || 7;
-      monday.setDate(monday.getDate() - dayOfWeek + 1);
+      const bas = gunBasi(now);
+      bas.setDate(bas.getDate() - ((bas.getDay() + 6) % 7));
+      return { start: bas.toISOString(), end: now.toISOString() };
+    }
+    case "month":
       return {
-        start: `${monday.toISOString().split("T")[0]}T00:00:00.000Z`,
+        start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
         end: now.toISOString(),
       };
-    }
-    case "month": {
-      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    case "last_month":
       return {
-        start: `${firstOfMonth.toISOString().split("T")[0]}T00:00:00.000Z`,
-        end: now.toISOString(),
+        start: new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString(),
+        end: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
       };
-    }
-    case "last_month": {
-      const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-      return {
-        start: `${firstOfLastMonth.toISOString().split("T")[0]}T00:00:00.000Z`,
-        end: `${lastOfLastMonth.toISOString().split("T")[0]}T23:59:59.999Z`,
-      };
-    }
     default: {
-      // "today"
-      const todayStr = now.toISOString().split("T")[0];
-      return { start: `${todayStr}T00:00:00.000Z`, end: `${todayStr}T23:59:59.999Z` };
+      const bas = gunBasi(now);
+      const bit = new Date(bas);
+      bit.setDate(bit.getDate() + 1);
+      return { start: bas.toISOString(), end: bit.toISOString() };
     }
   }
 }
@@ -73,7 +85,7 @@ export default async function KesimPage({
   }
 
   const params = await searchParams;
-  const dateFilter = params.dateFilter || "today";
+  const dateFilter = params.dateFilter || "bugun";
   const { start: rangeStart, end: rangeEnd } = getDateRange(dateFilter);
 
   const supabase = await createClient();
