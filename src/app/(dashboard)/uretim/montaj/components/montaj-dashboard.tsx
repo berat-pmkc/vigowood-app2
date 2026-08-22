@@ -11,6 +11,7 @@ import { CloseSessionDialog } from "./close-session-dialog";
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { SummaryCards } from "./summary-cards";
+import { MontajAnaliz } from "./montaj-analiz";
 import { PackageReadyDialog } from "./package-ready-widget";
 
 const StepPerformanceChart = dynamic(
@@ -37,10 +38,13 @@ interface MontajDashboardProps {
   productOptions: ProductOption[];
   /** Seans iptali yalnızca ofis rolleri için (PRODUCTION_CANCEL_ROLES). */
   canCancel: boolean;
+  /** Saha hesapları analizleri görmez — kişi/adım karşılaştırması içeriyor */
+  analizGorebilir: boolean;
 }
 
 export function MontajDashboard({
   canCancel,
+  analizGorebilir,
   activeSessions: serverActiveSessions,
   productOptions: serverProductOptions,
 }: MontajDashboardProps) {
@@ -144,6 +148,14 @@ export function MontajDashboard({
         <ProductTrendChart products={productOptions} />
         <StepPerformanceChart products={productOptions} />
       </section>
+
+      {/* Analiz — yalnızca Yönetici + Endüstri Mühendisi */}
+      {analizGorebilir && (
+        <>
+          <Separator />
+          <MontajAnaliz />
+        </>
+      )}
 
       {/* Dialogs & Sheets */}
       <NewSessionDialog open={newDialogOpen} onOpenChange={setNewDialogOpen} />

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PRODUCTION_ACCESS_ROLES, PRODUCTION_CANCEL_ROLES } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, PRODUCTION_CANCEL_ROLES, URETIM_ANALIZ_ROLES } from "@/lib/constants";
 import { MontajDashboard } from "./components/montaj-dashboard";
 import type { ActiveMontajSession } from "./components/session-card";
 import { parseWorkers } from "./utils";
@@ -65,6 +65,7 @@ export default async function MontajPage() {
         activeSessions={activeSessions}
         productOptions={productOptions}
         canCancel={PRODUCTION_CANCEL_ROLES.includes(user.role)}
+        analizGorebilir={URETIM_ANALIZ_ROLES.includes(user.role)}
       />
     </div>
   );

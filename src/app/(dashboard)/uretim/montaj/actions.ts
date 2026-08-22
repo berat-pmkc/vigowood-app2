@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { montajSessionCloseSchema } from "@/lib/validations";
-import { PRODUCTION_ACCESS_ROLES, PRODUCTION_CANCEL_ROLES } from "@/lib/constants";
+import { donemAraligi } from "@/lib/donem";
+import { PRODUCTION_ACCESS_ROLES, PRODUCTION_CANCEL_ROLES, URETIM_ANALIZ_ROLES } from "@/lib/constants";
 import { parseWorkers } from "./utils";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -263,35 +264,25 @@ export async function getMontajOperators() {
   }
 }
 
-/** KPI analiz verisi */
-export async function getMontajAnalytics(period: "today" | "week" | "month" | "lastMonth") {
+/**
+ * KPI analiz verisi.
+ *
+ * Dönem kodu etiketin kendisi: "bugun", "2026_08.2" (ayın 2. haftası),
+ * "2026_08" (ayın tamamı). Ayrı etiket/değer eşlemesi tutulmuyor.
+ */
+export async function getMontajAnalytics(donemKodu: string) {
   try {
     await requireProductionAccess();
     const supabase = await createClient();
 
-    const now = new Date();
-    let since: Date;
-    let until: Date | null = null;
-    if (period === "today") {
-      since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (period === "week") {
-      since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-    } else if (period === "lastMonth") {
-      since = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      until = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else {
-      since = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    }
+    const aralik = donemAraligi(donemKodu) ?? donemAraligi("bugun")!;
 
-    let query = supabase
+    const query = supabase
       .from("montaj_sessions")
-      .select("session_id, qty, start_time, end_time, worker_count, workers, birim_montaj_dk")
+      .select("session_id, qty, start_time, end_time, worker_count, workers, birim_montaj_dk, net_sure_dk")
       .eq("durum", "tamamlandi")
-      .gte("end_time", since.toISOString());
-
-    if (until) {
-      query = query.lt("end_time", until.toISOString());
-    }
+      .gte("end_time", aralik.bas.toISOString())
+      .lt("end_time", aralik.bit.toISOString());
 
     const { data, error } = await query;
 
@@ -548,6 +539,8 @@ export async function getStepPerformance(sku: string) {
 export async function getCompletedSessions(params: {
   period?: "today" | "week" | "month" | "all";
   sku?: string;
+  /** Personel adı, adım adı ya da SKU — sunucu tarafı arama */
+  q?: string;
   dateFrom?: string;
   dateTo?: string;
   page?: number;
@@ -593,6 +586,30 @@ export async function getCompletedSessions(params: {
     // SKU filter
     if (params.sku) {
       query = query.eq("sku", params.sku);
+    }
+
+    /**
+     * Serbest arama. arama_metni kolonu trigger ile dolduruluyor ve ekip
+     * üyelerinin adlarını da içeriyor (workers JSONB'si üzerinden doğrudan
+     * ILIKE yapılamıyor).
+     *
+     * PostgREST'in or/filter söz dizimi virgül ve parantezle çalıştığı için
+     * kullanıcı girdisi sadeleştiriliyor; aksi halde tek bir virgül sorguyu
+     * bozar.
+     */
+    if (params.q && params.q.trim()) {
+      // Türkçe karakterler ASCII'ye katlanıyor — arama_metni kolonu da
+      // aynı katlamayla yazılıyor (bkz. 20260822091000 migration).
+      const temiz = params.q
+        .toLocaleLowerCase("tr")
+        .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g")
+        .replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c")
+        .replace(/[^a-z0-9\s.-]/g, " ")
+        .trim()
+        .slice(0, 60);
+      if (temiz) {
+        query = query.or(`arama_metni.ilike.*${temiz.replace(/\s+/g, "*")}*`);
+      }
     }
 
     query = query.range(from, to);
@@ -1191,5 +1208,247 @@ export async function deleteCompletedMontajSession(sessionId: string): Promise<A
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MONTAJ ANALİZİ
+//
+// Ölçü birimi her yerde İŞÇİLİK dk/adet = süre × kişi ÷ adet.
+// birim_montaj_dk kolonu kullanılmıyor: o değer süre ÷ (adet × kişi)
+// olarak yazılıyor, yani kişi sayısına bölünmüş — kalabalık ekipler
+// otomatik iyi görünür. Süre olarak, varsa molası düşülmüş net_sure_dk
+// tercih ediliyor; yoksa brüt farka düşülüyor.
+// ═══════════════════════════════════════════════════════════════
+
+export interface AdimYuku {
+  adim: string;
+  seans: number;
+  adet: number;
+  /** Toplam işçilik dakikası */
+  iscilikDk: number;
+  /** Kümülatif işçilik payı (%) */
+  kumulatif: number;
+  /** Medyan işçilik dk/adet */
+  medyanBirim: number;
+}
+
+export interface AdimKararlilik {
+  adim: string;
+  olcum: number;
+  medyan: number;
+  /** En iyi %25 dilim — defalarca ulaşılmış hız */
+  iyiCeyrek: number;
+  /** En kötü %25 dilim */
+  kotuCeyrek: number;
+  /** (medyan - iyiCeyrek) × adet, saate çevrilmiş */
+  kazanilabilirSaat: number;
+  adet: number;
+}
+
+export interface UrunYuku {
+  urun: string;
+  adimSayisi: number;
+  adet: number;
+  /** Bir ürünü baştan sona montajlamanın toplam işçiliği (dk/adet) */
+  toplamBirim: number;
+  /** En pahalı adım ve payı */
+  enPahaliAdim: string;
+  enPahaliPay: number;
+}
+
+export interface MontajAnalizi {
+  adimYuku: AdimYuku[];
+  kararlilik: AdimKararlilik[];
+  urunYuku: UrunYuku[];
+  toplamSeans: number;
+  kullanilanSeans: number;
+  /** Süresi net (molası düşülmüş) olan seansların payı % */
+  netOran: number;
+  /** Kapatılmayı unuttuğu için elenen seans sayısı */
+  sarkanSeans: number;
+  /** 1 dakikanın altında kaldığı için elenen seans sayısı */
+  kisaSeans: number;
+}
+
+const MIN_OLCUM_ADIM = 3;
+
+/**
+ * Bir vardiyayı aşan seans kapatılmamış demektir, çalışılmış demek değil.
+ * Ölçüldü: 1385 dakikalık (gece boyu açık kalmış) tek bir kayıt, bir adımı
+ * tek başına en pahalı adım gösteriyordu. Mola fonksiyonu bunu düzeltmiyor —
+ * o yalnızca vardiya içi molaları düşüyor.
+ */
+const MAX_SEANS_DK = 600;
+
+/**
+ * Montaj analizi — ürün seçmeden tüm resmi verir.
+ *
+ * Paketlemeden farklı olarak montaj çok adımlı: asıl soru "kim hızlı"
+ * değil, "hangi adım hattı tıkıyor". Bu yüzden kırılım adım bazlı.
+ */
+export async function getMontajAnaliz(donemKodu: string) {
+  try {
+    // Arayüzde gizlemek yetmez; saha hesabı aksiyonu doğrudan çağırabilir.
+    const user = await getCurrentUser();
+    if (!user || !URETIM_ANALIZ_ROLES.includes(user.role)) {
+      return { success: false as const, error: "Bu analizi görme yetkiniz yok" };
+    }
+    const supabase = await createClient();
+    const aralik = donemAraligi(donemKodu) ?? donemAraligi("bugun")!;
+
+    const { data, error } = await supabase
+      .from("montaj_sessions")
+      .select("sku, step_name, qty, start_time, end_time, worker_count, workers, net_sure_dk")
+      .eq("durum", "tamamlandi")
+      .not("end_time", "is", null)
+      .gte("end_time", aralik.bas.toISOString())
+      .lt("end_time", aralik.bit.toISOString());
+
+    if (error) return { success: false as const, error: error.message };
+
+    type Ham = {
+      sku: string | null; step_name: string | null; qty: number;
+      start_time: string | null; end_time: string | null;
+      worker_count: number | null; workers: unknown; net_sure_dk: number | null;
+    };
+    const ham = (data ?? []) as Ham[];
+
+    const brut = (s: Ham) =>
+      s.start_time && s.end_time
+        ? (new Date(s.end_time).getTime() - new Date(s.start_time).getTime()) / 60000
+        : 0;
+
+    /** Molası düşülmüş süre varsa o; yoksa brüt. */
+    const sure = (s: Ham) =>
+      s.net_sure_dk != null && Number(s.net_sure_dk) > 0 ? Number(s.net_sure_dk) : brut(s);
+
+    let netli = 0;
+    let sarkan = 0;
+    let kisa = 0;
+    const gecerli = ham.filter((s) => {
+      if (!s.step_name || (s.qty ?? 0) <= 0) return false;
+      const d = sure(s);
+      // 1 dakikanın altı hatalı giriş kabul ediliyor
+      if (d <= 1) { kisa++; return false; }
+      // Vardiyayı aşan seans kapatılmamış demek — ortalamayı tek başına bozar
+      if (d > MAX_SEANS_DK) { sarkan++; return false; }
+      if (s.net_sure_dk != null && Number(s.net_sure_dk) > 0) netli++;
+      return true;
+    });
+
+    const kisiSayisi = (s: Ham) =>
+      s.worker_count ?? (parseWorkers(s.workers)?.length ?? 1) ?? 1;
+
+    /** Gerçek işçilik dk/adet */
+    const iscilikBirim = (s: Ham) => (sure(s) * kisiSayisi(s)) / s.qty;
+
+    const med = (xs: number[]) => {
+      const a = [...xs].sort((x, y) => x - y);
+      const o = Math.floor(a.length / 2);
+      return a.length % 2 ? a[o] : (a[o - 1] + a[o]) / 2;
+    };
+    const dilim = (xs: number[], p: number) => {
+      const a = [...xs].sort((x, y) => x - y);
+      return a[Math.min(a.length - 1, Math.max(0, Math.floor(a.length * p)))];
+    };
+
+    // ── 1) Adım bazlı yük ────────────────────────────────────
+    const adimlar = new Map<string, { seans: number; adet: number; isc: number; olcum: number[] }>();
+    for (const s of gecerli) {
+      const k = adimlar.get(s.step_name!) ?? { seans: 0, adet: 0, isc: 0, olcum: [] };
+      k.seans++;
+      k.adet += s.qty;
+      k.isc += sure(s) * kisiSayisi(s);
+      k.olcum.push(iscilikBirim(s));
+      adimlar.set(s.step_name!, k);
+    }
+
+    const sirali = [...adimlar.entries()].sort((a, b) => b[1].isc - a[1].isc);
+    const toplamIsc = sirali.reduce((t, [, v]) => t + v.isc, 0);
+    let birikim = 0;
+    const adimYuku: AdimYuku[] = sirali.map(([adim, v]) => {
+      birikim += v.isc;
+      return {
+        adim,
+        seans: v.seans,
+        adet: Math.round(v.adet),
+        iscilikDk: Math.round(v.isc),
+        kumulatif: toplamIsc ? Number(((birikim / toplamIsc) * 100).toFixed(1)) : 0,
+        medyanBirim: Number(med(v.olcum).toFixed(2)),
+      };
+    });
+
+    // ── 2) Adım kararlılığı ──────────────────────────────────
+    // Aynı adım her seferinde aynı sürmeli. Sürmüyorsa yöntem, malzeme
+    // ya da eğitim farkı var demektir; standart süre de güvenilmez olur.
+    const kararlilik: AdimKararlilik[] = [...adimlar.entries()]
+      .filter(([, v]) => v.olcum.length >= MIN_OLCUM_ADIM)
+      .map(([adim, v]) => {
+        const m = med(v.olcum);
+        const iyi = dilim(v.olcum, 0.25);
+        const kotu = dilim(v.olcum, 0.75);
+        return {
+          adim,
+          olcum: v.olcum.length,
+          medyan: Number(m.toFixed(2)),
+          iyiCeyrek: Number(iyi.toFixed(2)),
+          kotuCeyrek: Number(kotu.toFixed(2)),
+          adet: Math.round(v.adet),
+          kazanilabilirSaat: Math.round(((m - iyi) * v.adet) / 60),
+        };
+      })
+      .filter((x) => x.kazanilabilirSaat > 0)
+      .sort((a, b) => b.kazanilabilirSaat - a.kazanilabilirSaat);
+
+    // ── 3) Ürün bazlı toplam montaj işçiliği ─────────────────
+    const urunler = new Map<string, Map<string, { isc: number; adet: number }>>();
+    for (const s of gecerli) {
+      if (!s.sku) continue;
+      const u = urunler.get(s.sku) ?? new Map();
+      const a = u.get(s.step_name!) ?? { isc: 0, adet: 0 };
+      a.isc += sure(s) * kisiSayisi(s);
+      a.adet += s.qty;
+      u.set(s.step_name!, a);
+      urunler.set(s.sku, u);
+    }
+
+    const urunYuku: UrunYuku[] = [...urunler.entries()]
+      .map(([urun, adimMap]) => {
+        // Her adımın kendi adedine bölünür; adımlar farklı partilerde
+        // çalışıldığı için toplam süreyi toplam adede bölmek yanıltıcı olur.
+        const birimler = [...adimMap.entries()].map(([adim, a]) => ({
+          adim, birim: a.isc / a.adet, adet: a.adet,
+        }));
+        const toplamBirim = birimler.reduce((t, b) => t + b.birim, 0);
+        const enPahali = birimler.sort((a, b) => b.birim - a.birim)[0];
+        return {
+          urun,
+          adimSayisi: birimler.length,
+          adet: Math.round(Math.max(...birimler.map((b) => b.adet))),
+          toplamBirim: Number(toplamBirim.toFixed(2)),
+          enPahaliAdim: enPahali?.adim ?? "—",
+          enPahaliPay: toplamBirim
+            ? Math.round(((enPahali?.birim ?? 0) / toplamBirim) * 100)
+            : 0,
+        };
+      })
+      .sort((a, b) => b.toplamBirim - a.toplamBirim);
+
+    return {
+      success: true as const,
+      data: {
+        adimYuku,
+        kararlilik,
+        urunYuku,
+        toplamSeans: ham.length,
+        kullanilanSeans: gecerli.length,
+        netOran: gecerli.length ? Math.round((netli / gecerli.length) * 100) : 0,
+        sarkanSeans: sarkan,
+        kisaSeans: kisa,
+      } satisfies MontajAnalizi,
+    };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

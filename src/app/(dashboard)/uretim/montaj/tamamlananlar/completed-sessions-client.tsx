@@ -36,6 +36,7 @@ import {
   Users,
   CheckCircle,
   X,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -70,10 +71,19 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
   const [skuComboOpen, setSkuComboOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [arama, setArama] = useState("");
+  // Her tuşta sorgu atmamak için geciktirilmiş kopya
+  const [aramaGecikmeli, setAramaGecikmeli] = useState("");
 
   // Edit dialog
   const [editSession, setEditSession] = useState<CompletedMontajSession | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+
+  // 350 ms yazma durunca sorgula
+  useEffect(() => {
+    const t = setTimeout(() => setAramaGecikmeli(arama), 350);
+    return () => clearTimeout(t);
+  }, [arama]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -82,6 +92,7 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
       sku: selectedSku || undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
+      q: aramaGecikmeli || undefined,
       page,
       pageSize,
     });
@@ -90,7 +101,7 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
       setTotal(result.total);
     }
     setLoading(false);
-  }, [period, selectedSku, dateFrom, dateTo, page]);
+  }, [period, selectedSku, dateFrom, dateTo, aramaGecikmeli, page]);
 
   useEffect(() => {
     fetchData();
@@ -99,7 +110,7 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
   // Reset page on filter change
   useEffect(() => {
     setPage(1);
-  }, [period, selectedSku, dateFrom, dateTo]);
+  }, [period, selectedSku, dateFrom, dateTo, aramaGecikmeli]);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -108,10 +119,11 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
     setSelectedSku("");
     setDateFrom("");
     setDateTo("");
+    setArama("");
     setPage(1);
   };
 
-  const hasActiveFilters = selectedSku || dateFrom || dateTo || period !== "week";
+  const hasActiveFilters = selectedSku || dateFrom || dateTo || arama || period !== "week";
 
   return (
     <div className="space-y-4">
@@ -131,6 +143,28 @@ export function CompletedSessionsClient({ productOptions }: CompletedSessionsCli
             {total} kayıt
           </p>
         </div>
+      </div>
+
+      {/* Arama — personel adı, işlem (adım) adı ya da SKU */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={arama}
+          onChange={(e) => setArama(e.target.value)}
+          placeholder="Personel, işlem veya ürün ara..."
+          className="h-10 pl-9 pr-9"
+          autoComplete="off"
+        />
+        {arama && (
+          <button
+            type="button"
+            onClick={() => setArama("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted"
+            aria-label="Aramayı temizle"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
 
       {/* Filters */}
