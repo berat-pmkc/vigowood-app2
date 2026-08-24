@@ -11,7 +11,7 @@ import {
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 import { formatNumber, cn } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 
@@ -71,11 +71,50 @@ function StokCell({ stok, kritik }: { stok: number; kritik: number }) {
   );
 }
 
-function getColumns(): ColumnDef<StokProduct>[] {
+/** Tıklanınca sıralamayı değiştiren başlık. İlk tıklama büyükten küçüğe. */
+function SortableHeader({
+  label, col, sortBy, sortOrder, onSort, align = "left",
+}: {
+  label: string;
+  col: string;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+  onSort: (col: string) => void;
+  align?: "left" | "right";
+}) {
+  const aktif = sortBy === col;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(col)}
+      className={cn(
+        "flex items-center gap-1 text-xs font-medium transition-colors hover:text-foreground",
+        aktif ? "text-foreground" : "text-muted-foreground",
+        align === "right" && "ml-auto flex-row-reverse",
+      )}
+    >
+      {label}
+      {aktif ? (
+        sortOrder === "desc" ? <ArrowDown className="size-3.5" /> : <ArrowUp className="size-3.5" />
+      ) : (
+        <ChevronsUpDown className="size-3.5 opacity-40" />
+      )}
+    </button>
+  );
+}
+
+function getColumns(
+  sortBy: string,
+  sortOrder: "asc" | "desc",
+  onSort: (col: string) => void,
+): ColumnDef<StokProduct>[] {
   return [
     {
       accessorKey: "sku",
-      header: () => <span className="text-xs font-medium">Ürün Kodu</span>,
+      header: () => (
+        <SortableHeader label="Ürün Kodu" col="sku"
+          sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
+      ),
       cell: ({ row }) => (
         <span className="font-mono text-xs sm:text-sm whitespace-nowrap">
           {row.original.sku}
@@ -86,7 +125,10 @@ function getColumns(): ColumnDef<StokProduct>[] {
     },
     {
       accessorKey: "gunluk_satis",
-      header: () => <span className="text-xs font-medium">Günlük Satış</span>,
+      header: () => (
+        <SortableHeader label="Günlük Satış" col="gunluk_satis"
+          sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
+      ),
       cell: ({ row }) => (
         <span className="tabular-nums text-sm text-muted-foreground">
           {row.original.gunluk_satis > 0
@@ -100,7 +142,10 @@ function getColumns(): ColumnDef<StokProduct>[] {
     },
     {
       accessorKey: "stok_aktif",
-      header: () => <span className="text-xs font-medium">Stok</span>,
+      header: () => (
+        <SortableHeader label="Stok" col="stok_aktif"
+          sortBy={sortBy} sortOrder={sortOrder} onSort={onSort} />
+      ),
       cell: ({ row }) => (
         <StokCell
           stok={row.original.stok_aktif}
@@ -155,7 +200,23 @@ export function StokDataTable({
     [sortBy, sortOrder]
   );
 
-  const columns = useMemo(() => getColumns(), []);
+  /**
+   * Başlığa tıklama: aynı kolonsa yön değişir, farklı kolonsa büyükten
+   * küçüğe başlar (kullanıcı "önce büyükten küçüğe" istedi). Sayfa 0'a döner
+   * ki sıralama baştan görünsün.
+   */
+  const handleSort = useCallback(
+    (col: string) => {
+      const yeniYon = sortBy === col && sortOrder === "desc" ? "asc" : "desc";
+      navigate({ sortBy: col, sortOrder: yeniYon, page: "0" });
+    },
+    [sortBy, sortOrder, navigate]
+  );
+
+  const columns = useMemo(
+    () => getColumns(sortBy, sortOrder, handleSort),
+    [sortBy, sortOrder, handleSort]
+  );
 
   const table = useReactTable({
     data,

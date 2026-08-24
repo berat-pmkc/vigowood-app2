@@ -75,15 +75,19 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     productsQuery = productsQuery.eq("kategori", stokKategori as ProductCategory);
   }
 
-  const validStokSortColumns: (keyof Product)[] = [
-    "sku", "urun_adi", "kategori", "stok_aktif", "mamul_stok_kritik", "gunluk_satis",
-  ];
-  const stokSortColumn = validStokSortColumns.includes(stokSortBy as keyof Product)
+  /**
+   * Sıralama artık SAYFADA yapılıyor, veritabanında değil.
+   *
+   * Sebep: ekrandaki "Stok" değeri seçili deponun bakiyesi (urun_depo_stok
+   * / urun_toplam_stok görünümünden), ama products.stok_aktif toplam bakiye.
+   * DB'de stok_aktif'e göre sıralarsak, belirli bir depo seçiliyken görünen
+   * sayılarla sıra tutmuyordu (ör. Yurtdışı deposunda 800 adetlik ürün en
+   * altta kalabiliyordu). Aktif ürün sayısı az (~144) olduğu için tümü
+   * çekilip bakiyeye göre sıralanıp dilimleniyor; her depoda doğru çalışır.
+   */
+  const stokSortColumn = ["sku", "gunluk_satis", "stok_aktif"].includes(stokSortBy)
     ? stokSortBy
     : "gunluk_satis";
-  productsQuery = productsQuery
-    .order(stokSortColumn, { ascending: stokSortOrder === "asc" })
-    .range(stokPage * stokPageSize, stokPage * stokPageSize + stokPageSize - 1);
 
   // 2. Movements query with filters
   let movementsQuery = supabase
@@ -174,8 +178,26 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     .filter((m) => m.qty > 0)
     .reduce((sum, m) => sum + m.qty, 0);
 
+  // ---------- SORT (depo bakiyesine göre) + PAGINATE (sayfada) ----------
+  const tumUrunler = (productsResult.data || []) as Product[];
+  const balans = (p: Product) => stokHaritasi.get(p.sku) ?? 0;
+  const yon = stokSortOrder === "asc" ? 1 : -1;
+  const siraliUrunler = [...tumUrunler].sort((a, b) => {
+    if (stokSortColumn === "sku") return yon * a.sku.localeCompare(b.sku, "tr");
+    if (stokSortColumn === "gunluk_satis") {
+      return yon * ((a.gunluk_satis ?? 0) - (b.gunluk_satis ?? 0));
+    }
+    const fark = balans(a) - balans(b);
+    return fark !== 0 ? yon * fark : a.sku.localeCompare(b.sku, "tr");
+  });
+  const stokTotalCount = siraliUrunler.length;
+  const sayfaUrunleri = siraliUrunler.slice(
+    stokPage * stokPageSize,
+    stokPage * stokPageSize + stokPageSize,
+  );
+
   // ---------- FETCH LAST MOVEMENT DATES FOR CURRENT PAGE SKUs ONLY ----------
-  const pageSkus = ((productsResult.data || []) as Product[]).map((p) => p.sku);
+  const pageSkus = sayfaUrunleri.map((p) => p.sku);
   const lastMovementMap = new Map<string, string>();
   if (pageSkus.length > 0) {
     let lastMovQuery = supabase
@@ -194,7 +216,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   }
 
   // ---------- ENRICH PRODUCTS WITH LAST MOVEMENT DATE ----------
-  const products = ((productsResult.data || []) as Product[]).map((p): StokProduct => ({
+  const products = sayfaUrunleri.map((p): StokProduct => ({
     ...p,
     // Seçili depodaki (veya tüm depolardaki) miktar
     stok_aktif: stokHaritasi.get(p.sku) ?? 0,
@@ -254,7 +276,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
           todayProduction,
         }}
         stokData={products}
-        stokTotalCount={productsResult.count ?? 0}
+        stokTotalCount={stokTotalCount}
         stokPageIndex={stokPage}
         stokPageSize={stokPageSize}
         stokSearch={stokSearch}
