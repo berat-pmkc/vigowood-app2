@@ -904,11 +904,25 @@ export async function getPaketlemeAnaliz(
       haftaMap.set(anahtar, h);
     }
 
+    // "18–24 Ağu" gibi hafta aralığı. Sadece pazartesi tarihi (29/06)
+    // hangi hafta olduğunu anlatmıyordu; aralık + ay adı net.
+    const AY_KISA = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+    const haftaEtiket = (pztISO: string) => {
+      const bas = new Date(pztISO + "T00:00:00");
+      const bit = new Date(bas);
+      bit.setDate(bit.getDate() + 6);
+      const g = (d: Date) => d.getDate();
+      if (bas.getMonth() === bit.getMonth()) {
+        return `${g(bas)}–${g(bit)} ${AY_KISA[bas.getMonth()]}`;
+      }
+      return `${g(bas)} ${AY_KISA[bas.getMonth()]}–${g(bit)} ${AY_KISA[bit.getMonth()]}`;
+    };
+
     const haftalik: HaftaSatiri[] = [...haftaMap.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([hafta, h]) => ({
         hafta,
-        etiket: new Date(hafta).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" }),
+        etiket: haftaEtiket(hafta),
         adet: Math.round(h.adet),
         seans: h.seans,
         gerceklesen: Number((h.isc / h.adet).toFixed(2)),

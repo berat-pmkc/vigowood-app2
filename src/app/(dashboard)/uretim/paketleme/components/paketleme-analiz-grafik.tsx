@@ -115,10 +115,11 @@ export function PaketlemeAnalizGrafik({
   if (tip === "hafta") {
     const d = veri as HaftaSatiri[];
     return (
-      <ResponsiveContainer width="100%" height={300}>
-        <ComposedChart data={d} margin={{ top: 8, right: 16, left: -8, bottom: 8 }}>
+      <ResponsiveContainer width="100%" height={320}>
+        <ComposedChart data={d} margin={{ top: 8, right: 16, left: -8, bottom: 28 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e3dc" />
-          <XAxis dataKey="etiket" tick={{ fontSize: 12 }} stroke="#474237" />
+          <XAxis dataKey="etiket" tick={{ fontSize: 11 }} stroke="#474237"
+                 angle={-15} textAnchor="end" interval={0} height={44} />
           <YAxis yAxisId="l" tick={{ fontSize: 12 }} stroke="#474237" />
           <YAxis yAxisId="r" orientation="right" domain={[0.7, 1.3]}
                  tick={{ fontSize: 12 }} stroke="#a99c7d" />
