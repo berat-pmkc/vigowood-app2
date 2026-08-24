@@ -933,23 +933,36 @@ export async function getPaketlemeAnaliz(
     /**
      * ── İyileştirme potansiyeli ──
      *
-     * Hedef = ürünün KENDİ en iyi %20 dilimi (P20). Neden en iyi tek
-     * seans değil: tek bir hatalı kayıt (ör. yanlışlıkla sıfır süre)
-     * ulaşılmaz bir hedef üretiyordu. P20 defalarca ulaşılmış hızdır.
+     * ESKİ HESAP YANILTICIYDI. İki kaynaktan şişiyordu:
+     *   1) "Şu an" = ham ORTALAMA idi; kapatılmayı unutan (>4 saat) ve öğle
+     *      molasını kapsayan seanslar ortalamayı yukarı çekiyordu.
+     *   2) "Ulaşılabilir" = tüm seansların en iyi %20'siydi; içinde tek bir
+     *      uç-hızlı/hatalı kayıt (ör. 0,29 dk/adet) hedefi gerçekçi olmayan
+     *      bir yere indiriyordu.
+     * Sonuç: KÜÇÜK KOS'ta 2,54 → 0,52 gibi 5 kat sahte fark. Ölçüldü:
+     * temiz seanslarla gerçek tablo 2,30 → 1,79 (yaklaşık %22).
      *
-     * Hesap SKU seviyesinde yapılıp gruba toplanır. Grup seviyesinde
-     * yapılsaydı TABLO içinde XXL ile L aynı hızda olmalıymış gibi
-     * davranılır, ürün farkı israp gibi görünürdü.
-     *
-     * Bir dakikadan kısa seanslar dışlanır — hatalı giriş olma ihtimali
-     * yüksek ve hedefi aşağı çekiyorlar.
+     * DÜZELTME — kıyaslama bölümüyle aynı temizlik:
+     *   - 1 dk altı, 4 saat (MAX_SEANS_DK) üstü ve mola kapsayan seanslar atılır.
+     *   - "Şu an" = MEDYAN (ortalama değil; uzun seans tek başına bozamasın).
+     *   - "Ulaşılabilir" = temiz seansların P25'i (birkaç kez ulaşılmış iyi
+     *     çeyrek; tek uç değer değil).
+     * Hesap yine SKU seviyesinde, gruba hacim ağırlıklı toplanır.
      */
+    const molaKapsar = (x: { start_time: string | null; end_time: string | null }) => {
+      if (!x.start_time || !x.end_time) return false;
+      return trSaat(x.start_time) < MOLA_BAS && trSaat(x.end_time) > MOLA_BIT;
+    };
+    const ceyrek = (sirali: number[], q: number) =>
+      sirali[Math.min(sirali.length - 1, Math.max(0, Math.floor(sirali.length * q)))];
+
     const skuOlcum = new Map<string, { grup: string; adet: number; olcumler: number[] }>();
     for (const s of seanslar) {
       const kisi = s.worker_count ?? 0;
       if (!s.sku || !s.qty || kisi <= 0) continue;
       const gecen = gecenDk(s);
-      if (gecen <= 1) continue;
+      if (gecen <= 1 || gecen > MAX_SEANS_DK) continue;   // uzun/kapatılmamış elenir
+      if (molaKapsar(s)) continue;                        // mola kapsayan elenir
       const ia = (gecen * kisi) / s.qty;
       if (!(ia > 0)) continue;
       const k = skuOlcum.get(s.sku) ?? { grup: etiket(s.sku), adet: 0, olcumler: [] };
@@ -960,17 +973,17 @@ export async function getPaketlemeAnaliz(
 
     const grupTop = new Map<string, { sku: number; adet: number; ortTop: number; hedefTop: number }>();
     for (const [, k] of skuOlcum) {
-      // 4 ölçümün altında P20 anlamlı değil
+      // P25 anlamlı olsun diye en az 4 temiz ölçüm
       if (k.olcumler.length < 4) continue;
       const sirali = [...k.olcumler].sort((a, b) => a - b);
-      const p20i = Math.max(0, Math.floor(sirali.length * 0.2) - 1);
-      const hedef = sirali.slice(0, p20i + 1).reduce((t, v) => t + v, 0) / (p20i + 1);
-      const ort = sirali.reduce((t, v) => t + v, 0) / sirali.length;
+      const suan = medyan(sirali);          // ortalama değil, medyan
+      const hedef = ceyrek(sirali, 0.25);   // iyi çeyrek, tek uç değer değil
+      if (!(suan > hedef)) continue;         // iyileştirilecek yer yoksa atla
 
       const g = grupTop.get(k.grup) ?? { sku: 0, adet: 0, ortTop: 0, hedefTop: 0 };
       g.sku++;
       g.adet += k.adet;
-      g.ortTop += ort * k.adet;
+      g.ortTop += suan * k.adet;
       g.hedefTop += hedef * k.adet;
       grupTop.set(k.grup, g);
     }

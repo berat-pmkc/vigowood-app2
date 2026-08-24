@@ -150,10 +150,11 @@ export function PaketlemeAnaliz() {
                 <h3 className="text-sm font-medium">İyileştirme potansiyeli</h3>
               </div>
               <p className="mb-3 text-xs text-muted-foreground">
-                Yeşil kısım <b>ulaşılabilir süre</b> — ürünün kendi en iyi %20
-                seansının ortalaması, yani zaten defalarca yakaladığınız hız.
-                Turuncu kısım <b>kazanılabilir</b> fark. Teorik hedef değil,
-                kendi kayıtlarınız.
+                <b>Şu an</b> = ürünün <b>medyan</b> işçiliği (ortalama değil, tek
+                uzun seans bozmasın diye). <b>Ulaşılabilir</b> = temiz seansların
+                iyi çeyreği (P25) — zaten defalarca yakaladığınız hız, teorik hedef
+                değil. Kapatılmayı unutulan (4 saat üstü) ve öğle molasını kapsayan
+                seanslar hesaba katılmaz; aksi halde fark olduğundan büyük görünür.
               </p>
               <Grafik tip="potansiyel" veri={veri.potansiyel} />
 
