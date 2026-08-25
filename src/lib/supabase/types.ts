@@ -273,6 +273,7 @@ export type Database = {
         Row: {
           created_at: string
           hazir_eleman_aktif_stok: number
+          birim_fiyat: number | null
           hazir_eleman_kritik_stok: number
           mdf_renk: string | null
           mdf_tipi: string | null
@@ -286,6 +287,7 @@ export type Database = {
         Insert: {
           created_at?: string
           hazir_eleman_aktif_stok?: number
+          birim_fiyat?: number | null
           hazir_eleman_kritik_stok?: number
           mdf_renk?: string | null
           mdf_tipi?: string | null
@@ -299,6 +301,7 @@ export type Database = {
         Update: {
           created_at?: string
           hazir_eleman_aktif_stok?: number
+          birim_fiyat?: number | null
           hazir_eleman_kritik_stok?: number
           mdf_renk?: string | null
           mdf_tipi?: string | null

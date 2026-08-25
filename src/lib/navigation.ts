@@ -168,6 +168,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Analiz",
     items: [
       { title: "Raporlar", href: "/analiz", icon: BarChart3, roles: MANAGEMENT_ROLES },
+      { title: "Maliyet Analizi", href: "/maliyet", icon: Calculator, roles: ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Muhasebe"] },
     ],
   },
   {
