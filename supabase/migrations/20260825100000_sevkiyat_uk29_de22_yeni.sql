@@ -41,7 +41,7 @@ BEGIN
       planlanan_sevk_tarihi, gerceklesen_sevk_tarihi
     FROM sevkiyat WHERE sevkiyat_id='UK29';
 
-    UPDATE sevkiyat_items      SET sevkiyat_id='UK28' WHERE sevkiyat_id='UK29';
+    UPDATE sevkiyat_items      SET sevkiyat_id='UK28', item_id=replace(item_id,'UK29','UK28') WHERE sevkiyat_id='UK29';
     UPDATE sevkiyat_maliyetler SET sevkiyat_id='UK28' WHERE sevkiyat_id='UK29';
     UPDATE yukleme_planlari    SET sevkiyat_id='UK28' WHERE sevkiyat_id='UK29';
 
