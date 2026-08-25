@@ -1222,6 +1222,8 @@ export async function deleteCompletedMontajSession(sessionId: string): Promise<A
 // ═══════════════════════════════════════════════════════════════
 
 export interface AdimYuku {
+  /** Ürün grubu — hangi ürünün adımı olduğu açık olsun */
+  urun: string;
   adim: string;
   seans: number;
   adet: number;
@@ -1234,6 +1236,7 @@ export interface AdimYuku {
 }
 
 export interface AdimKararlilik {
+  urun: string;
   adim: string;
   olcum: number;
   medyan: number;
@@ -1257,10 +1260,21 @@ export interface UrunYuku {
   enPahaliPay: number;
 }
 
+export interface SarkanSeans {
+  sessionId: string;
+  urun: string;
+  adim: string;
+  operator: string;
+  sureSaat: number;
+  tarih: string | null;
+}
+
 export interface MontajAnalizi {
   adimYuku: AdimYuku[];
   kararlilik: AdimKararlilik[];
   urunYuku: UrunYuku[];
+  /** Kapatılmayı unutulmuş (4 saati aşan) seanslar — doğrudan aksiyon listesi */
+  sarkanListe: SarkanSeans[];
   toplamSeans: number;
   kullanilanSeans: number;
   /** Süresi net (molası düşülmüş) olan seansların payı % */
@@ -1299,7 +1313,7 @@ export async function getMontajAnaliz(donemKodu: string) {
 
     const { data, error } = await supabase
       .from("montaj_sessions")
-      .select("sku, step_name, qty, start_time, end_time, worker_count, workers, net_sure_dk")
+      .select("session_id, sku, step_name, qty, start_time, end_time, worker_count, workers, net_sure_dk, operator_name")
       .eq("durum", "tamamlandi")
       .not("end_time", "is", null)
       .gte("end_time", aralik.bas.toISOString())
@@ -1308,9 +1322,10 @@ export async function getMontajAnaliz(donemKodu: string) {
     if (error) return { success: false as const, error: error.message };
 
     type Ham = {
-      sku: string | null; step_name: string | null; qty: number;
+      session_id: string; sku: string | null; step_name: string | null; qty: number;
       start_time: string | null; end_time: string | null;
       worker_count: number | null; workers: unknown; net_sure_dk: number | null;
+      operator_name: string | null;
     };
     const ham = (data ?? []) as Ham[];
 
@@ -1324,18 +1339,19 @@ export async function getMontajAnaliz(donemKodu: string) {
       s.net_sure_dk != null && Number(s.net_sure_dk) > 0 ? Number(s.net_sure_dk) : brut(s);
 
     let netli = 0;
-    let sarkan = 0;
     let kisa = 0;
+    const sarkanHam: Ham[] = [];
     const gecerli = ham.filter((s) => {
       if (!s.step_name || (s.qty ?? 0) <= 0) return false;
       const d = sure(s);
       // 1 dakikanın altı hatalı giriş kabul ediliyor
       if (d <= 1) { kisa++; return false; }
-      // Vardiyayı aşan seans kapatılmamış demek — ortalamayı tek başına bozar
-      if (d > MAX_SEANS_DK) { sarkan++; return false; }
+      // Vardiyayı aşan seans kapatılmamış demek — hem elenir hem aksiyon listesine
+      if (d > MAX_SEANS_DK) { sarkanHam.push(s); return false; }
       if (s.net_sure_dk != null && Number(s.net_sure_dk) > 0) netli++;
       return true;
     });
+    const sarkan = sarkanHam.length;
 
     const kisiSayisi = (s: Ham) =>
       s.worker_count ?? (parseWorkers(s.workers)?.length ?? 1) ?? 1;
@@ -1353,24 +1369,39 @@ export async function getMontajAnaliz(donemKodu: string) {
       return a[Math.min(a.length - 1, Math.max(0, Math.floor(a.length * p)))];
     };
 
-    // ── 1) Adım bazlı yük ────────────────────────────────────
-    const adimlar = new Map<string, { seans: number; adet: number; isc: number; olcum: number[] }>();
+    // ── Ürün grubu eşlemesi (adımın hangi ürüne ait olduğu görünsün) ──
+    const skular = [...new Set(gecerli.map((x) => x.sku).filter(Boolean) as string[])];
+    const grupHarita = new Map<string, string>();
+    for (let i = 0; i < skular.length; i += 200) {
+      const { data: urunler } = await supabase
+        .from("products").select("sku, urun_grubu").in("sku", skular.slice(i, i + 200));
+      for (const u of urunler ?? []) if (u.urun_grubu) grupHarita.set(u.sku, u.urun_grubu);
+    }
+    const grupAdi = (sku: string | null) => (sku ? grupHarita.get(sku) ?? sku : "—");
+
+    // ── 1) Ürün + adım bazlı yük ─────────────────────────────
+    // Aynı adım (ör. OLUK HAZIRLIK) birçok üründe var; ürünle birlikte
+    // tutulmazsa "hangi ürünün adımı" belirsiz kalıyor ve aksiyon alınamıyor.
+    const adimlar = new Map<string, { urun: string; adim: string; seans: number; adet: number; isc: number; olcum: number[] }>();
     for (const s of gecerli) {
-      const k = adimlar.get(s.step_name!) ?? { seans: 0, adet: 0, isc: 0, olcum: [] };
+      const urun = grupAdi(s.sku);
+      const anahtar = `${urun}\u0000${s.step_name}`;
+      const k = adimlar.get(anahtar) ?? { urun, adim: s.step_name!, seans: 0, adet: 0, isc: 0, olcum: [] };
       k.seans++;
       k.adet += s.qty;
       k.isc += sure(s) * kisiSayisi(s);
       k.olcum.push(iscilikBirim(s));
-      adimlar.set(s.step_name!, k);
+      adimlar.set(anahtar, k);
     }
 
-    const sirali = [...adimlar.entries()].sort((a, b) => b[1].isc - a[1].isc);
-    const toplamIsc = sirali.reduce((t, [, v]) => t + v.isc, 0);
+    const sirali = [...adimlar.values()].sort((a, b) => b.isc - a.isc);
+    const toplamIsc = sirali.reduce((t, v) => t + v.isc, 0);
     let birikim = 0;
-    const adimYuku: AdimYuku[] = sirali.map(([adim, v]) => {
+    const adimYuku: AdimYuku[] = sirali.map((v) => {
       birikim += v.isc;
       return {
-        adim,
+        urun: v.urun,
+        adim: v.adim,
         seans: v.seans,
         adet: Math.round(v.adet),
         iscilikDk: Math.round(v.isc),
@@ -1382,14 +1413,15 @@ export async function getMontajAnaliz(donemKodu: string) {
     // ── 2) Adım kararlılığı ──────────────────────────────────
     // Aynı adım her seferinde aynı sürmeli. Sürmüyorsa yöntem, malzeme
     // ya da eğitim farkı var demektir; standart süre de güvenilmez olur.
-    const kararlilik: AdimKararlilik[] = [...adimlar.entries()]
-      .filter(([, v]) => v.olcum.length >= MIN_OLCUM_ADIM)
-      .map(([adim, v]) => {
+    const kararlilik: AdimKararlilik[] = [...adimlar.values()]
+      .filter((v) => v.olcum.length >= MIN_OLCUM_ADIM)
+      .map((v) => {
         const m = med(v.olcum);
         const iyi = dilim(v.olcum, 0.25);
         const kotu = dilim(v.olcum, 0.75);
         return {
-          adim,
+          urun: v.urun,
+          adim: v.adim,
           olcum: v.olcum.length,
           medyan: Number(m.toFixed(2)),
           iyiCeyrek: Number(iyi.toFixed(2)),
@@ -1435,12 +1467,26 @@ export async function getMontajAnaliz(donemKodu: string) {
       })
       .sort((a, b) => b.toplamBirim - a.toplamBirim);
 
+    // ── Kapatılmayı unutulmuş seanslar (aksiyon listesi) ─────
+    const sarkanListe: SarkanSeans[] = sarkanHam
+      .map((s) => ({
+        sessionId: s.session_id,
+        urun: grupAdi(s.sku),
+        adim: s.step_name ?? "—",
+        operator: s.operator_name ?? "—",
+        sureSaat: Number((brut(s) / 60).toFixed(1)),
+        tarih: s.end_time,
+      }))
+      .sort((a, b) => b.sureSaat - a.sureSaat)
+      .slice(0, 20);
+
     return {
       success: true as const,
       data: {
         adimYuku,
         kararlilik,
         urunYuku,
+        sarkanListe,
         toplamSeans: ham.length,
         kullanilanSeans: gecerli.length,
         netOran: gecerli.length ? Math.round((netli / gecerli.length) * 100) : 0,

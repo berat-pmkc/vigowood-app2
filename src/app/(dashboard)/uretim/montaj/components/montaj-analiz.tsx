@@ -13,7 +13,7 @@ import {
 import { getMontajAnaliz, type MontajAnalizi } from "../actions";
 import { sonHaftalar, sonAylar, donemAciklama } from "@/lib/donem";
 import { cn } from "@/lib/utils";
-import { Layers, Activity, Package, Info, TriangleAlert } from "lucide-react";
+import { Layers, Activity, Package, Info, TriangleAlert, CircleAlert } from "lucide-react";
 
 export function MontajAnaliz() {
   const [donem, setDonem] = useState<string>("bugun");
@@ -131,21 +131,69 @@ export function MontajAnaliz() {
             </div>
           )}
 
+          {/* ── AKSİYON: kapatılmayı unutulan seanslar ──── */}
+          {veri.sarkanListe.length > 0 && (
+            <Card className="border-red-300 p-0">
+              <div className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-3">
+                <CircleAlert className="size-4 text-red-600" />
+                <h3 className="text-sm font-medium text-red-800">
+                  Kapatılmayı unutulan seanslar ({veri.sarkanListe.length})
+                </h3>
+              </div>
+              <p className="border-b px-4 py-2 text-xs text-muted-foreground">
+                4 saati aşan bu seanslar &quot;bitirilmiş&quot; görünüyor ama süreleri
+                gerçekçi değil — kapatma unutulmuş. <b>Aksiyon:</b> her birinin
+                bitiş saatini gerçek değerine düzeltin (Tamamlananlar → Düzenle).
+                Düzeltilene kadar analizden dışlanıyorlar.
+              </p>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ürün</TableHead>
+                      <TableHead>Adım</TableHead>
+                      <TableHead>Operatör</TableHead>
+                      <TableHead className="text-right">Süre</TableHead>
+                      <TableHead>Tarih</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {veri.sarkanListe.map((s) => (
+                      <TableRow key={s.sessionId}>
+                        <TableCell><span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{s.urun}</span></TableCell>
+                        <TableCell className="text-xs">{s.adim}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{s.operator}</TableCell>
+                        <TableCell className="text-right text-xs font-semibold tabular-nums text-red-700">
+                          {s.sureSaat} sa
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {s.tarih ? new Date(s.tarih).toLocaleDateString("tr-TR") : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          )}
+
           {/* ── 1) Adım bazlı yük ───────────────────────── */}
           <Card className="p-0">
             <div className="flex items-center gap-2 border-b px-4 py-3">
               <Layers className="size-4 text-muted-foreground" />
-              <h3 className="text-sm font-medium">Hangi adım iş gücünü yiyor?</h3>
+              <h3 className="text-sm font-medium">Hangi ürünün hangi adımı iş gücünü yiyor?</h3>
             </div>
             <p className="border-b px-4 py-2 text-xs text-muted-foreground">
-              Montaj çok adımlı; hattı tıkayan adımı bulmak tek tek ürüne
-              bakmaktan daha hızlı sonuç verir. Sıralama toplam işçilik dakikasına göre.
+              Montaj çok adımlı. Her satır bir <b>ürün + adım</b>; hattı tıkayan
+              noktayı doğrudan gösterir. Sıralama toplam işçilik dakikasına göre —
+              en üsttekiler önce ele alınmalı.
             </p>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="min-w-[200px]">Adım</TableHead>
+                    <TableHead className="min-w-[110px]">Ürün</TableHead>
+                    <TableHead className="min-w-[180px]">Adım</TableHead>
                     <TableHead className="text-right">Seans</TableHead>
                     <TableHead className="text-right">Adet</TableHead>
                     <TableHead className="text-right">İşçilik (sa)</TableHead>
@@ -155,7 +203,8 @@ export function MontajAnaliz() {
                 </TableHeader>
                 <TableBody>
                   {veri.adimYuku.slice(0, 15).map((a) => (
-                    <TableRow key={a.adim}>
+                    <TableRow key={`${a.urun}-${a.adim}`}>
+                      <TableCell><span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{a.urun}</span></TableCell>
                       <TableCell className="font-medium">{a.adim}</TableCell>
                       <TableCell className="text-right tabular-nums">{a.seans}</TableCell>
                       <TableCell className="text-right tabular-nums">{a.adet.toLocaleString("tr-TR")}</TableCell>
@@ -176,8 +225,8 @@ export function MontajAnaliz() {
             </div>
             {paretoEsik && (
               <p className="m-4 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-                İş gücünün <b>%80&apos;i</b> yalnızca <b>{paretoEsik} adıma</b> gidiyor.
-                İyileştirmeye buradan başlamak en hızlı geri dönüşü verir.
+                İş gücünün <b>%80&apos;i</b> yalnızca <b>{paretoEsik} ürün-adım</b>
+                satırına gidiyor. İyileştirmeye tam olarak bunlardan başlayın.
               </p>
             )}
           </Card>
@@ -204,7 +253,8 @@ export function MontajAnaliz() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[200px]">Adım</TableHead>
+                      <TableHead className="min-w-[100px]">Ürün</TableHead>
+                      <TableHead className="min-w-[180px]">Adım</TableHead>
                       <TableHead className="text-right">Ölçüm</TableHead>
                       <TableHead className="text-right">Hedef (iyi %25)</TableHead>
                       <TableHead className="text-right">Medyan</TableHead>
@@ -214,7 +264,8 @@ export function MontajAnaliz() {
                   </TableHeader>
                   <TableBody>
                     {veri.kararlilik.slice(0, 12).map((k) => (
-                      <TableRow key={k.adim}>
+                      <TableRow key={`${k.urun}-${k.adim}`}>
+                        <TableCell><span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{k.urun}</span></TableCell>
                         <TableCell className="font-medium">{k.adim}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">{k.olcum}</TableCell>
                         <TableCell className="text-right tabular-nums text-emerald-700">{k.iyiCeyrek}</TableCell>
