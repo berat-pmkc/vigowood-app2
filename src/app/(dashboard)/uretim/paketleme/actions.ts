@@ -737,6 +737,8 @@ export interface AnalizVerisi {
   pareto: ParetoSatiri[];
   haftalik: HaftaSatiri[];
   potansiyel: PotansiyelSatiri[];
+  /** Seçili dönemde paketleme yapılan farklı gün sayısı — kapasite çevrimi için */
+  calisilanGun: number;
 }
 
 /**
@@ -1001,7 +1003,17 @@ export async function getPaketlemeAnaliz(
       .filter((x) => x.kazanilabilirSaat > 0)
       .sort((a, b) => b.kazanilabilirSaat - a.kazanilabilirSaat);
 
-    return { success: true as const, data: { pareto, haftalik, potansiyel } satisfies AnalizVerisi };
+    // Kazanılan işçilik saatini "kaç kişilik kapasite" diye yorumlamak için
+    // dönemdeki farklı çalışma günü sayısı gerekiyor.
+    const gunSet = new Set<string>();
+    for (const s of seanslar) {
+      if (!s.start_time) continue;
+      const d = new Date(s.start_time);
+      gunSet.add(`${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`);
+    }
+    const calisilanGun = gunSet.size;
+
+    return { success: true as const, data: { pareto, haftalik, potansiyel, calisilanGun } satisfies AnalizVerisi };
   } catch (e) {
     return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }

@@ -186,17 +186,51 @@ export function PaketlemeAnaliz() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-emerald-300 bg-emerald-50/60 font-medium">
+                      <td className="px-2 py-1.5">TOPLAM</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">
+                        {veri.potansiyel.reduce((t, x) => t + x.adet, 0).toLocaleString("tr-TR")}
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">—</td>
+                      <td className="px-2 py-1.5 text-right text-muted-foreground">—</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-amber-700">
+                        {veri.potansiyel.reduce((t, x) => t + x.kazanilabilirSaat, 0)} saat
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
 
-              <p className="mt-2 rounded border border-emerald-300 bg-emerald-50 p-2 text-xs leading-relaxed text-emerald-900">
-                İlk 10 grupta toplam{" "}
-                <b>
-                  {veri.potansiyel.slice(0, 10).reduce((t, x) => t + x.kazanilabilirSaat, 0)} saat
-                </b>{" "}
-                iş gücü geri kazanılabilir. Hesap SKU seviyesinde yapılır — grup
-                içindeki büyük ve küçük ürünler birbiriyle kıyaslanmaz.
-              </p>
+              {(() => {
+                const toplamKazanc = veri.potansiyel.reduce((t, x) => t + x.kazanilabilirSaat, 0);
+                const toplamAdet = veri.potansiyel.reduce((t, x) => t + x.adet, 0);
+                // 1 kişinin dönemdeki net mesaisi: çalışılan gün × 7,5 saat
+                // (öğle molası hariç — hesap zaten molalı seansları eliyor).
+                const NET_SAAT = 7.5;
+                const kisiSaat = veri.calisilanGun * NET_SAAT;
+                const kisiKapasite = kisiSaat > 0 ? toplamKazanc / kisiSaat : 0;
+                return (
+                  <p className="mt-2 rounded border border-emerald-300 bg-emerald-50 p-2 text-xs leading-relaxed text-emerald-900">
+                    Değerlendirilen <b>{toplamAdet.toLocaleString("tr-TR")} ürün</b>de
+                    toplam <b>{toplamKazanc} saat</b> iş gücü geri kazanılabilir.
+                    {veri.calisilanGun > 0 && kisiKapasite >= 0.1 && (
+                      <>
+                        {" "}Bu dönemde <b>{veri.calisilanGun} gün</b> paketleme
+                        yapıldı; kişi başı ~7,5 saat üzerinden bu kayıp kabaca{" "}
+                        <b>{kisiKapasite.toFixed(1)} kişilik</b> iş gücüne denk.
+                      </>
+                    )}
+                    <br />
+                    <span className="text-emerald-700">
+                      Not: Teorik ÜST SINIR — her ürün her seansta kendi iyi çeyreği
+                      (P25) hızında paketlenseydi. Gerçekte hep o hıza ulaşılmaz;
+                      &quot;fazla işçi&quot; kararı değil, iyileştirme kapasitesinin
+                      kaba ölçüsüdür. Hesap SKU seviyesinde yapılır.
+                    </span>
+                  </p>
+                );
+              })()}
             </Card>
           )}
 
