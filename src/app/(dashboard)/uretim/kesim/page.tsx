@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS, URETIM_ANALIZ_ROLES } from "@/lib/constants";
 import { KesimDashboard } from "./components/kesim-dashboard";
 import { getKesimTalepleri } from "./actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "./types";
@@ -232,6 +232,7 @@ export default async function KesimPage({
   return (
     <div className="pb-20 md:pb-6">
       <KesimDashboard
+        analizGorebilir={URETIM_ANALIZ_ROLES.includes(user.role)}
         acikTalepler={acikTalepler}
         records={enrichedRecords}
         todayTotalBatch={todayTotalBatch}

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cutBatchCreateSchema } from "@/lib/validations";
-import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS } from "@/lib/constants";
+import { PRODUCTION_ACCESS_ROLES, KESIM_MAKINE_IDS, URETIM_ANALIZ_ROLES } from "@/lib/constants";
+import { donemAraligi } from "@/lib/donem";
 import type { MachineStatusEntry, MdfStokItem } from "./types";
 
 type ActionResult = { success: true } | { success: false; error: string };
@@ -983,5 +984,254 @@ export async function updateCutBatch(
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KESİM RAPORU / ANALİZ
+//
+// ÖNEMLİ KISIT: Kesimlerde gerçek başlangıç/bitiş süresi tutulmuyor
+// (baslama_zamani = bitis_zamani). Bu yüzden "verimlilik" (gerçek ÷
+// standart) HESAPLANAMAZ. Tüm süre analizi PLANLI YÜK üzerinden:
+// plakanın makine standart süresi (dakika) × kesilen adet.
+// Ekranda bu açıkça "planlı" olarak etiketleniyor, yanlış okunmasın.
+// ═══════════════════════════════════════════════════════════════
+
+export interface MakineYuk {
+  makine: string;
+  kesim: number;
+  plaka: number;
+  saat: number;   // planlı makine-saati
+  pay: number;    // toplam içindeki % pay
+}
+
+export interface MdfSatiri {
+  ad: string;
+  plaka: number;
+  kesim: number;
+}
+
+export interface PlakaPareto {
+  plakaId: string;
+  ad: string;
+  urun: string;
+  plaka: number;
+  saat: number;       // planlı makine-saati
+  kumulatif: number;  // kümülatif %
+}
+
+export interface OperatorSatiri {
+  ad: string;
+  kesim: number;
+  plaka: number;
+  saat: number;
+}
+
+export interface ParcaKarsilastirma {
+  partId: string;
+  ad: string;
+  kesilen: number;
+  tuketilen: number;
+  bakiye: number;
+}
+
+export interface KesimAnalizi {
+  kpi: { kesim: number; plaka: number; makineSaati: number; uretilenParca: number };
+  makineYuku: MakineYuk[];
+  mdfTip: MdfSatiri[];
+  mdfRenk: MdfSatiri[];
+  plakaPareto: PlakaPareto[];
+  operatorler: OperatorSatiri[];
+  parcalar: ParcaKarsilastirma[];
+  gunSayisi: number;
+}
+
+export async function getKesimAnaliz(donemKodu: string) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || !URETIM_ANALIZ_ROLES.includes(user.role)) {
+      return { success: false as const, error: "Bu analizi görme yetkiniz yok" };
+    }
+    const supabase = await createClient();
+    const aralik = donemAraligi(donemKodu) ?? donemAraligi("tum")!;
+    const basISO = aralik.bas.toISOString();
+    const bitISO = aralik.bit.toISOString();
+
+    // ── Kesim partileri + plaka bilgisi ──────────────────────
+    const { data: batchData, error } = await supabase
+      .from("cut_batches")
+      .select("cut_id, tarih, sku, plaka_id, makine_id, adet, operator_id")
+      .eq("durum", "tamamlandi")
+      .gte("tarih", basISO)
+      .lt("tarih", bitISO);
+    if (error) return { success: false as const, error: error.message };
+
+    type Batch = {
+      cut_id: string; tarih: string | null; sku: string | null;
+      plaka_id: string | null; makine_id: string | null;
+      adet: number; operator_id: string | null;
+    };
+    const batches = (batchData ?? []) as Batch[];
+
+    // Plaka meta (standart süre, tip, renk, ad)
+    const plakaIds = [...new Set(batches.map((b) => b.plaka_id).filter(Boolean) as string[])];
+    type Plaka = {
+      plaka_id: string; plaka_adi: string | null; tipi: string | null;
+      renk: string | null; kesim_sureleri: Record<string, number> | null;
+    };
+    const plakaMeta = new Map<string, Plaka>();
+    for (let i = 0; i < plakaIds.length; i += 200) {
+      const { data } = await supabase
+        .from("plakalar")
+        .select("plaka_id, plaka_adi, tipi, renk, kesim_sureleri")
+        .in("plaka_id", plakaIds.slice(i, i + 200));
+      for (const p of (data ?? []) as Plaka[]) plakaMeta.set(p.plaka_id, p);
+    }
+
+    // Standart dakika: plakanın o makinedeki süresi
+    const stdDk = (plakaId: string | null, makine: string | null): number => {
+      if (!plakaId || !makine) return 0;
+      const m = plakaMeta.get(plakaId)?.kesim_sureleri;
+      const v = m && typeof m === "object" ? Number(m[makine]) : 0;
+      return Number.isFinite(v) ? v : 0;
+    };
+
+    // ── Toplama ──────────────────────────────────────────────
+    const makine = new Map<string, { kesim: number; plaka: number; dk: number }>();
+    const mdfTipM = new Map<string, { plaka: number; kesim: number }>();
+    const mdfRenkM = new Map<string, { plaka: number; kesim: number }>();
+    const plakaM = new Map<string, { ad: string; urun: string; plaka: number; dk: number }>();
+    const opM = new Map<string, { plaka: number; kesim: number; dk: number }>();
+    const gunSet = new Set<string>();
+    let toplamDk = 0;
+
+    for (const b of batches) {
+      const dk = stdDk(b.plaka_id, b.makine_id) * (b.adet ?? 0);
+      toplamDk += dk;
+      if (b.tarih) gunSet.add(b.tarih.slice(0, 10));
+
+      const mk = b.makine_id ?? "?";
+      const m = makine.get(mk) ?? { kesim: 0, plaka: 0, dk: 0 };
+      m.kesim++; m.plaka += b.adet ?? 0; m.dk += dk;
+      makine.set(mk, m);
+
+      const meta = b.plaka_id ? plakaMeta.get(b.plaka_id) : undefined;
+      const tip = meta?.tipi ?? "(belirsiz)";
+      const t = mdfTipM.get(tip) ?? { plaka: 0, kesim: 0 };
+      t.plaka += b.adet ?? 0; t.kesim++;
+      mdfTipM.set(tip, t);
+
+      const renk = meta?.renk ?? "(belirsiz)";
+      const rk = mdfRenkM.get(renk) ?? { plaka: 0, kesim: 0 };
+      rk.plaka += b.adet ?? 0; rk.kesim++;
+      mdfRenkM.set(renk, rk);
+
+      if (b.plaka_id) {
+        const p = plakaM.get(b.plaka_id) ?? {
+          ad: meta?.plaka_adi ?? b.plaka_id, urun: b.sku ?? "—", plaka: 0, dk: 0,
+        };
+        p.plaka += b.adet ?? 0; p.dk += dk;
+        plakaM.set(b.plaka_id, p);
+      }
+
+      const op = b.operator_id ?? "(atanmamış)";
+      const o = opM.get(op) ?? { plaka: 0, kesim: 0, dk: 0 };
+      o.plaka += b.adet ?? 0; o.kesim++; o.dk += dk;
+      opM.set(op, o);
+    }
+
+    // Operatör adları
+    const opIds = [...opM.keys()].filter((x) => x !== "(atanmamış)");
+    const opAd = new Map<string, string>();
+    if (opIds.length > 0) {
+      const { data } = await supabase.from("users").select("user_id, full_name").in("user_id", opIds);
+      for (const u of (data ?? []) as { user_id: string; full_name: string | null }[]) {
+        if (u.full_name) opAd.set(u.user_id, u.full_name);
+      }
+    }
+
+    // ── Üretilen parça (cut_lines, dönem içi) ─────────────────
+    const cutIds = batches.map((b) => b.cut_id);
+    let uretilenParca = 0;
+    for (let i = 0; i < cutIds.length; i += 300) {
+      const { data } = await supabase
+        .from("cut_lines").select("adet").in("cut_id", cutIds.slice(i, i + 300));
+      for (const l of (data ?? []) as { adet: number | null }[]) uretilenParca += Number(l.adet ?? 0);
+    }
+
+    // ── Parça karşılaştırması: kesilen (IN/Kesim) vs tüketilen (OUT/Montaj) ──
+    // Dönem filtresi tarih üzerinden.
+    const { data: ymsData } = await supabase
+      .from("yari_mamul_stok")
+      .select("part_id, part_adi, qty, direction, source")
+      .gte("tarih", basISO)
+      .lt("tarih", bitISO);
+    const parcaM = new Map<string, { ad: string; kesilen: number; tuketilen: number }>();
+    for (const y of (ymsData ?? []) as {
+      part_id: string | null; part_adi: string | null; qty: number;
+      direction: string | null; source: string | null;
+    }[]) {
+      if (!y.part_id) continue;
+      const p = parcaM.get(y.part_id) ?? { ad: y.part_adi ?? y.part_id, kesilen: 0, tuketilen: 0 };
+      const q = Math.abs(Number(y.qty ?? 0));
+      if (y.direction === "IN") p.kesilen += q;
+      else if (y.direction === "OUT") p.tuketilen += q;
+      parcaM.set(y.part_id, p);
+    }
+
+    // ── Sonuç şekillendirme ──────────────────────────────────
+    const makineYuku: MakineYuk[] = [...makine.entries()]
+      .map(([m, v]) => ({
+        makine: m, kesim: v.kesim, plaka: Math.round(v.plaka),
+        saat: Number((v.dk / 60).toFixed(1)),
+        pay: toplamDk > 0 ? Math.round((v.dk / toplamDk) * 100) : 0,
+      }))
+      .sort((a, b) => b.saat - a.saat);
+
+    const mdfSirala = (m: Map<string, { plaka: number; kesim: number }>): MdfSatiri[] =>
+      [...m.entries()].map(([ad, v]) => ({ ad, plaka: Math.round(v.plaka), kesim: v.kesim }))
+        .sort((a, b) => b.plaka - a.plaka);
+
+    const plakaSirali = [...plakaM.entries()].sort((a, b) => b[1].dk - a[1].dk);
+    let birikim = 0;
+    const plakaPareto: PlakaPareto[] = plakaSirali.slice(0, 15).map(([id, v]) => {
+      birikim += v.dk;
+      return {
+        plakaId: id, ad: v.ad, urun: v.urun, plaka: Math.round(v.plaka),
+        saat: Number((v.dk / 60).toFixed(1)),
+        kumulatif: toplamDk > 0 ? Number(((birikim / toplamDk) * 100).toFixed(1)) : 0,
+      };
+    });
+
+    const operatorler: OperatorSatiri[] = [...opM.entries()]
+      .map(([id, v]) => ({
+        ad: id === "(atanmamış)" ? "Atanmamış" : (opAd.get(id) ?? id),
+        kesim: v.kesim, plaka: Math.round(v.plaka), saat: Number((v.dk / 60).toFixed(1)),
+      }))
+      .sort((a, b) => b.plaka - a.plaka);
+
+    const parcalar: ParcaKarsilastirma[] = [...parcaM.entries()]
+      .map(([id, v]) => ({
+        partId: id, ad: v.ad, kesilen: Math.round(v.kesilen),
+        tuketilen: Math.round(v.tuketilen), bakiye: Math.round(v.kesilen - v.tuketilen),
+      }))
+      .filter((x) => x.kesilen > 0 || x.tuketilen > 0)
+      .sort((a, b) => (b.kesilen + b.tuketilen) - (a.kesilen + a.tuketilen));
+
+    return {
+      success: true as const,
+      data: {
+        kpi: {
+          kesim: batches.length,
+          plaka: Math.round(batches.reduce((t, b) => t + (b.adet ?? 0), 0)),
+          makineSaati: Number((toplamDk / 60).toFixed(0)),
+          uretilenParca: Math.round(uretilenParca),
+        },
+        makineYuku, mdfTip: mdfSirala(mdfTipM), mdfRenk: mdfSirala(mdfRenkM),
+        plakaPareto, operatorler, parcalar, gunSayisi: gunSet.size,
+      } satisfies KesimAnalizi,
+    };
+  } catch (e) {
+    return { success: false as const, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }

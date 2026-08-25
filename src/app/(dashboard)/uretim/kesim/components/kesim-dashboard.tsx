@@ -19,7 +19,8 @@ import { PlakaStokPaneli } from "./plaka-stok-paneli";
 import { KesimDonemOzeti } from "./kesim-donem-ozeti";
 import type { KesimTalebi } from "../actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
-import { Plus, Scissors, CalendarDays } from "lucide-react";
+import { Plus, Scissors, CalendarDays, BarChart3 } from "lucide-react";
+import Link from "next/link";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
 import { sonHaftalar, sonAylar, donemAciklama } from "@/lib/donem";
 
@@ -44,6 +45,8 @@ interface KesimDashboardProps {
   dailyAvgConsumption: number;
   /** Bekleyen kesim talepleri — üstteki şeritte gösterilir */
   acikTalepler: KesimTalebi[];
+  /** Rapor ekranı yalnızca analiz rollerine görünür */
+  analizGorebilir: boolean;
 }
 
 export function KesimDashboard({
@@ -55,7 +58,7 @@ export function KesimDashboard({
   machineStatus,
   stokTahminiGun,
   dailyAvgConsumption,
-
+  analizGorebilir,
   acikTalepler,
 }: KesimDashboardProps) {
   const router = useRouter();
@@ -104,13 +107,20 @@ export function KesimDashboard({
               <p className="text-sm text-muted-foreground">Lazer kesim istasyonu</p>
             </div>
           </div>
-          <Button
-            onClick={() => setDialogOpen(true)}
-            className="h-11 px-5"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Yeni Kesim
-          </Button>
+          <div className="flex items-center gap-2">
+            {analizGorebilir && (
+              <Button asChild variant="outline" className="h-11 px-4">
+                <Link href="/uretim/kesim/rapor">
+                  <BarChart3 className="mr-2 h-5 w-5" />
+                  Raporlar
+                </Link>
+              </Button>
+            )}
+            <Button onClick={() => setDialogOpen(true)} className="h-11 px-5">
+              <Plus className="w-5 h-5 mr-2" />
+              Yeni Kesim
+            </Button>
+          </div>
         </div>
         <MachineStatusBar machineStatus={machineStatus} />
       </div>

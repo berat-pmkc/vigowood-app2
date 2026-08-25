@@ -40,6 +40,10 @@ export interface DonemAraligi {
 
 /** Kod → tarih aralığı. Tanınmayan kod için null. */
 export function donemAraligi(kod: string): DonemAraligi | null {
+  if (kod === "tum") {
+    // Çok geniş aralık = filtre yok gibi davranır
+    return { bas: new Date("2000-01-01"), bit: new Date("2100-01-01"), etiket: "Tüm Zamanlar" };
+  }
   if (kod === "bugun" || kod === "dun") {
     const bas = new Date();
     bas.setHours(0, 0, 0, 0);
@@ -102,6 +106,7 @@ const AYLAR = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
                "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
 
 export function donemAciklama(kod: string): string {
+  if (kod === "tum") return "Tüm Zamanlar";
   if (kod === "bugun") return "Bugün";
   if (kod === "dun") return "Dün";
   const h = kod.match(/^(\d{4})_(\d{2})\.(\d)$/);
