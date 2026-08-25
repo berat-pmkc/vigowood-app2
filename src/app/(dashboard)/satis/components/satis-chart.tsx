@@ -59,12 +59,15 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   );
 }
 
-export function SatisChart({ data }: { data: DailySalesData[] }) {
+export function SatisChart({ data, period }: { data: DailySalesData[]; period?: string }) {
   return (
     <Card className="border-border/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">
-          Günlük Satış Trendi (Son 30 Gün)
+          Günlük Satış Trendi{period && period !== "all" ? "" : " (tüm zamanlar)"}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {data.length} gün
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4">

@@ -48,25 +48,31 @@ export default async function SatisPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const { start, end } = getPeriodDates(period, params.start, params.end);
 
-  // Build base query filter
-  let query = supabase
-    .from("satis_satirlari")
-    .select("sku, miktar, toplam_tutar, satis_kanali, fatura_no, tarih, is_hizmet");
-
-  if (start) query = query.gte("tarih", start);
-  if (end) query = query.lte("tarih", end);
-  if (kanal !== "all") query = query.eq("satis_kanali", kanal);
-
-  const { data: rows } = await query;
-  const satirlar = (rows || []) as {
-    sku: string | null;
-    miktar: number;
-    toplam_tutar: number;
-    satis_kanali: string | null;
-    fatura_no: string | null;
-    tarih: string | null;
-    is_hizmet: boolean;
-  }[];
+  // Tüm dönemi sayfalayarak çek. PostgREST varsayılanı 1000 satır; tek
+  // sorgu bir ayın (ör. 4975 satır) tamamını getirmiyordu, bu yüzden
+  // KPI'lar ve grafik gerçeğin altında kalıyordu.
+  type SatisSatir = {
+    sku: string | null; miktar: number; toplam_tutar: number;
+    satis_kanali: string | null; fatura_no: string | null;
+    tarih: string | null; is_hizmet: boolean;
+  };
+  const satirlar: SatisSatir[] = [];
+  const SAYFA = 1000;
+  for (let off = 0; ; off += SAYFA) {
+    let q = supabase
+      .from("satis_satirlari")
+      .select("sku, miktar, toplam_tutar, satis_kanali, fatura_no, tarih, is_hizmet")
+      .order("tarih", { ascending: true })
+      .range(off, off + SAYFA - 1);
+    if (start) q = q.gte("tarih", start);
+    if (end) q = q.lte("tarih", end);
+    if (kanal !== "all") q = q.eq("satis_kanali", kanal);
+    const { data: rows } = await q;
+    const batch = (rows || []) as SatisSatir[];
+    satirlar.push(...batch);
+    if (batch.length < SAYFA) break;
+    if (off > 100000) break; // güvenlik
+  }
 
   // KPI Calculations
   const toplamTutar = satirlar.reduce((s, r) => s + (r.toplam_tutar || 0), 0);
@@ -122,6 +128,56 @@ export default async function SatisPage({ searchParams }: PageProps) {
     .map(([date, v]) => ({ date, tutar: Math.round(v.tutar), adet: v.adet }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  // ── SEVKİYAT (ihracat) analizi — satış faturalarından ayrı fiziksel çıkışlar
+  const { data: sevkHeaderlar } = await supabase
+    .from("sevkiyat")
+    .select("sevkiyat_id, ulke, country_code, durum");
+  const { data: sevkItemler } = await supabase
+    .from("sevkiyat_items")
+    .select("sevkiyat_id, sku, qty, palet_sayisi, agirlik");
+
+  const sevkBaslik = new Map<string, { ulke: string; country: string; durum: string }>(
+    (sevkHeaderlar ?? []).map((h) => [h.sevkiyat_id, {
+      ulke: h.ulke ?? h.country_code ?? "?", country: h.country_code ?? "?", durum: h.durum ?? "",
+    }]),
+  );
+
+  const ulkeAgg = new Map<string, { ulke: string; sevkiyat: Set<string>; adet: number; palet: number; kg: number }>();
+  const urunAgg = new Map<string, { adet: number; ulkeler: Map<string, number> }>();
+  for (const it of (sevkItemler ?? []) as { sevkiyat_id: string; sku: string | null; qty: number; palet_sayisi: number | null; agirlik: number | null }[]) {
+    const b = sevkBaslik.get(it.sevkiyat_id);
+    if (!b) continue;
+    const u = ulkeAgg.get(b.country) ?? { ulke: b.ulke, sevkiyat: new Set<string>(), adet: 0, palet: 0, kg: 0 };
+    u.sevkiyat.add(it.sevkiyat_id);
+    u.adet += it.qty ?? 0;
+    u.palet += it.palet_sayisi ?? 0;
+    u.kg += Number(it.agirlik ?? 0);
+    ulkeAgg.set(b.country, u);
+    if (it.sku) {
+      const p = urunAgg.get(it.sku) ?? { adet: 0, ulkeler: new Map<string, number>() };
+      p.adet += it.qty ?? 0;
+      p.ulkeler.set(b.country, (p.ulkeler.get(b.country) ?? 0) + (it.qty ?? 0));
+      urunAgg.set(it.sku, p);
+    }
+  }
+
+  const sevkiyatUlkeler = [...ulkeAgg.entries()].map(([country, v]) => ({
+    country, ulke: v.ulke, sevkiyatSayisi: v.sevkiyat.size,
+    adet: Math.round(v.adet), palet: Math.round(v.palet), kg: Math.round(v.kg),
+  })).sort((a, b) => b.adet - a.adet);
+
+  const sevkiyatUrunler = [...urunAgg.entries()].map(([sku, v]) => ({
+    sku, adet: Math.round(v.adet),
+    ulkeDagilim: [...v.ulkeler.entries()].map(([c, q]) => `${c}:${q}`).join(" · "),
+  })).sort((a, b) => b.adet - a.adet).slice(0, 30);
+
+  const sevkiyatToplam = {
+    sevkiyat: sevkBaslik.size,
+    adet: sevkiyatUlkeler.reduce((t, u) => t + u.adet, 0),
+    palet: sevkiyatUlkeler.reduce((t, u) => t + u.palet, 0),
+    kg: sevkiyatUlkeler.reduce((t, u) => t + u.kg, 0),
+  };
+
   return (
     <div className="px-4 pb-6 sm:px-6">
       <SatisDashboard
@@ -136,6 +192,9 @@ export default async function SatisPage({ searchParams }: PageProps) {
         channels={settings.kanallari}
         customStart={params.start}
         customEnd={params.end}
+        sevkiyatUlkeler={sevkiyatUlkeler}
+        sevkiyatUrunler={sevkiyatUrunler}
+        sevkiyatToplam={sevkiyatToplam}
       />
     </div>
   );

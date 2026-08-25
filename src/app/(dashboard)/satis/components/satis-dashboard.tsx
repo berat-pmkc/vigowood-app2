@@ -10,6 +10,7 @@ const SatisChart = dynamic(
   () => import("./satis-chart").then(mod => ({ default: mod.SatisChart })),
   { ssr: false, loading: () => <ChartSkeleton /> }
 );
+import { SevkiyatOzeti } from "./sevkiyat-ozeti";
 import { SatisTable, type SkuSalesRow } from "./satis-table";
 import { ExcelUpload } from "./excel-upload";
 import type { PeriodType } from "../actions";
@@ -27,6 +28,9 @@ interface SatisDashboardProps {
   channels: SalesChannel[];
   customStart?: string;
   customEnd?: string;
+  sevkiyatUlkeler: { country: string; ulke: string; sevkiyatSayisi: number; adet: number; palet: number; kg: number }[];
+  sevkiyatUrunler: { sku: string; adet: number; ulkeDagilim: string }[];
+  sevkiyatToplam: { sevkiyat: number; adet: number; palet: number; kg: number };
 }
 
 export function SatisDashboard({
@@ -41,6 +45,9 @@ export function SatisDashboard({
   channels,
   customStart,
   customEnd,
+  sevkiyatUlkeler,
+  sevkiyatUrunler,
+  sevkiyatToplam,
 }: SatisDashboardProps) {
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -64,7 +71,7 @@ export function SatisDashboard({
       <SatisKpiCards data={kpiData} />
 
       {/* Chart */}
-      <SatisChart data={chartData} />
+      <SatisChart data={chartData} period={period} />
 
       {/* SKU Tables */}
       <SatisTable
@@ -72,6 +79,13 @@ export function SatisDashboard({
         ihracatRows={ihracatRows}
         trToplam={trToplam}
         ihracatToplam={ihracatToplam}
+      />
+
+      {/* İhracat sevkiyatları */}
+      <SevkiyatOzeti
+        ulkeler={sevkiyatUlkeler}
+        urunler={sevkiyatUrunler}
+        toplam={sevkiyatToplam}
       />
     </div>
   );
