@@ -32,7 +32,14 @@ import {
 } from "@/components/ui/popover";
 import { sevkiyatCreateSchema, type SevkiyatCreateData } from "@/lib/validations";
 import type { ShipmentCountry, KonteynerTipi, AracTipi } from "@/lib/shipment-settings-types";
-import { createSevkiyatWithItems, getPaletSablonlar } from "../actions";
+import {
+  createSevkiyatWithItems, getPaletSablonlar,
+  getKopyalanabilirSevkiyatlar, getSevkiyatKalemleriKopya,
+  type KopyaSevkiyat,
+} from "../actions";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import {
   ArrowLeft,
   Truck,
@@ -48,6 +55,8 @@ import {
   Package,
   Container,
   ArrowRight,
+  Copy,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -86,6 +95,12 @@ export function YeniSevkiyatForm({ products, ulkeler, konteynerTipleri, aracTipl
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<LocalItem[]>([]);
+
+  // Kopyalama
+  const [kopyaOpen, setKopyaOpen] = useState(false);
+  const [kopyaListe, setKopyaListe] = useState<KopyaSevkiyat[]>([]);
+  const [kopyaYukleniyor, setKopyaYukleniyor] = useState(false);
+  const [kopyaArama, setKopyaArama] = useState("");
 
   // Item ekleme state
   const [skuOpen, setSkuOpen] = useState(false);
@@ -187,6 +202,41 @@ export function YeniSevkiyatForm({ products, ulkeler, konteynerTipleri, aracTipl
 
   const handleRemoveItem = (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  // ── Kopyalama ────────────────────────────────────────────
+  const kopyaAc = async () => {
+    setKopyaOpen(true);
+    setKopyaYukleniyor(true);
+    setKopyaListe(await getKopyalanabilirSevkiyatlar(countryCode));
+    setKopyaYukleniyor(false);
+  };
+
+  const sevkiyattanKopyala = async (sevkiyatId: string) => {
+    const kalemler = await getSevkiyatKalemleriKopya(sevkiyatId);
+    if (kalemler.length === 0) {
+      toast.error("Bu sevkiyatın kopyalanacak kalemi yok");
+      return;
+    }
+    const yeni: LocalItem[] = kalemler.map((k, i) => ({
+      id: `kopya-${Date.now()}-${i}`,
+      sku: k.sku,
+      urun_adi: k.urun_adi,
+      palet_boyut: k.palet_boyut,
+      palet_yukseklik: k.palet_yukseklik,
+      en: k.en, boy: k.boy, yuk: k.yuk,
+      koli_adedi: k.koli_adedi,
+      palette_koli: k.palette_koli,
+      koli_agirlik: k.koli_agirlik,
+      palet_sayisi: k.palet_sayisi,
+      grup: k.grup,
+      // Palet ölçüleri kopyalandıysa şablon var kabul (ekranda uyarı çıkmasın)
+      hasSablon: k.palet_yukseklik > 0 && k.koli_adedi > 0 && k.palette_koli > 0,
+    }));
+    // Mevcut liste boşsa değiştir, doluysa ekle (çalışma kaybolmasın)
+    setItems((prev) => (prev.length === 0 ? yeni : [...prev, ...yeni]));
+    setKopyaOpen(false);
+    toast.success(`${yeni.length} ürün kopyalandı — istediğini değiştir/çıkar`);
   };
 
   const onSubmit = async (data: SevkiyatCreateData) => {
@@ -443,9 +493,15 @@ export function YeniSevkiyatForm({ products, ulkeler, konteynerTipleri, aracTipl
                 <Package className="w-5 h-5" />
                 Ürünler
               </span>
-              {items.length > 0 && (
-                <Badge variant="secondary">{items.length} ürün</Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {items.length > 0 && (
+                  <Badge variant="secondary">{items.length} ürün</Badge>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={kopyaAc}>
+                  <Copy className="mr-1.5 h-3.5 w-3.5" />
+                  Sevkiyattan kopyala
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -701,6 +757,79 @@ export function YeniSevkiyatForm({ products, ulkeler, konteynerTipleri, aracTipl
           </Button>
         </div>
       </form>
+
+      {/* Sevkiyattan kopyala dialogu */}
+      <Dialog open={kopyaOpen} onOpenChange={setKopyaOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy className="h-4 w-4" />
+              Önceki sevkiyattan kopyala
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Bir sevkiyatın tüm ürünlerini bu forma yükler. Sonra istediğin
+            ürünü/adedi değiştirebilir veya çıkarabilirsin.
+            {countryCode ? ` ${countryCode} sevkiyatları önce listelenir.` : ""}
+          </p>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={kopyaArama}
+              onChange={(e) => setKopyaArama(e.target.value)}
+              placeholder="Sevkiyat ara (kod, ülke)..."
+              className="h-9 pl-9"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="max-h-[50vh] overflow-y-auto">
+            {kopyaYukleniyor ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Yükleniyor...
+              </div>
+            ) : (() => {
+              const q = kopyaArama.trim().toLocaleLowerCase("tr");
+              const filtre = q
+                ? kopyaListe.filter((k) =>
+                    k.sevkiyatId.toLocaleLowerCase("tr").includes(q) ||
+                    k.ulke.toLocaleLowerCase("tr").includes(q) ||
+                    k.ad.toLocaleLowerCase("tr").includes(q))
+                : kopyaListe;
+              if (filtre.length === 0) {
+                return <p className="py-8 text-center text-sm text-muted-foreground">Kopyalanacak sevkiyat bulunamadı.</p>;
+              }
+              return (
+                <ul className="divide-y">
+                  {filtre.map((k) => (
+                    <li key={k.sevkiyatId}>
+                      <button
+                        type="button"
+                        onClick={() => sevkiyattanKopyala(k.sevkiyatId)}
+                        className="flex w-full items-center gap-3 px-1 py-2.5 text-left hover:bg-muted/50"
+                      >
+                        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs font-semibold">
+                          {k.sevkiyatId}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{k.ad}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {k.ulke}{k.tarih ? ` · ${new Date(k.tarih).toLocaleDateString("tr-TR")}` : ""}
+                          </p>
+                        </div>
+                        <Badge variant="secondary" className="shrink-0 text-[11px]">
+                          {k.kalemSayisi} ürün
+                        </Badge>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

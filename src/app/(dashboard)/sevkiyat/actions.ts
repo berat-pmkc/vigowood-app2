@@ -1571,3 +1571,113 @@ export async function deleteSevkiyat(sevkiyatId: string): Promise<ActionResult> 
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
 }
+
+// ─── SEVKİYAT KOPYALAMA ─────────────────────────────────────────
+// Excel'de son sevkiyatı kopyalayıp ürün/adet değiştirme alışkanlığının
+// sistem içi karşılığı. Yeni sevkiyat formunda "önceki sevkiyattan kopyala".
+
+export interface KopyaSevkiyat {
+  sevkiyatId: string;
+  ad: string;
+  ulke: string;
+  countryCode: string;
+  durum: string;
+  tarih: string | null;
+  kalemSayisi: number;
+}
+
+/** Kopyalanabilir sevkiyatları listeler. Aynı ülke önce gelir. */
+export async function getKopyalanabilirSevkiyatlar(
+  countryCode?: string,
+): Promise<KopyaSevkiyat[]> {
+  await requireSevkiyatAccess();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("sevkiyat")
+    .select("sevkiyat_id, sevkiyat_adi, ulke, country_code, durum, planlanan_sevk_tarihi, sevk_tarihi, created_at")
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  const sevkiyatlar = (data ?? []) as {
+    sevkiyat_id: string; sevkiyat_adi: string | null; ulke: string | null;
+    country_code: string | null; durum: string | null;
+    planlanan_sevk_tarihi: string | null; sevk_tarihi: string | null; created_at: string;
+  }[];
+  if (sevkiyatlar.length === 0) return [];
+
+  // Kalem sayıları
+  const ids = sevkiyatlar.map((s) => s.sevkiyat_id);
+  const sayim = new Map<string, number>();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data: kalemler } = await supabase
+      .from("sevkiyat_items")
+      .select("sevkiyat_id")
+      .in("sevkiyat_id", ids.slice(i, i + 100));
+    for (const k of kalemler ?? []) sayim.set(k.sevkiyat_id, (sayim.get(k.sevkiyat_id) ?? 0) + 1);
+  }
+
+  const liste: KopyaSevkiyat[] = sevkiyatlar
+    .map((s) => ({
+      sevkiyatId: s.sevkiyat_id,
+      ad: s.sevkiyat_adi ?? s.sevkiyat_id,
+      ulke: s.ulke ?? "",
+      countryCode: s.country_code ?? "",
+      durum: s.durum ?? "",
+      tarih: s.sevk_tarihi ?? s.planlanan_sevk_tarihi,
+      kalemSayisi: sayim.get(s.sevkiyat_id) ?? 0,
+    }))
+    // İçi boş sevkiyatı kopyalamanın anlamı yok
+    .filter((s) => s.kalemSayisi > 0);
+
+  // Aynı ülke başa
+  if (countryCode) {
+    liste.sort((a, b) => {
+      const au = a.countryCode === countryCode ? 0 : 1;
+      const bu = b.countryCode === countryCode ? 0 : 1;
+      return au - bu;
+    });
+  }
+  return liste;
+}
+
+export interface KopyaKalem {
+  sku: string;
+  urun_adi: string;
+  palet_boyut: string;
+  palet_yukseklik: number;
+  en: number;
+  boy: number;
+  yuk: number;
+  koli_adedi: number;
+  palette_koli: number;
+  koli_agirlik: number;
+  palet_sayisi: number;
+  grup: string | null;
+}
+
+/** Bir sevkiyatın kalemlerini yeni forma yüklenmeye hazır döndürür. */
+export async function getSevkiyatKalemleriKopya(sevkiyatId: string): Promise<KopyaKalem[]> {
+  await requireSevkiyatAccess();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("sevkiyat_items")
+    .select("sku, urun_adi, palet_boyut, palet_yukseklik, en, boy, yuk, koli_adedi, palette_koli, koli_agirlik, palet_sayisi, grup")
+    .eq("sevkiyat_id", sevkiyatId)
+    .order("created_at");
+
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    sku: String(r.sku ?? ""),
+    urun_adi: r.urun_adi ? String(r.urun_adi) : String(r.sku ?? ""),
+    palet_boyut: r.palet_boyut ? String(r.palet_boyut) : "80x120",
+    palet_yukseklik: Number(r.palet_yukseklik ?? 0),
+    en: Number(r.en ?? 0),
+    boy: Number(r.boy ?? 0),
+    yuk: Number(r.yuk ?? 0),
+    koli_adedi: Number(r.koli_adedi ?? 0),
+    palette_koli: Number(r.palette_koli ?? 0),
+    koli_agirlik: Number(r.koli_agirlik ?? 0),
+    palet_sayisi: Number(r.palet_sayisi ?? 1),
+    grup: r.grup ? String(r.grup) : null,
+  }));
+}
