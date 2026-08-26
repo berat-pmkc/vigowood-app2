@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { AnalizDashboard } from "./components/analiz-dashboard";
+import { urunMaliyetleriHesapla } from "@/lib/maliyet";
+import type { KarlilikRow, KarlilikKpi } from "./components/karlilik-tab";
 import { MONTH_LABELS } from "./components/overview-trend-chart";
 import type { PeriodType, TabType } from "./actions";
 import type { OverviewKpiData } from "./components/overview-kpi-cards";
@@ -564,6 +566,47 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     .sort((a, b) => b.toplamAdet - a.toplamAdet)
     .slice(0, 10);
 
+  // ── Kârlılık (sadece sekme seçiliyse hesapla — maliyet motoru ağır) ──
+  let karlilikKpi: KarlilikKpi = { ciro: 0, maliyet: 0, kar: 0, marj: 0, eksikSayi: 0 };
+  let karlilikRows: KarlilikRow[] = [];
+  if (tab === "karlilik" && skuMap.size > 0) {
+    const maliyetHarita = await urunMaliyetleriHesapla([...skuMap.keys()]);
+    let cSum = 0;
+    let mSum = 0;
+    let eksikSayi = 0;
+    for (const [sku, v] of skuMap) {
+      const mal = maliyetHarita.get(sku);
+      const eksik = !mal || mal.eksikFiyatliParca.length > 0 || mal.iscilikEksikAdim > 0;
+      const birimMaliyet = mal ? mal.birimMaliyet : null;
+      const toplamMaliyet = birimMaliyet != null ? birimMaliyet * v.adet : 0;
+      const kar = v.tutar - toplamMaliyet;
+      const marj = v.tutar > 0 ? (kar / v.tutar) * 100 : 0;
+      cSum += v.tutar;
+      if (birimMaliyet != null) mSum += toplamMaliyet;
+      if (eksik) eksikSayi++;
+      karlilikRows.push({
+        sku,
+        urunAdi: productNameMap.get(sku) || "",
+        adet: v.adet,
+        ciro: v.tutar,
+        birimMaliyet,
+        toplamMaliyet,
+        kar,
+        marj,
+        eksik,
+      });
+    }
+    karlilikRows.sort((a, b) => b.kar - a.kar);
+    const karSum = cSum - mSum;
+    karlilikKpi = {
+      ciro: cSum,
+      maliyet: mSum,
+      kar: karSum,
+      marj: cSum > 0 ? (karSum / cSum) * 100 : 0,
+      eksikSayi,
+    };
+  }
+
   // ── Stock KPI ──
   const kritikUrun = productsRows.filter(
     (p) =>
@@ -661,6 +704,8 @@ export default async function AnalizPage({ searchParams }: PageProps) {
         stockKpi={stockKpi}
         stockMovement={stockMovement}
         stockCritical={stockCritical}
+        karlilikKpi={karlilikKpi}
+        karlilikRows={karlilikRows}
       />
     </div>
   );

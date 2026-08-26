@@ -8,6 +8,7 @@ import { OverviewTab } from "./overview-tab";
 import { ProductionTab } from "./production-tab";
 import { SalesTab } from "./sales-tab";
 import { StockTab } from "./stock-tab";
+import { KarlilikTab, type KarlilikRow, type KarlilikKpi } from "./karlilik-tab";
 import type { PeriodType, TabType } from "../actions";
 import type { OverviewKpiData } from "./overview-kpi-cards";
 import type { DailyOverviewData } from "./overview-production-chart";
@@ -41,6 +42,9 @@ export interface AnalizDashboardProps {
   stockKpi: StockKpiData;
   stockMovement: StockMovementData[];
   stockCritical: CriticalStockRow[];
+  // Kârlılık
+  karlilikKpi: KarlilikKpi;
+  karlilikRows: KarlilikRow[];
 }
 
 export function AnalizDashboard({
@@ -58,6 +62,8 @@ export function AnalizDashboard({
   stockKpi,
   stockMovement,
   stockCritical,
+  karlilikKpi,
+  karlilikRows,
 }: AnalizDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -97,6 +103,7 @@ export function AnalizDashboard({
           <TabsTrigger value="uretim">Üretim</TabsTrigger>
           <TabsTrigger value="satis">Satış</TabsTrigger>
           <TabsTrigger value="stok">Stok</TabsTrigger>
+          <TabsTrigger value="karlilik">Kârlılık</TabsTrigger>
         </TabsList>
 
         <TabsContent value="genel" className="mt-4">
@@ -129,6 +136,10 @@ export function AnalizDashboard({
             movementData={stockMovement}
             criticalData={stockCritical}
           />
+        </TabsContent>
+
+        <TabsContent value="karlilik" className="mt-4">
+          <KarlilikTab kpi={karlilikKpi} rows={karlilikRows} />
         </TabsContent>
       </Tabs>
     </div>
