@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { urunMaliyetleriHesapla, getMaliyetAyarlari, type UrunMaliyet } from "@/lib/maliyet";
+import { urunMaliyetleriHesapla, getMaliyetAyarlari, getAylar, type UrunMaliyet } from "@/lib/maliyet";
 import { MALIYET_ROLES, type MaliyetVerisi } from "./constants";
 
 async function yetki() {
@@ -12,8 +12,8 @@ async function yetki() {
   return user;
 }
 
-/** Aktif ürünlerin birim maliyetleri + ayarlar. */
-export async function getMaliyetVerisi(): Promise<MaliyetVerisi> {
+/** Aktif ürünlerin birim maliyetleri + ayarlar. ay = "YYYY-MM" veya null (tüm zamanlar). */
+export async function getMaliyetVerisi(ay: string | null = null): Promise<MaliyetVerisi> {
   await yetki();
   const supabase = await createClient();
   const { data } = await supabase
@@ -21,10 +21,12 @@ export async function getMaliyetVerisi(): Promise<MaliyetVerisi> {
     .select("sku")
     .eq("aktif_mi", true);
   const skular = (data ?? []).map((p) => p.sku);
-  const harita = await urunMaliyetleriHesapla(skular);
+  const aylar = await getAylar();
+  const secilenAy = ay && aylar.includes(ay) ? ay : null;
+  const harita = await urunMaliyetleriHesapla(skular, secilenAy);
   const ayar = await getMaliyetAyarlari();
   const urunler = [...harita.values()].sort((a, b) => b.birimMaliyet - a.birimMaliyet);
-  return { urunler, ayar };
+  return { urunler, ayar, aylar, secilenAy };
 }
 
 /** Tek ürün detay (breakdown) — gerekirse ayrı çağrı için. */

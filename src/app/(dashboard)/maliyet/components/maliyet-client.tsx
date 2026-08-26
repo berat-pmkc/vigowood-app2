@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,13 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
   const [montaj, setMontaj] = useState(String(veri.ayar.montajSaatUcreti));
   const [paketleme, setPaketleme] = useState(String(veri.ayar.paketlemeSaatUcreti));
   const [bekliyor, basla] = useTransition();
+  const router = useRouter();
+
+  const ayEtiket = (a: string) => {
+    const [y, m] = a.split("-");
+    const adlar = ["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+    return `${adlar[Number(m)]} ${y}`;
+  };
 
   const filtre = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr");
@@ -57,9 +65,25 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
           <div>
             <h1 className="text-lg font-semibold">Ürün Birim Maliyet Analizi</h1>
             <p className="text-sm text-muted-foreground">
-              Reçeteden malzeme + gerçek seans işçiliği
+              Reçeteden malzeme + gerçek seans işçiliği (adet-ağırlıklı)
             </p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">İşçilik dönemi:</span>
+          <select
+            value={veri.secilenAy ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              router.push(v ? `/maliyet?ay=${v}` : "/maliyet");
+            }}
+            className="h-8 rounded-md border bg-background px-2 text-sm"
+          >
+            <option value="">Tüm zamanlar</option>
+            {veri.aylar.map((a) => (
+              <option key={a} value={a}>{ayEtiket(a)}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -69,9 +93,9 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
         <span>
           <b>Malzeme</b> = reçetedeki (step_bom) satın alınan parçalar × birim fiyat
           + kesilen parçaların MDF levha payı. <b>İşçilik</b> = her montaj/paketleme
-          adımının gerçek medyan dk/adet&apos;i × saat ücreti. Fiyatı tanımsız
-          malzeme ya da seans verisi olmayan adım varsa maliyet eksik olabilir
-          (satırda uyarı gösterilir).
+          adımının <b>adet-ağırlıklı</b> gerçek işçilik süresi (Σ kişi-dk ÷ Σ adet)
+          × saat ücreti. Dönem seçiliyse o ayın seansları; o ay veri yoksa tüm
+          zamanlar verisine düşülür (satırda &quot;geçmiş&quot; rozeti).
         </span>
       </div>
 
@@ -259,6 +283,9 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
                           <td className="px-2 py-1">
                             {a.adim}
                             <Badge variant="outline" className="ml-1 text-[9px]">{a.kaynak}</Badge>
+                            {a.eski && (
+                              <Badge variant="outline" className="ml-1 border-amber-300 text-[9px] text-amber-700">geçmiş</Badge>
+                            )}
                           </td>
                           <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{a.dkAdet} dk/adet</td>
                           <td className="px-2 py-1 text-right tabular-nums font-medium">{tl(a.tutar)}</td>

@@ -47,6 +47,8 @@ export interface AdimIscilik {
   kaynak: "montaj" | "paketleme";
   dkAdet: number;
   tutar: number;
+  /** true = seçilen ayda veri yoktu, tüm zamanlar verisine düşüldü */
+  eski: boolean;
 }
 
 export interface UrunMaliyet {
@@ -76,7 +78,7 @@ export async function getMaliyetAyarlari(): Promise<MaliyetAyarlari> {
   };
 }
 
-export async function urunMaliyetleriHesapla(skular: string[]): Promise<Map<string, UrunMaliyet>> {
+export async function urunMaliyetleriHesapla(skular: string[], ay: string | null = null): Promise<Map<string, UrunMaliyet>> {
   const supabase = await createClient();
   const ayar = await getMaliyetAyarlari();
   const sonuc = new Map<string, UrunMaliyet>();
@@ -151,8 +153,8 @@ export async function urunMaliyetleriHesapla(skular: string[]): Promise<Map<stri
     }
   }
 
-  const montajIsc = await medyanIscilik(supabase, "montaj_sessions", skular);
-  const paketIsc = await medyanIscilik(supabase, "pack_events", skular);
+  const montajIsc = await iscilikHesapla(supabase, "montaj_sessions", skular, ay);
+  const paketIsc = await iscilikHesapla(supabase, "pack_events", skular, ay);
 
   for (const sku of skular) {
     const recete = receteler.get(sku) ?? new Map<string, number>();
@@ -187,13 +189,13 @@ export async function urunMaliyetleriHesapla(skular: string[]): Promise<Map<stri
     const malzemeToplam = kalemler.reduce((t, k) => t + k.tutar, 0);
 
     const iscAdim: AdimIscilik[] = [];
-    const montajSteps = montajIsc.get(sku) ?? new Map<string, number>();
-    for (const [adim, dk] of montajSteps) {
-      iscAdim.push({ adim, kaynak: "montaj", dkAdet: Number(dk.toFixed(2)), tutar: (dk / 60) * ayar.montajSaatUcreti });
+    const montajSteps = montajIsc.get(sku) ?? new Map<string, { dk: number; eski: boolean }>();
+    for (const [adim, v] of montajSteps) {
+      iscAdim.push({ adim, kaynak: "montaj", dkAdet: Number(v.dk.toFixed(2)), tutar: (v.dk / 60) * ayar.montajSaatUcreti, eski: v.eski });
     }
     const pkt = paketIsc.get(sku)?.get("__paketleme__");
     if (pkt != null) {
-      iscAdim.push({ adim: "PAKETLEME", kaynak: "paketleme", dkAdet: Number(pkt.toFixed(2)), tutar: (pkt / 60) * ayar.paketlemeSaatUcreti });
+      iscAdim.push({ adim: "PAKETLEME", kaynak: "paketleme", dkAdet: Number(pkt.dk.toFixed(2)), tutar: (pkt.dk / 60) * ayar.paketlemeSaatUcreti, eski: pkt.eski });
     }
     const iscilikToplam = iscAdim.reduce((t, a) => t + a.tutar, 0);
 
@@ -217,13 +219,15 @@ export async function urunMaliyetleriHesapla(skular: string[]): Promise<Map<stri
   return sonuc;
 }
 
-async function medyanIscilik(
+async function iscilikHesapla(
   supabase: Awaited<ReturnType<typeof createClient>>,
   tablo: "montaj_sessions" | "pack_events",
   skular: string[],
-): Promise<Map<string, Map<string, number>>> {
-  const sonuc = new Map<string, Map<string, number>>();
-  const olcumler = new Map<string, number[]>();
+  ay: string | null,
+): Promise<Map<string, Map<string, { dk: number; eski: boolean }>>> {
+  const sonuc = new Map<string, Map<string, { dk: number; eski: boolean }>>();
+  // key -> ay/tüm zamanlar toplamları (dk = kişi-dakika, qty = adet)
+  const acc = new Map<string, { aDk: number; aQty: number; tDk: number; tQty: number }>();
 
   const kolonlar = tablo === "montaj_sessions"
     ? "sku, step_name, qty, start_time, end_time, worker_count, net_sure_dk"
@@ -243,26 +247,46 @@ async function medyanIscilik(
       const gecen = net > 0 ? net : (en > st ? (en - st) / 60000 : 0);
       if (gecen <= 1 || gecen > 240) continue;
       const kisi = Number(r.worker_count ?? 1) || 1;
-      const ia = (gecen * kisi) / qty;
-      if (!(ia > 0)) continue;
+      const perAdet = (gecen * kisi) / qty; // uç kayıt filtresi
+      if (!(perAdet > 0) || perAdet > 240) continue;
       const step = tablo === "montaj_sessions" ? String(r.step_name ?? "") : "__paketleme__";
-      const key = `${sku} ${step}`;
-      const arr = olcumler.get(key) ?? [];
-      arr.push(ia);
-      olcumler.set(key, arr);
+      const key = `${sku}\u0001${step}`;
+      const a = acc.get(key) ?? { aDk: 0, aQty: 0, tDk: 0, tQty: 0 };
+      const kisiDk = gecen * kisi;
+      a.tDk += kisiDk; a.tQty += qty;
+      const rowAy = r.start_time ? String(r.start_time).slice(0, 7) : "";
+      if (ay && rowAy === ay) { a.aDk += kisiDk; a.aQty += qty; }
+      acc.set(key, a);
     }
   }
 
-  const medyan = (xs: number[]) => {
-    const a = [...xs].sort((x, y) => x - y);
-    const o = Math.floor(a.length / 2);
-    return a.length % 2 ? a[o] : (a[o - 1] + a[o]) / 2;
-  };
-  for (const [key, xs] of olcumler) {
-    const [sku, step] = key.split(" ");
-    const m = sonuc.get(sku) ?? new Map<string, number>();
-    m.set(step, medyan(xs));
+  // Adet-ağırlıklı ortalama: Σ(kişi-dk) ÷ Σ(adet). Ay seçiliyse o ay; yoksa tüm zamanlar (eski=true).
+  for (const [key, a] of acc) {
+    const [sku, step] = key.split("\u0001");
+    let dk: number; let eski: boolean;
+    if (ay && a.aQty > 0) { dk = a.aDk / a.aQty; eski = false; }
+    else if (a.tQty > 0) { dk = a.tDk / a.tQty; eski = ay != null; }
+    else continue;
+    const m = sonuc.get(sku) ?? new Map<string, { dk: number; eski: boolean }>();
+    m.set(step, { dk, eski });
     sonuc.set(sku, m);
   }
   return sonuc;
+}
+
+/** İşçilik seansı olan ayların listesi (YYYY-MM), en yeni önce. */
+export async function getAylar(): Promise<string[]> {
+  const supabase = await createClient();
+  const aylar = new Set<string>();
+  for (const t of ["montaj_sessions", "pack_events"] as const) {
+    const { data } = await supabase
+      .from(t).select("start_time")
+      .eq("durum", "tamamlandi").not("start_time", "is", null)
+      .order("start_time", { ascending: false }).limit(5000);
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
+      const st = r.start_time ? String(r.start_time).slice(0, 7) : "";
+      if (st) aylar.add(st);
+    }
+  }
+  return [...aylar].sort().reverse();
 }

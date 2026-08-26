@@ -8,4 +8,6 @@ export const MALIYET_ROLES: UserRole[] = [
 export interface MaliyetVerisi {
   urunler: UrunMaliyet[];
   ayar: MaliyetAyarlari;
+  aylar: string[];
+  secilenAy: string | null;
 }
