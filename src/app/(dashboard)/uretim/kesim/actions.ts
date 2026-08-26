@@ -675,6 +675,41 @@ export async function iptalKesimTalebi(talepId: string): Promise<ActionResult> {
   }
 }
 
+/** İptal edilmiş talebi listeden tamamen siler (işlenmiş kesim yoksa). */
+export async function silKesimTalebi(talepId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    // İşlenmiş kesim varsa silme — stok/geçmiş bozulmasın
+    const { count } = await supabase
+      .from("cut_batches")
+      .select("cut_id", { count: "exact", head: true })
+      .eq("talep_id", talepId);
+    if ((count ?? 0) > 0) {
+      return { success: false, error: "Bu talebe işlenmiş kesim var — silinemez, sadece kayıt olarak kalır" };
+    }
+
+    const { data, error } = await supabase
+      .from("kesim_talepleri")
+      .delete()
+      .eq("talep_id", talepId)
+      .eq("durum", "iptal")
+      .select("talep_id");
+
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) {
+      return { success: false, error: "Talep silinemedi — yalnızca iptal edilmiş talepler silinebilir" };
+    }
+
+    revalidatePath("/uretim/kesim");
+    revalidatePath("/uretim/kesim/talepler");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 // ─── Kesim Düzeltme / Silme ─────────────────────────────────
 
 /**

@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { iptalKesimTalebi, type KesimTalebi } from "../../actions";
+import { iptalKesimTalebi, silKesimTalebi, type KesimTalebi } from "../../actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Flame, X, PackageCheck } from "lucide-react";
+import { Flame, X, PackageCheck, Trash2 } from "lucide-react";
 
 interface Props {
   talepler: KesimTalebi[];
@@ -53,6 +53,18 @@ export function TalepListesi({ talepler, kesimeBaslaGoster, onKesimeBasla }: Pro
       return;
     }
     toast.success("Talep iptal edildi");
+    router.refresh();
+  };
+
+  const sil = async (talepId: string) => {
+    setIslenen(talepId);
+    const r = await silKesimTalebi(talepId);
+    setIslenen(null);
+    if (!r.success) {
+      toast.error(r.error);
+      return;
+    }
+    toast.success("Talep silindi");
     router.refresh();
   };
 
@@ -129,16 +141,29 @@ export function TalepListesi({ talepler, kesimeBaslaGoster, onKesimeBasla }: Pro
                     Kesime Başla
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive"
-                  onClick={() => iptal(t.talep_id)}
-                  disabled={islenen === t.talep_id}
-                >
-                  <X className="mr-1 size-3.5" />
-                  İptal
-                </Button>
+                {t.durum === "iptal" ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => sil(t.talep_id)}
+                    disabled={islenen === t.talep_id}
+                  >
+                    <Trash2 className="mr-1 size-3.5" />
+                    Sil
+                  </Button>
+                ) : t.durum === "bekliyor" || t.durum === "kesimde" ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => iptal(t.talep_id)}
+                    disabled={islenen === t.talep_id}
+                  >
+                    <X className="mr-1 size-3.5" />
+                    İptal
+                  </Button>
+                ) : null}
               </div>
             </div>
           </Card>
