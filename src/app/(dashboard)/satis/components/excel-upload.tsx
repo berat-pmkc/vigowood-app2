@@ -24,6 +24,8 @@ export function ExcelUpload() {
     new Date().toISOString().split("T")[0],
   );
   const [loading, setLoading] = useState(false);
+  // Güncel satış → stoktan düş. Geçmiş/kayıt yüklemesi → düşme.
+  const [stokDus, setStokDus] = useState(true);
   const [duplicateWarning, setDuplicateWarning] = useState<{
     error: string;
     duplicates: { fatura_no: string; rapor_id: string }[];
@@ -40,6 +42,7 @@ export function ExcelUpload() {
       formData.append("file", file);
       formData.append("rapor_tarihi", raporTarihi);
       if (forceOverwrite) formData.append("force_overwrite", "true");
+      if (!stokDus) formData.append("stok_dus", "false");
 
       const result = await uploadSalesExcel(formData);
 
@@ -116,6 +119,23 @@ export function ExcelUpload() {
               </p>
             )}
           </div>
+
+          {/* Stoktan düş / geçmiş kayıt seçeneği */}
+          <label className="flex items-start gap-2 rounded-lg border p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={stokDus}
+              onChange={(e) => setStokDus(e.target.checked)}
+            />
+            <span className="text-sm">
+              Stoktan düş
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Güncel satış yüklüyorsan işaretli kalsın. <b>Geçmiş ayın satışını
+                kayıt için</b> yüklüyorsan işareti kaldır — mevcut stok etkilenmez.
+              </span>
+            </span>
+          </label>
 
           {duplicateWarning && (
             <div className="rounded-lg border border-destructive bg-destructive/10 p-4">

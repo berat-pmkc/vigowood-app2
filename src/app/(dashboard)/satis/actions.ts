@@ -213,6 +213,8 @@ export async function uploadSalesExcel(
 
     const raporTarihiStr = formData.get("rapor_tarihi") as string | null;
     const forceOverwrite = formData.get("force_overwrite") === "true";
+    // Geçmiş/kayıt amaçlı yüklemede stok düşülmemeli. Varsayılan: düş.
+    const stokDus = formData.get("stok_dus") !== "false";
 
     const settings = await getSalesSettings();
 
@@ -357,9 +359,9 @@ export async function uploadSalesExcel(
       }
     }
 
-    // STOK DÜŞÜMÜ
+    // STOK DÜŞÜMÜ — yalnızca güncel satışta. Geçmiş kayıt yüklemesinde atlanır.
     const productRows = rows.filter((r) => !r.is_hizmet && r.sku);
-    if (productRows.length > 0) {
+    if (stokDus && productRows.length > 0) {
       const skuTotals = new Map<string, number>();
       for (const r of productRows) {
         const current = skuTotals.get(r.sku!) || 0;
