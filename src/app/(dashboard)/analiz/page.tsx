@@ -17,25 +17,36 @@ import type { StockMovementData } from "./components/stock-movement-chart";
 import type { CriticalStockRow } from "./components/stock-critical-table";
 import { isExportChannel } from "@/lib/constants";
 
-// ─── Period Helper ──────────────────────────────────────────────
+// ─── Period Helper (Europe/Istanbul, UTC+3) ─────────────────────
+const TR_TZ = "Europe/Istanbul";
+/** TR yerel tarihini YYYY-MM-DD verir (sunucu UTC olsa bile). */
+function trBugun(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: TR_TZ });
+}
+/** YYYY-MM-DD stringine gün ekler/çıkarır (TZ-güvenli). */
+function tarihKaydir(gunStr: string, delta: number): string {
+  const [y, m, d] = gunStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().split("T")[0];
+}
 function getPeriodDates(period: PeriodType): {
   start: string | null;
   end: string | null;
 } {
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
+  const todayStr = trBugun();
+  const [y, m, d] = todayStr.split("-").map(Number);
   switch (period) {
     case "today":
       return { start: todayStr, end: todayStr };
     case "week": {
-      const startOfWeek = new Date(now);
-      startOfWeek.setDate(now.getDate() - now.getDay() + 1);
-      return { start: startOfWeek.toISOString().split("T")[0], end: todayStr };
+      const base = new Date(Date.UTC(y, m - 1, d));
+      const dow = base.getUTCDay(); // 0=Pazar
+      const pazartesiyeKadar = dow === 0 ? 6 : dow - 1;
+      return { start: tarihKaydir(todayStr, -pazartesiyeKadar), end: todayStr };
     }
-    case "month": {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start: startOfMonth.toISOString().split("T")[0], end: todayStr };
-    }
+    case "month":
+      return { start: `${y}-${String(m).padStart(2, "0")}-01`, end: todayStr };
     case "all":
       return { start: null, end: null };
   }
@@ -44,11 +55,9 @@ function getPeriodDates(period: PeriodType): {
 // ─── 30 day helper ──────────────────────────────────────────────
 function getLast30DaysMap<T>(init: () => T): Map<string, T> {
   const map = new Map<string, T>();
-  const now = new Date();
+  const todayStr = trBugun();
   for (let i = 30; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    map.set(d.toISOString().split("T")[0], init());
+    map.set(tarihKaydir(todayStr, -i), init());
   }
   return map;
 }
@@ -71,16 +80,14 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   const supabase = await createClient();
   const { start, end } = getPeriodDates(period);
 
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
-  const thirtyDaysAgo = new Date(now);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
+  const todayStr = trBugun();
+  const thirtyDaysAgoStr = tarihKaydir(todayStr, -30);
 
-  // 12 months ago for monthly trend
-  const twelveMonthsAgo = new Date(now);
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
+  // 12 ay öncesi (aylık trend için) — TR tabanlı
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const twelveMonthsAgoStr = new Date(Date.UTC(ty, tm - 1 - 12, td))
+    .toISOString()
+    .split("T")[0];
 
   // ─── 14 Parallel Queries ───────────────────────────────────────
   const [
@@ -178,7 +185,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     (() => {
       let q = supabase
         .from("montaj_sessions")
-        .select("session_id, qty, start_time, end_time")
+        .select("session_id, qty, start_time, end_time, net_sure_dk")
         .eq("durum", "tamamlandi");
       if (start) q = q.gte("created_at", start);
       if (end) q = q.lte("created_at", `${end}T23:59:59`);
@@ -317,8 +324,8 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   // ── Overview Monthly Trend ──
   const monthlyMap = new Map<string, number>();
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const d = new Date(Date.UTC(ty, tm - 1 - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     monthlyMap.set(key, 0);
   }
 
@@ -356,6 +363,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     qty: number;
     start_time: string | null;
     end_time: string | null;
+    net_sure_dk: number | null;
   }[];
   const packPeriodQty = packLast30Rows
     .filter((r) => {
@@ -428,26 +436,33 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     .map(([date, v]) => ({ date, ...v }));
 
   // ── Production Efficiency ──
-  function avgMinutes(
-    items: { start: string | null; end: string | null }[],
+  // Medyan süre (dk). net süre varsa onu kullan; uç kayıtları (≤1 / >240 dk) ele.
+  function medyanSure(
+    items: { dk?: number | null; start: string | null; end: string | null }[],
   ): number {
-    let total = 0;
-    let count = 0;
+    const xs: number[] = [];
     for (const item of items) {
-      if (!item.start || !item.end) continue;
-      const s = new Date(item.start).getTime();
-      const e = new Date(item.end).getTime();
-      if (isNaN(s) || isNaN(e) || e <= s) continue;
-      total += (e - s) / 60000;
-      count++;
+      let dk = item.dk != null && item.dk > 0 ? item.dk : NaN;
+      if (isNaN(dk)) {
+        if (!item.start || !item.end) continue;
+        const s = new Date(item.start).getTime();
+        const e = new Date(item.end).getTime();
+        if (isNaN(s) || isNaN(e) || e <= s) continue;
+        dk = (e - s) / 60000;
+      }
+      if (dk <= 1 || dk > 240) continue;
+      xs.push(dk);
     }
-    return count > 0 ? total / count : 0;
+    if (xs.length === 0) return 0;
+    xs.sort((a, b) => a - b);
+    const o = Math.floor(xs.length / 2);
+    return xs.length % 2 ? xs[o] : (xs[o - 1] + xs[o]) / 2;
   }
 
   const productionEfficiency: EfficiencyData[] = [
     {
       istasyon: "Kesim",
-      ortSureDk: avgMinutes(
+      ortSureDk: medyanSure(
         cutBatchesPeriod.map((r) => ({
           start: r.baslama_zamani,
           end: r.bitis_zamani,
@@ -456,7 +471,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     },
     {
       istasyon: "Temizlik",
-      ortSureDk: avgMinutes(
+      ortSureDk: medyanSure(
         cleanPeriod.map((r) => ({
           start: r.start_time,
           end: r.end_time,
@@ -465,8 +480,9 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     },
     {
       istasyon: "Montaj",
-      ortSureDk: avgMinutes(
+      ortSureDk: medyanSure(
         montajPeriod.map((r) => ({
+          dk: r.net_sure_dk,
           start: r.start_time,
           end: r.end_time,
         })),
@@ -474,7 +490,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     },
     {
       istasyon: "Paketleme",
-      ortSureDk: avgMinutes(
+      ortSureDk: medyanSure(
         packLast30Rows
           .filter((r) => {
             if (!start) return true;
