@@ -10,7 +10,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { maliyetAyarKaydet, type MaliyetVerisi } from "../actions";
+import { maliyetAyarKaydet } from "../actions";
+import type { MaliyetVerisi } from "../constants";
 import type { UrunMaliyet } from "@/lib/maliyet";
 import {
   Calculator, Search, ChevronDown, ChevronRight, Info, TriangleAlert,

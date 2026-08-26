@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { getMaliyetVerisi, MALIYET_ROLES } from "./actions";
+import { getMaliyetVerisi } from "./actions";
+import { MALIYET_ROLES } from "./constants";
 import { MaliyetClient } from "./components/maliyet-client";
 
 export const metadata: Metadata = { title: "Maliyet Analizi" };

@@ -3,25 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import {
-  urunMaliyetleriHesapla, getMaliyetAyarlari,
-  type UrunMaliyet, type MaliyetAyarlari,
-} from "@/lib/maliyet";
-import type { UserRole } from "@/lib/constants";
-
-export const MALIYET_ROLES: UserRole[] = [
-  "Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Muhasebe",
-];
+import { urunMaliyetleriHesapla, getMaliyetAyarlari, type UrunMaliyet } from "@/lib/maliyet";
+import { MALIYET_ROLES, type MaliyetVerisi } from "./constants";
 
 async function yetki() {
   const user = await getCurrentUser();
   if (!user || !MALIYET_ROLES.includes(user.role)) throw new Error("Bu ekranı görme yetkiniz yok");
   return user;
-}
-
-export interface MaliyetVerisi {
-  urunler: UrunMaliyet[];
-  ayar: MaliyetAyarlari;
 }
 
 /** Aktif ürünlerin birim maliyetleri + ayarlar. */
