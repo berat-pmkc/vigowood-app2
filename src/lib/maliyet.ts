@@ -38,6 +38,8 @@ export interface MaliyetKalemi {
   miktar: number;
   birimFiyat: number;
   tutar: number;
+  /** "manuel" = all_parts.birim_fiyat elle girildi, "formul" = plakadan hesaplandı */
+  kaynak: "manuel" | "formul";
 }
 
 export interface AdimIscilik {
@@ -164,11 +166,21 @@ export async function urunMaliyetleriHesapla(skular: string[]): Promise<Map<stri
         const fiyat = bilgi?.fiyat ?? null;
         if (fiyat == null) { eksik.push(partId); continue; }
         if (fiyat === 0) continue;
-        kalemler.push({ partId, ad: bilgi?.ad ?? partId, tur: "HP", miktar: qty, birimFiyat: fiyat, tutar: qty * fiyat });
+        kalemler.push({ partId, ad: bilgi?.ad ?? partId, tur: "HP", miktar: qty, birimFiyat: fiyat, tutar: qty * fiyat, kaynak: "manuel" });
       } else if (/-P\d/.test(partId)) {
-        const birim = pMdfBirim.get(partId);
+        // Öncelik: elle girilen birim_fiyat (all_parts). Yoksa plaka MDF payı formülü.
+        const manuel = partBilgi.get(partId)?.fiyat ?? null;
+        const birim = manuel != null ? manuel : (pMdfBirim.get(partId) ?? null);
         if (birim == null) { eksik.push(partId); continue; }
-        kalemler.push({ partId, ad: pAd.get(partId) ?? partId, tur: "MDF", miktar: qty, birimFiyat: Number(birim.toFixed(4)), tutar: qty * birim });
+        if (birim === 0) continue;
+        kalemler.push({
+          partId,
+          ad: pAd.get(partId) ?? partBilgi.get(partId)?.ad ?? partId,
+          tur: "MDF", miktar: qty,
+          birimFiyat: Number(birim.toFixed(4)),
+          tutar: qty * birim,
+          kaynak: manuel != null ? "manuel" : "formul",
+        });
       }
     }
 

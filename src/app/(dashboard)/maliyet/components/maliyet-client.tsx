@@ -10,12 +10,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { maliyetAyarKaydet } from "../actions";
+import { maliyetAyarKaydet, malzemeFiyatKaydet } from "../actions";
 import type { MaliyetVerisi } from "../constants";
 import type { UrunMaliyet } from "@/lib/maliyet";
 import {
   Calculator, Search, ChevronDown, ChevronRight, Info, TriangleAlert,
-  Boxes, Wrench, Save,
+  Boxes, Wrench, Save, Pencil, Check,
 } from "lucide-react";
 
 const tl = (n: number) =>
@@ -197,15 +197,42 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
                     <tbody>
                       {u.malzemeKalemleri.map((k) => (
                         <tr key={k.partId} className="border-b last:border-0">
-                          <td className="px-2 py-1">
+                          <td className="px-2 py-1 align-top">
                             <span className="font-mono">{k.partId}</span>
                             <span className="ml-1 text-muted-foreground">{k.ad}</span>
                             {k.tur === "MDF" && <Badge variant="outline" className="ml-1 text-[9px]">MDF</Badge>}
+                            {k.tur === "MDF" && (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "ml-1 text-[9px]",
+                                  k.kaynak === "manuel"
+                                    ? "border-blue-300 text-blue-700"
+                                    : "border-emerald-300 text-emerald-700",
+                                )}
+                              >
+                                {k.kaynak === "manuel" ? "elle" : "formül"}
+                              </Badge>
+                            )}
                           </td>
-                          <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                            {k.miktar} × {k.birimFiyat.toLocaleString("tr-TR")}
+                          <td className="px-2 py-1 text-right align-top">
+                            <FiyatDuzenle partId={k.partId} mevcut={k.birimFiyat} />
+                            <span className="ml-1 text-[10px] text-muted-foreground">× {k.miktar}</span>
                           </td>
-                          <td className="px-2 py-1 text-right tabular-nums font-medium">{tl(k.tutar)}</td>
+                          <td className="px-2 py-1 text-right align-top font-medium tabular-nums">{tl(k.tutar)}</td>
+                        </tr>
+                      ))}
+                      {u.eksikFiyatliParca.map((pid) => (
+                        <tr key={pid} className="border-b bg-amber-50/40 last:border-0">
+                          <td className="px-2 py-1 align-top">
+                            <span className="font-mono">{pid}</span>
+                            <Badge variant="outline" className="ml-1 border-amber-300 text-[9px] text-amber-700">
+                              fiyatsız
+                            </Badge>
+                          </td>
+                          <td className="px-2 py-1 text-right align-top" colSpan={2}>
+                            <FiyatDuzenle partId={pid} mevcut={null} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -213,7 +240,8 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
                 </div>
                 {u.eksikFiyatliParca.length > 0 && (
                   <p className="mt-1 text-[11px] text-amber-700">
-                    Fiyatı tanımsız: {u.eksikFiyatliParca.join(", ")}
+                    {u.eksikFiyatliParca.length} parçanın kesim/plaka verisi yok — birim fiyatı
+                    elle girince maliyete eklenir.
                   </p>
                 )}
               </div>
@@ -250,5 +278,55 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
         </TableRow>
       )}
     </>
+  );
+}
+
+
+function FiyatDuzenle({ partId, mevcut }: { partId: string; mevcut: number | null }) {
+  const [deger, setDeger] = useState(mevcut != null ? String(mevcut) : "");
+  const [duzenle, setDuzenle] = useState(false);
+  const [bekle, basla] = useTransition();
+
+  if (!duzenle) {
+    return (
+      <button
+        type="button"
+        onClick={() => setDuzenle(true)}
+        className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-foreground"
+      >
+        {mevcut != null ? mevcut.toLocaleString("tr-TR") : <span className="text-amber-700">fiyat gir</span>}
+        <Pencil className="size-3 opacity-60" />
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Input
+        autoFocus
+        value={deger}
+        onChange={(e) => setDeger(e.target.value)}
+        className="h-6 w-20 px-1 text-right text-xs"
+        placeholder="₺"
+      />
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-1.5"
+        disabled={bekle}
+        onClick={() =>
+          basla(async () => {
+            const r = await malzemeFiyatKaydet(partId, Number(deger));
+            if (r.success) {
+              toast.success(`${partId} fiyatı kaydedildi — sayfayı yenileyin`);
+              setDuzenle(false);
+            } else {
+              toast.error(r.error ?? "Hata");
+            }
+          })
+        }
+      >
+        <Check className="size-3.5" />
+      </Button>
+    </span>
   );
 }
