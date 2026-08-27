@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Factory, DollarSign, Warehouse, Truck } from "lucide-react";
+import { Factory, DollarSign, Warehouse, Truck, TrendingUp } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 
 export interface OverviewKpiData {
@@ -9,6 +9,7 @@ export interface OverviewKpiData {
   donemSatis: number;
   mamulStok: number;
   bekleyenSevkiyat: number;
+  donemKar: number;
 }
 
 export function OverviewKpiCards({ data }: { data: OverviewKpiData }) {
@@ -30,6 +31,14 @@ export function OverviewKpiCards({ data }: { data: OverviewKpiData }) {
       iconColor: "text-vw-info",
     },
     {
+      title: "Dönem Kâr",
+      value: `₺${formatNumber(Math.round(data.donemKar))}`,
+      subtitle: "Ciro − maliyet (tahmini)",
+      icon: TrendingUp,
+      iconBg: "bg-purple-50",
+      iconColor: "text-purple-600",
+    },
+    {
       title: "Ürün Stok",
       value: formatNumber(data.mamulStok),
       subtitle: "Aktif ürün toplam stok",
@@ -48,7 +57,7 @@ export function OverviewKpiCards({ data }: { data: OverviewKpiData }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 md:gap-4">
       {cards.map((card) => (
         <Card key={card.title} className="border-border/50">
           <CardContent className="p-4">

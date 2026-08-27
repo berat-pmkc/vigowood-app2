@@ -1,6 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Card, CardContent } from "@/components/ui/card";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -27,6 +29,11 @@ export interface KarlilikKpi {
   marj: number;
   eksikSayi: number;
 }
+
+const KarlilikChart = dynamic(
+  () => import("./karlilik-chart").then((m) => ({ default: m.KarlilikChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> },
+);
 
 const tl = (n: number) => `₺${formatNumber(Math.round(n))}`;
 const marjRenk = (m: number) =>
@@ -70,6 +77,8 @@ export function KarlilikTab({ kpi, rows }: { kpi: KarlilikKpi; rows: KarlilikRow
           )}
         </span>
       </div>
+
+      {rows.length > 0 && <KarlilikChart rows={rows} />}
 
       <Card className="border-border/50 p-0">
         <div className="overflow-x-auto">

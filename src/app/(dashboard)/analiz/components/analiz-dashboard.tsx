@@ -16,12 +16,14 @@ import type { MonthlyTrendData } from "./overview-trend-chart";
 import type { ProductionKpiData } from "./production-kpi-cards";
 import type { DailyProductionData } from "./production-daily-chart";
 import type { EfficiencyData } from "./production-efficiency";
+import type { LaborCostData } from "./production-labor-cost";
 import type { SalesKpiData } from "./sales-kpi-cards";
 import type { ChannelSalesData } from "./sales-channel-chart";
 import type { TopProductRow } from "./sales-top-products";
 import type { StockKpiData } from "./stock-kpi-cards";
 import type { StockMovementData } from "./stock-movement-chart";
 import type { CriticalStockRow } from "./stock-critical-table";
+import type { StockValueData } from "./stock-value";
 
 export interface AnalizDashboardProps {
   period: PeriodType;
@@ -34,6 +36,7 @@ export interface AnalizDashboardProps {
   productionKpi: ProductionKpiData;
   productionDaily: DailyProductionData[];
   productionEfficiency: EfficiencyData[];
+  laborCost: LaborCostData;
   // Sales
   salesKpi: SalesKpiData;
   salesChannel: ChannelSalesData[];
@@ -42,6 +45,7 @@ export interface AnalizDashboardProps {
   stockKpi: StockKpiData;
   stockMovement: StockMovementData[];
   stockCritical: CriticalStockRow[];
+  stockValue: StockValueData;
   // Kârlılık
   karlilikKpi: KarlilikKpi;
   karlilikRows: KarlilikRow[];
@@ -56,12 +60,14 @@ export function AnalizDashboard({
   productionKpi,
   productionDaily,
   productionEfficiency,
+  laborCost,
   salesKpi,
   salesChannel,
   salesTopProducts,
   stockKpi,
   stockMovement,
   stockCritical,
+  stockValue,
   karlilikKpi,
   karlilikRows,
 }: AnalizDashboardProps) {
@@ -119,6 +125,7 @@ export function AnalizDashboard({
             kpiData={productionKpi}
             dailyData={productionDaily}
             efficiencyData={productionEfficiency}
+            laborCost={laborCost}
           />
         </TabsContent>
 
@@ -135,6 +142,7 @@ export function AnalizDashboard({
             kpiData={stockKpi}
             movementData={stockMovement}
             criticalData={stockCritical}
+            stockValue={stockValue}
           />
         </TabsContent>
 

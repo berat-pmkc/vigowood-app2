@@ -8,6 +8,7 @@ import {
   StockCriticalTable,
   type CriticalStockRow,
 } from "./stock-critical-table";
+import { StockValue, type StockValueData } from "./stock-value";
 
 const StockMovementChart = dynamic(
   () => import("./stock-movement-chart").then(mod => ({ default: mod.StockMovementChart })),
@@ -18,16 +19,19 @@ interface StockTabProps {
   kpiData: StockKpiData;
   movementData: StockMovementData[];
   criticalData: CriticalStockRow[];
+  stockValue: StockValueData;
 }
 
 export function StockTab({
   kpiData,
   movementData,
   criticalData,
+  stockValue,
 }: StockTabProps) {
   return (
     <div className="space-y-4">
       <StockKpiCards data={kpiData} />
+      <StockValue data={stockValue} />
       <StockMovementChart data={movementData} />
       <StockCriticalTable data={criticalData} />
     </div>

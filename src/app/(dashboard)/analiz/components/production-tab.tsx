@@ -8,6 +8,7 @@ import {
 } from "./production-kpi-cards";
 import type { DailyProductionData } from "./production-daily-chart";
 import type { EfficiencyData } from "./production-efficiency";
+import { ProductionLaborCost, type LaborCostData } from "./production-labor-cost";
 
 const ProductionDailyChart = dynamic(
   () => import("./production-daily-chart").then(mod => ({ default: mod.ProductionDailyChart })),
@@ -22,16 +23,19 @@ interface ProductionTabProps {
   kpiData: ProductionKpiData;
   dailyData: DailyProductionData[];
   efficiencyData: EfficiencyData[];
+  laborCost: LaborCostData;
 }
 
 export function ProductionTab({
   kpiData,
   dailyData,
   efficiencyData,
+  laborCost,
 }: ProductionTabProps) {
   return (
     <div className="space-y-4">
       <ProductionKpiCards data={kpiData} />
+      <ProductionLaborCost data={laborCost} />
       <ProductionDailyChart data={dailyData} />
       <ProductionEfficiency data={efficiencyData} />
     </div>

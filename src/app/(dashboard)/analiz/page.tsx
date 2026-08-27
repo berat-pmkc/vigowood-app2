@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { AnalizDashboard } from "./components/analiz-dashboard";
-import { urunMaliyetleriHesapla } from "@/lib/maliyet";
+import { urunMaliyetleriHesapla, getMaliyetAyarlari } from "@/lib/maliyet";
+import type { LaborCostData } from "./components/production-labor-cost";
+import type { StockValueData } from "./components/stock-value";
 import type { KarlilikRow, KarlilikKpi } from "./components/karlilik-tab";
 import { MONTH_LABELS } from "./components/overview-trend-chart";
 import type { PeriodType, TabType } from "./actions";
@@ -157,7 +159,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     // 5 — pack last 30 days
     supabase
       .from("pack_events")
-      .select("tarih, qty, start_time, end_time")
+      .select("tarih, qty, start_time, end_time, worker_count")
       .eq("durum", "tamamlandi")
       .gte("tarih", thirtyDaysAgoStr),
 
@@ -187,7 +189,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     (() => {
       let q = supabase
         .from("montaj_sessions")
-        .select("session_id, qty, start_time, end_time, net_sure_dk")
+        .select("session_id, qty, start_time, end_time, net_sure_dk, worker_count")
         .eq("durum", "tamamlandi");
       if (start) q = q.gte("created_at", start);
       if (end) q = q.lte("created_at", `${end}T23:59:59`);
@@ -220,7 +222,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     // 12 — satis last 12 months (monthly trend)
     supabase
       .from("satis_satirlari")
-      .select("tarih, toplam_tutar")
+      .select("tarih, toplam_tutar, sku, miktar, is_hizmet")
       .gte("tarih", twelveMonthsAgoStr),
 
     // 13 — cut batches last 30 days
@@ -280,6 +282,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     donemSatis,
     mamulStok,
     bekleyenSevkiyat,
+    donemKar: 0,
   };
 
   // ── Overview Daily Chart (production + sales, last 30 days) ──
@@ -293,6 +296,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     qty: number;
     start_time: string | null;
     end_time: string | null;
+    worker_count: number | null;
   }[];
   for (const r of packLast30Rows) {
     if (!r.tarih) continue;
@@ -305,6 +309,9 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   const satisMonthlyRows = (satisMonthlyResult.data || []) as {
     tarih: string | null;
     toplam_tutar: number;
+    sku: string | null;
+    miktar: number | null;
+    is_hizmet: boolean | null;
   }[];
   for (const r of satisMonthlyRows) {
     if (!r.tarih) continue;
@@ -340,11 +347,49 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     }
   }
 
+  // ── Kâr (yalnızca Genel sekmesinde — maliyet motoru) ──
+  const karByMonth = new Map<string, number>();
+  let donemKar = 0;
+  if (tab === "genel") {
+    const periodQty = new Map<string, number>();
+    for (const r of satisRows) {
+      if (!r.sku || r.is_hizmet) continue;
+      periodQty.set(r.sku, (periodQty.get(r.sku) || 0) + (r.miktar || 0));
+    }
+    const monthlyQty = new Map<string, Map<string, number>>();
+    for (const r of satisMonthlyRows) {
+      if (!r.sku || r.is_hizmet || !r.tarih) continue;
+      const mk = r.tarih.substring(0, 7);
+      const mm = monthlyQty.get(mk) || new Map<string, number>();
+      mm.set(r.sku, (mm.get(r.sku) || 0) + (r.miktar || 0));
+      monthlyQty.set(mk, mm);
+    }
+    const allSkus = new Set<string>(periodQty.keys());
+    for (const mm of monthlyQty.values()) for (const k of mm.keys()) allSkus.add(k);
+    const cm = allSkus.size > 0
+      ? await urunMaliyetleriHesapla([...allSkus])
+      : new Map<string, { birimMaliyet: number }>();
+    const birim = (sku: string) => {
+      const m = cm.get(sku);
+      return m ? m.birimMaliyet : 0;
+    };
+    let dMal = 0;
+    for (const [sku, q] of periodQty) dMal += birim(sku) * q;
+    donemKar = donemSatis - dMal;
+    for (const [mk, mm] of monthlyQty) {
+      let malM = 0;
+      for (const [sku, q] of mm) malM += birim(sku) * q;
+      karByMonth.set(mk, (monthlyMap.get(mk) || 0) - malM);
+    }
+  }
+  overviewKpi.donemKar = donemKar;
+
   const overviewMonthly: MonthlyTrendData[] = Array.from(
     monthlyMap.entries(),
   ).map(([key, ciro]) => ({
     month: MONTH_LABELS[parseInt(key.split("-")[1]) - 1],
     ciro: Math.round(ciro),
+    kar: Math.round(karByMonth.get(key) ?? 0),
   }));
 
   // ── Production KPI ──
@@ -366,6 +411,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     start_time: string | null;
     end_time: string | null;
     net_sure_dk: number | null;
+    worker_count: number | null;
   }[];
   const packPeriodQty = packLast30Rows
     .filter((r) => {
@@ -504,6 +550,51 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       ),
     },
   ].filter((e) => e.ortSureDk > 0);
+
+  // ── Üretim İşçilik Maliyeti (yalnızca Üretim sekmesinde) ──
+  let laborCost: LaborCostData = {
+    montajToplam: 0, paketToplam: 0, toplam: 0, adet: 0,
+    montajBirim: 0, paketBirim: 0, birim: 0,
+  };
+  if (tab === "uretim") {
+    const ayar = await getMaliyetAyarlari();
+    const tutar = (dk: number, kisi: number, rate: number) => (dk * kisi) / 60 * rate;
+    let montajTut = 0;
+    for (const r of montajPeriod) {
+      let dk = Number(r.net_sure_dk ?? 0);
+      if (dk <= 0 && r.start_time && r.end_time) {
+        const st = new Date(r.start_time).getTime();
+        const en = new Date(r.end_time).getTime();
+        if (en > st) dk = (en - st) / 60000;
+      }
+      if (dk <= 1 || dk > 240) continue;
+      montajTut += tutar(dk, Number(r.worker_count ?? 1) || 1, ayar.montajSaatUcreti);
+    }
+    let paketTut = 0;
+    for (const r of packLast30Rows) {
+      if (start && r.tarih) {
+        const day = String(r.tarih).split("T")[0];
+        if (!(day >= start && (!end || day <= end))) continue;
+      }
+      if (!r.start_time || !r.end_time) continue;
+      const st = new Date(r.start_time).getTime();
+      const en = new Date(r.end_time).getTime();
+      if (!(en > st)) continue;
+      const dk = (en - st) / 60000;
+      if (dk <= 1 || dk > 240) continue;
+      paketTut += tutar(dk, Number(r.worker_count ?? 1) || 1, ayar.paketlemeSaatUcreti);
+    }
+    const adet = packPeriodQty;
+    laborCost = {
+      montajToplam: montajTut,
+      paketToplam: paketTut,
+      toplam: montajTut + paketTut,
+      adet,
+      montajBirim: adet > 0 ? montajTut / adet : 0,
+      paketBirim: adet > 0 ? paketTut / adet : 0,
+      birim: adet > 0 ? (montajTut + paketTut) / adet : 0,
+    };
+  }
 
   // ── Sales KPI ──
   const toplamCiro = satisRows.reduce(
@@ -686,6 +777,27 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     .sort((a, b) => a.mevcut - a.kritikEsik - (b.mevcut - b.kritikEsik))
     .slice(0, 15);
 
+  // ── Stok Envanter Değeri (yalnızca Stok sekmesinde — maliyet motoru) ──
+  let stockValue: StockValueData = { toplam: 0, eksikSayi: 0, urunler: [] };
+  if (tab === "stok") {
+    const cm = await urunMaliyetleriHesapla(productsRows.map((p) => p.sku));
+    const list: StockValueData["urunler"] = [];
+    let toplam = 0;
+    let eksik = 0;
+    for (const p of productsRows) {
+      const m = cm.get(p.sku);
+      if (!m || m.eksikFiyatliParca.length > 0 || m.iscilikEksikAdim > 0) eksik++;
+      const bm = m ? m.birimMaliyet : null;
+      const adet = p.stok_aktif || 0;
+      if (bm == null || bm <= 0 || adet <= 0) continue;
+      const deger = bm * adet;
+      toplam += deger;
+      list.push({ sku: p.sku, urunAdi: p.urun_adi || "", adet, birimMaliyet: bm, deger });
+    }
+    list.sort((a, b) => b.deger - a.deger);
+    stockValue = { toplam, eksikSayi: eksik, urunler: list.slice(0, 10) };
+  }
+
   // ─── Render ────────────────────────────────────────────────────
   return (
     <div className="px-4 pb-6 sm:px-6">
@@ -698,12 +810,14 @@ export default async function AnalizPage({ searchParams }: PageProps) {
         productionKpi={productionKpi}
         productionDaily={productionDaily}
         productionEfficiency={productionEfficiency}
+        laborCost={laborCost}
         salesKpi={salesKpi}
         salesChannel={salesChannel}
         salesTopProducts={salesTopProducts}
         stockKpi={stockKpi}
         stockMovement={stockMovement}
         stockCritical={stockCritical}
+        stockValue={stockValue}
         karlilikKpi={karlilikKpi}
         karlilikRows={karlilikRows}
       />

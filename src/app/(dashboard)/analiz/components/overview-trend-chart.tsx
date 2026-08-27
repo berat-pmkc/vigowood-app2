@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export interface MonthlyTrendData {
   month: string; // "Oca", "Şub", etc.
   ciro: number;
+  kar: number;
 }
 
 const MONTH_LABELS = [
@@ -61,7 +62,7 @@ export function OverviewTrendChart({ data }: { data: MonthlyTrendData[] }) {
     <Card className="border-border/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">
-          Aylık Satış Trendi (Son 12 Ay)
+          Aylık Ciro & Kâr Trendi (Son 12 Ay)
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4">
@@ -74,6 +75,10 @@ export function OverviewTrendChart({ data }: { data: MonthlyTrendData[] }) {
               <linearGradient id="colorCiro" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#cdbd9d" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="#cdbd9d" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorKar" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#70c1aa" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#70c1aa" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid
@@ -105,6 +110,14 @@ export function OverviewTrendChart({ data }: { data: MonthlyTrendData[] }) {
               stroke="#cdbd9d"
               strokeWidth={2}
               fill="url(#colorCiro)"
+            />
+            <Area
+              type="monotone"
+              dataKey="kar"
+              name="Kâr"
+              stroke="#70c1aa"
+              strokeWidth={2}
+              fill="url(#colorKar)"
             />
           </AreaChart>
         </ResponsiveContainer>
