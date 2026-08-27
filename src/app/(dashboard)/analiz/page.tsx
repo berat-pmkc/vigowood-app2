@@ -594,8 +594,11 @@ export default async function AnalizPage({ searchParams }: PageProps) {
         const en = new Date(r.end_time).getTime();
         if (en > st) dk = (en - st) / 60000;
       }
-      if (dk <= 1 || dk > 240) continue;
-      montajTut += tutar(dk, Number(r.worker_count ?? 1) || 1, ayar.montajSaatUcreti);
+      if (dk <= 1 || dk > 1440) continue;
+      const kisiM = Number(r.worker_count ?? 1) || 1;
+      const qM = Number(r.qty) || 0;
+      if (qM > 0 && (dk * kisiM) / qM > 30) continue; // uç birim-süre elenir
+      montajTut += tutar(dk, kisiM, ayar.montajSaatUcreti);
     }
     let paketTut = 0;
     for (const r of packLast30Rows) {
@@ -608,8 +611,11 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       const en = new Date(r.end_time).getTime();
       if (!(en > st)) continue;
       const dk = (en - st) / 60000;
-      if (dk <= 1 || dk > 240) continue;
-      paketTut += tutar(dk, Number(r.worker_count ?? 1) || 1, ayar.paketlemeSaatUcreti);
+      if (dk <= 1 || dk > 1440) continue;
+      const kisiP = Number(r.worker_count ?? 1) || 1;
+      const qP = Number(r.qty) || 0;
+      if (qP > 0 && (dk * kisiP) / qP > 30) continue; // uç birim-süre elenir
+      paketTut += tutar(dk, kisiP, ayar.paketlemeSaatUcreti);
     }
     const adet = packPeriodQty;
     laborCost = {

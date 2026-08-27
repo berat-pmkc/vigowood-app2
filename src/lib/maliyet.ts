@@ -245,10 +245,12 @@ async function iscilikHesapla(
       const en = r.end_time ? new Date(String(r.end_time)).getTime() : 0;
       const net = tablo === "montaj_sessions" ? Number(r.net_sure_dk ?? 0) : 0;
       const gecen = net > 0 ? net : (en > st ? (en - st) / 60000 : 0);
-      if (gecen <= 1 || gecen > 240) continue;
+      // Filtre birim-süreye (dk/adet) dayanır: meşru tam-gün batch'ler (birim
+      // süresi normal) dahil, gerçek uç değerler (tamir/hatalı kayıt) elenir.
+      if (gecen <= 1 || gecen > 1440) continue; // sadece hatalı/çok-günlük kayıt
       const kisi = Number(r.worker_count ?? 1) || 1;
-      const perAdet = (gecen * kisi) / qty; // uç kayıt filtresi
-      if (!(perAdet > 0) || perAdet > 240) continue;
+      const perAdet = (gecen * kisi) / qty;
+      if (!(perAdet > 0) || perAdet > 30) continue; // uç birim-süre eşiği
       const step = tablo === "montaj_sessions" ? String(r.step_name ?? "") : "__paketleme__";
       const key = `${sku}\u0001${step}`;
       const a = acc.get(key) ?? { aDk: 0, aQty: 0, tDk: 0, tQty: 0 };
