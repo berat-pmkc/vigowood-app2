@@ -23,6 +23,7 @@ import type { TopProductRow } from "./sales-top-products";
 import type { StockKpiData } from "./stock-kpi-cards";
 import type { StockMovementData } from "./stock-movement-chart";
 import type { CriticalStockRow } from "./stock-critical-table";
+import type { OverviewCommandData } from "./overview-command";
 import type { StockValueData } from "./stock-value";
 
 export interface AnalizDashboardProps {
@@ -30,6 +31,7 @@ export interface AnalizDashboardProps {
   tab: TabType;
   // Overview
   overviewKpi: OverviewKpiData;
+  overviewCmd: OverviewCommandData;
   overviewDaily: DailyOverviewData[];
   overviewMonthly: MonthlyTrendData[];
   // Production
@@ -55,6 +57,7 @@ export function AnalizDashboard({
   period,
   tab,
   overviewKpi,
+  overviewCmd,
   overviewDaily,
   overviewMonthly,
   productionKpi,
@@ -117,6 +120,8 @@ export function AnalizDashboard({
             kpiData={overviewKpi}
             dailyData={overviewDaily}
             monthlyData={overviewMonthly}
+            cmdData={overviewCmd}
+            onNavigate={handleTabChange}
           />
         </TabsContent>
 

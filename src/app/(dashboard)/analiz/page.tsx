@@ -4,6 +4,7 @@ import { AnalizDashboard } from "./components/analiz-dashboard";
 import { urunMaliyetleriHesapla, getMaliyetAyarlari } from "@/lib/maliyet";
 import type { LaborCostData } from "./components/production-labor-cost";
 import type { StockValueData } from "./components/stock-value";
+import type { OverviewCommandData } from "./components/overview-command";
 import type { KarlilikRow, KarlilikKpi } from "./components/karlilik-tab";
 import { MONTH_LABELS } from "./components/overview-trend-chart";
 import type { PeriodType, TabType } from "./actions";
@@ -53,6 +54,30 @@ function getPeriodDates(period: PeriodType): {
       return { start: `${y}-${String(m).padStart(2, "0")}-01`, end: todayStr };
     case "all":
       return { start: null, end: null };
+  }
+}
+
+/** Bir önceki dönem (delta karşılaştırması için). */
+function getPrevPeriodDates(period: PeriodType): { start: string; end: string } | null {
+  const todayStr = trBugun();
+  const [y, m] = todayStr.split("-").map(Number);
+  switch (period) {
+    case "today": {
+      const y1 = tarihKaydir(todayStr, -1);
+      return { start: y1, end: y1 };
+    }
+    case "week": {
+      const cur = getPeriodDates("week");
+      if (!cur.start) return null;
+      return { start: tarihKaydir(cur.start, -7), end: tarihKaydir(cur.start, -1) };
+    }
+    case "month": {
+      const buAyIlk = `${y}-${String(m).padStart(2, "0")}-01`;
+      const oncekiIlk = new Date(Date.UTC(y, m - 2, 1)).toISOString().split("T")[0];
+      return { start: oncekiIlk, end: tarihKaydir(buAyIlk, -1) };
+    }
+    case "all":
+      return null;
   }
 }
 
@@ -350,6 +375,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   // ── Kâr (yalnızca Genel sekmesinde — maliyet motoru) ──
   const karByMonth = new Map<string, number>();
   let donemKar = 0;
+  let donemMaliyet = 0;
   if (tab === "genel") {
     const periodQty = new Map<string, number>();
     for (const r of satisRows) {
@@ -376,6 +402,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     let dMal = 0;
     for (const [sku, q] of periodQty) dMal += birim(sku) * q;
     donemKar = donemSatis - dMal;
+    donemMaliyet = dMal;
     for (const [mk, mm] of monthlyQty) {
       let malM = 0;
       for (const [sku, q] of mm) malM += birim(sku) * q;
@@ -596,6 +623,55 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     };
   }
 
+  // ── Genel Özet Komuta Merkezi (KPI kartları + önceki döneme göre değişim) ──
+  let overviewCmd: OverviewCommandData = {
+    paketleme: 0, montaj: 0, kesim: 0, ciro: 0, maliyet: 0, kar: 0, marj: 0,
+    bekleyenSevkiyat: 0,
+    deltas: { paketleme: null, montaj: null, kesim: null, ciro: null },
+  };
+  if (tab === "genel") {
+    const montajPeriodQty = montajPeriod.reduce((t, r) => t + (Number(r.qty) || 0), 0);
+    const kesimPeriodAdet = cutBatchesPeriod.reduce((t, r) => t + (Number(r.adet) || 0), 0);
+
+    let deltas: OverviewCommandData["deltas"] = {
+      paketleme: null, montaj: null, kesim: null, ciro: null,
+    };
+    const prev = getPrevPeriodDates(period);
+    if (prev) {
+      const [pPack, pMontaj, pCut, pSatis] = await Promise.all([
+        supabase.from("pack_events").select("qty").eq("durum", "tamamlandi").gte("tarih", prev.start).lte("tarih", prev.end),
+        supabase.from("montaj_sessions").select("qty").eq("durum", "tamamlandi").gte("created_at", prev.start).lte("created_at", `${prev.end}T23:59:59`),
+        supabase.from("cut_batches").select("adet").eq("durum", "tamamlandi").gte("tarih", prev.start).lte("tarih", prev.end),
+        supabase.from("satis_satirlari").select("toplam_tutar").gte("tarih", prev.start).lte("tarih", prev.end),
+      ]);
+      const topla = (res: { data: unknown }, f: string) =>
+        ((res.data as Record<string, unknown>[]) || []).reduce((t, r) => t + (Number(r[f]) || 0), 0);
+      const pP = topla(pPack, "qty");
+      const pM = topla(pMontaj, "qty");
+      const pK = topla(pCut, "adet");
+      const pC = topla(pSatis, "toplam_tutar");
+      const d = (cur: number, onceki: number) => (onceki > 0 ? ((cur - onceki) / onceki) * 100 : null);
+      deltas = {
+        paketleme: d(packPeriodQty, pP),
+        montaj: d(montajPeriodQty, pM),
+        kesim: d(kesimPeriodAdet, pK),
+        ciro: d(donemSatis, pC),
+      };
+    }
+
+    overviewCmd = {
+      paketleme: packPeriodQty,
+      montaj: montajPeriodQty,
+      kesim: kesimPeriodAdet,
+      ciro: donemSatis,
+      maliyet: donemMaliyet,
+      kar: donemKar,
+      marj: donemSatis > 0 ? (donemKar / donemSatis) * 100 : 0,
+      bekleyenSevkiyat,
+      deltas,
+    };
+  }
+
   // ── Sales KPI ──
   const toplamCiro = satisRows.reduce(
     (s, r) => s + (r.toplam_tutar || 0),
@@ -805,6 +881,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
         period={period}
         tab={tab}
         overviewKpi={overviewKpi}
+        overviewCmd={overviewCmd}
         overviewDaily={overviewDaily}
         overviewMonthly={overviewMonthly}
         productionKpi={productionKpi}
