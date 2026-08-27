@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { urunMaliyetleriHesapla, getMaliyetAyarlari, getAylar, type UrunMaliyet } from "@/lib/maliyet";
 import { MALIYET_ROLES, type MaliyetVerisi } from "./constants";
 
@@ -41,7 +42,10 @@ export async function maliyetAyarKaydet(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await yetki();
-    const supabase = await createClient();
+    if (!Number.isFinite(montaj) || !Number.isFinite(paketleme) || montaj < 0 || paketleme < 0) {
+      return { success: false, error: "Geçersiz ücret değeri" };
+    }
+    const supabase = createAdminClient();
     const { error } = await supabase.from("app_settings").upsert(
       { key: "maliyet_ayarlari", value: { montaj_saat_ucreti: montaj, paketleme_saat_ucreti: paketleme, guncelleme: new Date().toISOString() } },
       { onConflict: "key" },
@@ -60,7 +64,7 @@ export async function malzemeFiyatKaydet(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await yetki();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase.from("all_parts").update({ birim_fiyat: fiyat }).eq("part_id", partId);
     if (error) return { success: false, error: error.message };
     revalidatePath("/maliyet");
