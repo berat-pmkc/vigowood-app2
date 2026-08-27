@@ -5,6 +5,7 @@ import { urunMaliyetleriHesapla, getMaliyetAyarlari } from "@/lib/maliyet";
 import type { LaborCostData } from "./components/production-labor-cost";
 import type { StockValueData } from "./components/stock-value";
 import type { OverviewCommandData } from "./components/overview-command";
+import type { MontajOzet, MontajOperator, MontajGun } from "./components/montaj-analiz";
 import type { KarlilikRow, KarlilikKpi } from "./components/karlilik-tab";
 import { MONTH_LABELS } from "./components/overview-trend-chart";
 import type { PeriodType, TabType } from "./actions";
@@ -214,7 +215,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     (() => {
       let q = supabase
         .from("montaj_sessions")
-        .select("session_id, qty, start_time, end_time, net_sure_dk, worker_count")
+        .select("session_id, qty, start_time, end_time, net_sure_dk, worker_count, workers")
         .eq("durum", "tamamlandi");
       if (start) q = q.gte("created_at", start);
       if (end) q = q.lte("created_at", `${end}T23:59:59`);
@@ -439,6 +440,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
     end_time: string | null;
     net_sure_dk: number | null;
     worker_count: number | null;
+    workers: { id: string; name: string }[] | null;
   }[];
   const packPeriodQty = packLast30Rows
     .filter((r) => {
@@ -627,6 +629,69 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       paketBirim: adet > 0 ? paketTut / adet : 0,
       birim: adet > 0 ? (montajTut + paketTut) / adet : 0,
     };
+  }
+
+  // ── Montaj Analizi (yönetim odaklı, sade) — yalnızca Üretim sekmesinde ──
+  let montajOzet: MontajOzet = { adet: 0, dkAdet: 0, tlAdet: 0, operatorSayisi: 0, saat: 0 };
+  let montajOperatorler: MontajOperator[] = [];
+  let montajGunluk: MontajGun[] = [];
+  if (tab === "uretim") {
+    const ayar = await getMaliyetAyarlari();
+    const opMap = new Map<string, { adet: number; dkKisi: number; qtySum: number; saatDk: number }>();
+    const gunMap = new Map<string, number>();
+    let toplamAdet = 0;
+    let toplamDkKisi = 0;
+    let toplamQty = 0;
+    for (const r of montajPeriod) {
+      const q = Number(r.qty) || 0;
+      if (q <= 0) continue;
+      let dk = Number(r.net_sure_dk ?? 0);
+      if (dk <= 0 && r.start_time && r.end_time) {
+        const st = new Date(r.start_time).getTime();
+        const en = new Date(r.end_time).getTime();
+        if (en > st) dk = (en - st) / 60000;
+      }
+      if (dk <= 1 || dk > 1440) continue;
+      const kisi = Number(r.worker_count ?? 1) || 1;
+      if ((dk * kisi) / q > 30) continue; // uç birim-süre elenir
+      toplamAdet += q;
+      toplamDkKisi += dk * kisi;
+      toplamQty += q;
+      // günlük
+      if (r.start_time) {
+        const gun = String(r.start_time).slice(0, 10);
+        gunMap.set(gun, (gunMap.get(gun) || 0) + q);
+      }
+      // operatör (workers listesindeki her kişiye tam adet kredisi)
+      for (const w of r.workers ?? []) {
+        const ad = w.name || w.id;
+        const o = opMap.get(ad) || { adet: 0, dkKisi: 0, qtySum: 0, saatDk: 0 };
+        o.adet += q;
+        o.dkKisi += dk * kisi;
+        o.qtySum += q;
+        o.saatDk += dk;
+        opMap.set(ad, o);
+      }
+    }
+    const dkAdet = toplamQty > 0 ? toplamDkKisi / toplamQty : 0;
+    montajOzet = {
+      adet: toplamAdet,
+      dkAdet: Number(dkAdet.toFixed(2)),
+      tlAdet: Number(((dkAdet / 60) * ayar.montajSaatUcreti).toFixed(2)),
+      operatorSayisi: opMap.size,
+      saat: Math.round(toplamDkKisi / 60),
+    };
+    montajOperatorler = [...opMap.entries()]
+      .map(([ad, o]) => ({
+        ad,
+        adet: o.adet,
+        saat: Math.round(o.saatDk / 60),
+        dkAdet: Number((o.qtySum > 0 ? o.dkKisi / o.qtySum : 0).toFixed(2)),
+      }))
+      .sort((a, b) => b.adet - a.adet);
+    montajGunluk = [...gunMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([tarih, adet]) => ({ tarih, adet }));
   }
 
   // ── Genel Özet Komuta Merkezi (KPI kartları + önceki döneme göre değişim) ──
@@ -894,6 +959,9 @@ export default async function AnalizPage({ searchParams }: PageProps) {
         productionDaily={productionDaily}
         productionEfficiency={productionEfficiency}
         laborCost={laborCost}
+        montajOzet={montajOzet}
+        montajOperatorler={montajOperatorler}
+        montajGunluk={montajGunluk}
         salesKpi={salesKpi}
         salesChannel={salesChannel}
         salesTopProducts={salesTopProducts}

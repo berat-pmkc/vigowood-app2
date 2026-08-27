@@ -17,6 +17,7 @@ import type { ProductionKpiData } from "./production-kpi-cards";
 import type { DailyProductionData } from "./production-daily-chart";
 import type { EfficiencyData } from "./production-efficiency";
 import type { LaborCostData } from "./production-labor-cost";
+import type { MontajOzet, MontajOperator, MontajGun } from "./montaj-analiz";
 import type { SalesKpiData } from "./sales-kpi-cards";
 import type { ChannelSalesData } from "./sales-channel-chart";
 import type { TopProductRow } from "./sales-top-products";
@@ -39,6 +40,9 @@ export interface AnalizDashboardProps {
   productionDaily: DailyProductionData[];
   productionEfficiency: EfficiencyData[];
   laborCost: LaborCostData;
+  montajOzet: MontajOzet;
+  montajOperatorler: MontajOperator[];
+  montajGunluk: MontajGun[];
   // Sales
   salesKpi: SalesKpiData;
   salesChannel: ChannelSalesData[];
@@ -64,6 +68,9 @@ export function AnalizDashboard({
   productionDaily,
   productionEfficiency,
   laborCost,
+  montajOzet,
+  montajOperatorler,
+  montajGunluk,
   salesKpi,
   salesChannel,
   salesTopProducts,
@@ -131,6 +138,9 @@ export function AnalizDashboard({
             dailyData={productionDaily}
             efficiencyData={productionEfficiency}
             laborCost={laborCost}
+            montajOzet={montajOzet}
+            montajOperatorler={montajOperatorler}
+            montajGunluk={montajGunluk}
           />
         </TabsContent>
 
