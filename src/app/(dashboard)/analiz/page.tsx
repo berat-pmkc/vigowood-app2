@@ -806,7 +806,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
 
   // ── Kârlılık (sadece sekme seçiliyse hesapla — maliyet motoru ağır) ──
   let karlilikKpi: KarlilikKpi = { ciro: 0, maliyet: 0, kar: 0, marj: 0, eksikSayi: 0 };
-  let karlilikRows: KarlilikRow[] = [];
+  const karlilikRows: KarlilikRow[] = [];
   if (tab === "karlilik" && skuMap.size > 0) {
     const maliyetHarita = await urunMaliyetleriHesapla([...skuMap.keys()]);
     let cSum = 0;
