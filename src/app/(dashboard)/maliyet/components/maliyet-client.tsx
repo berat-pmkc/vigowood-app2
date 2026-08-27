@@ -25,6 +25,7 @@ const tl = (n: number) =>
 export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState<string | null>(null);
+  const [sadeceEksik, setSadeceEksik] = useState(false);
   const [montaj, setMontaj] = useState(String(veri.ayar.montajSaatUcreti));
   const [paketleme, setPaketleme] = useState(String(veri.ayar.paketlemeSaatUcreti));
   const [bekliyor, basla] = useTransition();
@@ -38,12 +39,13 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
 
   const filtre = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr");
-    if (!q) return veri.urunler;
-    return veri.urunler.filter(
-      (u) => u.sku.toLocaleLowerCase("tr").includes(q) ||
-             (u.urunAdi ?? "").toLocaleLowerCase("tr").includes(q),
-    );
-  }, [veri.urunler, arama]);
+    return veri.urunler.filter((u) => {
+      if (sadeceEksik && !(u.eksikFiyatliParca.length > 0 || u.iscilikEksikAdim > 0)) return false;
+      if (!q) return true;
+      return u.sku.toLocaleLowerCase("tr").includes(q) ||
+             (u.urunAdi ?? "").toLocaleLowerCase("tr").includes(q);
+    });
+  }, [veri.urunler, arama, sadeceEksik]);
 
   const toplamOrt = useMemo(() => {
     const gecerli = veri.urunler.filter((u) => u.birimMaliyet > 0);
@@ -127,17 +129,30 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
       {/* Ortalama KPI */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { ikon: Boxes, et: "Ort. malzeme", v: tl(toplamOrt.malzeme), renk: "text-[#8d9d70]" },
-          { ikon: Wrench, et: "Ort. işçilik", v: tl(toplamOrt.iscilik), renk: "text-amber-600" },
-          { ikon: Calculator, et: "Ort. birim maliyet", v: tl(toplamOrt.birim), renk: "text-blue-600" },
-          { ikon: TriangleAlert, et: "Eksik verili ürün", v: String(eksikSayi), renk: "text-red-600" },
+          { ikon: Boxes, et: "Ort. malzeme", v: tl(toplamOrt.malzeme), renk: "text-[#8d9d70]", tikla: false },
+          { ikon: Wrench, et: "Ort. işçilik", v: tl(toplamOrt.iscilik), renk: "text-amber-600", tikla: false },
+          { ikon: Calculator, et: "Ort. birim maliyet", v: tl(toplamOrt.birim), renk: "text-blue-600", tikla: false },
+          { ikon: TriangleAlert, et: "Eksik verili ürün", v: String(eksikSayi), renk: "text-red-600", tikla: true },
         ].map((k) => (
-          <Card key={k.et} className="p-4">
+          <Card
+            key={k.et}
+            onClick={k.tikla ? () => setSadeceEksik((x) => !x) : undefined}
+            className={cn(
+              "p-4",
+              k.tikla && "cursor-pointer transition hover:border-red-300 hover:shadow-md",
+              k.tikla && sadeceEksik && "border-red-400 ring-1 ring-red-300",
+            )}
+          >
             <div className="mb-1 flex items-center gap-2">
               <k.ikon className={cn("size-4", k.renk)} />
               <span className="text-xs text-muted-foreground">{k.et}</span>
             </div>
             <p className="text-xl font-bold tabular-nums">{k.v}</p>
+            {k.tikla && (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {sadeceEksik ? "Filtre açık — tümünü göster" : "Tıkla: yalnızca eksikleri gör"}
+              </p>
+            )}
           </Card>
         ))}
       </div>
