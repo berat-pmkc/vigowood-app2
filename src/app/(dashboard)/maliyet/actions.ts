@@ -51,6 +51,7 @@ export async function maliyetAyarKaydet(
       { onConflict: "key" },
     );
     if (error) return { success: false, error: error.message };
+    await supabase.rpc("refresh_urun_maliyet_cache");
     revalidatePath("/maliyet");
     return { success: true };
   } catch (e) {
@@ -67,6 +68,7 @@ export async function malzemeFiyatKaydet(
     const supabase = createAdminClient();
     const { error } = await supabase.from("all_parts").update({ birim_fiyat: fiyat }).eq("part_id", partId);
     if (error) return { success: false, error: error.message };
+    await supabase.rpc("refresh_urun_maliyet_cache");
     revalidatePath("/maliyet");
     return { success: true };
   } catch (e) {

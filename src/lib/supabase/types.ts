@@ -5164,6 +5164,10 @@ export type Database = {
       }
     }
     Functions: {
+      refresh_urun_maliyet_cache: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
       sevkiyat_sil: {
         Args: { p_sevkiyat_id: string }
         Returns: { silinen_kalem: number; kopan_plan: number }[]
