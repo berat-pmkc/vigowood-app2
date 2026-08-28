@@ -17,15 +17,42 @@ async function yetki() {
 export async function getMaliyetVerisi(ay: string | null = null): Promise<MaliyetVerisi> {
   await yetki();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("products")
-    .select("sku")
-    .eq("aktif_mi", true);
-  const skular = (data ?? []).map((p) => p.sku);
   const aylar = await getAylar();
   const secilenAy = ay && aylar.includes(ay) ? ay : null;
-  const harita = await urunMaliyetleriHesapla(skular, secilenAy);
   const ayar = await getMaliyetAyarlari();
+
+  // Varsayılan (tüm zamanlar): hızlı — önbellekten oku (motor canlı çalışmaz).
+  if (!secilenAy) {
+    const [{ data: prod }, { data: cache }] = await Promise.all([
+      supabase.from("products").select("sku, urun_adi").eq("aktif_mi", true),
+      supabase.from("urun_maliyet_cache").select("sku, malzeme, iscilik, birim_maliyet, eksik"),
+    ]);
+    const cmap = new Map(
+      (cache ?? []).map((c) => [c.sku as string, c]),
+    );
+    const urunler: UrunMaliyet[] = (prod ?? []).map((p) => {
+      const c = cmap.get(p.sku);
+      return {
+        sku: p.sku,
+        urunAdi: p.urun_adi ?? null,
+        malzemeKalemleri: [],
+        malzemeToplam: Number(c?.malzeme ?? 0),
+        iscilikAdimlari: [],
+        iscilikToplam: Number(c?.iscilik ?? 0),
+        birimMaliyet: Number(c?.birim_maliyet ?? 0),
+        eksikFiyatliParca: [],
+        iscilikEksikAdim: 0,
+        eksik: !c || !!c.eksik,
+        detaySiz: true,
+      };
+    }).sort((a, b) => b.birimMaliyet - a.birimMaliyet);
+    return { urunler, ayar, aylar, secilenAy };
+  }
+
+  // Belirli ay seçili: motor (yavaş ama isteğe bağlı).
+  const { data } = await supabase.from("products").select("sku").eq("aktif_mi", true);
+  const skular = (data ?? []).map((p) => p.sku);
+  const harita = await urunMaliyetleriHesapla(skular, secilenAy);
   const urunler = [...harita.values()].sort((a, b) => b.birimMaliyet - a.birimMaliyet);
   return { urunler, ayar, aylar, secilenAy };
 }

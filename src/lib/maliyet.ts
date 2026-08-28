@@ -61,6 +61,10 @@ export interface UrunMaliyet {
   birimMaliyet: number;
   eksikFiyatliParca: string[];
   iscilikEksikAdim: number;
+  /** önbellek/liste modunda hızlı eksik-veri bayrağı (breakdown yüklenmemiş olabilir) */
+  eksik?: boolean;
+  /** true = breakdown (kalemler) henüz yüklenmedi; satır açılınca yüklenecek */
+  detaySiz?: boolean;
 }
 
 export interface MaliyetAyarlari {

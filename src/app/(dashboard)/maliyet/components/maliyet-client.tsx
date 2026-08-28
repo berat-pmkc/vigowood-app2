@@ -11,7 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { maliyetAyarKaydet, malzemeFiyatKaydet } from "../actions";
+import { maliyetAyarKaydet, malzemeFiyatKaydet, getUrunMaliyetDetay } from "../actions";
 import type { MaliyetVerisi } from "../constants";
 import type { UrunMaliyet } from "@/lib/maliyet";
 import {
@@ -22,10 +22,27 @@ import {
 const tl = (n: number) =>
   n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₺";
 
+function eksikMi(u: UrunMaliyet): boolean {
+  return u.detaySiz ? !!u.eksik : (u.eksikFiyatliParca.length > 0 || u.iscilikEksikAdim > 0);
+}
+
 export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
   const [arama, setArama] = useState("");
   const [acik, setAcik] = useState<string | null>(null);
   const [sadeceEksik, setSadeceEksik] = useState(false);
+  const [detaylar, setDetaylar] = useState<Record<string, UrunMaliyet>>({});
+  const [, detayBasla] = useTransition();
+
+  const satirAc = (u: UrunMaliyet) => {
+    const yeni = acik === u.sku ? null : u.sku;
+    setAcik(yeni);
+    if (yeni && u.detaySiz && !detaylar[u.sku]) {
+      detayBasla(async () => {
+        const d = await getUrunMaliyetDetay(u.sku);
+        if (d) setDetaylar((m) => ({ ...m, [u.sku]: d }));
+      });
+    }
+  };
   const [montaj, setMontaj] = useState(String(veri.ayar.montajSaatUcreti));
   const [paketleme, setPaketleme] = useState(String(veri.ayar.paketlemeSaatUcreti));
   const [bekliyor, basla] = useTransition();
@@ -40,7 +57,7 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
   const filtre = useMemo(() => {
     const q = arama.trim().toLocaleLowerCase("tr");
     return veri.urunler.filter((u) => {
-      if (sadeceEksik && !(u.eksikFiyatliParca.length > 0 || u.iscilikEksikAdim > 0)) return false;
+      if (sadeceEksik && !eksikMi(u)) return false;
       if (!q) return true;
       return u.sku.toLocaleLowerCase("tr").includes(q) ||
              (u.urunAdi ?? "").toLocaleLowerCase("tr").includes(q);
@@ -57,7 +74,7 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
     };
   }, [veri.urunler]);
 
-  const eksikSayi = veri.urunler.filter((u) => u.eksikFiyatliParca.length > 0 || u.iscilikEksikAdim > 0).length;
+  const eksikSayi = veri.urunler.filter((u) => eksikMi(u)).length;
 
   return (
     <div className="space-y-4 py-4">
@@ -181,8 +198,9 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
               {filtre.map((u) => (
                 <MaliyetSatiri
                   key={u.sku} u={u}
+                  detay={detaylar[u.sku]}
                   acik={acik === u.sku}
-                  toggle={() => setAcik(acik === u.sku ? null : u.sku)}
+                  toggle={() => satirAc(u)}
                 />
               ))}
               {filtre.length === 0 && (
@@ -196,8 +214,17 @@ export function MaliyetClient({ veri }: { veri: MaliyetVerisi }) {
   );
 }
 
-function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; toggle: () => void }) {
-  const uyari = u.eksikFiyatliParca.length > 0 || u.iscilikEksikAdim > 0;
+function MaliyetSatiri({
+  u, detay, acik, toggle,
+}: {
+  u: UrunMaliyet;
+  detay?: UrunMaliyet;
+  acik: boolean;
+  toggle: () => void;
+}) {
+  const uyari = eksikMi(u);
+  const d = detay ?? u;
+  const detayYukleniyor = acik && !!u.detaySiz && !detay;
   return (
     <>
       <TableRow className="cursor-pointer hover:bg-muted/40" onClick={toggle}>
@@ -213,9 +240,9 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
           {uyari ? (
             <Badge variant="outline" className="border-amber-300 text-amber-700">
               <TriangleAlert className="mr-1 size-3" />
-              {u.eksikFiyatliParca.length > 0 ? `${u.eksikFiyatliParca.length} fiyatsız` : ""}
-              {u.eksikFiyatliParca.length > 0 && u.iscilikEksikAdim > 0 ? " · " : ""}
-              {u.iscilikEksikAdim > 0 ? `${u.iscilikEksikAdim} işçiliksiz adım` : ""}
+              {u.detaySiz ? "eksik veri" : (u.eksikFiyatliParca.length > 0 ? `${u.eksikFiyatliParca.length} fiyatsız` : "")}
+              {!u.detaySiz && u.eksikFiyatliParca.length > 0 && u.iscilikEksikAdim > 0 ? " · " : ""}
+              {!u.detaySiz && u.iscilikEksikAdim > 0 ? `${u.iscilikEksikAdim} işçiliksiz adım` : ""}
             </Badge>
           ) : (
             <Badge variant="secondary" className="text-emerald-700">tam</Badge>
@@ -226,15 +253,18 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
         <TableRow className="bg-muted/20 hover:bg-muted/20">
           <TableCell></TableCell>
           <TableCell colSpan={5}>
+            {detayYukleniyor ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">Detay yükleniyor…</p>
+            ) : (
             <div className="grid gap-4 py-2 md:grid-cols-2">
               <div>
                 <p className="mb-1 flex items-center gap-1.5 text-xs font-medium">
-                  <Boxes className="size-3.5" /> Malzeme ({tl(u.malzemeToplam)})
+                  <Boxes className="size-3.5" /> Malzeme ({tl(d.malzemeToplam)})
                 </p>
                 <div className="rounded border">
                   <table className="w-full text-xs">
                     <tbody>
-                      {u.malzemeKalemleri.map((k) => (
+                      {d.malzemeKalemleri.map((k) => (
                         <tr key={k.partId} className="border-b last:border-0">
                           <td className="px-2 py-1 align-top">
                             <span className="font-mono">{k.partId}</span>
@@ -261,7 +291,7 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
                           <td className="px-2 py-1 text-right align-top font-medium tabular-nums">{tl(k.tutar)}</td>
                         </tr>
                       ))}
-                      {u.eksikFiyatliParca.map((pid) => (
+                      {d.eksikFiyatliParca.map((pid) => (
                         <tr key={pid} className="border-b bg-amber-50/40 last:border-0">
                           <td className="px-2 py-1 align-top">
                             <span className="font-mono">{pid}</span>
@@ -277,23 +307,23 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
                     </tbody>
                   </table>
                 </div>
-                {u.eksikFiyatliParca.length > 0 && (
+                {d.eksikFiyatliParca.length > 0 && (
                   <p className="mt-1 text-[11px] text-amber-700">
-                    {u.eksikFiyatliParca.length} parçanın kesim/plaka verisi yok — birim fiyatı
+                    {d.eksikFiyatliParca.length} parçanın kesim/plaka verisi yok — birim fiyatı
                     elle girince maliyete eklenir.
                   </p>
                 )}
               </div>
               <div>
                 <p className="mb-1 flex items-center gap-1.5 text-xs font-medium">
-                  <Wrench className="size-3.5" /> İşçilik ({tl(u.iscilikToplam)})
+                  <Wrench className="size-3.5" /> İşçilik ({tl(d.iscilikToplam)})
                 </p>
                 <div className="rounded border">
                   <table className="w-full text-xs">
                     <tbody>
-                      {u.iscilikAdimlari.length === 0 ? (
+                      {d.iscilikAdimlari.length === 0 ? (
                         <tr><td className="px-2 py-2 text-center text-muted-foreground">Seans verisi yok</td></tr>
-                      ) : u.iscilikAdimlari.map((a, i) => (
+                      ) : d.iscilikAdimlari.map((a, i) => (
                         <tr key={i} className="border-b last:border-0">
                           <td className="px-2 py-1">
                             {a.adim}
@@ -309,13 +339,14 @@ function MaliyetSatiri({ u, acik, toggle }: { u: UrunMaliyet; acik: boolean; tog
                     </tbody>
                   </table>
                 </div>
-                {u.iscilikEksikAdim > 0 && (
+                {d.iscilikEksikAdim > 0 && (
                   <p className="mt-1 text-[11px] text-amber-700">
-                    {u.iscilikEksikAdim} montaj adımının seans verisi yok — işçilik eksik hesaplanmış olabilir.
+                    {d.iscilikEksikAdim} montaj adımının seans verisi yok — işçilik eksik hesaplanmış olabilir.
                   </p>
                 )}
               </div>
             </div>
+            )}
           </TableCell>
         </TableRow>
       )}
