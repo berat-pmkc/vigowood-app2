@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { AnalizDashboard } from "./components/analiz-dashboard";
-import { urunMaliyetleriHesapla, getMaliyetAyarlari } from "@/lib/maliyet";
+import { getMaliyetAyarlari } from "@/lib/maliyet";
 import type { LaborCostData } from "./components/production-labor-cost";
 import type { StockValueData } from "./components/stock-value";
 import type { OverviewCommandData } from "./components/overview-command";
@@ -374,6 +374,7 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   }
 
   // ── Kâr (yalnızca Genel sekmesinde — maliyet motoru) ──
+  // ── Kâr: maliyet önbelleğinden (urun_maliyet_cache) — motor canlı çalışmaz (performans) ──
   const karByMonth = new Map<string, number>();
   let donemKar = 0;
   let donemMaliyet = 0;
@@ -383,31 +384,17 @@ export default async function AnalizPage({ searchParams }: PageProps) {
       if (!r.sku || r.is_hizmet) continue;
       periodQty.set(r.sku, (periodQty.get(r.sku) || 0) + (r.miktar || 0));
     }
-    const monthlyQty = new Map<string, Map<string, number>>();
-    for (const r of satisMonthlyRows) {
-      if (!r.sku || r.is_hizmet || !r.tarih) continue;
-      const mk = r.tarih.substring(0, 7);
-      const mm = monthlyQty.get(mk) || new Map<string, number>();
-      mm.set(r.sku, (mm.get(r.sku) || 0) + (r.miktar || 0));
-      monthlyQty.set(mk, mm);
-    }
-    const allSkus = new Set<string>(periodQty.keys());
-    for (const mm of monthlyQty.values()) for (const k of mm.keys()) allSkus.add(k);
-    const cm = allSkus.size > 0
-      ? await urunMaliyetleriHesapla([...allSkus])
-      : new Map<string, { birimMaliyet: number }>();
-    const birim = (sku: string) => {
-      const m = cm.get(sku);
-      return m ? m.birimMaliyet : 0;
-    };
-    let dMal = 0;
-    for (const [sku, q] of periodQty) dMal += birim(sku) * q;
-    donemKar = donemSatis - dMal;
-    donemMaliyet = dMal;
-    for (const [mk, mm] of monthlyQty) {
-      let malM = 0;
-      for (const [sku, q] of mm) malM += birim(sku) * q;
-      karByMonth.set(mk, (monthlyMap.get(mk) || 0) - malM);
+    if (periodQty.size > 0) {
+      const { data: cacheRows } = await supabase
+        .from("urun_maliyet_cache").select("sku, birim_maliyet")
+        .in("sku", [...periodQty.keys()]);
+      const birimMap = new Map<string, number>(
+        (cacheRows ?? []).map((c) => [c.sku as string, Number(c.birim_maliyet) || 0]),
+      );
+      let dMal = 0;
+      for (const [sku, q] of periodQty) dMal += (birimMap.get(sku) ?? 0) * q;
+      donemMaliyet = dMal;
+      donemKar = donemSatis - dMal;
     }
   }
   overviewKpi.donemKar = donemKar;
@@ -808,13 +795,18 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   let karlilikKpi: KarlilikKpi = { ciro: 0, maliyet: 0, kar: 0, marj: 0, eksikSayi: 0 };
   const karlilikRows: KarlilikRow[] = [];
   if (tab === "karlilik" && skuMap.size > 0) {
-    const maliyetHarita = await urunMaliyetleriHesapla([...skuMap.keys()]);
+    const { data: cacheRows } = await supabase
+      .from("urun_maliyet_cache").select("sku, birim_maliyet, eksik")
+      .in("sku", [...skuMap.keys()]);
+    const maliyetHarita = new Map<string, { birimMaliyet: number; eksik: boolean }>(
+      (cacheRows ?? []).map((c) => [c.sku as string, { birimMaliyet: Number(c.birim_maliyet) || 0, eksik: !!c.eksik }]),
+    );
     let cSum = 0;
     let mSum = 0;
     let eksikSayi = 0;
     for (const [sku, v] of skuMap) {
       const mal = maliyetHarita.get(sku);
-      const eksik = !mal || mal.eksikFiyatliParca.length > 0 || mal.iscilikEksikAdim > 0;
+      const eksik = !mal || mal.eksik;
       const birimMaliyet = mal ? mal.birimMaliyet : null;
       const toplamMaliyet = birimMaliyet != null ? birimMaliyet * v.adet : 0;
       const kar = v.tutar - toplamMaliyet;
@@ -927,13 +919,18 @@ export default async function AnalizPage({ searchParams }: PageProps) {
   // ── Stok Envanter Değeri (yalnızca Stok sekmesinde — maliyet motoru) ──
   let stockValue: StockValueData = { toplam: 0, eksikSayi: 0, urunler: [] };
   if (tab === "stok") {
-    const cm = await urunMaliyetleriHesapla(productsRows.map((p) => p.sku));
+    const { data: cacheRows } = await supabase
+      .from("urun_maliyet_cache").select("sku, birim_maliyet, eksik")
+      .in("sku", productsRows.map((p) => p.sku));
+    const cm = new Map<string, { birimMaliyet: number; eksik: boolean }>(
+      (cacheRows ?? []).map((c) => [c.sku as string, { birimMaliyet: Number(c.birim_maliyet) || 0, eksik: !!c.eksik }]),
+    );
     const list: StockValueData["urunler"] = [];
     let toplam = 0;
     let eksik = 0;
     for (const p of productsRows) {
       const m = cm.get(p.sku);
-      if (!m || m.eksikFiyatliParca.length > 0 || m.iscilikEksikAdim > 0) eksik++;
+      if (!m || m.eksik) eksik++;
       const bm = m ? m.birimMaliyet : null;
       const adet = p.stok_aktif || 0;
       if (bm == null || bm <= 0 || adet <= 0) continue;

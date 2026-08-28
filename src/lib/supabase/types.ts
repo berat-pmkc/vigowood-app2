@@ -338,6 +338,33 @@ export type Database = {
         }
         Relationships: []
       }
+      urun_maliyet_cache: {
+        Row: {
+          sku: string
+          malzeme: number | null
+          iscilik: number | null
+          birim_maliyet: number | null
+          eksik: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          sku: string
+          malzeme?: number | null
+          iscilik?: number | null
+          birim_maliyet?: number | null
+          eksik?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          sku?: string
+          malzeme?: number | null
+          iscilik?: number | null
+          birim_maliyet?: number | null
+          eksik?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       assembly_steps: {
         Row: {
           created_at: string
