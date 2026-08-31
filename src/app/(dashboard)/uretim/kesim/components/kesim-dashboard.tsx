@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -17,12 +18,20 @@ import { YeniKesimDialog } from "./yeni-kesim-dialog";
 import { AcikTalepSeridi } from "./acik-talep-seridi";
 import { PlakaStokPaneli } from "./plaka-stok-paneli";
 import { KesimDonemOzeti } from "./kesim-donem-ozeti";
+import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import type { MiniAnalizData } from "./kesim-mini-analiz";
 import type { KesimTalebi } from "../actions";
 import type { CutBatchRow, MdfStokItem, MachineStatusEntry, MachineCounts } from "../types";
 import { Plus, Scissors, CalendarDays, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
 import { sonHaftalar, sonAylar, donemAciklama } from "@/lib/donem";
+
+// Mini analiz grafikleri — lazy yüklenir (sayfa yükünü artırmaz)
+const KesimMiniAnaliz = dynamic(
+  () => import("./kesim-mini-analiz").then((m) => m.KesimMiniAnaliz),
+  { ssr: false, loading: () => <ChartSkeleton height={190} /> }
+);
 
 /**
  * Hızlı gün seçimleri. Hafta ve ay artık tek tek seçiliyor (montaj
@@ -47,6 +56,8 @@ interface KesimDashboardProps {
   acikTalepler: KesimTalebi[];
   /** Rapor ekranı yalnızca analiz rollerine görünür */
   analizGorebilir: boolean;
+  /** Mini analiz (son 30 gün, filtreden bağımsız) — opsiyonel */
+  miniAnaliz?: MiniAnalizData;
 }
 
 export function KesimDashboard({
@@ -60,6 +71,7 @@ export function KesimDashboard({
   dailyAvgConsumption,
   analizGorebilir,
   acikTalepler,
+  miniAnaliz,
 }: KesimDashboardProps) {
   const router = useRouter();
   const records = useServerDataCache("kesim-records", serverRecords);
@@ -133,6 +145,9 @@ export function KesimDashboard({
         stokTahminiGun={stokTahminiGun}
         dailyAvgConsumption={dailyAvgConsumption}
       />
+
+      {/* Mini Analiz — filtreden bağımsız, son 30 gün */}
+      {miniAnaliz && <KesimMiniAnaliz data={miniAnaliz} />}
 
       {/* Kesim Kayıtları */}
       <div>
