@@ -100,6 +100,12 @@ export default async function KesimPage({
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = sevenDaysAgo.toISOString();
 
+  // ▼▼▼ MINI ANALIZ — 30 gün öncesi (filtreden bağımsız grafikler) ▼▼▼
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+  // ▲▲▲ MINI ANALIZ ▲▲▲
+
   // Parallel fetches
   const [
     allBatchesRes,
@@ -107,6 +113,7 @@ export default async function KesimPage({
     machineStatusResults,
     last7DaysCutsRes,
     todayBatchesRes,
+    last30Res, // ← MINI ANALIZ
   ] = await Promise.all([
     // Tarih aralığındaki tüm batch'ler
     supabase
@@ -148,6 +155,14 @@ export default async function KesimPage({
       .eq("durum", "tamamlandi")
       .gte("bitis_zamani", todayStart)
       .lte("bitis_zamani", todayEnd),
+    // ▼▼▼ MINI ANALIZ — son 30 gün (filtreden bağımsız) ▼▼▼
+    supabase
+      .from("cut_batches")
+      .select("tarih, adet, makine_id, sku")
+      .eq("durum", "tamamlandi")
+      .gte("tarih", thirtyDaysAgoStr)
+      .not("plaka_id", "is", null),
+    // ▲▲▲ MINI ANALIZ ▲▲▲
   ]);
 
   const allBatches = (allBatchesRes.data ?? []) as CutBatchRow[];
@@ -226,6 +241,46 @@ export default async function KesimPage({
     stokTahminiGun = Math.floor(Math.min(...gunler));
   }
 
+  // ▼▼▼ MINI ANALIZ — son 30 gün grafik verileri (filtreden bağımsız) ▼▼▼
+  const AY_KISA = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+  const last30 = (last30Res.data ?? []) as { tarih: string | null; adet: number | null; makine_id: string | null; sku: string | null }[];
+
+  // Günlük trend (son 14 gün, boş günler 0)
+  const gunMap = new Map<string, number>();
+  for (const c of last30) {
+    if (!c.tarih) continue;
+    const key = new Date(c.tarih).toISOString().split("T")[0];
+    gunMap.set(key, (gunMap.get(key) ?? 0) + (c.adet ?? 0));
+  }
+  const gunlukTrend: { gun: string; plaka: number }[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split("T")[0];
+    gunlukTrend.push({ gun: `${d.getDate()} ${AY_KISA[d.getMonth()]}`, plaka: gunMap.get(key) ?? 0 });
+  }
+
+  // Makine dağılımı (30 gün)
+  const makMap = new Map<string, number>();
+  for (const c of last30) {
+    if (c.makine_id) makMap.set(c.makine_id, (makMap.get(c.makine_id) ?? 0) + (c.adet ?? 0));
+  }
+  const makineDagilim = ["MAK-1", "MAK-2", "MAK-3"].map((m) => ({ makine: m, plaka: makMap.get(m) ?? 0 }));
+
+  // En çok kesilen projeler (30 gün, top 6)
+  const skuMap = new Map<string, number>();
+  for (const c of last30) {
+    if (c.sku) skuMap.set(c.sku, (skuMap.get(c.sku) ?? 0) + (c.adet ?? 0));
+  }
+  const topProjeler = [...skuMap.entries()]
+    .map(([ad, plaka]) => ({ ad, plaka }))
+    .sort((a, b) => b.plaka - a.plaka)
+    .slice(0, 6);
+
+  const toplam30 = last30.reduce((s, c) => s + (c.adet ?? 0), 0);
+  const miniAnaliz = { gunlukTrend, makineDagilim, topProjeler, toplam30 };
+  // ▲▲▲ MINI ANALIZ ▲▲▲
+
   // Bekleyen kesim talepleri — kesimhane ekrana girer girmez görsün
   const acikTalepler = await getKesimTalepleri(true);
 
@@ -242,6 +297,7 @@ export default async function KesimPage({
         machineStatus={machineStatusResults}
         stokTahminiGun={stokTahminiGun}
         dailyAvgConsumption={dailyAvgConsumption}
+        miniAnaliz={miniAnaliz}
       />
     </div>
   );
