@@ -283,6 +283,165 @@ export async function getDevamsizlikOzeti(ay: string): Promise<DevamsizlikOzet> 
 }
 
 
+// ─── Puantaj (aylık çizelge: kişi × gün) ────────────────────
+
+export type PuantajDurum = "geldi" | "izinli" | "raporlu" | "devamsiz";
+
+export interface PuantajGun {
+  tarih: string;
+  gun: number;
+  haftaGunu: string;
+  cumartesi: boolean;
+}
+
+export interface PuantajSatir {
+  user_id: string;
+  full_name: string;
+  station: string | null;
+  department: string | null;
+  /** tarih → durum (yalnızca kaydı olan günler; olmayan iş günü = devamsız) */
+  hucreler: Record<string, PuantajDurum>;
+  geldi: number;
+  izinli: number;
+  raporlu: number;
+  devamsiz: number;
+  toplamGun: number;
+  toplamMesaiDk: number;
+}
+
+export interface PuantajSonuc {
+  ay: string;
+  gunler: PuantajGun[];
+  satirlar: PuantajSatir[];
+  tatiller: { tarih: string; ad: string }[];
+}
+
+/**
+ * Aylık puantaj çizelgesi.
+ *
+ * İş günü tanımı: o ay içinde en az bir yoklama kaydı bulunan günler
+ * (yani firmanın fiilen çalıştığı günler), pazarlar ve resmî tatiller hariç.
+ * Kapsam: tüm aktif Üretim + Hat personeli — hiç gelmeyen de satır olarak görünür.
+ * Eşleşme: attendance.employee, kullanıcının user_id'si VEYA full_name'i olabilir
+ * (eski AppSheet verisi isim, uygulama içi kayıt user_id tutuyor).
+ */
+export async function getPuantaj(ay: string): Promise<PuantajSonuc> {
+  await requirePersonelAccess();
+  const supabase = await createClient();
+
+  const [yilStr, ayStr] = ay.split("-");
+  const yil = Number(yilStr);
+  const ayNo = Number(ayStr);
+  const ilkGun = `${ay}-01`;
+  const sonGunSayisi = new Date(yil, ayNo, 0).getDate();
+  const sonGun = `${ay}-${String(sonGunSayisi).padStart(2, "0")}`;
+
+  const { data: tatiller } = await supabase
+    .from("resmi_tatiller")
+    .select("tarih, ad")
+    .gte("tarih", ilkGun)
+    .lte("tarih", sonGun)
+    .eq("aktif", true)
+    .eq("hedeften_dus", true);
+  const tatilListesi = (tatiller ?? []) as { tarih: string; ad: string }[];
+  const tatilSet = new Set(tatilListesi.map((t) => t.tarih));
+
+  const { data: personel } = await supabase
+    .from("users")
+    .select("user_id, full_name, station")
+    .in("role", ["Üretim", "Hat"])
+    .eq("is_active", true)
+    .order("full_name");
+
+  const { data: kayitlar } = await supabase
+    .from("attendance")
+    .select("employee, tarih, department, durum, start_time, end_time")
+    .gte("tarih", ilkGun)
+    .lte("tarih", sonGun);
+
+  type K = {
+    employee: string;
+    tarih: string;
+    department: string | null;
+    durum: string;
+    start_time: string | null;
+    end_time: string | null;
+  };
+  const kayitListe = (kayitlar ?? []) as K[];
+
+  // Çalışılan günler: en az bir kayıt olan, pazar ve resmî tatil olmayan günler
+  const gunSet = new Set<string>();
+  for (const k of kayitListe) {
+    const d = new Date(k.tarih + "T00:00:00");
+    if (d.getDay() === 0) continue; // pazar
+    if (tatilSet.has(k.tarih)) continue; // resmî tatil
+    gunSet.add(k.tarih);
+  }
+  const HG = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+  const gunler: PuantajGun[] = [...gunSet].sort().map((t) => {
+    const d = new Date(t + "T00:00:00");
+    return { tarih: t, gun: d.getDate(), haftaGunu: HG[d.getDay()], cumartesi: d.getDay() === 6 };
+  });
+
+  const dakika = (bas: string | null, bit: string | null) => {
+    if (!bas || !bit) return 0;
+    const [bs, bd] = bas.split(":").map(Number);
+    const [ts, td] = bit.split(":").map(Number);
+    const fark = ts * 60 + td - (bs * 60 + bd);
+    return fark > 0 ? fark : 0;
+  };
+
+  // Aynı gün birden çok kayıt olursa: geldi > izin/rapor > devamsız
+  const oncelik: Record<string, number> = { geldi: 3, izinli: 2, raporlu: 2, devamsiz: 1 };
+
+  const satirlar: PuantajSatir[] = (
+    (personel ?? []) as { user_id: string; full_name: string; station: string | null }[]
+  ).map((p) => {
+    const kendi = kayitListe.filter(
+      (k) => k.employee === p.user_id || k.employee === p.full_name
+    );
+    const hucreler: Record<string, PuantajDurum> = {};
+    let toplamMesaiDk = 0;
+    for (const k of kendi) {
+      if (!gunSet.has(k.tarih)) continue;
+      const dv = (["geldi", "izinli", "raporlu", "devamsiz"].includes(k.durum)
+        ? k.durum
+        : "geldi") as PuantajDurum;
+      const cur = hucreler[k.tarih];
+      if (!cur || (oncelik[dv] ?? 0) > (oncelik[cur] ?? 0)) hucreler[k.tarih] = dv;
+      if (dv === "geldi") toplamMesaiDk += dakika(k.start_time, k.end_time);
+    }
+    let geldi = 0,
+      izinli = 0,
+      raporlu = 0;
+    for (const t of gunSet) {
+      const v = hucreler[t];
+      if (v === "geldi") geldi++;
+      else if (v === "izinli") izinli++;
+      else if (v === "raporlu") raporlu++;
+    }
+    const toplamGun = gunSet.size;
+    const devamsiz = Math.max(0, toplamGun - geldi - izinli - raporlu);
+    const department = kendi.find((k) => k.department)?.department ?? null;
+    return {
+      user_id: p.user_id,
+      full_name: p.full_name,
+      station: p.station,
+      department,
+      hucreler,
+      geldi,
+      izinli,
+      raporlu,
+      devamsiz,
+      toplamGun,
+      toplamMesaiDk,
+    };
+  });
+
+  return { ay, gunler, satirlar, tatiller: tatilListesi };
+}
+
+
 // ─── Resmî Tatil Takvimi ────────────────────────────────────
 
 export interface ResmiTatil {

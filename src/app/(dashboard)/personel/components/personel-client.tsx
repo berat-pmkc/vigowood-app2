@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DevamsizlikTab } from "./devamsizlik-tab";
+import { PuantajTab } from "./puantaj-tab";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { KpiCards } from "./kpi-cards";
@@ -132,6 +133,7 @@ export function PersonelClient({
           <TabsTrigger value="liste">Yoklama Listesi</TabsTrigger>
           <TabsTrigger value="ozet">Özet</TabsTrigger>
           <TabsTrigger value="devamsizlik">Devamsızlık</TabsTrigger>
+          <TabsTrigger value="puantaj">Puantaj</TabsTrigger>
         </TabsList>
 
         <TabsContent value="liste" className="mt-4 space-y-4">
@@ -158,6 +160,10 @@ export function PersonelClient({
 
         <TabsContent value="devamsizlik" className="mt-4">
           <DevamsizlikTab />
+        </TabsContent>
+
+        <TabsContent value="puantaj" className="mt-4">
+          <PuantajTab />
         </TabsContent>
       </Tabs>
 

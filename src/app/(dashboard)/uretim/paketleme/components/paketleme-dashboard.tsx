@@ -20,7 +20,7 @@ const ProductTrendChart = dynamic(
 );
 import { CompletedSessionsSheet, type CompletedSession } from "./completed-sessions";
 import type { ActiveSession } from "./session-card";
-import { cancelSession } from "../actions";
+import { cancelSession, toggleDuraklat } from "../actions";
 import { toast } from "sonner";
 import { usePaketlemeRealtime } from "@/hooks/use-paketleme-realtime";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
@@ -73,6 +73,16 @@ export function PaketlemeDashboard({
     const result = await cancelSession(sessionId);
     if (result.success) {
       toast.success("Seans iptal edildi");
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const handleToggleDuraklat = async (sessionId: string) => {
+    const paused = activeSessions.find((s) => s.session_id === sessionId)?.duraklatma_baslangic;
+    const result = await toggleDuraklat(sessionId);
+    if (result.success) {
+      toast.success(paused ? "Seans devam ediyor" : "Seans duraklatıldı");
     } else {
       toast.error(result.error);
     }
@@ -131,6 +141,7 @@ export function PaketlemeDashboard({
           sessions={activeSessions}
           onClose={handleClose}
           onCancel={handleCancel}
+          onToggleDuraklat={handleToggleDuraklat}
         />
       </section>
 

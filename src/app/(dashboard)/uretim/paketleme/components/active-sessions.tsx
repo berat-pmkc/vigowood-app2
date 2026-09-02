@@ -7,9 +7,10 @@ interface ActiveSessionsProps {
   sessions: ActiveSession[];
   onClose: (session: ActiveSession) => void;
   onCancel: (sessionId: string) => void;
+  onToggleDuraklat: (sessionId: string) => void | Promise<void>;
 }
 
-export function ActiveSessions({ sessions, onClose, onCancel }: ActiveSessionsProps) {
+export function ActiveSessions({ sessions, onClose, onCancel, onToggleDuraklat }: ActiveSessionsProps) {
   if (sessions.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -28,6 +29,7 @@ export function ActiveSessions({ sessions, onClose, onCancel }: ActiveSessionsPr
           session={session}
           onClose={onClose}
           onCancel={onCancel}
+          onToggleDuraklat={onToggleDuraklat}
         />
       ))}
     </div>

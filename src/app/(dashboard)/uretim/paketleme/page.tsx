@@ -20,7 +20,7 @@ export default async function PaketlemePage() {
   // Devam eden seanslar
   const { data: activeData } = await supabase
     .from("pack_events")
-    .select("session_id, sku, start_time, durum, operator_name")
+    .select("session_id, sku, start_time, durum, operator_name, duraklama_dk, duraklatma_baslangic")
     .eq("durum", "paketlemede")
     .order("start_time", { ascending: true });
 

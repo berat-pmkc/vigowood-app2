@@ -25,7 +25,9 @@ export default async function PersonelPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
-  const activeTab = params.tab === "ozet" ? "ozet" : "liste";
+  const activeTab = ["ozet", "devamsizlik", "puantaj"].includes(params.tab ?? "")
+    ? (params.tab as string)
+    : "liste";
 
   // ---------- TABLE PARAMS ----------
   const page = Math.max(0, Number(params.page || "0"));

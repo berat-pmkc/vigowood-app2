@@ -2382,6 +2382,8 @@ export type Database = {
           birim_paketleme_dk: number | null
           created_at: string
           depo_id: string | null
+          duraklama_dk: number
+          duraklatma_baslangic: string | null
           durum: string
           email: string | null
           end_time: string | null
@@ -2402,6 +2404,8 @@ export type Database = {
           birim_paketleme_dk?: number | null
           created_at?: string
           depo_id?: string | null
+          duraklama_dk?: number
+          duraklatma_baslangic?: string | null
           durum?: string
           email?: string | null
           end_time?: string | null
@@ -2422,6 +2426,8 @@ export type Database = {
           birim_paketleme_dk?: number | null
           created_at?: string
           depo_id?: string | null
+          duraklama_dk?: number
+          duraklatma_baslangic?: string | null
           durum?: string
           email?: string | null
           end_time?: string | null

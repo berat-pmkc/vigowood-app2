@@ -87,7 +87,7 @@ export async function getAnalytics(period: "today" | "week" | "month" | "last_mo
 
     let query = supabase
       .from("pack_events")
-      .select("session_id, qty, start_time, end_time, worker_count, workers, birim_paketleme_dk")
+      .select("session_id, qty, start_time, end_time, worker_count, workers, birim_paketleme_dk, duraklama_dk")
       .eq("durum", "tamamlandi")
       .gte("end_time", since.toISOString());
     if (until) query = query.lt("end_time", until.toISOString());
@@ -107,12 +107,12 @@ export async function getAnalytics(period: "today" | "week" | "month" | "last_mo
       }
     });
 
-    // Toplam seans süresi (dk)
+    // Toplam seans süresi (dk) — bekleme (duraklatma) düşülmüş net süre
     let totalMinutes = 0;
     sessions.forEach((s) => {
       if (s.start_time && s.end_time) {
         const diff = new Date(s.end_time).getTime() - new Date(s.start_time).getTime();
-        totalMinutes += diff / 60000;
+        totalMinutes += Math.max(0, diff / 60000 - Number(s.duraklama_dk ?? 0));
       }
     });
 
@@ -271,7 +271,7 @@ export async function closePackSession(
     // Seans bilgileri
     const { data } = await supabase
       .from("pack_events")
-      .select("session_id, durum, sku, start_time")
+      .select("session_id, durum, sku, start_time, duraklama_dk, duraklatma_baslangic")
       .eq("session_id", sessionId)
       .single();
 
@@ -280,6 +280,8 @@ export async function closePackSession(
       durum: string;
       sku: string | null;
       start_time: string | null;
+      duraklama_dk: number | null;
+      duraklatma_baslangic: string | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -290,12 +292,21 @@ export async function closePackSession(
     const { qty, workers, depo_id } = parsed.data;
     if (!depo_id) return { success: false, error: "Ürünün gireceği depoyu seçiniz" };
 
-    // Birim paketleme süresi hesapla
+    // Toplam bekleme (duraklatma) süresi — kapanışta hâlâ duraklatılmışsa
+    // son aralık da eklenir. Bu süre toplam seans süresinden düşülür.
+    const oncekiDuraklama = Number(session.duraklama_dk ?? 0);
+    const acikDuraklama = session.duraklatma_baslangic
+      ? (now.getTime() - new Date(session.duraklatma_baslangic).getTime()) / 60000
+      : 0;
+    const toplamDuraklamaDk =
+      Math.max(0, Math.round((oncekiDuraklama + acikDuraklama) * 100) / 100);
+
+    // Birim paketleme süresi — bekleme düşülmüş net süre üzerinden
     let birimDk: number | null = null;
     if (session.start_time && qty > 0 && workers.length > 0) {
       const diffMs = now.getTime() - new Date(session.start_time).getTime();
-      const totalMinutes = diffMs / 60000;
-      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+      const netMinutes = Math.max(0, diffMs / 60000 - toplamDuraklamaDk);
+      birimDk = Math.round((netMinutes / (qty * workers.length)) * 100) / 100;
     }
 
     // Update pack_events
@@ -309,6 +320,8 @@ export async function closePackSession(
         worker_count: workers.length,
         workers: workers,
         birim_paketleme_dk: birimDk,
+        duraklama_dk: toplamDuraklamaDk,
+        duraklatma_baslangic: null,
         depo_id,
       })
       .eq("session_id", sessionId);
@@ -384,6 +397,59 @@ export async function closePackSession(
 }
 
 /** Devam eden seansı iptal et (sil) */
+/**
+ * Aktif seansı duraklat / devam ettir (toggle).
+ * Duraklatınca duraklatma_baslangic=now yazılır; devam edince geçen bekleme
+ * süresi duraklama_dk'ya eklenir. Bu bekleme kapanışta toplam süreden düşülür.
+ */
+export async function toggleDuraklat(sessionId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("pack_events")
+      .select("durum, duraklama_dk, duraklatma_baslangic")
+      .eq("session_id", sessionId)
+      .single();
+    const session = data as {
+      durum: string;
+      duraklama_dk: number | null;
+      duraklatma_baslangic: string | null;
+    } | null;
+
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "paketlemede")
+      return { success: false, error: "Seans aktif değil" };
+
+    const now = new Date();
+    let update: { duraklatma_baslangic: string | null; duraklama_dk?: number };
+    if (session.duraklatma_baslangic) {
+      // Devam et: geçen bekleme süresini biriktir
+      const ekMs = now.getTime() - new Date(session.duraklatma_baslangic).getTime();
+      const yeni = Number(session.duraklama_dk ?? 0) + Math.max(0, ekMs / 60000);
+      update = { duraklatma_baslangic: null, duraklama_dk: Math.round(yeni * 100) / 100 };
+    } else {
+      // Duraklat
+      update = { duraklatma_baslangic: now.toISOString() };
+    }
+
+    const { error } = await supabase
+      .from("pack_events")
+      .update(update)
+      .eq("session_id", sessionId);
+    if (error) return { success: false, error: error.message };
+
+    revalidatePath("/uretim/paketleme");
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Bilinmeyen hata",
+    };
+  }
+}
+
 export async function cancelSession(sessionId: string): Promise<ActionResult> {
   try {
     await requireProductionAccess();
@@ -435,7 +501,7 @@ export async function updateCompletedSession(
     // Seans bilgileri
     const { data } = await supabase
       .from("pack_events")
-      .select("session_id, durum, sku, start_time, end_time, qty, depo_id")
+      .select("session_id, durum, sku, start_time, end_time, qty, depo_id, duraklama_dk")
       .eq("session_id", sessionId)
       .single();
 
@@ -447,6 +513,7 @@ export async function updateCompletedSession(
       end_time: string | null;
       qty: number;
       depo_id: string | null;
+      duraklama_dk: number | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -459,12 +526,12 @@ export async function updateCompletedSession(
     // Operatör yanlış saatte başlatmış olabilir; verilmezse mevcut korunur
     const yeniBaslangic = formData.start_time || session.start_time;
 
-    // Birim paketleme süresi yeniden hesapla
+    // Birim paketleme süresi yeniden hesapla — bekleme (duraklatma) düşülmüş net süre
     let birimDk: number | null = null;
     if (yeniBaslangic && session.end_time && qty > 0 && workers.length > 0) {
       const diffMs = new Date(session.end_time).getTime() - new Date(yeniBaslangic).getTime();
-      const totalMinutes = diffMs / 60000;
-      birimDk = Math.round((totalMinutes / (qty * workers.length)) * 100) / 100;
+      const netMinutes = Math.max(0, diffMs / 60000 - Number(session.duraklama_dk ?? 0));
+      birimDk = Math.round((netMinutes / (qty * workers.length)) * 100) / 100;
     }
 
     // Update pack_events
