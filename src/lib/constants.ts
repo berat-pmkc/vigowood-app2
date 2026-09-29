@@ -875,6 +875,15 @@ export const WMA_WEIGHT_7D = 0.20;
 export const WMA_WEIGHT_30D = 0.50;
 export const WMA_WEIGHT_90D = 0.30;
 
+// ─── Kritik Stok Önerisi — Tedarik Süresi + Güvenlik Payı ──────
+// Önerilen kritik stok = günlük satış hızı × tedarik süresi (gün) × güvenlik katsayısı
+/** Son 90 günde SKU başına gerçek paketleme aralığından hesaplanan tedarik süresi bu değeri aşamaz (gün). */
+export const KRITIK_STOK_MAX_TEDARIK_SURESI_GUN = 30;
+/** Bir SKU için 90 günde 2'den az farklı paketleme günü varsa (veri yetersiz), tedarik süresi olarak kritik_stok_gun ayarı kullanılır. */
+export const KRITIK_STOK_MIN_PAKETLEME_GUN_SAYISI = 2;
+/** Talep dalgalanmasına karşı güvenlik payı — önerilen değeri %30 artırır. */
+export const KRITIK_STOK_GUVENLIK_KATSAYISI = 1.3;
+
 // ─── Proforma Fatura Konfigürasyonu ────────────────────────────
 /** @deprecated DB'den okunacak (sevkiyat_firmalar). Fallback olarak kalıyor. */
 

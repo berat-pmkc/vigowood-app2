@@ -43,6 +43,7 @@ interface HareketlerDataTableProps {
   pageSize: number;
   search: string;
   source: string;
+  yon: string;
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
@@ -117,6 +118,24 @@ function getColumns(onSort: (id: string, desc: boolean) => void): ColumnDef<Stok
       size: 100,
     },
     {
+      id: "yon",
+      header: "Yön",
+      cell: ({ row }) => {
+        const qty = row.original.qty;
+        return qty > 0 ? (
+          <Badge className="bg-vw-success/20 text-vw-success border-vw-success/30 text-xs">
+            Giriş
+          </Badge>
+        ) : (
+          <Badge className="bg-vw-error/20 text-vw-error border-vw-error/30 text-xs">
+            Çıkış
+          </Badge>
+        );
+      },
+      size: 90,
+      enableSorting: false,
+    },
+    {
       accessorKey: "source",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Kaynak" onSort={onSort} />
@@ -167,6 +186,7 @@ export function HareketlerDataTable({
   pageSize,
   search,
   source,
+  yon,
   sortBy,
   sortOrder,
 }: HareketlerDataTableProps) {
@@ -272,6 +292,21 @@ export function HareketlerDataTable({
                 {s.label}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={yon || "all"}
+          onValueChange={(v) =>
+            navigate({ mYon: v === "all" ? undefined : v, mPage: "0" })
+          }
+        >
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectValue placeholder="Tüm Yönler" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tüm Yönler</SelectItem>
+            <SelectItem value="giris">Giriş</SelectItem>
+            <SelectItem value="cikis">Çıkış</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -133,19 +133,14 @@ export async function createCutBatch(formData: {
     const operatorId = parsed.data.operator_id;
     const email = authUser?.email ?? user.email;
 
-    // Generate next KES-XXXX ID
-    const { data: lastBatch } = await supabase
-      .from("cut_batches")
-      .select("cut_id")
-      .order("cut_id", { ascending: false })
-      .limit(1);
-
-    let nextNum = 1;
-    if (lastBatch && lastBatch.length > 0) {
-      const match = lastBatch[0].cut_id.match(/KES-(\d+)/);
-      if (match) nextNum = parseInt(match[1], 10) + 1;
+    // Generate next KES-XXXX ID (atomic via next_id RPC)
+    const { data: cutId, error: cutIdError } = await supabase.rpc("next_id", {
+      p_prefix: "KES-",
+      p_width: 4,
+    });
+    if (cutIdError || !cutId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const cutId = `KES-${String(nextNum).padStart(4, "0")}`;
 
     // Get plaka_parts for this plaka_id
     const { data: plakaParts, error: ppError } = await supabase
@@ -178,31 +173,32 @@ export async function createCutBatch(formData: {
 
     // Generate cut_lines from plaka_parts
     if (plakaParts && plakaParts.length > 0) {
-      // Get last K-XXXX ID
-      const { data: lastLine } = await supabase
-        .from("cut_lines")
-        .select("cut_line_id")
-        .order("cut_line_id", { ascending: false })
-        .limit(1);
-
-      let lineNum = 1;
-      if (lastLine && lastLine.length > 0) {
-        const match = lastLine[0].cut_line_id.match(/K-(\d+)/);
-        if (match) lineNum = parseInt(match[1], 10) + 1;
-      }
-
-      const cutLines = plakaParts.map((pp) => {
-        const lineId = `K-${String(lineNum).padStart(4, "0")}`;
-        lineNum++;
-        return {
+      // Generate next K-XXXX ids (atomic via next_id RPC, one per line)
+      const cutLines: {
+        cut_line_id: string;
+        cut_id: string;
+        tarih: string;
+        part_id: string;
+        adet: number;
+        email: string | null;
+      }[] = [];
+      for (const pp of plakaParts) {
+        const { data: lineId, error: lineIdError } = await supabase.rpc("next_id", {
+          p_prefix: "K-",
+          p_width: 4,
+        });
+        if (lineIdError || !lineId) {
+          return { success: false, error: "ID üretilemedi" };
+        }
+        cutLines.push({
           cut_line_id: lineId,
           cut_id: cutId,
           tarih: now,
           part_id: pp.part_id,
           adet: (pp.default_qty ?? 0) * parsed.data.adet,
           email: email,
-        };
-      });
+        });
+      }
 
       const { error: linesError } = await supabase.from("cut_lines").insert(cutLines);
       if (linesError) return { success: false, error: linesError.message };
@@ -272,38 +268,41 @@ export async function createCutBatch(formData: {
         (ymsAllParts ?? []).map(p => [p.part_id, p.part_adi])
       );
 
-      // Generate next YMS ID
-      const { data: lastYms } = await supabase
-        .from("yari_mamul_stok")
-        .select("yms_id")
-        .like("yms_id", "YMS-%")
-        .order("yms_id", { ascending: false })
-        .limit(1);
-
-      let ymsNum = 1;
-      if (lastYms && lastYms.length > 0) {
-        const match = lastYms[0].yms_id.match(/YMS-(\d+)/);
-        if (match) ymsNum = parseInt(match[1], 10) + 1;
-      }
-
-      const ymsInserts = plakaParts
-        .filter(l => l.part_id)
-        .map(l => {
-          const ymsId = `YMS-${String(ymsNum).padStart(6, "0")}`;
-          ymsNum++;
-          return {
-            yms_id: ymsId,
-            tarih: now,
-            part_id: l.part_id,
-            part_adi: ymsPartNameMap.get(l.part_id) ?? null,
-            sku: parsed.data.sku,
-            qty: (l.default_qty ?? 0) * parsed.data.adet,
-            direction: "IN",
-            source: "Kesim",
-            source_id: cutId,
-            operator: operatorId,
-          };
+      // Generate next YMS-XXXXXX ids (atomic via next_id RPC, one per line)
+      const partLines = plakaParts.filter(l => l.part_id);
+      const ymsInserts: {
+        yms_id: string;
+        tarih: string;
+        part_id: string;
+        part_adi: string | null;
+        sku: string;
+        qty: number;
+        direction: string;
+        source: string;
+        source_id: string;
+        operator: string;
+      }[] = [];
+      for (const l of partLines) {
+        const { data: ymsId, error: ymsIdError } = await supabase.rpc("next_id", {
+          p_prefix: "YMS-",
+          p_width: 6,
         });
+        if (ymsIdError || !ymsId) {
+          return { success: false, error: "ID üretilemedi" };
+        }
+        ymsInserts.push({
+          yms_id: ymsId,
+          tarih: now,
+          part_id: l.part_id,
+          part_adi: ymsPartNameMap.get(l.part_id) ?? null,
+          sku: parsed.data.sku,
+          qty: (l.default_qty ?? 0) * parsed.data.adet,
+          direction: "IN",
+          source: "Kesim",
+          source_id: cutId,
+          operator: operatorId,
+        });
+      }
 
       if (ymsInserts.length > 0) {
         const { error: ymsError } = await supabase.from("yari_mamul_stok").insert(ymsInserts);

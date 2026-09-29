@@ -22,20 +22,17 @@ async function requireAdmin() {
 
 export async function getNextUserId(): Promise<string> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("users")
-    .select("user_id")
-    .like("user_id", "VW%")
-    .order("user_id", { ascending: false })
-    .limit(1);
 
-  if (data && data.length > 0) {
-    const lastNum = parseInt(data[0].user_id.replace("VW", ""), 10);
-    if (!isNaN(lastNum)) {
-      return `VW${String(lastNum + 1).padStart(3, "0")}`;
-    }
+  // Atomic via next_id RPC — eski "read max + 1" yöntemi concurrent
+  // isteklerde aynı kodu iki kez üretebiliyordu.
+  const { data, error } = await supabase.rpc("next_id", {
+    p_prefix: "VW",
+    p_width: 3,
+  });
+  if (error || !data) {
+    throw new Error("ID üretilemedi");
   }
-  return "VW001";
+  return data;
 }
 
 export async function createUser(

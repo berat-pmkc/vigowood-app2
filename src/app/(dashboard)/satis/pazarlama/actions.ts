@@ -37,18 +37,14 @@ export async function createPazarlama(formData: {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Geçersiz veri" };
     }
     const supabase = await createClient();
-    const { data: lastRow } = await supabase
-      .from("tr_pazarlama")
-      .select("kodu")
-      .order("kodu", { ascending: false })
-      .limit(1)
-      .single();
-    let nextNum = 1;
-    if (lastRow) {
-      const match = (lastRow as { kodu: string }).kodu.match(/TRP-(\d+)/);
-      if (match) nextNum = parseInt(match[1], 10) + 1;
+    // Generate next TRP-XXXX id — atomic via next_id RPC
+    const { data: kodu, error: koduError } = await supabase.rpc("next_id", {
+      p_prefix: "TRP-",
+      p_width: 4,
+    });
+    if (koduError || !kodu) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const kodu = `TRP-${String(nextNum).padStart(4, "0")}`;
     const { error } = await supabase.from("tr_pazarlama").insert({ kodu, ...parsed.data });
     if (error) return { success: false, error: error.message };
     revalidatePath("/satis/pazarlama");

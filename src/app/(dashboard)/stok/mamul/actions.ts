@@ -36,6 +36,7 @@ export async function updateKritikStok(
     if (error) throw error;
 
     revalidatePath("/stok/mamul");
+    revalidatePath("/stok/kritik-stok");
     return { success: true };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Bilinmeyen hata" };

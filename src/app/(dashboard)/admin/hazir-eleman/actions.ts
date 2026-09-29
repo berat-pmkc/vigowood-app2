@@ -19,58 +19,31 @@ async function requireAdmin() {
 export async function getNextHPCode(): Promise<string> {
   const supabase = await createClient();
 
-  /**
-   * TÜR FİLTRESİ YOK — bilerek.
-   *
-   * HP öneki yalnız HAZIR'da değil, KUTU ve KARTON parçalarında da
-   * kullanılıyor (HP0123 bir KUTU parçası). Yalnızca HAZIR'a bakıldığında
-   * diğer türlerdeki numaralar boş sanılıyor ve üretilen kod "zaten
-   * kullanılıyor" hatasına düşüyordu.
-   */
-  const { data } = await supabase
-    .from("all_parts")
-    .select("part_id")
-    .like("part_id", "HP%")
-    .order("part_id", { ascending: false });
-
-  let maxNum = 0;
-  if (data && data.length > 0) {
-    for (const row of data) {
-      const match = row.part_id.match(/^HP(\d+)$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum) maxNum = num;
-      }
-    }
+  // Atomic via next_id RPC — eski "read max + 1" yöntemi concurrent
+  // isteklerde aynı kodu iki kez üretebiliyordu.
+  const { data, error } = await supabase.rpc("next_id", {
+    p_prefix: "HP",
+    p_width: 4,
+  });
+  if (error || !data) {
+    throw new Error("ID üretilemedi");
   }
-
-  const nextNum = maxNum + 1;
-  return `HP${String(nextNum).padStart(4, "0")}`;
+  return data;
 }
 
 export async function getNextMDFCode(): Promise<string> {
   const supabase = await createClient();
 
-  // HP'deki gerekçenin aynısı: önek türe göre değil, önekin kendisine bakılır
-  const { data } = await supabase
-    .from("all_parts")
-    .select("part_id")
-    .like("part_id", "MDF%")
-    .order("part_id", { ascending: false });
-
-  let maxNum = 0;
-  if (data && data.length > 0) {
-    for (const row of data) {
-      const match = row.part_id.match(/^MDF(\d+)$/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > maxNum) maxNum = num;
-      }
-    }
+  // Atomic via next_id RPC — eski "read max + 1" yöntemi concurrent
+  // isteklerde aynı kodu iki kez üretebiliyordu.
+  const { data, error } = await supabase.rpc("next_id", {
+    p_prefix: "MDF",
+    p_width: 4,
+  });
+  if (error || !data) {
+    throw new Error("ID üretilemedi");
   }
-
-  const nextNum = maxNum + 1;
-  return `MDF${String(nextNum).padStart(4, "0")}`;
+  return data;
 }
 
 export async function createHazirEleman(formData: {

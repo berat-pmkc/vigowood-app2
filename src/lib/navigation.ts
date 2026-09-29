@@ -9,6 +9,7 @@ import {
   Layers,
   Component,
   RotateCcw,
+  ArrowRightLeft,
   ShoppingCart,
   Truck,
   BarChart3,
@@ -38,6 +39,7 @@ import {
   Tags,
   Container,
   PlugZap,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole, ModuleKey } from "@/lib/constants";
@@ -120,7 +122,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Yarı Mamül", href: "/stok/yari-mamul", icon: Layers, roles: ALL_INTERNAL },
       { title: "Hazır Eleman", href: "/stok/hazir-eleman", icon: Component, roles: ALL_INTERNAL },
       { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: ALL_INTERNAL },
+      { title: "Depo Transferi", href: "/stok/transfer", icon: ArrowRightLeft, roles: ALL_INTERNAL },
       { title: "Stok Sayımı", href: "/stok/sayim", icon: ClipboardList, roles: ALL_INTERNAL },
+      { title: "Kritik Stok", href: "/stok/kritik-stok", icon: AlertTriangle, roles: ALL_INTERNAL },
     ],
   },
   {

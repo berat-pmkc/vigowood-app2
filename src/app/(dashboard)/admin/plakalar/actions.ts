@@ -96,22 +96,14 @@ export async function createPlaka(
 
     const supabase = await createClient();
 
-    // Generate next plakalar_id (PL-0001 format)
-    const { data: lastPlaka } = await supabase
-      .from("plakalar")
-      .select("plakalar_id")
-      .like("plakalar_id", "PL-%")
-      .order("plakalar_id", { ascending: false })
-      .limit(1);
-
-    let nextNum = 1;
-    if (lastPlaka && lastPlaka.length > 0) {
-      const match = lastPlaka[0].plakalar_id.match(/PL-(\d+)/);
-      if (match) {
-        nextNum = parseInt(match[1], 10) + 1;
-      }
+    // Generate next plakalar_id (PL-0001 format) — atomic via next_id RPC
+    const { data: plakalarId, error: idError } = await supabase.rpc("next_id", {
+      p_prefix: "PL-",
+      p_width: 4,
+    });
+    if (idError || !plakalarId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const plakalarId = `PL-${String(nextNum).padStart(4, "0")}`;
 
     const { error } = await supabase.from("plakalar").insert({
       plakalar_id: plakalarId,
@@ -287,21 +279,14 @@ export async function addPlakaPart(
 
     const supabase = await createClient();
 
-    // Generate next ppart_id
-    const { data: lastPpart } = await supabase
-      .from("plaka_parts")
-      .select("ppart_id")
-      .order("ppart_id", { ascending: false })
-      .limit(1);
-
-    let nextNum = 1;
-    if (lastPpart && lastPpart.length > 0) {
-      const match = lastPpart[0].ppart_id.match(/PPart(\d+)/);
-      if (match) {
-        nextNum = parseInt(match[1], 10) + 1;
-      }
+    // Generate next ppart_id — atomic via next_id RPC
+    const { data: ppartId, error: idError } = await supabase.rpc("next_id", {
+      p_prefix: "PPart",
+      p_width: 4,
+    });
+    if (idError || !ppartId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const ppartId = `PPart${String(nextNum).padStart(4, "0")}`;
 
     const { error } = await supabase.from("plaka_parts").insert({
       ppart_id: ppartId,
@@ -509,19 +494,14 @@ export async function importPlakalar(
           return { success: false, error: `Satır ${row.plakalar_id}: ${error.message}` };
         }
       } else {
-        const { data: lastPlaka } = await supabase
-          .from("plakalar")
-          .select("plakalar_id")
-          .like("plakalar_id", "PL-%")
-          .order("plakalar_id", { ascending: false })
-          .limit(1);
-
-        let nextNum = 1;
-        if (lastPlaka && lastPlaka.length > 0) {
-          const match = lastPlaka[0].plakalar_id.match(/PL-(\d+)/);
-          if (match) nextNum = parseInt(match[1], 10) + 1;
+        // Generate next plakalar_id — atomic via next_id RPC
+        const { data: plakalarId, error: idError } = await supabase.rpc("next_id", {
+          p_prefix: "PL-",
+          p_width: 4,
+        });
+        if (idError || !plakalarId) {
+          return { success: false, error: "ID üretilemedi" };
         }
-        const plakalarId = `PL-${String(nextNum).padStart(4, "0")}`;
 
         const { error } = await supabase.from("plakalar").insert({
           plakalar_id: plakalarId,

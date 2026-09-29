@@ -340,20 +340,14 @@ export async function closePackSession(
       return { success: true };
     }
 
-    // Generate mov_id: SM-XXXXXX
-    const { data: lastMov } = await supabase
-      .from("stock_movements")
-      .select("mov_id")
-      .like("mov_id", "SM-%")
-      .order("mov_id", { ascending: false })
-      .limit(1);
-
-    let movNum = 1;
-    if (lastMov && lastMov.length > 0) {
-      const match = lastMov[0].mov_id?.match(/SM-(\d+)/);
-      if (match) movNum = parseInt(match[1], 10) + 1;
+    // Generate mov_id: SM-XXXXXX (atomic via next_id RPC)
+    const { data: movId, error: movIdError } = await supabase.rpc("next_id", {
+      p_prefix: "SM-",
+      p_width: 6,
+    });
+    if (movIdError || !movId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const movId = `SM-${String(movNum).padStart(6, "0")}`;
 
     // stock_movements INSERT — mamül stok IN
     const { error: movError } = await supabase.from("stock_movements").insert({
@@ -678,19 +672,13 @@ export async function completePack(sessionId: string): Promise<ActionResult> {
       return { success: true };
     }
 
-    const { data: lastMov } = await supabase
-      .from("stock_movements")
-      .select("mov_id")
-      .like("mov_id", "SM-%")
-      .order("mov_id", { ascending: false })
-      .limit(1);
-
-    let movNum = 1;
-    if (lastMov && lastMov.length > 0) {
-      const match = lastMov[0].mov_id?.match(/SM-(\d+)/);
-      if (match) movNum = parseInt(match[1], 10) + 1;
+    const { data: movId, error: movIdError } = await supabase.rpc("next_id", {
+      p_prefix: "SM-",
+      p_width: 6,
+    });
+    if (movIdError || !movId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const movId = `SM-${String(movNum).padStart(6, "0")}`;
 
     const { error: movError } = await supabase.from("stock_movements").insert({
       mov_id: movId,

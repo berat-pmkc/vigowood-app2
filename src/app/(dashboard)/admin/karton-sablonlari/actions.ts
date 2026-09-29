@@ -79,20 +79,14 @@ export async function createKartonSablon(formData: {
 
     const supabase = await createClient();
 
-    // Generate next KRT-XXX ID
-    const { data: lastKarton } = await supabase
-      .from("plakalar")
-      .select("plakalar_id")
-      .like("plakalar_id", "KRT-%")
-      .order("plakalar_id", { ascending: false })
-      .limit(1);
-
-    let nextNum = 1;
-    if (lastKarton && lastKarton.length > 0) {
-      const match = lastKarton[0].plakalar_id.match(/KRT-(\d+)/);
-      if (match) nextNum = parseInt(match[1], 10) + 1;
+    // Generate next KRT-XXX ID — atomic via next_id RPC
+    const { data: kartonId, error: kartonIdError } = await supabase.rpc("next_id", {
+      p_prefix: "KRT-",
+      p_width: 3,
+    });
+    if (kartonIdError || !kartonId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const kartonId = `KRT-${String(nextNum).padStart(3, "0")}`;
 
     // Build kesim_sureleri (only KUTU key)
     const kesimSureleri: Record<string, number | null> = { KUTU: parsed.data.kutu_sure_dk };
@@ -113,19 +107,14 @@ export async function createKartonSablon(formData: {
 
     if (plakaError) return { success: false, error: plakaError.message };
 
-    // Generate next ppart_id
-    const { data: lastPpart } = await supabase
-      .from("plaka_parts")
-      .select("ppart_id")
-      .order("ppart_id", { ascending: false })
-      .limit(1);
-
-    let ppartNum = 1;
-    if (lastPpart && lastPpart.length > 0) {
-      const match = lastPpart[0].ppart_id.match(/PPart(\d+)/);
-      if (match) ppartNum = parseInt(match[1], 10) + 1;
+    // Generate next ppart_id — atomic via next_id RPC
+    const { data: ppartId, error: ppartIdError } = await supabase.rpc("next_id", {
+      p_prefix: "PPart",
+      p_width: 4,
+    });
+    if (ppartIdError || !ppartId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const ppartId = `PPart${String(ppartNum).padStart(4, "0")}`;
 
     // Insert plaka_parts (1:1)
     const { error: partError } = await supabase.from("plaka_parts").insert({
@@ -210,18 +199,14 @@ export async function updateKartonSablon(
         })
         .eq("ppart_id", existingParts[0].ppart_id);
     } else {
-      const { data: lastPpart } = await supabase
-        .from("plaka_parts")
-        .select("ppart_id")
-        .order("ppart_id", { ascending: false })
-        .limit(1);
-
-      let ppartNum = 1;
-      if (lastPpart && lastPpart.length > 0) {
-        const match = lastPpart[0].ppart_id.match(/PPart(\d+)/);
-        if (match) ppartNum = parseInt(match[1], 10) + 1;
+      // Generate next ppart_id — atomic via next_id RPC
+      const { data: ppartId, error: ppartIdError } = await supabase.rpc("next_id", {
+        p_prefix: "PPart",
+        p_width: 4,
+      });
+      if (ppartIdError || !ppartId) {
+        return { success: false, error: "ID üretilemedi" };
       }
-      const ppartId = `PPart${String(ppartNum).padStart(4, "0")}`;
 
       await supabase.from("plaka_parts").insert({
         ppart_id: ppartId,

@@ -1076,39 +1076,44 @@ async function deductStockForSession(
 
   // YARIMAMUL → yari_mamul_stok INSERT direction='OUT'
   if (yarimamulParts.size > 0) {
-    const { data: lastYms } = await supabase
-      .from("yari_mamul_stok")
-      .select("yms_id")
-      .like("yms_id", "YMS-%")
-      .order("yms_id", { ascending: false })
-      .limit(1);
-
-    let ymsNum = 1;
-    if (lastYms && lastYms.length > 0) {
-      const match = lastYms[0].yms_id.match(/YMS-(\d+)/);
-      if (match) ymsNum = parseInt(match[1], 10) + 1;
-    }
-
     const now = new Date().toISOString();
-    const ymsInserts = bomItems
-      .filter((b) => yarimamulParts.has(b.part_id))
-      .map((b) => {
-        const ymsId = `YMS-${String(ymsNum).padStart(6, "0")}`;
-        ymsNum++;
-        const partInfo = partMap.get(b.part_id);
-        return {
-          yms_id: ymsId,
-          tarih: now,
-          part_id: b.part_id,
-          part_adi: partInfo?.part_adi ?? null,
-          sku,
-          qty: b.qty_per * qty,
-          direction: "OUT",
-          source: "Montaj",
-          source_id: sessionId,
-          operator: operatorId,
-        };
+    const bomForYarimamul = bomItems.filter((b) => yarimamulParts.has(b.part_id));
+
+    // Generate next YMS-XXXXXX ids (atomic via next_id RPC, one per line)
+    const ymsInserts: {
+      yms_id: string;
+      tarih: string;
+      part_id: string;
+      part_adi: string | null;
+      sku: string;
+      qty: number;
+      direction: string;
+      source: string;
+      source_id: string;
+      operator: string | null;
+    }[] = [];
+    for (const b of bomForYarimamul) {
+      const { data: ymsId, error: ymsIdError } = await supabase.rpc("next_id", {
+        p_prefix: "YMS-",
+        p_width: 6,
       });
+      if (ymsIdError || !ymsId) {
+        return { success: false, error: "ID üretilemedi" };
+      }
+      const partInfo = partMap.get(b.part_id);
+      ymsInserts.push({
+        yms_id: ymsId,
+        tarih: now,
+        part_id: b.part_id,
+        part_adi: partInfo?.part_adi ?? null,
+        sku,
+        qty: b.qty_per * qty,
+        direction: "OUT",
+        source: "Montaj",
+        source_id: sessionId,
+        operator: operatorId,
+      });
+    }
 
     if (ymsInserts.length > 0) {
       const { error: ymsError } = await supabase.from("yari_mamul_stok").insert(ymsInserts);

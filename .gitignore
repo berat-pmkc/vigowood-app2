@@ -55,3 +55,4 @@ supabase/.temp/
 *.swo
 
 .vercel
+.claude/

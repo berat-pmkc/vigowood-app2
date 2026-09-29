@@ -5239,6 +5239,10 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_admin_or_engineer: { Args: never; Returns: boolean }
       is_admin_or_finance: { Args: never; Returns: boolean }
+      next_id: {
+        Args: { p_prefix: string; p_width: number }
+        Returns: string
+      }
       next_sevkiyat_item_id: { Args: never; Returns: string }
     }
     Enums: {

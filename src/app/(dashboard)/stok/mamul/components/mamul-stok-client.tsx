@@ -41,6 +41,7 @@ interface MamulStokClientProps {
   movementsPageSize: number;
   movementsSearch: string;
   movementsSource: string;
+  movementsYon: string;
   movementsSortBy: string;
   movementsSortOrder: "asc" | "desc";
 }
@@ -64,6 +65,7 @@ export function MamulStokClient({
   movementsPageSize,
   movementsSearch,
   movementsSource,
+  movementsYon,
   movementsSortBy,
   movementsSortOrder,
 }: MamulStokClientProps) {
@@ -174,6 +176,7 @@ export function MamulStokClient({
             pageSize={movementsPageSize}
             search={movementsSearch}
             source={movementsSource}
+            yon={movementsYon}
             sortBy={movementsSortBy}
             sortOrder={movementsSortOrder}
           />

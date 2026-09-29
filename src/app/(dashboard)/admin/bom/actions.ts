@@ -333,22 +333,14 @@ export async function createStep(
 
     const supabase = await createClient();
 
-    // Generate next ASM-XXXX id
-    const { data: lastStep } = await supabase
-      .from("assembly_steps")
-      .select("step_id")
-      .like("step_id", "ASM-%")
-      .order("step_id", { ascending: false })
-      .limit(1);
-
-    let nextNum = 1;
-    if (lastStep && lastStep.length > 0) {
-      const match = lastStep[0].step_id.match(/ASM-(\d+)/);
-      if (match) {
-        nextNum = parseInt(match[1], 10) + 1;
-      }
+    // Generate next ASM-XXXX id (atomic via next_id RPC)
+    const { data: stepId, error: idError } = await supabase.rpc("next_id", {
+      p_prefix: "ASM-",
+      p_width: 4,
+    });
+    if (idError || !stepId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const stepId = `ASM-${String(nextNum).padStart(4, "0")}`;
 
     const { error } = await supabase.from("assembly_steps").insert({
       step_id: stepId,
@@ -468,22 +460,14 @@ export async function addBomItem(
 
     const supabase = await createClient();
 
-    // Generate next SBOM-XXXX id
-    const { data: lastBom } = await supabase
-      .from("step_bom")
-      .select("step_bom_id")
-      .like("step_bom_id", "SBOM-%")
-      .order("step_bom_id", { ascending: false })
-      .limit(1);
-
-    let nextNum = 1;
-    if (lastBom && lastBom.length > 0) {
-      const match = lastBom[0].step_bom_id.match(/SBOM-(\d+)/);
-      if (match) {
-        nextNum = parseInt(match[1], 10) + 1;
-      }
+    // Generate next SBOM-XXXX id (atomic via next_id RPC)
+    const { data: stepBomId, error: idError } = await supabase.rpc("next_id", {
+      p_prefix: "SBOM-",
+      p_width: 4,
+    });
+    if (idError || !stepBomId) {
+      return { success: false, error: "ID üretilemedi" };
     }
-    const stepBomId = `SBOM-${String(nextNum).padStart(4, "0")}`;
 
     const { error } = await supabase.from("step_bom").insert({
       step_bom_id: stepBomId,

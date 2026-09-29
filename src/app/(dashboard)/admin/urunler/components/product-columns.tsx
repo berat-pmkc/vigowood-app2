@@ -1,18 +1,43 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { type ColumnDef } from "@tanstack/react-table";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DataTableColumnHeader } from "@/components/shared/data-table-column-header";
 import { formatNumber } from "@/lib/utils";
+import { deleteProduct, duplicateProduct } from "../actions";
+import { toast } from "sonner";
 import type { Database } from "@/lib/supabase/types";
 
 type Product = Database["public"]["Tables"]["products"]["Row"];
@@ -21,6 +46,178 @@ interface ColumnOptions {
   onSort: (columnId: string, desc: boolean) => void;
   onEdit: (product: Product) => void;
   onToggleActive: (product: Product) => void;
+}
+
+function ProductActionsCell({
+  product,
+  onEdit,
+  onToggleActive,
+}: {
+  product: Product;
+  onEdit: (product: Product) => void;
+  onToggleActive: (product: Product) => void;
+}) {
+  const router = useRouter();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [newSku, setNewSku] = useState("");
+  const [newUrunAdi, setNewUrunAdi] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const result = await deleteProduct(product.sku);
+      if (result.success) {
+        toast.success("Ürün silindi");
+        setDeleteOpen(false);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  const openDuplicate = () => {
+    setNewSku("");
+    setNewUrunAdi("");
+    setDuplicateOpen(true);
+  };
+
+  const handleDuplicate = () => {
+    const trimmed = newSku.trim();
+    if (!trimmed) {
+      toast.error("Yeni SKU gereklidir");
+      return;
+    }
+    if (trimmed === product.sku) {
+      toast.error("Yeni SKU, kaynak SKU ile aynı olamaz");
+      return;
+    }
+    startTransition(async () => {
+      const result = await duplicateProduct(
+        product.sku,
+        trimmed,
+        newUrunAdi.trim() || undefined
+      );
+      if (result.success) {
+        toast.success(`${result.sku} olarak kopyalandı`);
+        setDuplicateOpen(false);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+            <span className="sr-only">Menü</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onEdit(product)}>
+            Düzenle
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onToggleActive(product)}>
+            {product.aktif_mi ? "Pasif Yap" : "Aktif Yap"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              openDuplicate();
+            }}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Kopyala
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteOpen(true);
+            }}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Sil
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ürünü Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{product.sku}</strong> — {product.urun_adi || "İsimsiz"}{" "}
+              ürününü silmek istediğinize emin misiniz? Bu ürünün montaj
+              adımları ve reçetesi de silinecektir. Bu işlem geri alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isPending}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isPending ? "Siliniyor..." : "Sil"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Ürünü Kopyala</DialogTitle>
+            <DialogDescription>
+              <strong>{product.sku}</strong> ürününün reçetesi ve tanımlayıcı
+              alanları yeni bir SKU altında kopyalanır. Stok ve satış geçmişi
+              kopyalanmaz.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-sku">Yeni SKU</Label>
+              <Input
+                id="new-sku"
+                value={newSku}
+                onChange={(e) => setNewSku(e.target.value)}
+                placeholder="ör. AE-2"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-urun-adi">Yeni Ürün Adı (opsiyonel)</Label>
+              <Input
+                id="new-urun-adi"
+                value={newUrunAdi}
+                onChange={(e) => setNewUrunAdi(e.target.value)}
+                placeholder={product.urun_adi || ""}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDuplicateOpen(false)}
+              disabled={isPending}
+            >
+              İptal
+            </Button>
+            <Button onClick={handleDuplicate} disabled={isPending}>
+              {isPending ? "Kopyalanıyor..." : "Kopyala"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 export function getProductColumns({
@@ -281,22 +478,11 @@ export function getProductColumns({
       cell: ({ row }) => {
         const product = row.original;
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-                <span className="sr-only">Menü</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(product)}>
-                Düzenle
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onToggleActive(product)}>
-                {product.aktif_mi ? "Pasif Yap" : "Aktif Yap"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ProductActionsCell
+            product={product}
+            onEdit={onEdit}
+            onToggleActive={onToggleActive}
+          />
         );
       },
       size: 50,

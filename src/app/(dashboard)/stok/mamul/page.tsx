@@ -23,6 +23,7 @@ interface PageProps {
     mPageSize?: string;
     mSearch?: string;
     mSource?: string;
+    mYon?: string;
     mSortBy?: string;
     mSortOrder?: string;
   }>;
@@ -55,6 +56,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
     : 100;
   const mSearch = params.mSearch?.trim() || "";
   const mSource = params.mSource || "";
+  const mYon = params.mYon === "giris" || params.mYon === "cikis" ? params.mYon : "";
   const mSortBy = params.mSortBy || "tarih";
   const mSortOrder = params.mSortOrder === "asc" ? "asc" as const : "desc" as const;
 
@@ -102,6 +104,11 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
   }
   if (mSource) {
     movementsQuery = movementsQuery.eq("source", mSource);
+  }
+  if (mYon === "giris") {
+    movementsQuery = movementsQuery.gt("qty", 0);
+  } else if (mYon === "cikis") {
+    movementsQuery = movementsQuery.lt("qty", 0);
   }
 
   const validMSortColumns = ["tarih", "sku", "qty", "source"];
@@ -289,6 +296,7 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
         movementsPageSize={mPageSize}
         movementsSearch={mSearch}
         movementsSource={mSource}
+        movementsYon={mYon}
         movementsSortBy={mSortColumn}
         movementsSortOrder={mSortOrder}
       />
