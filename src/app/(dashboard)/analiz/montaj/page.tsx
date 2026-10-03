@@ -38,12 +38,13 @@ const CHIPS: MetricChip[] = [
   { key: "adet", label: "İş Adımı Adedi" },
   { key: "birim-sure", label: "Birim Süre" },
   { key: "calisan", label: "Çalışan Sayısı" },
-  { key: "uygunsuz", label: "Uygunsuz YM" },
-  { key: "fire", label: "Fire YM" },
+  { key: "uygunsuz", label: "Uygunsuz" },
+  { key: "fire", label: "Fire" },
 ];
 
 type SP = Record<string, string | string[] | undefined>;
-const TIPLER = ["YARI_MAMUL"];
+// Yarı mamul + montajda üretilen ürün (tablet "Uygunsuz/Fire" butonları ürün için de kayıt açar)
+const TIPLER = ["YARI_MAMUL", "URUN"];
 
 interface Summary {
   qty: number;
@@ -142,19 +143,19 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
       };
     case "uygunsuz":
       return {
-        title: "Uygunsuz yarı mamul (adet)",
+        title: "Uygunsuz YM + ürün (adet)",
         type: "bar",
         xKey: "label",
         data: buildSeries(from, to, g, { v: d.uygunsuzByDay }),
-        series: [{ key: "v", label: "Uygunsuz YM", color: "#f28a19" }],
+        series: [{ key: "v", label: "Uygunsuz", color: "#f28a19" }],
       };
     case "fire":
       return {
-        title: "Fire yarı mamul (adet)",
+        title: "Fire YM + ürün (adet)",
         type: "bar",
         xKey: "label",
         data: buildSeries(from, to, g, { v: d.fireByDay }),
-        series: [{ key: "v", label: "Fire YM", color: "#ee7683" }],
+        series: [{ key: "v", label: "Fire", color: "#ee7683" }],
       };
     case "adet":
     default:
@@ -173,9 +174,10 @@ const COLS: CompactColumn[] = [
   { key: "sku", label: "Ürün Kodu" },
   { key: "adim", label: "İş Adımı Kodu" },
   { key: "kisi", label: "Personel Adı Soyadı" },
+  { key: "part", label: "Parça/Ürün" },
   { key: "adet", label: "İş Adımı Adedi", align: "right", format: "number" },
-  { key: "uygunsuz", label: "Uygunsuz YM", align: "right", format: "number" },
-  { key: "kontrol", label: "Kontrol Edilen Uygunsuz YM", align: "right", format: "number" },
+  { key: "uygunsuz", label: "Uygunsuz", align: "right", format: "number" },
+  { key: "kontrol", label: "Kontrol Edilen Uygunsuz", align: "right", format: "number" },
   { key: "fire", label: "Fire", align: "right", format: "number" },
   { key: "birim", label: "Birim Süre", align: "right", format: "dk" },
 ];
@@ -189,6 +191,8 @@ interface Acc {
   stepName: string | null;
   personId: string;
   person: string;
+  /** Seansa bağlı olmayan kalite kayıtlarında parça/ürün kodu; seans satırlarında "—" */
+  part: string;
   qty: number;
   num: number;
   den: number;
@@ -204,18 +208,26 @@ interface Acc {
 function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): Acc[] {
   const acc = new Map<string, Acc>();
   const bySession = new Map<string, MontajSessionRow>();
-  const getAcc = (s: MontajSessionRow, pid: string, pname: string) => {
-    const bk = bucketKey(s.day, g);
-    const key = `${bk}|${s.sku}|${s.step_id}|${pid}`;
+  const getAccRaw = (
+    bk: string,
+    sku: string,
+    stepId: string,
+    stepName: string | null,
+    pid: string,
+    pname: string,
+    part: string,
+  ) => {
+    const key = `${bk}|${sku}|${stepId}|${pid}|${part}`;
     let a = acc.get(key);
     if (!a) {
       a = {
         bucket: bk,
-        sku: s.sku,
-        stepId: s.step_id,
-        stepName: s.step_name,
+        sku,
+        stepId,
+        stepName,
         personId: pid,
         person: pname,
+        part,
         qty: 0,
         num: 0,
         den: 0,
@@ -230,6 +242,8 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
     }
     return a;
   };
+  const getAcc = (s: MontajSessionRow, pid: string, pname: string) =>
+    getAccRaw(bucketKey(s.day, g), s.sku, s.step_id, s.step_name, pid, pname, "—");
 
   for (const s of sessions) {
     bySession.set(s.session_id, s);
@@ -253,10 +267,28 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
   for (const r of kalite) {
     if (!TIPLER.includes(r.item_tipi)) continue;
     const o = resolveOrigin(r, byId);
-    if (o.origin !== "montaj" || !o.sourceId) continue;
-    const s = bySession.get(o.sourceId);
-    if (!s || s.workers.length === 0) continue;
+    if (o.origin !== "montaj") continue;
     const day = trDay(r.tarih);
+    const s = o.sourceId ? bySession.get(o.sourceId) : undefined;
+    if (!s || s.workers.length === 0) {
+      // Seansa bağlı olmayan (tablet butonlarından girilen) kalite kaydı: kendi liste satırını oluşturur
+      if (!day) continue;
+      const pname = r.operator_name ?? r.operator_id ?? "—";
+      const a = getAccRaw(
+        bucketKey(day, g),
+        r.item_tipi === "URUN" ? (r.item_id ?? "—") : "—",
+        "—",
+        null,
+        r.operator_id ?? pname,
+        pname,
+        r.item_id ?? "—",
+      );
+      for (const c of kaliteContribution(r)) {
+        a.m[c.metric] += c.value;
+        addTo(a.kByDay[c.metric], day, c.value);
+      }
+      continue;
+    }
     for (const c of kaliteContribution(r)) {
       // Uygunsuz giriş ve fire: kaydı giren kişi seans çalışanıysa ona, değilse eşit pay
       const direct =
@@ -288,6 +320,7 @@ const toRow = (a: Acc, g: Gran): CompactRow => ({
   sku: a.sku,
   adim: a.stepName ? `${a.stepId} · ${a.stepName}` : a.stepId,
   kisi: a.person,
+  part: a.part,
   adet: round(a.qty, 1),
   uygunsuz: round(a.m.uygunsuz, 1),
   kontrol: round(a.m.kontrol, 1),
@@ -414,7 +447,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       )}
       {!hide(cur.uygunsuz === 0) && (
         <StatCard
-          title="Toplam Uygunsuz Yarı Mamul"
+          title="Toplam Uygunsuz (YM + Ürün)"
           value={fmtNum(cur.uygunsuz)}
           subtitle="Montajdan uygunsuza giren"
           delta={prev ? deltaPct(cur.uygunsuz, prev.uygunsuz) : null}
@@ -423,7 +456,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       )}
       {!hide(cur.kontrol === 0) && (
         <StatCard
-          title="Kontrol Edilen Uygunsuz YM"
+          title="Kontrol Edilen Uygunsuz"
           value={fmtNum(cur.kontrol)}
           subtitle="Kontrol kararı verilen adet"
           delta={prev ? deltaPct(cur.kontrol, prev.kontrol) : null}
@@ -431,7 +464,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       )}
       {!hide(cur.fire === 0) && (
         <StatCard
-          title="Fire Yarı Mamul"
+          title="Fire (YM + Ürün)"
           value={fmtNum(cur.fire)}
           subtitle="Montaj kaynaklı fire"
           delta={prev ? deltaPct(cur.fire, prev.fire) : null}

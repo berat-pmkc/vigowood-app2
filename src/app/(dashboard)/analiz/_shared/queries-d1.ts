@@ -93,6 +93,12 @@ export async function getUygunsuzBakiye(): Promise<number> {
 
 export const isUygunsuzGiris = (r: KaliteRow) =>
   r.stok_turu === "UYGUNSUZ" && r.islem === "giris" && r.item_tipi === "URUN";
+/** Ürün + yarı mamul uygunsuz girişi (analiz/uretim/uygunsuz listesi). */
+export const isUygunsuzGirisAny = (r: KaliteRow) =>
+  r.stok_turu === "UYGUNSUZ" && r.islem === "giris" && (r.item_tipi === "URUN" || r.item_tipi === "YARI_MAMUL");
+/** Ürün + yarı mamul kontrol kararları (uygunsuz stoktan çıkış). */
+export const isKontrolAny = (r: KaliteRow) =>
+  r.stok_turu === "UYGUNSUZ" && r.qty < 0 && (r.item_tipi === "URUN" || r.item_tipi === "YARI_MAMUL");
 export const isKontrol = (r: KaliteRow) => r.stok_turu === "UYGUNSUZ" && r.qty < 0 && r.item_tipi === "URUN";
 export const isFireUrun = (r: KaliteRow) => r.stok_turu === "FIRE" && r.item_tipi === "URUN";
 

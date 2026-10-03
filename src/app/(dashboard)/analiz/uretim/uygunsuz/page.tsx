@@ -18,9 +18,10 @@ import { buildSeries, resolveGranularity } from "../../_shared/series";
 import { fmtNum } from "../../_shared/utils";
 import {
   getKaliteRows,
-  isUygunsuzGiris,
+  isUygunsuzGirisAny,
   kaynakLabel,
   safe,
+  TIP_LABELS,
   trunc,
   type KaliteRow,
 } from "../../_shared/queries-d1";
@@ -33,6 +34,8 @@ const CHIPS: MetricChip[] = [
   { key: "iade", label: "İade" },
   { key: "uretim", label: "Üretim" },
   { key: "stok", label: "Stok" },
+  { key: "tip-urun", label: "Ürün" },
+  { key: "tip-ym", label: "Yarı Mamul" },
   { key: "kargo", label: "Kargo Firmasına Göre" },
   { key: "urun", label: "Ürüne Göre" },
 ];
@@ -42,8 +45,9 @@ const URETIM_KAYNAK = ["paketleme", "montaj", "kesim"];
 
 const COLS: CompactColumn[] = [
   { key: "tarih", label: "Tarih" },
-  { key: "sku", label: "Ürün Kodu" },
-  { key: "ad", label: "Ürün Adı" },
+  { key: "tip", label: "Tip" },
+  { key: "sku", label: "Ürün / Parça Kodu" },
+  { key: "ad", label: "Ad" },
   { key: "kaynak", label: "Kaynak" },
   { key: "kargo", label: "Kargo Firması" },
   { key: "musteri", label: "Müşteri" },
@@ -52,6 +56,7 @@ const COLS: CompactColumn[] = [
 
 const toRow = (r: KaliteRow): CompactRow => ({
   tarih: r.tarih ? formatTrDate(r.tarih) : "—",
+  tip: TIP_LABELS[r.item_tipi] ?? r.item_tipi,
   sku: r.item_id,
   ad: r.item_adi ?? r.item_id,
   kaynak: kaynakLabel(r.kaynak),
@@ -79,7 +84,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
   const g = resolveGranularity(sp.g, from, to);
 
   const kal = await safe(getKaliteRows(from, to, "UYGUNSUZ"), { available: false, rows: [] as KaliteRow[] });
-  const allUnfiltered = kal.rows.filter(isUygunsuzGiris);
+  const allUnfiltered = kal.rows.filter(isUygunsuzGirisAny);
 
   // kolon filtreleri: kart + grafik + liste hepsi filtrelenmiş kayıtlardan türer
   const colFilters = parseColumnFilters(sp, COLS);
@@ -92,12 +97,15 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
     if (metric === "iade") return r.kaynak === "iade";
     if (metric === "uretim") return URETIM_KAYNAK.includes(r.kaynak ?? "");
     if (metric === "stok") return r.kaynak === "stok";
+    if (metric === "tip-urun") return r.item_tipi === "URUN";
+    if (metric === "tip-ym") return r.item_tipi === "YARI_MAMUL";
     if (metric === "kargo") return !!r.kargo_firmasi;
     return true;
   });
 
   // kartlar (dönemin tümü)
-  const total = all.reduce((a, r) => a + r.qty, 0);
+  const total = all.filter((r) => r.item_tipi === "URUN").reduce((a, r) => a + r.qty, 0);
+  const totalYm = all.filter((r) => r.item_tipi === "YARI_MAMUL").reduce((a, r) => a + r.qty, 0);
   const byProduct = groupSum(all, (r) => r.item_id);
   const topProduct = byProduct[0];
   const iade = all.filter((r) => r.kaynak === "iade").reduce((a, r) => a + r.qty, 0);
@@ -134,7 +142,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
     const byDay: Record<string, number> = {};
     for (const r of filtered) byDay[r.tarih] = (byDay[r.tarih] ?? 0) + r.qty;
     chart = {
-      title: "Uygunsuz ürün girişi (adet)",
+      title: "Uygunsuz giriş (adet)",
       type: "bar",
       xKey: "label",
       data: buildSeries(from, to, g, { v: byDay }),
@@ -152,6 +160,9 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
   const cards = (
     <>
       {!hide(total === 0) && <StatCard title="Toplam Uygunsuz Ürün" value={fmtNum(total)} subtitle="Adet" />}
+      {!hide(totalYm === 0) && (
+        <StatCard title="Toplam Uygunsuz Yarı Mamul" value={fmtNum(totalYm)} subtitle="Adet" />
+      )}
       {!hide(!topProduct) && (
         <StatCard
           title="En Çok Gelen Ürün"
@@ -175,7 +186,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
 
   return (
     <AnalizLayout
-      title="Uygunsuz Ürünler"
+      title="Uygunsuz Ürünler ve Yarı Mamuller"
       backHref="/analiz/uretim"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
@@ -191,7 +202,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
       cardsClassName="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
       list={
         <CompactList
-          title="Uygunsuz ürün kayıtları"
+          title="Uygunsuz kayıtları (ürün + yarı mamul)"
           columns={COLS}
           rows={rows}
           filterOptions={options}

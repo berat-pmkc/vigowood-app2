@@ -98,7 +98,8 @@ export function KontrolDialog({
     setLoadingParts(true);
     getUrunYariMamulleri(item.id).then((r) => {
       if (r.success) {
-        setParts(r.data);
+        // Söküm yalnızca yarı mamulleri kapsar; hazır elemanlar listelenmez.
+        setParts(r.data.filter((p) => p.part_type === "YARIMAMUL"));
         setPartInputs({});
       } else {
         toast.error(r.error);
@@ -326,8 +327,7 @@ export function KontrolDialog({
                           </div>
                           {r.kalan > 0 && (
                             <p className="mt-1.5 text-xs text-[#f28a19]">
-                              {fmt(r.kalan)} adet{" "}
-                              {r.p.part_type === "YARIMAMUL" ? "uygunsuz yarı mamule gidecek" : "fire sayılacak"}
+                              {fmt(r.kalan)} adet uygunsuz yarı mamule gidecek
                             </p>
                           )}
                         </div>

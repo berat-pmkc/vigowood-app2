@@ -130,10 +130,19 @@ function cellText(v: CellValue): string {
   return v === null || v === undefined || v === "" ? "—" : String(v);
 }
 
+/** Hücre değerini sayıya çevirir (Supabase numeric kolonları string döner: "5", "22.5", "5,5"). */
+export function toNum(v: CellValue): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const t = v.trim();
+  if (t === "" || t === "—") return null;
+  const n = Number(t.includes(",") && !t.includes(".") ? t.replace(",", ".") : t);
+  return Number.isFinite(n) ? n : null;
+}
+
 function matchOne(v: CellValue, f: ColumnFilter): boolean {
   if (f.kind === "number") {
-    const n = typeof v === "number" ? v : v === null || v === undefined || v === "" ? null : Number(v);
-    const num = n !== null && Number.isFinite(n) ? n : null;
+    const num = toNum(v);
     if (f.op === "gt0") return num !== null && num > 0;
     if (f.op === "eq0") return num === null || num === 0;
     if (num === null) return false;

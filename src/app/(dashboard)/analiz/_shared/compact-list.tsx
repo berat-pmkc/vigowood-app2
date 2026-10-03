@@ -9,6 +9,7 @@ import {
   FILTER_PREFIX,
   columnKind,
   describeFilter,
+  toNum,
   parseColumnFilters,
   serializeFilter,
   type ColumnFilter,
@@ -37,7 +38,13 @@ const STEP = 10;
 
 function fmt(v: string | number | null, f: CompactColumn["format"]): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "string") return v;
+  if (typeof v === "string") {
+    // Sayı kolonlarında string gelen değerler (Supabase numeric) de biçimlenir
+    if (!f || f === "text") return v;
+    const n = toNum(v);
+    if (n === null) return v;
+    v = n;
+  }
   switch (f) {
     case "dk":
       return `${v.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} dk`;

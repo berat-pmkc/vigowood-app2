@@ -19,9 +19,10 @@ import { fmtNum } from "../../_shared/utils";
 import {
   getKaliteRows,
   getUygunsuzBakiye,
-  isKontrol,
+  isKontrolAny,
   kontrolKarar,
   safe,
+  TIP_LABELS,
   type KaliteRow,
 } from "../../_shared/queries-d1";
 
@@ -40,8 +41,9 @@ type SP = Record<string, string | string[] | undefined>;
 
 const COLS: CompactColumn[] = [
   { key: "tarih", label: "Tarih" },
-  { key: "sku", label: "Ürün Kodu" },
-  { key: "ad", label: "Ürün Adı" },
+  { key: "tip", label: "Tip" },
+  { key: "sku", label: "Ürün / Parça Kodu" },
+  { key: "ad", label: "Ad" },
   { key: "karar", label: "Karar" },
   { key: "qty", label: "Miktar", align: "right", format: "number" },
   { key: "personel", label: "Personel" },
@@ -56,6 +58,7 @@ const SOKUM_COLS: CompactColumn[] = [
 
 const toRow = (r: KaliteRow): CompactRow => ({
   tarih: r.tarih ? formatTrDate(r.tarih) : "—",
+  tip: TIP_LABELS[r.item_tipi] ?? r.item_tipi,
   sku: r.item_id,
   ad: r.item_adi ?? r.item_id,
   karar: KARAR_LABEL[kontrolKarar(r.islem)],
@@ -80,7 +83,7 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
     safe(getUygunsuzBakiye(), 0),
   ]);
 
-  const kontrolAll = kal.rows.filter(isKontrol);
+  const kontrolAll = kal.rows.filter(isKontrolAny);
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
   // kart + grafik + liste filtrelenmiş kontrol kayıtlarından türer

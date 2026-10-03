@@ -107,6 +107,7 @@ const COLS: CompactColumn[] = [
   { key: "plaka", label: "Plaka" },
   { key: "makine", label: "Makine" },
   { key: "op", label: "Operatör" },
+  { key: "part", label: "Parça Kodu" },
   { key: "plates", label: "Plaka Adedi", align: "right", format: "number" },
   { key: "parts", label: "Parça Adedi", align: "right", format: "number" },
   { key: "uygunsuz", label: "Uygunsuz", align: "right", format: "number" },
@@ -121,6 +122,8 @@ interface Acc {
   plaka: string;
   makine: string;
   op: string;
+  /** Kesim koduna bağlı olmayan kalite kayıtlarında yarı mamul (parça) kodu; kesim satırlarında "—" */
+  part: string;
   plates: number;
   parts: number;
   plannedMin: number;
@@ -138,8 +141,8 @@ interface Acc {
 function buildAccs(d: KesimDetay, kalite: KaliteRow[], g: Gran): Acc[] {
   const acc = new Map<string, Acc>();
   const byCut = new Map<string, string>();
-  const getAcc = (bucket: string, plaka: string, makine: string, op: string) => {
-    const key = `${bucket}|${plaka}|${makine}|${op}`;
+  const getAcc = (bucket: string, plaka: string, makine: string, op: string, part = "—") => {
+    const key = `${bucket}|${plaka}|${makine}|${op}|${part}`;
     let a = acc.get(key);
     if (!a) {
       a = {
@@ -147,6 +150,7 @@ function buildAccs(d: KesimDetay, kalite: KaliteRow[], g: Gran): Acc[] {
         plaka,
         makine,
         op,
+        part,
         plates: 0,
         parts: 0,
         plannedMin: 0,
@@ -171,17 +175,23 @@ function buildAccs(d: KesimDetay, kalite: KaliteRow[], g: Gran): Acc[] {
     addTo(a.plateByDay, b.day, b.adet);
     addTo(a.partByDay, b.day, b.parts);
     addTo(a.minByDay, b.day, b.plannedMin / 60);
-    byCut.set(b.cut_id, `${bucketKey(b.day, g)}|${b.plaka_id ?? "—"}|${b.makine_id ?? "—"}|${op}`);
+    byCut.set(b.cut_id, `${bucketKey(b.day, g)}|${b.plaka_id ?? "—"}|${b.makine_id ?? "—"}|${op}|—`);
   }
   const byId = new Map(kalite.map((r) => [r.id, r]));
   for (const r of kalite) {
     if (!TIPLER.includes(r.item_tipi)) continue;
     const o = resolveOrigin(r, byId);
-    if (o.origin !== "kesim" || !o.sourceId) continue;
-    const key = byCut.get(o.sourceId);
-    const a = key ? acc.get(key) : undefined;
-    if (!a) continue;
+    if (o.origin !== "kesim") continue;
     const day = trDay(r.tarih);
+    const key = o.sourceId ? byCut.get(o.sourceId) : undefined;
+    let a = key ? acc.get(key) : undefined;
+    if (!a) {
+      // Kesim koduna bağlı olmayan (tablet butonlarından girilen) kalite kaydı: kendi liste satırını oluşturur
+      if (!day) continue;
+      const opName = r.operator_name ?? r.operator_id ?? "—";
+      const isPlaka = r.item_tipi === "PLAKA";
+      a = getAcc(bucketKey(day, g), isPlaka ? (r.item_id ?? "—") : "—", "—", opName, isPlaka ? "—" : (r.item_id ?? "—"));
+    }
     for (const c of kaliteContribution(r)) {
       a.m[c.metric] += c.value;
       addTo(a.kByDay[c.metric], day, c.value);
@@ -201,6 +211,7 @@ const toRow = (a: Acc, g: Gran): CompactRow => ({
   plaka: a.plaka,
   makine: a.makine,
   op: a.op,
+  part: a.part,
   plates: round(a.plates, 1),
   parts: round(a.parts, 1),
   uygunsuz: round(a.m.uygunsuz, 1),

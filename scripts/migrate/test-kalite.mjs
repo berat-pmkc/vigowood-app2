@@ -36,7 +36,7 @@ begin
 
   -- 3) söküm: ilk YM parçası tamamen sağlam, diğerleri girilmez (uygunsuz YM'ye gitmeli)
   select jsonb_agg(jsonb_build_object('part_id', part_id, 'saglam', case when part_id=first_part then qty_per else 0 end, 'fire', 0))
-    into parts from ${S}.urun_yari_mamul_listesi(${ql(sku)});
+    into parts from ${S}.urun_yari_mamul_listesi(${ql(sku)}) where part_type = 'YARIMAMUL';
   r := ${S}.kalite_sokum(${ql(sku)}, 1, parts, 'TEST', 'Test', 'smoke');
   out := out || 'sokum=' || r::text || E'\\n';
   select coalesce(yari_mamul_stok,0) into ym_after from ${S}.all_parts where part_id = first_part;
