@@ -5,6 +5,7 @@ import { resolvePeriod, type ResolvedPeriod } from "@/lib/periods";
 import { AnalizLayout } from "./_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "./_shared/analiz-chart";
 import type { MetricChip } from "./_shared/metric-chips";
+import { SummaryChart, type SummaryItem } from "./_shared/summary-chart";
 import { StatCard, StatSlot } from "./_shared/stat-card";
 import { buildSeries, resolveGranularity } from "./_shared/series";
 import { deltaPct, fmtNum, round } from "./_shared/utils";
@@ -30,6 +31,7 @@ export const metadata: Metadata = { title: "Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "ozet", label: "Özet" },
   { key: "uretim", label: "Üretim" },
   { key: "montaj", label: "Montaj" },
   { key: "kesim", label: "Kesim" },
@@ -210,7 +212,8 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
   const metricRaw = Array.isArray(sp.m) ? sp.m[0] : sp.m;
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
 
-  const [uretim, uretimPrev, montaj, montajPrev, kesim, kesimPrev, birim, stok, perf, kalite] = await Promise.all([
+  const isOzet = metric === "ozet";
+  const [uretim, uretimPrev, montaj, montajPrev, kesim, kesimPrev, birim, stok, perf, kalite, birimPrev, stokPrev, perfPrev, kalitePrev] = await Promise.all([
     safe(getUretim(from, to), EMPTY_URETIM),
     prevOf(period, getUretim, EMPTY_URETIM),
     safe(getMontaj(from, to), EMPTY_MONTAJ),
@@ -221,16 +224,42 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
     safe(getStokVerimlilik(from, to), EMPTY_STOK),
     safe(computePerformance(from, to), EMPTY_PERF),
     safe(getKalite(from, to), EMPTY_KALITE),
+    // Önceki dönem değerleri yalnızca Özet grafiği için gerekli
+    isOzet ? prevOf(period, getBirimSure, EMPTY_BIRIM) : Promise.resolve(null),
+    isOzet ? prevOf(period, getStokVerimlilik, EMPTY_STOK) : Promise.resolve(null),
+    isOzet ? prevOf(period, computePerformance, EMPTY_PERF) : Promise.resolve(null),
+    isOzet ? prevOf(period, getKalite, EMPTY_KALITE) : Promise.resolve(null),
   ]);
 
-  const { title: chartTitle, ...chartProps } = await buildChart(metric, period, sp, {
-    uretim,
-    montaj,
-    kesim,
-    birim,
-    stok,
-    perf,
-  });
+  let chartNode: React.ReactNode;
+  if (isOzet) {
+    const hasPrev = !!period.prevFrom && !!period.prevTo;
+    const items: SummaryItem[] = [
+      { key: "uretim", label: "Üretim", short: "Üretim", href: "/analiz/uretim", unit: "adet", cur: uretim.total, prev: uretimPrev?.total ?? null },
+      { key: "montaj", label: "Montaj", short: "Montaj", href: "/analiz/montaj", unit: "adet", cur: montaj.total, prev: montajPrev?.total ?? null },
+      { key: "kesim", label: "Kesim", short: "Kesim", href: "/analiz/kesim", unit: "plaka", cur: kesim.plates, prev: kesimPrev?.plates ?? null },
+      { key: "birim-sure", label: "Birim Süre", short: "B.Süre", href: "/analiz/birim-sure", unit: "dk", lowerBetter: true, cur: birim.montajAvg, prev: birimPrev?.montajAvg ?? null },
+      { key: "stok", label: "Stok Verimliliği", short: "Stok V.", href: "/analiz/stok-verimliligi", unit: "%", cur: stok.overallPct, prev: stokPrev?.overallPct ?? null },
+      { key: "personel", label: "Personel Performans", short: "Perf.", href: "/analiz/personel", unit: "%", cur: perf.overallPct, prev: perfPrev?.overallPct ?? null },
+      { key: "fire", label: "Fire", short: "Fire", href: "/analiz/fire", unit: "adet", lowerBetter: true, cur: kalite.fire.total, prev: kalitePrev?.fire.total ?? null },
+    ];
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (k === "m" || v === undefined) continue;
+      for (const x of Array.isArray(v) ? v : [v]) qs.append(k, x);
+    }
+    chartNode = <SummaryChart title={`Dönem Özeti — ${period.label}`} items={items} hasPrev={hasPrev} query={qs.toString()} />;
+  } else {
+    const { title: chartTitle, ...chartProps } = await buildChart(metric, period, sp, {
+      uretim,
+      montaj,
+      kesim,
+      birim,
+      stok,
+      perf,
+    });
+    chartNode = <AnalizChart {...chartProps} title={chartTitle} />;
+  }
 
   const dk = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} dk`);
 
@@ -309,7 +338,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       period={period}
       chips={CHIPS}
       activeMetric={metric}
-      chart={<AnalizChart {...chartProps} title={chartTitle} />}
+      chart={chartNode}
       cards={cards}
     />
   );
