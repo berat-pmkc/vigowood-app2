@@ -6,7 +6,14 @@ import { AnalizLayout } from "../../_shared/analiz-layout";
 import { AnalizChart } from "../../_shared/analiz-chart";
 import type { MetricChip } from "../../_shared/metric-chips";
 import { StatCard } from "../../_shared/stat-card";
-import { CompactList, type CompactRow } from "../../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../../_shared/column-filters";
 import { buildSeries, resolveGranularity } from "../../_shared/series";
 import { fmtNum } from "../../_shared/utils";
 import {
@@ -31,6 +38,31 @@ const CHIPS: MetricChip[] = [
 const KARAR_LABEL = { uygun: "Uygun", sokum: "Söküm", fire: "Fire", diger: "Diğer" } as const;
 type SP = Record<string, string | string[] | undefined>;
 
+const COLS: CompactColumn[] = [
+  { key: "tarih", label: "Tarih" },
+  { key: "sku", label: "Ürün Kodu" },
+  { key: "ad", label: "Ürün Adı" },
+  { key: "karar", label: "Karar" },
+  { key: "qty", label: "Miktar", align: "right", format: "number" },
+  { key: "personel", label: "Personel" },
+];
+// Söküm listesi kendi anahtarlarını kullanır (yalnızca kendi listesini filtreler)
+const SOKUM_COLS: CompactColumn[] = [
+  { key: "s_kod", label: "Parça Kodu" },
+  { key: "s_ad", label: "Parça Adı" },
+  { key: "s_saglam", label: "Sağlam", align: "right", format: "number" },
+  { key: "s_fire", label: "Fire", align: "right", format: "number" },
+];
+
+const toRow = (r: KaliteRow): CompactRow => ({
+  tarih: r.tarih ? formatTrDate(r.tarih) : "—",
+  sku: r.item_id,
+  ad: r.item_adi ?? r.item_id,
+  karar: KARAR_LABEL[kontrolKarar(r.islem)],
+  qty: Math.abs(r.qty),
+  personel: r.operator_name ?? "—",
+});
+
 export default async function KontrolPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -48,7 +80,12 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
     safe(getUygunsuzBakiye(), 0),
   ]);
 
-  const kontrol = kal.rows.filter(isKontrol);
+  const kontrolAll = kal.rows.filter(isKontrol);
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  // kart + grafik + liste filtrelenmiş kontrol kayıtlarından türer
+  const kontrol = pickByFilters(kontrolAll, toRow, colFilters);
+  const options = distinctOptions(kontrolAll.map(toRow), COLS);
   const qtyOf = (k: string) =>
     kontrol.filter((r) => kontrolKarar(r.islem) === k).reduce((a, r) => a + Math.abs(r.qty), 0);
   const filtered = kontrol.filter((r) => metric === "tumu" || kontrolKarar(r.islem) === metric);
@@ -71,14 +108,7 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
 
   const rows: CompactRow[] = [...filtered]
     .sort((a, b) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0))
-    .map((r) => ({
-      tarih: r.tarih ? formatTrDate(r.tarih) : "—",
-      sku: r.item_id,
-      ad: r.item_adi ?? r.item_id,
-      karar: KARAR_LABEL[kontrolKarar(r.islem)],
-      qty: Math.abs(r.qty),
-      personel: r.operator_name ?? "—",
-    }));
+    .map(toRow);
 
   // söküm sonucu yarı mamuller
   const sokumAcc = new Map<string, { id: string; ad: string; saglam: number; fire: number }>();
@@ -90,16 +120,31 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
     else a.fire += Math.abs(r.qty);
     sokumAcc.set(r.item_id, a);
   }
-  const sokumRows: CompactRow[] = [...sokumAcc.values()]
+  const sokumAllRows: CompactRow[] = [...sokumAcc.values()]
     .sort((a, b) => b.saglam + b.fire - (a.saglam + a.fire))
-    .map((a) => ({ kod: a.id, ad: a.ad, saglam: a.saglam, fire: a.fire }));
+    .map((a) => ({ s_kod: a.id, s_ad: a.ad, s_saglam: a.saglam, s_fire: a.fire }));
+  const sokumFilters = parseColumnFilters(sp, SOKUM_COLS);
+  const sokumRows = pickByFilters(sokumAllRows, (r) => r, sokumFilters);
+  const sokumOptions = distinctOptions(sokumAllRows, SOKUM_COLS);
 
+  // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir; tüm-zaman bakiyesi filtreyle hesaplanamaz
+  const qU = qtyOf("uygun");
+  const qS = qtyOf("sokum");
+  const qF = qtyOf("fire");
   const cards = (
     <>
-      <StatCard title="Uygun'a Dönen" value={fmtNum(qtyOf("uygun"))} subtitle="Satılabilir stoğa geri alınan" />
-      <StatCard title="Söküme Giden" value={fmtNum(qtyOf("sokum"))} subtitle="Parçalarına ayrılan" />
-      <StatCard title="Fire'ye Ayrılan" value={fmtNum(qtyOf("fire"))} subtitle="Fire stoğuna alınan" />
-      <StatCard title="Bekleyen Uygunsuz Bakiye" value={fmtNum(bakiye)} subtitle="Şu an kontrol bekleyen (tüm zamanlar)" />
+      {!(filtActive && qU === 0) && (
+        <StatCard title="Uygun'a Dönen" value={fmtNum(qU)} subtitle="Satılabilir stoğa geri alınan" />
+      )}
+      {!(filtActive && qS === 0) && <StatCard title="Söküme Giden" value={fmtNum(qS)} subtitle="Parçalarına ayrılan" />}
+      {!(filtActive && qF === 0) && <StatCard title="Fire'ye Ayrılan" value={fmtNum(qF)} subtitle="Fire stoğuna alınan" />}
+      {!filtActive && (
+        <StatCard
+          title="Bekleyen Uygunsuz Bakiye"
+          value={fmtNum(bakiye)}
+          subtitle="Şu an kontrol bekleyen (tüm zamanlar)"
+        />
+      )}
     </>
   );
 
@@ -108,6 +153,7 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
       title="Kontrol Edilen Uygunsuz Ürünler"
       backHref="/analiz/uretim"
       period={period}
+      filterNote={filterNote(colFilters, COLS)}
       chips={CHIPS}
       activeMetric={metric}
       chart={
@@ -129,26 +175,16 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
         <div className="space-y-4">
           <CompactList
             title="Kontrol kayıtları"
-            columns={[
-              { key: "tarih", label: "Tarih" },
-              { key: "sku", label: "Ürün Kodu" },
-              { key: "ad", label: "Ürün Adı" },
-              { key: "karar", label: "Karar" },
-              { key: "qty", label: "Miktar", align: "right", format: "number" },
-              { key: "personel", label: "Personel" },
-            ]}
+            columns={COLS}
             rows={rows}
+            filterOptions={options}
           />
-          {sokumRows.length > 0 && (
+          {(sokumAllRows.length > 0) && (
             <CompactList
               title="Söküm sonucu yarı mamuller"
-              columns={[
-                { key: "kod", label: "Parça Kodu" },
-                { key: "ad", label: "Parça Adı" },
-                { key: "saglam", label: "Sağlam", align: "right", format: "number" },
-                { key: "fire", label: "Fire", align: "right", format: "number" },
-              ]}
+              columns={SOKUM_COLS}
               rows={sokumRows}
+              filterOptions={sokumOptions}
             />
           )}
         </div>

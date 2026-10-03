@@ -6,7 +6,14 @@ import { AnalizLayout } from "../../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../../_shared/analiz-chart";
 import type { MetricChip } from "../../_shared/metric-chips";
 import { StatCard } from "../../_shared/stat-card";
-import { CompactList, type CompactRow } from "../../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../../_shared/column-filters";
 import { buildSeries, resolveGranularity } from "../../_shared/series";
 import { fmtNum } from "../../_shared/utils";
 import {
@@ -33,6 +40,26 @@ const CHIPS: MetricChip[] = [
 type SP = Record<string, string | string[] | undefined>;
 const URETIM_KAYNAK = ["paketleme", "montaj", "kesim"];
 
+const COLS: CompactColumn[] = [
+  { key: "tarih", label: "Tarih" },
+  { key: "sku", label: "Ürün Kodu" },
+  { key: "ad", label: "Ürün Adı" },
+  { key: "kaynak", label: "Kaynak" },
+  { key: "kargo", label: "Kargo Firması" },
+  { key: "musteri", label: "Müşteri" },
+  { key: "qty", label: "Miktar", align: "right", format: "number" },
+];
+
+const toRow = (r: KaliteRow): CompactRow => ({
+  tarih: r.tarih ? formatTrDate(r.tarih) : "—",
+  sku: r.item_id,
+  ad: r.item_adi ?? r.item_id,
+  kaynak: kaynakLabel(r.kaynak),
+  kargo: r.kargo_firmasi ?? "—",
+  musteri: r.musteri ?? "—",
+  qty: r.qty,
+});
+
 function groupSum(rows: KaliteRow[], key: (r: KaliteRow) => string) {
   const m = new Map<string, number>();
   for (const r of rows) m.set(key(r), (m.get(key(r)) ?? 0) + r.qty);
@@ -52,7 +79,13 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
   const g = resolveGranularity(sp.g, from, to);
 
   const kal = await safe(getKaliteRows(from, to, "UYGUNSUZ"), { available: false, rows: [] as KaliteRow[] });
-  const all = kal.rows.filter(isUygunsuzGiris);
+  const allUnfiltered = kal.rows.filter(isUygunsuzGiris);
+
+  // kolon filtreleri: kart + grafik + liste hepsi filtrelenmiş kayıtlardan türer
+  const colFilters = parseColumnFilters(sp, COLS);
+  const active = hasActiveFilters(colFilters);
+  const all = pickByFilters(allUnfiltered, toRow, colFilters);
+  const options = distinctOptions(allUnfiltered.map(toRow), COLS);
 
   // chip filtresi (veri + grafik + liste)
   const filtered = all.filter((r) => {
@@ -112,31 +145,31 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
 
   const rows: CompactRow[] = [...filtered]
     .sort((a, b) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0))
-    .map((r) => ({
-      tarih: r.tarih ? formatTrDate(r.tarih) : "—",
-      sku: r.item_id,
-      ad: r.item_adi ?? r.item_id,
-      kaynak: kaynakLabel(r.kaynak),
-      kargo: r.kargo_firmasi ?? "—",
-      musteri: r.musteri ?? "—",
-      qty: r.qty,
-    }));
+    .map(toRow);
 
+  // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir
+  const hide = (empty: boolean) => active && empty;
   const cards = (
     <>
-      <StatCard title="Toplam Uygunsuz Ürün" value={fmtNum(total)} subtitle="Adet" />
-      <StatCard
-        title="En Çok Gelen Ürün"
-        value={topProduct ? fmtNum(topProduct[1]) : "—"}
-        subtitle={topProduct ? `${topProduct[0]} · ${nameOf(topProduct[0])}` : "Kayıt yok"}
-      />
-      <StatCard title="İade Kaynaklı" value={fmtNum(iade)} subtitle="Adet" />
-      <StatCard title="Üretim Kaynaklı" value={fmtNum(uretim)} subtitle="Paketleme, montaj, kesim" />
-      <StatCard
-        title="En Çok Uygunsuzluk Çıkan Kargo"
-        value={kargoTop ? kargoTop[0] : "—"}
-        subtitle={kargoTop ? `${fmtNum(kargoTop[1])} adet` : "Kargo bilgisi yok"}
-      />
+      {!hide(total === 0) && <StatCard title="Toplam Uygunsuz Ürün" value={fmtNum(total)} subtitle="Adet" />}
+      {!hide(!topProduct) && (
+        <StatCard
+          title="En Çok Gelen Ürün"
+          value={topProduct ? fmtNum(topProduct[1]) : "—"}
+          subtitle={topProduct ? `${topProduct[0]} · ${nameOf(topProduct[0])}` : "Kayıt yok"}
+        />
+      )}
+      {!hide(iade === 0) && <StatCard title="İade Kaynaklı" value={fmtNum(iade)} subtitle="Adet" />}
+      {!hide(uretim === 0) && (
+        <StatCard title="Üretim Kaynaklı" value={fmtNum(uretim)} subtitle="Paketleme, montaj, kesim" />
+      )}
+      {!hide(!kargoTop) && (
+        <StatCard
+          title="En Çok Uygunsuzluk Çıkan Kargo"
+          value={kargoTop ? kargoTop[0] : "—"}
+          subtitle={kargoTop ? `${fmtNum(kargoTop[1])} adet` : "Kargo bilgisi yok"}
+        />
+      )}
     </>
   );
 
@@ -145,6 +178,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
       title="Uygunsuz Ürünler"
       backHref="/analiz/uretim"
       period={period}
+      filterNote={filterNote(colFilters, COLS)}
       chips={CHIPS}
       activeMetric={metric}
       chart={
@@ -158,16 +192,9 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
       list={
         <CompactList
           title="Uygunsuz ürün kayıtları"
-          columns={[
-            { key: "tarih", label: "Tarih" },
-            { key: "sku", label: "Ürün Kodu" },
-            { key: "ad", label: "Ürün Adı" },
-            { key: "kaynak", label: "Kaynak" },
-            { key: "kargo", label: "Kargo Firması" },
-            { key: "musteri", label: "Müşteri" },
-            { key: "qty", label: "Miktar", align: "right", format: "number" },
-          ]}
+          columns={COLS}
           rows={rows}
+          filterOptions={options}
         />
       }
     />

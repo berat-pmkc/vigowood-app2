@@ -6,7 +6,14 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
-import { CompactList, type CompactRow } from "../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../_shared/column-filters";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { fmtNum, round } from "../_shared/utils";
 import { getUretim } from "../_shared/queries";
@@ -35,6 +42,32 @@ const TIP_OF: Record<string, string> = { urun: "URUN", "yari-mamul": "YARI_MAMUL
 
 type SP = Record<string, string | string[] | undefined>;
 
+const FIRE_COLS: CompactColumn[] = [
+  { key: "tarih", label: "Tarih" },
+  { key: "tip", label: "Tip" },
+  { key: "kod", label: "Kod" },
+  { key: "ad", label: "Ad" },
+  { key: "kaynak", label: "Kaynak" },
+  { key: "qty", label: "Miktar", align: "right", format: "number" },
+  { key: "personel", label: "Personel" },
+];
+// Firesiz listesi kendi anahtarlarını kullanır (fire listesiyle çakışmasın)
+const FIRESIZ_COLS: CompactColumn[] = [
+  { key: "fkod", label: "Ürün Kodu" },
+  { key: "fad", label: "Ürün Adı" },
+  { key: "fqty", label: "Üretim", align: "right", format: "number" },
+];
+
+const toFireRow = (r: KaliteRow): CompactRow => ({
+  tarih: r.tarih ? formatTrDate(r.tarih) : "—",
+  tip: TIP_LABELS[r.item_tipi] ?? r.item_tipi,
+  kod: r.item_id,
+  ad: r.item_adi ?? r.item_id,
+  kaynak: kaynakLabel(r.kaynak),
+  qty: r.qty,
+  personel: r.operator_name ?? "—",
+});
+
 export default async function FirePage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -53,10 +86,24 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
     safe(getActiveSkus(), new Map<string, string>()),
   ]);
 
-  const fires = kal.rows;
+  const allFires = kal.rows;
+  const isFiresiz = metric === "firesiz";
+  const fireFilters = isFiresiz ? {} : parseColumnFilters(sp, FIRE_COLS);
+  const firesizFilters = isFiresiz ? parseColumnFilters(sp, FIRESIZ_COLS) : {};
+  const fireActive = hasActiveFilters(fireFilters);
+  const firesizActive = hasActiveFilters(firesizFilters);
+  const note = isFiresiz ? filterNote(firesizFilters, FIRESIZ_COLS) : filterNote(fireFilters, FIRE_COLS);
+
+  // Kart + grafik + liste filtrelenmiş fire kayıtlarından türer
+  const fires = pickByFilters(allFires, toFireRow, fireFilters);
   const sumTip = (t: string) => fires.filter((r) => r.item_tipi === t).reduce((a, r) => a + r.qty, 0);
   const urunFire = sumTip("URUN");
-  const rate = uretim.total > 0 ? round((urunFire / uretim.total) * 100, 2) : null;
+  // Fire oranı: filtre varsa yalnızca filtredeki ürünlerin üretimine göre
+  const rateSkus = new Set(fires.filter((r) => r.item_tipi === "URUN").map((r) => r.item_id));
+  const rateDen = fireActive
+    ? [...rateSkus].reduce((a, sku) => a + (uretim.bySku[sku] ?? 0), 0)
+    : uretim.total;
+  const rate = rateDen > 0 ? round((urunFire / rateDen) * 100, 2) : null;
 
   // kalem bazlı toplam
   const items = new Map<string, { tip: string; id: string; ad: string; qty: number }>();
@@ -71,11 +118,18 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
     trunc(`${a.ad}${a.ad === a.id ? "" : ""}`) + (a.tip === "URUN" ? "" : ` (${TIP_LABELS[a.tip] ?? a.tip})`);
 
   // firesiz ürünler: aktif, dönemde üretimi olan ama fire kaydı olmayan
-  const fireSkus = new Set(itemList.filter((i) => i.tip === "URUN" && i.qty > 0).map((i) => i.id));
-  const firesiz = Object.entries(uretim.bySku)
+  // (tanım, fire listesi filtrelerinden bağımsızdır: tüm dönem fire kayıtları esas alınır)
+  const fireSkus = new Set(allFires.filter((r) => r.item_tipi === "URUN" && r.qty > 0).map((r) => r.item_id));
+  const firesizAll = Object.entries(uretim.bySku)
     .filter(([sku, q]) => q > 0 && aktif.has(sku) && !fireSkus.has(sku))
     .map(([sku, q]) => ({ sku, ad: aktif.get(sku) ?? sku, qty: q }))
     .sort((a, b) => b.qty - a.qty);
+  const toFiresizRow = (a: { sku: string; ad: string; qty: number }): CompactRow => ({
+    fkod: a.sku,
+    fad: a.ad,
+    fqty: a.qty,
+  });
+  const firesiz = pickByFilters(firesizAll, toFiresizRow, firesizFilters);
 
   let chart: AnalizChartProps & { title: string };
   if (metric === "en-cok") {
@@ -129,57 +183,59 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
 
   // liste
   const tipFilter = TIP_OF[metric];
+  const byDate = (a: KaliteRow, b: KaliteRow) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0);
   const rows: CompactRow[] = fires
     .filter((r) => !tipFilter || r.item_tipi === tipFilter)
-    .sort((a, b) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0))
-    .map((r) => ({
-      tarih: r.tarih ? formatTrDate(r.tarih) : "—",
-      tip: TIP_LABELS[r.item_tipi] ?? r.item_tipi,
-      kod: r.item_id,
-      ad: r.item_adi ?? r.item_id,
-      kaynak: kaynakLabel(r.kaynak),
-      qty: r.qty,
-      personel: r.operator_name ?? "—",
-    }));
+    .sort(byDate)
+    .map(toFireRow);
+  const fireOptions = distinctOptions(
+    allFires.filter((r) => !tipFilter || r.item_tipi === tipFilter).map(toFireRow),
+    FIRE_COLS,
+  );
+  const firesizOptions = distinctOptions(firesizAll.map(toFiresizRow), FIRESIZ_COLS);
 
   const list =
     metric === "firesiz" ? (
       <CompactList
         title="Firesiz ürünler (dönemde üretilen, fire kaydı olmayan)"
-        columns={[
-          { key: "kod", label: "Ürün Kodu" },
-          { key: "ad", label: "Ürün Adı" },
-          { key: "qty", label: "Üretim", align: "right", format: "number" },
-        ]}
-        rows={firesiz.map((a) => ({ kod: a.sku, ad: a.ad, qty: a.qty }))}
+        columns={FIRESIZ_COLS}
+        rows={firesiz.map(toFiresizRow)}
+        filterOptions={firesizOptions}
         emptyText="Firesiz ürün yok"
       />
     ) : (
       <CompactList
         title="Fire kayıtları"
-        columns={[
-          { key: "tarih", label: "Tarih" },
-          { key: "tip", label: "Tip" },
-          { key: "kod", label: "Kod" },
-          { key: "ad", label: "Ad" },
-          { key: "kaynak", label: "Kaynak" },
-          { key: "qty", label: "Miktar", align: "right", format: "number" },
-          { key: "personel", label: "Personel" },
-        ]}
+        columns={FIRE_COLS}
         rows={rows}
+        filterOptions={fireOptions}
       />
     );
 
-  const cards = (
+  // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir
+  const ymFire = sumTip("YARI_MAMUL");
+  const plakaFire = sumTip("PLAKA");
+  const cards = firesizActive ? (
     <>
-      <StatCard title="Ürün Firesi" value={fmtNum(urunFire)} subtitle="Adet" />
-      <StatCard title="Yarı Mamul Firesi" value={fmtNum(sumTip("YARI_MAMUL"))} subtitle="Adet" />
-      <StatCard title="Plaka Firesi" value={fmtNum(sumTip("PLAKA"))} subtitle="Adet" />
+      <StatCard title="Firesiz Ürün" value={fmtNum(firesiz.length)} subtitle="Filtreye uyan ürün sayısı" />
       <StatCard
-        title="Fire Oranı"
-        value={rate === null ? "—" : `%${rate.toLocaleString("tr-TR")}`}
-        subtitle={`Ürün firesi / üretim (${fmtNum(uretim.total)} adet)`}
+        title="Firesiz Ürün Üretimi"
+        value={fmtNum(firesiz.reduce((a, r) => a + r.qty, 0))}
+        subtitle="Adet"
       />
+    </>
+  ) : (
+    <>
+      {(!fireActive || urunFire > 0) && <StatCard title="Ürün Firesi" value={fmtNum(urunFire)} subtitle="Adet" />}
+      {(!fireActive || ymFire > 0) && <StatCard title="Yarı Mamul Firesi" value={fmtNum(ymFire)} subtitle="Adet" />}
+      {(!fireActive || plakaFire > 0) && <StatCard title="Plaka Firesi" value={fmtNum(plakaFire)} subtitle="Adet" />}
+      {(!fireActive || (rate !== null && urunFire > 0)) && (
+        <StatCard
+          title="Fire Oranı"
+          value={rate === null ? "—" : `%${rate.toLocaleString("tr-TR")}`}
+          subtitle={`Ürün firesi / üretim (${fmtNum(rateDen)} adet)`}
+        />
+      )}
     </>
   );
 
@@ -188,6 +244,7 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
       title="Fire"
       backHref="/analiz"
       period={period}
+      filterNote={note}
       chips={CHIPS}
       activeMetric={metric}
       chart={

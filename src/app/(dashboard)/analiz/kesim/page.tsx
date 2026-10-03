@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ADMIN_ROLES, OFFICE_ROLES, getCurrentUser } from "@/lib/auth";
-import { bucketKey, bucketLabel, resolvePeriod, type ResolvedPeriod } from "@/lib/periods";
+import { bucketKey, bucketLabel, resolvePeriod, trDay, type ResolvedPeriod } from "@/lib/periods";
 import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
-import { CompactList, type CompactRow } from "../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../_shared/column-filters";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
 import {
@@ -95,6 +102,20 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
   }
 }
 
+const COLS: CompactColumn[] = [
+  { key: "donem", label: "Dönem" },
+  { key: "plaka", label: "Plaka" },
+  { key: "makine", label: "Makine" },
+  { key: "op", label: "Operatör" },
+  { key: "plates", label: "Plaka Adedi", align: "right", format: "number" },
+  { key: "parts", label: "Parça Adedi", align: "right", format: "number" },
+  { key: "uygunsuz", label: "Uygunsuz", align: "right", format: "number" },
+  { key: "fire", label: "Fire", align: "right", format: "number" },
+  { key: "donusum", label: "Dönüşüm", align: "right", format: "number" },
+];
+
+type Gran = ReturnType<typeof resolveGranularity>;
+
 interface Acc {
   bucket: string;
   plaka: string;
@@ -102,17 +123,41 @@ interface Acc {
   op: string;
   plates: number;
   parts: number;
+  plannedMin: number;
   m: Record<KaliteMetric, number>;
+  /** Yalnızca yarı mamul kalite katkıları (kart: Uygunsuz YM / Dönüştürülen YM) */
+  ym: Record<KaliteMetric, number>;
+  fireByTip: { YARI_MAMUL: number; PLAKA: number };
+  // filtre altında kart/grafik yeniden hesabı için gün kırılımı
+  plateByDay: DayMap;
+  partByDay: DayMap;
+  minByDay: DayMap;
+  kByDay: Record<KaliteMetric, DayMap>;
 }
 
-function buildRows(d: KesimDetay, kalite: KaliteRow[], g: ReturnType<typeof resolveGranularity>): CompactRow[] {
+function buildAccs(d: KesimDetay, kalite: KaliteRow[], g: Gran): Acc[] {
   const acc = new Map<string, Acc>();
   const byCut = new Map<string, string>();
   const getAcc = (bucket: string, plaka: string, makine: string, op: string) => {
     const key = `${bucket}|${plaka}|${makine}|${op}`;
     let a = acc.get(key);
     if (!a) {
-      a = { bucket, plaka, makine, op, plates: 0, parts: 0, m: { uygunsuz: 0, kontrol: 0, fire: 0, donusum: 0 } };
+      a = {
+        bucket,
+        plaka,
+        makine,
+        op,
+        plates: 0,
+        parts: 0,
+        plannedMin: 0,
+        m: { uygunsuz: 0, kontrol: 0, fire: 0, donusum: 0 },
+        ym: { uygunsuz: 0, kontrol: 0, fire: 0, donusum: 0 },
+        fireByTip: { YARI_MAMUL: 0, PLAKA: 0 },
+        plateByDay: {},
+        partByDay: {},
+        minByDay: {},
+        kByDay: { uygunsuz: {}, kontrol: {}, fire: {}, donusum: {} },
+      };
       acc.set(key, a);
     }
     return a;
@@ -122,6 +167,10 @@ function buildRows(d: KesimDetay, kalite: KaliteRow[], g: ReturnType<typeof reso
     const a = getAcc(bucketKey(b.day, g), b.plaka_id ?? "—", b.makine_id ?? "—", op);
     a.plates += b.adet;
     a.parts += b.parts;
+    a.plannedMin += b.plannedMin;
+    addTo(a.plateByDay, b.day, b.adet);
+    addTo(a.partByDay, b.day, b.parts);
+    addTo(a.minByDay, b.day, b.plannedMin / 60);
     byCut.set(b.cut_id, `${bucketKey(b.day, g)}|${b.plaka_id ?? "—"}|${b.makine_id ?? "—"}|${op}`);
   }
   const byId = new Map(kalite.map((r) => [r.id, r]));
@@ -132,21 +181,68 @@ function buildRows(d: KesimDetay, kalite: KaliteRow[], g: ReturnType<typeof reso
     const key = byCut.get(o.sourceId);
     const a = key ? acc.get(key) : undefined;
     if (!a) continue;
-    for (const c of kaliteContribution(r)) a.m[c.metric] += c.value;
+    const day = trDay(r.tarih);
+    for (const c of kaliteContribution(r)) {
+      a.m[c.metric] += c.value;
+      addTo(a.kByDay[c.metric], day, c.value);
+      if (r.item_tipi === "YARI_MAMUL") a.ym[c.metric] += c.value;
+      if (c.metric === "fire" && (r.item_tipi === "YARI_MAMUL" || r.item_tipi === "PLAKA")) {
+        a.fireByTip[r.item_tipi] += c.value;
+      }
+    }
   }
-  return [...acc.values()]
-    .sort((a, b) => (a.bucket < b.bucket ? 1 : a.bucket > b.bucket ? -1 : b.plates - a.plates))
-    .map((a) => ({
-      donem: bucketLabel(a.bucket, g),
-      plaka: a.plaka,
-      makine: a.makine,
-      op: a.op,
-      plates: round(a.plates, 1),
-      parts: round(a.parts, 1),
-      uygunsuz: round(a.m.uygunsuz, 1),
-      fire: round(a.m.fire, 1),
-      donusum: round(a.m.donusum, 1),
-    }));
+  return [...acc.values()].sort((a, b) =>
+    a.bucket < b.bucket ? 1 : a.bucket > b.bucket ? -1 : b.plates - a.plates,
+  );
+}
+
+const toRow = (a: Acc, g: Gran): CompactRow => ({
+  donem: bucketLabel(a.bucket, g),
+  plaka: a.plaka,
+  makine: a.makine,
+  op: a.op,
+  plates: round(a.plates, 1),
+  parts: round(a.parts, 1),
+  uygunsuz: round(a.m.uygunsuz, 1),
+  fire: round(a.m.fire, 1),
+  donusum: round(a.m.donusum, 1),
+});
+
+/** Filtreyle eşleşen satırlardan kart/grafik özeti (filtre aktifken kullanılır). */
+function summarizeAccs(accs: Acc[]): Summary & { ymUygunsuz: number; ymDonusum: number } {
+  const plateByDay: DayMap = {};
+  const partByDay: DayMap = {};
+  const minByDay: DayMap = {};
+  const k: KaliteAgg = {
+    uygunsuz: 0,
+    kontrol: 0,
+    fire: 0,
+    donusum: 0,
+    fireByTip: { YARI_MAMUL: 0, PLAKA: 0, URUN: 0 },
+    byDay: { uygunsuz: {}, kontrol: {}, fire: {}, donusum: {} },
+  };
+  let plates = 0;
+  let parts = 0;
+  let plannedMin = 0;
+  let ymUygunsuz = 0;
+  let ymDonusum = 0;
+  for (const a of accs) {
+    plates += a.plates;
+    parts += a.parts;
+    plannedMin += a.plannedMin;
+    for (const [d, v] of Object.entries(a.plateByDay)) addTo(plateByDay, d, v);
+    for (const [d, v] of Object.entries(a.partByDay)) addTo(partByDay, d, v);
+    for (const [d, v] of Object.entries(a.minByDay)) addTo(minByDay, d, v);
+    for (const mk of ["uygunsuz", "kontrol", "fire", "donusum"] as KaliteMetric[]) {
+      k[mk] += a.m[mk];
+      for (const [d, v] of Object.entries(a.kByDay[mk])) addTo(k.byDay[mk], d, v);
+    }
+    k.fireByTip.YARI_MAMUL += a.fireByTip.YARI_MAMUL;
+    k.fireByTip.PLAKA += a.fireByTip.PLAKA;
+    ymUygunsuz += a.ym.uygunsuz;
+    ymDonusum += a.ym.donusum;
+  }
+  return { plates, parts, plannedMin, plateByDay, partByDay, minByDay, k, ymUygunsuz, ymDonusum };
 }
 
 const EMPTY_DETAY: KesimDetay = { batches: [], operatorNames: new Map() };
@@ -171,60 +267,83 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     hasPrev ? safe(getKaliteRows(period.prevFrom, period.prevTo), [] as KaliteRow[]) : Promise.resolve(null),
   ]);
 
-  const cur = summarize(detay, kalite);
-  const prev = prevDetay && prevKalite ? summarize(prevDetay, prevKalite) : null;
+  // Kolon filtreleri: kart + grafik + liste eşleşen satırlardan türer
+  const accs = buildAccs(detay, kalite, g);
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  const matched = pickByFilters(accs, (a) => toRow(a, g), colFilters);
+  const options = distinctOptions(accs.map((a) => toRow(a, g)), COLS);
+  const rows = matched.map((a) => toRow(a, g));
+  const fsum = filtActive ? summarizeAccs(matched) : null;
+
+  const cur: Summary = fsum ?? summarize(detay, kalite);
+  // Önceki dönem kıyası filtreye uygulanamaz; filtre aktifken gizlenir
+  const prev = !filtActive && prevDetay && prevKalite ? summarize(prevDetay, prevKalite) : null;
+  const prevK = !filtActive ? prevKalite : null;
   const { title, ...chartProps } = buildChart(metric, period, sp, cur);
-  const rows = buildRows(detay, kalite, g);
 
   // Uygunsuz YM: yalnızca yarı mamul; fire: plaka + yarı mamul
-  const uyg = aggregateKalite(kalite, "kesim", ["YARI_MAMUL"]).uygunsuz;
-  const uygPrev = prevKalite ? aggregateKalite(prevKalite, "kesim", ["YARI_MAMUL"]).uygunsuz : null;
-  const donusum = aggregateKalite(kalite, "kesim", ["YARI_MAMUL"]).donusum;
-  const donusumPrev = prevKalite ? aggregateKalite(prevKalite, "kesim", ["YARI_MAMUL"]).donusum : null;
+  const uyg = fsum ? fsum.ymUygunsuz : aggregateKalite(kalite, "kesim", ["YARI_MAMUL"]).uygunsuz;
+  const uygPrev = prevK ? aggregateKalite(prevK, "kesim", ["YARI_MAMUL"]).uygunsuz : null;
+  const donusum = fsum ? fsum.ymDonusum : aggregateKalite(kalite, "kesim", ["YARI_MAMUL"]).donusum;
+  const donusumPrev = prevK ? aggregateKalite(prevK, "kesim", ["YARI_MAMUL"]).donusum : null;
   const fireYm = cur.k.fireByTip.YARI_MAMUL;
   const firePlaka = cur.k.fireByTip.PLAKA;
   const hours = cur.plannedMin / 60;
 
+  const hide = (empty: boolean) => filtActive && empty;
   const cards = (
     <>
-      <StatCard
-        title="Kesilen Plaka"
-        value={fmtNum(cur.plates)}
-        subtitle="Tamamlanan kesim adedi"
-        delta={prev ? deltaPct(cur.plates, prev.plates) : null}
-      />
-      <StatCard
-        title="Kesilen Parça"
-        value={fmtNum(cur.parts)}
-        subtitle="Kesim satırları toplamı"
-        delta={prev ? deltaPct(cur.parts, prev.parts) : null}
-      />
-      <StatCard
-        title="Planlanan Kesim Süresi"
-        value={`${fmtNum(hours, 1)} saat`}
-        subtitle="Plaka adedi × plakanın makine kesim süresi"
-        delta={prev ? deltaPct(cur.plannedMin, prev.plannedMin) : null}
-      />
-      <StatCard
-        title="Uygunsuz YM"
-        value={fmtNum(uyg)}
-        subtitle="Kesimden uygunsuza giren yarı mamul"
-        delta={uygPrev !== null ? deltaPct(uyg, uygPrev) : null}
-        inverseDelta
-      />
-      <StatCard
-        title="Dönüştürülen YM"
-        value={fmtNum(donusum)}
-        subtitle="Dönüşüm kaynağı olarak çıkan adet"
-        delta={donusumPrev !== null ? deltaPct(donusum, donusumPrev) : null}
-      />
-      <StatCard
-        title="Fire"
-        value={fmtNum(cur.k.fire)}
-        subtitle={`Plaka ${fmtNum(firePlaka)} · Yarı mamul ${fmtNum(fireYm)}`}
-        delta={prev ? deltaPct(cur.k.fire, prev.k.fire) : null}
-        inverseDelta
-      />
+      {!hide(cur.plates === 0) && (
+        <StatCard
+          title="Kesilen Plaka"
+          value={fmtNum(cur.plates)}
+          subtitle="Tamamlanan kesim adedi"
+          delta={prev ? deltaPct(cur.plates, prev.plates) : null}
+        />
+      )}
+      {!hide(cur.parts === 0) && (
+        <StatCard
+          title="Kesilen Parça"
+          value={fmtNum(cur.parts)}
+          subtitle="Kesim satırları toplamı"
+          delta={prev ? deltaPct(cur.parts, prev.parts) : null}
+        />
+      )}
+      {!hide(cur.plannedMin === 0) && (
+        <StatCard
+          title="Planlanan Kesim Süresi"
+          value={`${fmtNum(hours, 1)} saat`}
+          subtitle="Plaka adedi × plakanın makine kesim süresi"
+          delta={prev ? deltaPct(cur.plannedMin, prev.plannedMin) : null}
+        />
+      )}
+      {!hide(uyg === 0) && (
+        <StatCard
+          title="Uygunsuz YM"
+          value={fmtNum(uyg)}
+          subtitle="Kesimden uygunsuza giren yarı mamul"
+          delta={uygPrev !== null ? deltaPct(uyg, uygPrev) : null}
+          inverseDelta
+        />
+      )}
+      {!hide(donusum === 0) && (
+        <StatCard
+          title="Dönüştürülen YM"
+          value={fmtNum(donusum)}
+          subtitle="Dönüşüm kaynağı olarak çıkan adet"
+          delta={donusumPrev !== null ? deltaPct(donusum, donusumPrev) : null}
+        />
+      )}
+      {!hide(cur.k.fire === 0) && (
+        <StatCard
+          title="Fire"
+          value={fmtNum(cur.k.fire)}
+          subtitle={`Plaka ${fmtNum(firePlaka)} · Yarı mamul ${fmtNum(fireYm)}`}
+          delta={prev ? deltaPct(cur.k.fire, prev.k.fire) : null}
+          inverseDelta
+        />
+      )}
     </>
   );
 
@@ -234,18 +353,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         title="Kesim Detayı"
         showGrouping
         activeGranularity={g}
-        columns={[
-          { key: "donem", label: "Dönem" },
-          { key: "plaka", label: "Plaka" },
-          { key: "makine", label: "Makine" },
-          { key: "op", label: "Operatör" },
-          { key: "plates", label: "Plaka Adedi", align: "right", format: "number" },
-          { key: "parts", label: "Parça Adedi", align: "right", format: "number" },
-          { key: "uygunsuz", label: "Uygunsuz", align: "right", format: "number" },
-          { key: "fire", label: "Fire", align: "right", format: "number" },
-          { key: "donusum", label: "Dönüşüm", align: "right", format: "number" },
-        ]}
+        columns={COLS}
         rows={rows}
+        filterOptions={options}
       />
       <p className="px-1 text-[11px] text-muted-foreground">
         Planlanan süre gerçek ölçüm değil, plakanın tanımlı makine kesim süresine dayanır (kesimde gerçek süre kaydı
@@ -259,6 +369,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       title="Kesim"
       backHref="/analiz"
       period={period}
+      filterNote={filterNote(colFilters, COLS)}
       chips={CHIPS}
       activeMetric={metric}
       chart={<AnalizChart {...chartProps} title={title} />}

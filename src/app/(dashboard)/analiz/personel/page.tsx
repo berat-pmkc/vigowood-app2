@@ -7,12 +7,20 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
-import { CompactList, type CompactRow } from "../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../_shared/column-filters";
 import { fmtNum, round } from "../_shared/utils";
 import { getBirimSure, type BirimSureData } from "../_shared/queries";
 import {
   computePerformance,
   getStandardTimes,
+  type PersonPerformance,
   type PerformanceData,
   type StandardTimes,
 } from "../_shared/performance";
@@ -30,6 +38,16 @@ const CHIPS: MetricChip[] = [
 ];
 
 type SP = Record<string, string | string[] | undefined>;
+
+const COLS: CompactColumn[] = [
+  { key: "ad", label: "Personel" },
+  { key: "saat", label: "Adam Saat", align: "right", format: "number" },
+  { key: "adet", label: "Üretilen Adet (kredilenen)", align: "right", format: "number" },
+  { key: "kazanilan", label: "Kazanılan Süre (dk)", align: "right", format: "number" },
+  { key: "harcanan", label: "Harcanan Süre (dk)", align: "right", format: "number" },
+  { key: "pct", label: "Performans %", align: "right", format: "percent" },
+  { key: "adim", label: "Çalıştığı Adım Sayısı", align: "right", format: "number" },
+];
 
 const EMPTY_PERF: PerformanceData = { overallPct: null, people: [], stepStandards: [] };
 const EMPTY_BIRIM: BirimSureData = {
@@ -62,11 +80,36 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     safe(getPersonStepStats(from, to), new Map<string, PersonStepStat[]>()),
   ]);
 
-  const totalActualMin = perf.people.reduce((a, p) => a + p.actual, 0);
+  // Kolon filtreleri: kart + grafikler + liste eşleşen personelden türer
+  const toRow = (p: PersonPerformance): CompactRow => ({
+    ad: p.name,
+    saat: round(p.actual / 60, 1),
+    adet: round(p.montajQty + p.paketlemeQty, 1),
+    kazanilan: round(p.earned, 0),
+    harcanan: round(p.actual, 0),
+    pct: p.pct,
+    adim: stepStats.get(p.id)?.length ?? 0,
+  });
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  const options = distinctOptions(perf.people.map(toRow), COLS);
+  const people = pickByFilters(perf.people, toRow, colFilters);
+
+  const totalActualMin = people.reduce((a, p) => a + p.actual, 0);
   const totalHours = totalActualMin / 60;
+  const totalEarned = people.reduce((a, p) => a + p.earned, 0);
+  const overallPct = filtActive ? (totalActualMin > 0 ? round((totalEarned / totalActualMin) * 100, 1) : null) : perf.overallPct;
+  // Ortalama birim süre: filtre altında eşleşen kişilerin montaj adımları (net dk / adet)
+  let stepMin = 0;
+  let stepQty = 0;
+  for (const p of people) for (const st of stepStats.get(p.id) ?? []) {
+    stepMin += st.minutes;
+    stepQty += st.qty;
+  }
+  const montajAvg = filtActive ? (stepQty > 0 ? round(stepMin / stepQty, 2) : null) : birim.montajAvg;
 
   // Seçili kişi (varsayılan: en çok saat çalışan)
-  const byHours = [...perf.people].sort((a, b) => b.actual - a.actual);
+  const byHours = [...people].sort((a, b) => b.actual - a.actual);
   const selected = byHours.find((p) => p.id === kisiRaw) ?? byHours[0];
   const personSteps = selected ? (stepStats.get(selected.id) ?? []) : [];
 
@@ -78,7 +121,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       layout="vertical"
       xKey="label"
       unit="%"
-      data={perf.people.slice(0, 20).map((p) => ({ label: trunc(p.name), v: p.pct }))}
+      data={people.slice(0, 20).map((p) => ({ label: trunc(p.name), v: p.pct }))}
       series={[{ key: "v", label: "Performans", color: "#70c1aa" }]}
     />
   );
@@ -99,7 +142,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   // Grafik 3: seçili kişinin adım bazlı birim süresi (standart ile)
   const unitChart = (
     <div className="space-y-2">
-      {perf.people.length > 0 && selected && (
+      {people.length > 0 && selected && (
         <Suspense fallback={null}>
           <PersonSelect
             people={byHours.map((p) => ({ id: p.id, name: p.name }))}
@@ -142,50 +185,43 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       </div>
     );
 
+  // Filtre aktifken eşleşen kişi yoksa / değer hesaplanamıyorsa kartlar gizlenir
+  const hide = (empty: boolean) => filtActive && empty;
   const cards = (
     <>
-      <StatCard
-        title="Personel Adam Saat Çalışma Süresi"
-        value={`${fmtNum(totalHours, 1)} sa`}
-        subtitle={`${perf.people.length} kişi, net seans süresi (mola düşülmüş)`}
-      />
-      <StatCard
-        title="Ortalama Birim Süre"
-        value={birim.montajAvg === null ? "—" : `${birim.montajAvg.toLocaleString("tr-TR")} dk`}
-        subtitle="Montaj, dk / adet (adet ağırlıklı)"
-      />
-      <StatCard
-        title="Genel Performans"
-        value={perf.overallPct === null ? "—" : `%${perf.overallPct.toLocaleString("tr-TR")}`}
-        subtitle="Kazanılan ÷ harcanan süre"
-      />
+      {!hide(people.length === 0) && (
+        <StatCard
+          title="Personel Adam Saat Çalışma Süresi"
+          value={`${fmtNum(totalHours, 1)} sa`}
+          subtitle={`${people.length} kişi, net seans süresi (mola düşülmüş)`}
+        />
+      )}
+      {!hide(montajAvg === null) && (
+        <StatCard
+          title="Ortalama Birim Süre"
+          value={montajAvg === null ? "—" : `${montajAvg.toLocaleString("tr-TR")} dk`}
+          subtitle="Montaj, dk / adet (adet ağırlıklı)"
+        />
+      )}
+      {!hide(overallPct === null) && (
+        <StatCard
+          title="Genel Performans"
+          value={overallPct === null ? "—" : `%${overallPct.toLocaleString("tr-TR")}`}
+          subtitle="Kazanılan ÷ harcanan süre"
+        />
+      )}
     </>
   );
 
-  const rows: CompactRow[] = perf.people.map((p) => ({
-    ad: p.name,
-    saat: round(p.actual / 60, 1),
-    adet: round(p.montajQty + p.paketlemeQty, 1),
-    kazanilan: round(p.earned, 0),
-    harcanan: round(p.actual, 0),
-    pct: p.pct,
-    adim: stepStats.get(p.id)?.length ?? 0,
-  }));
+  const rows: CompactRow[] = people.map(toRow);
 
   const list = (
     <div className="space-y-4">
       <CompactList
         title="Personel Detayı"
-        columns={[
-          { key: "ad", label: "Personel" },
-          { key: "saat", label: "Adam Saat", align: "right", format: "number" },
-          { key: "adet", label: "Üretilen Adet (kredilenen)", align: "right", format: "number" },
-          { key: "kazanilan", label: "Kazanılan Süre (dk)", align: "right", format: "number" },
-          { key: "harcanan", label: "Harcanan Süre (dk)", align: "right", format: "number" },
-          { key: "pct", label: "Performans %", align: "right", format: "percent" },
-          { key: "adim", label: "Çalıştığı Adım Sayısı", align: "right", format: "number" },
-        ]}
+        columns={COLS}
         rows={rows}
+        filterOptions={options}
       />
       <div className="rounded-xl border border-[#a99c7d]/30 bg-[#f0ede1]/60 p-4 text-xs text-[#5e5747]">
         <h3 className="mb-1.5 text-sm font-semibold text-[#474237]">Performans Formülü (Hesaplama Notu)</h3>
@@ -219,6 +255,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       title="Personel Verimliliği"
       backHref="/analiz"
       period={period}
+      filterNote={filterNote(colFilters, COLS)}
       chips={CHIPS}
       activeMetric={metric}
       chart={chart}

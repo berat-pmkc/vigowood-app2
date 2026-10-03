@@ -6,7 +6,14 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
-import { CompactList, type CompactRow } from "../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../_shared/column-filters";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
 import { getProductNames } from "../_shared/queries";
@@ -38,6 +45,20 @@ const CHIPS: MetricChip[] = [
 ];
 
 type SP = Record<string, string | string[] | undefined>;
+
+const COLS: CompactColumn[] = [
+  { key: "donem", label: "Dönem" },
+  { key: "sku", label: "Ürün Kodu" },
+  { key: "ad", label: "Ürün Adı" },
+  { key: "uretim", label: "Toplam Üretim", align: "right", format: "number" },
+  { key: "uyg", label: "Uygunsuz", align: "right", format: "number" },
+  { key: "kon", label: "Kontrol Edilen", align: "right", format: "number" },
+  { key: "fire", label: "Fire", align: "right", format: "number" },
+  { key: "cikis", label: "Stoktan Çıkış", align: "right", format: "number" },
+  { key: "stok", label: "Güncel Stok", align: "right", format: "number" },
+  { key: "birim", label: "Birim Süre", align: "right", format: "dk" },
+  { key: "perf", label: "Performans", align: "right", format: "percent" },
+];
 const EMPTY_PROD: ProdRows = { pack: [], montaj: [] };
 const EMPTY_STD: StandardTimes = { montaj: new Map(), paketleme: new Map() };
 
@@ -77,7 +98,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   const g = resolveGranularity(sp.g, from, to);
   const qs = periodQs(sp);
 
-  const [prod, prodPrev, kal, stdT, cikis, stok, names] = await Promise.all([
+  const [prodAll, prodPrev, kalAll, stdT, cikis, stok, names] = await Promise.all([
     safe(getProdRows(from, to), EMPTY_PROD),
     period.prevFrom && period.prevTo
       ? safe<ProdRows | null>(getProdRows(period.prevFrom, period.prevTo), EMPTY_PROD)
@@ -89,8 +110,99 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
     safe(getProductNames(), new Map<string, string>()),
   ]);
 
+  // ── Liste (kova × sku)
+  interface Acc {
+    bucket: string;
+    sku: string;
+    packed: number;
+    man: number;
+    earned: number;
+    known: number;
+    uyg: number;
+    kon: number;
+    fire: number;
+    cikis: number;
+  }
+  const acc = new Map<string, Acc>();
+  const get = (day: string, sku: string): Acc => {
+    const b = bucketKey(day, g);
+    const k = `${b}|${sku}`;
+    let a = acc.get(k);
+    if (!a) {
+      a = { bucket: b, sku, packed: 0, man: 0, earned: 0, known: 0, uyg: 0, kon: 0, fire: 0, cikis: 0 };
+      acc.set(k, a);
+    }
+    return a;
+  };
+  for (const r of prodAll.pack) {
+    const a = get(r.day, r.sku);
+    a.packed += r.qty;
+    a.man += r.manMin;
+    const t = stdT.paketleme.get(r.sku);
+    if (t && r.manMin > 0) {
+      a.earned += r.qty * t;
+      a.known += r.manMin;
+    }
+  }
+  for (const r of prodAll.montaj) {
+    if (!r.sku) continue;
+    const a = get(r.day, r.sku);
+    a.man += r.manMin;
+    const t = stdT.montaj.get(r.stepId);
+    if (t && r.manMin > 0) {
+      a.earned += r.qty * t;
+      a.known += r.manMin;
+    }
+  }
+  for (const r of kalAll.rows) {
+    if (r.item_tipi !== "URUN" || !r.tarih) continue;
+    if (isUygunsuzGiris(r)) get(r.tarih, r.item_id).uyg += r.qty;
+    else if (isKontrol(r)) get(r.tarih, r.item_id).kon += Math.abs(r.qty);
+    else if (r.stok_turu === "FIRE") get(r.tarih, r.item_id).fire += r.qty;
+  }
+  for (const r of cikis) get(r.day, r.sku).cikis += r.qty;
+
+  const accList = [...acc.values()].sort((a, b) =>
+    a.bucket === b.bucket ? b.packed - a.packed : a.bucket < b.bucket ? 1 : -1,
+  );
+  const toRow = (a: Acc): CompactRow => ({
+    donem: periodText(a.bucket, g),
+    sku: a.sku,
+    ad: names.get(a.sku) ?? a.sku,
+    uretim: a.packed,
+    uyg: a.uyg,
+    kon: a.kon,
+    fire: a.fire,
+    cikis: a.cikis,
+    stok: stok.get(a.sku) ?? 0,
+    birim: a.packed > 0 && a.man > 0 ? round(a.man / a.packed, 2) : null,
+    perf: a.known > 0 ? round((a.earned / a.known) * 100, 1) : null,
+  });
+
+  // ── Kolon filtreleri: kart + grafik + liste eşleşen (kova × ürün) kayıtlarından türer
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  const matched = pickByFilters(accList, toRow, colFilters);
+  const options = distinctOptions(accList.map(toRow), COLS);
+  const selKeys = new Set(matched.map((a) => `${a.bucket}|${a.sku}`));
+  const inSel = (day: string | null, sku: string | null) =>
+    !filtActive || (!!day && !!sku && selKeys.has(`${bucketKey(day, g)}|${sku}`));
+  const prod: ProdRows = filtActive
+    ? {
+        pack: prodAll.pack.filter((r) => inSel(r.day, r.sku)),
+        montaj: prodAll.montaj.filter((r) => inSel(r.day, r.sku)),
+      }
+    : prodAll;
+  const kal = {
+    available: kalAll.available,
+    rows: filtActive
+      ? kalAll.rows.filter((r) => r.item_tipi === "URUN" && inSel(r.tarih, r.item_id))
+      : kalAll.rows,
+  };
+  const rows: CompactRow[] = matched.slice(0, 1500).map(toRow);
+
   const T = totals(prod);
-  const Tp = prodPrev ? totals(prodPrev) : null;
+  const Tp = prodPrev && !filtActive ? totals(prodPrev) : null;
   const uygunsuz = sum(kal.rows, isUygunsuzGiris);
   const kontrol = sum(kal.rows, isKontrol, true);
   const fire = sum(kal.rows, isFireUrun);
@@ -174,116 +286,61 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   }
   const { title: chartTitle, ...chartProps } = chart;
 
-  // ── Liste (kova × sku)
-  interface Acc {
-    bucket: string;
-    sku: string;
-    packed: number;
-    man: number;
-    earned: number;
-    known: number;
-    uyg: number;
-    kon: number;
-    fire: number;
-    cikis: number;
-  }
-  const acc = new Map<string, Acc>();
-  const get = (day: string, sku: string): Acc => {
-    const b = bucketKey(day, g);
-    const k = `${b}|${sku}`;
-    let a = acc.get(k);
-    if (!a) {
-      a = { bucket: b, sku, packed: 0, man: 0, earned: 0, known: 0, uyg: 0, kon: 0, fire: 0, cikis: 0 };
-      acc.set(k, a);
-    }
-    return a;
-  };
-  for (const r of prod.pack) {
-    const a = get(r.day, r.sku);
-    a.packed += r.qty;
-    a.man += r.manMin;
-    const t = stdT.paketleme.get(r.sku);
-    if (t && r.manMin > 0) {
-      a.earned += r.qty * t;
-      a.known += r.manMin;
-    }
-  }
-  for (const r of prod.montaj) {
-    if (!r.sku) continue;
-    const a = get(r.day, r.sku);
-    a.man += r.manMin;
-    const t = stdT.montaj.get(r.stepId);
-    if (t && r.manMin > 0) {
-      a.earned += r.qty * t;
-      a.known += r.manMin;
-    }
-  }
-  for (const r of kal.rows) {
-    if (r.item_tipi !== "URUN" || !r.tarih) continue;
-    if (isUygunsuzGiris(r)) get(r.tarih, r.item_id).uyg += r.qty;
-    else if (isKontrol(r)) get(r.tarih, r.item_id).kon += Math.abs(r.qty);
-    else if (r.stok_turu === "FIRE") get(r.tarih, r.item_id).fire += r.qty;
-  }
-  for (const r of cikis) get(r.day, r.sku).cikis += r.qty;
-
-  const rows: CompactRow[] = [...acc.values()]
-    .sort((a, b) => (a.bucket === b.bucket ? b.packed - a.packed : a.bucket < b.bucket ? 1 : -1))
-    .slice(0, 1500)
-    .map((a) => ({
-      donem: periodText(a.bucket, g),
-      sku: a.sku,
-      ad: names.get(a.sku) ?? a.sku,
-      uretim: a.packed,
-      uyg: a.uyg,
-      kon: a.kon,
-      fire: a.fire,
-      cikis: a.cikis,
-      stok: stok.get(a.sku) ?? 0,
-      birim: a.packed > 0 && a.man > 0 ? round(a.man / a.packed, 2) : null,
-      perf: a.known > 0 ? round((a.earned / a.known) * 100, 1) : null,
-    }));
-
   const dk = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} dk`);
 
+  // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir
+  const hide = (empty: boolean) => filtActive && empty;
   const cards = (
     <>
-      <StatCard
-        title="Toplam Üretim Miktarı"
-        value={fmtNum(T.packed)}
-        subtitle="Paketlenen ürün (adet)"
-        delta={Tp ? deltaPct(T.packed, Tp.packed) : null}
-      />
-      <StatCard
-        title="Birim Süre"
-        value={dk(T.unit === null ? null : round(T.unit, 2))}
-        subtitle="Montaj + paketleme kişi-dk / adet"
-        delta={Tp && T.unit !== null && Tp.unit !== null ? deltaPct(T.unit, Tp.unit) : null}
-        inverseDelta
-      />
-      <StatCard
-        title="Adam Saat"
-        value={`${fmtNum(T.man / 60, 1)} sa`}
-        subtitle="Montaj + paketleme toplam"
-        delta={Tp ? deltaPct(T.man, Tp.man) : null}
-      />
-      <StatCard
-        title="Uygunsuz Ürün Miktarı"
-        href={`/analiz/uretim/uygunsuz${qs}`}
-        value={fmtNum(uygunsuz)}
-        subtitle="Ayrıntı için dokunun"
-      />
-      <StatCard
-        title="Kontrol Edilen Uygunsuz Ürün"
-        href={`/analiz/uretim/kontrol${qs}`}
-        value={fmtNum(kontrol)}
-        subtitle="Ayrıntı için dokunun"
-      />
-      <StatCard
-        title="Fire Ürün Miktarı"
-        href={`/analiz/fire${qs}`}
-        value={fmtNum(fire)}
-        subtitle="Ayrıntı için dokunun"
-      />
+      {!hide(T.packed === 0) && (
+        <StatCard
+          title="Toplam Üretim Miktarı"
+          value={fmtNum(T.packed)}
+          subtitle="Paketlenen ürün (adet)"
+          delta={Tp ? deltaPct(T.packed, Tp.packed) : null}
+        />
+      )}
+      {!hide(T.unit === null) && (
+        <StatCard
+          title="Birim Süre"
+          value={dk(T.unit === null ? null : round(T.unit, 2))}
+          subtitle="Montaj + paketleme kişi-dk / adet"
+          delta={Tp && T.unit !== null && Tp.unit !== null ? deltaPct(T.unit, Tp.unit) : null}
+          inverseDelta
+        />
+      )}
+      {!hide(T.man === 0) && (
+        <StatCard
+          title="Adam Saat"
+          value={`${fmtNum(T.man / 60, 1)} sa`}
+          subtitle="Montaj + paketleme toplam"
+          delta={Tp ? deltaPct(T.man, Tp.man) : null}
+        />
+      )}
+      {!hide(uygunsuz === 0) && (
+        <StatCard
+          title="Uygunsuz Ürün Miktarı"
+          href={`/analiz/uretim/uygunsuz${qs}`}
+          value={fmtNum(uygunsuz)}
+          subtitle="Ayrıntı için dokunun"
+        />
+      )}
+      {!hide(kontrol === 0) && (
+        <StatCard
+          title="Kontrol Edilen Uygunsuz Ürün"
+          href={`/analiz/uretim/kontrol${qs}`}
+          value={fmtNum(kontrol)}
+          subtitle="Ayrıntı için dokunun"
+        />
+      )}
+      {!hide(fire === 0) && (
+        <StatCard
+          title="Fire Ürün Miktarı"
+          href={`/analiz/fire${qs}`}
+          value={fmtNum(fire)}
+          subtitle="Ayrıntı için dokunun"
+        />
+      )}
     </>
   );
 
@@ -292,6 +349,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
       title="Üretim"
       backHref="/analiz"
       period={period}
+      filterNote={filterNote(colFilters, COLS)}
       chips={CHIPS}
       activeMetric={metric}
       chart={
@@ -307,20 +365,9 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
           title="Ürün bazlı üretim"
           showGrouping
           activeGranularity={g}
-          columns={[
-            { key: "donem", label: "Dönem" },
-            { key: "sku", label: "Ürün Kodu" },
-            { key: "ad", label: "Ürün Adı" },
-            { key: "uretim", label: "Toplam Üretim", align: "right", format: "number" },
-            { key: "uyg", label: "Uygunsuz", align: "right", format: "number" },
-            { key: "kon", label: "Kontrol Edilen", align: "right", format: "number" },
-            { key: "fire", label: "Fire", align: "right", format: "number" },
-            { key: "cikis", label: "Stoktan Çıkış", align: "right", format: "number" },
-            { key: "stok", label: "Güncel Stok", align: "right", format: "number" },
-            { key: "birim", label: "Birim Süre", align: "right", format: "dk" },
-            { key: "perf", label: "Performans", align: "right", format: "percent" },
-          ]}
+          columns={COLS}
           rows={rows}
+          filterOptions={options}
         />
       }
     />

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Filter } from "lucide-react";
 import type { ResolvedPeriod } from "@/lib/periods";
 import { PeriodBar } from "./period-bar";
 import { MetricChips, type MetricChip } from "./metric-chips";
@@ -18,6 +18,8 @@ interface AnalizLayoutProps {
   list?: ReactNode;
   /** Kartlar grid sütun sınıfı (varsayılan 1/2/3/4 sütun) */
   cardsClassName?: string;
+  /** Kolon filtresi aktifse: "Filtre uygulandı: ..." notu (kart ve grafikler filtrelenmiştir) */
+  filterNote?: string | null;
 }
 
 export function AnalizLayout({
@@ -30,6 +32,7 @@ export function AnalizLayout({
   cards,
   list,
   cardsClassName = "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4",
+  filterNote,
 }: AnalizLayoutProps) {
   return (
     <div className="space-y-4">
@@ -49,6 +52,13 @@ export function AnalizLayout({
       <Suspense fallback={<div className="h-20 animate-pulse rounded-lg bg-muted" />}>
         <PeriodBar periodKey={period.key} from={period.from} to={period.to} />
       </Suspense>
+
+      {filterNote && (
+        <p className="flex items-start gap-1.5 rounded-lg border border-[#3368b1]/30 bg-[#3368b1]/5 px-3 py-1.5 text-xs font-medium text-[#3368b1]">
+          <Filter className="mt-0.5 h-3.5 w-3.5 shrink-0" fill="#3368b1" />
+          <span>{filterNote} — kartlar ve grafik filtreye göre hesaplanır</span>
+        </p>
+      )}
 
       {chips && chips.length > 0 && (
         <Suspense fallback={<div className="h-9 animate-pulse rounded-lg bg-muted" />}>

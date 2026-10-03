@@ -6,9 +6,22 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
-import { CompactList, type CompactRow } from "../_shared/compact-list";
+import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
+import {
+  distinctOptions,
+  filterNote,
+  hasActiveFilters,
+  parseColumnFilters,
+  pickByFilters,
+} from "../_shared/column-filters";
 import { buildSeries, resolveGranularity } from "../_shared/series";
-import { getStokVerimlilikDetay, safe, type StokVerimlilikDetay } from "../_shared/queries-d2";
+import { round } from "../_shared/utils";
+import {
+  getStokVerimlilikDetay,
+  safe,
+  type StokProductRow,
+  type StokVerimlilikDetay,
+} from "../_shared/queries-d2";
 
 export const metadata: Metadata = { title: "Stok Verimliliği | Analiz" };
 export const revalidate = 30;
@@ -21,6 +34,28 @@ const CHIPS: MetricChip[] = [
 ];
 
 type SP = Record<string, string | string[] | undefined>;
+
+const COLS: CompactColumn[] = [
+  { key: "sku", label: "Ürün Kodu" },
+  { key: "ad", label: "Ürün Adı" },
+  { key: "kritik", label: "Kritik", align: "right", format: "number" },
+  { key: "guncel", label: "Güncel Stok", align: "right", format: "number" },
+  { key: "ort", label: "Ort. Stok", align: "right", format: "number" },
+  { key: "alt", label: "Kritik Altı Gün", align: "right", format: "number" },
+  { key: "ust", label: "Aşırı Gün", align: "right", format: "number" },
+  { key: "verim", label: "Verim %", align: "right", format: "percent" },
+];
+
+const toRow = (p: StokProductRow): CompactRow => ({
+  sku: p.sku,
+  ad: p.name,
+  kritik: p.kritik,
+  guncel: p.current,
+  ort: p.avg,
+  alt: p.belowDays,
+  ust: p.aboveDays,
+  verim: p.score,
+});
 
 const EMPTY: StokVerimlilikDetay = {
   overallPct: null,
@@ -53,7 +88,66 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const d = await safe(getStokVerimlilikDetay(from, to), EMPTY);
 
+  // Kolon filtreleri: kart + grafik + liste eşleşen ürünlerden türer
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  const sortedAll = [...d.products].sort((a, b) => a.score - b.score);
+  const matched = pickByFilters(sortedAll, toRow, colFilters);
+  const options = distinctOptions(sortedAll.map(toRow), COLS);
+  const mAvg = (f: (p: StokProductRow) => number) =>
+    matched.length ? round(matched.reduce((a, p) => a + f(p), 0) / matched.length, 1) : null;
+  const dayTotal = matched.reduce((a, p) => a + p.days, 0);
+  const overallPct = filtActive ? mAvg((p) => p.score) : d.overallPct;
+  const belowDayPct = filtActive
+    ? dayTotal > 0
+      ? round((matched.reduce((a, p) => a + p.belowDays, 0) / dayTotal) * 100, 1)
+      : null
+    : d.belowDayPct;
+  const aboveDayPct = filtActive
+    ? dayTotal > 0
+      ? round((matched.reduce((a, p) => a + p.aboveDays, 0) / dayTotal) * 100, 1)
+      : null
+    : d.aboveDayPct;
+  const currentBelow = filtActive ? matched.filter((p) => p.current < p.kritik * (1 - d.altPct / 100)).length : d.currentBelow;
+  const activeCount = filtActive ? matched.length : d.activeCount;
+
   let chart: AnalizChartProps & { title: string };
+  if (filtActive) {
+    // Gün bazlı seriler ürün kırılımı içermez; filtre altında eşleşen ürünler gösterilir
+    const share = (p: StokProductRow, days: number) => (p.days > 0 ? round((days / p.days) * 100, 1) : 0);
+    const byMetric: Record<string, { title: string; color: string; v: (p: StokProductRow) => number; order: 1 | -1 }> = {
+      "kritik-alti": {
+        title: "Filtreye uyan ürünler — kritik altında geçen gün oranı (%, ilk 10)",
+        color: "#ee7683",
+        v: (p) => share(p, p.belowDays),
+        order: -1,
+      },
+      asiri: {
+        title: "Filtreye uyan ürünler — aşırı stokta geçen gün oranı (%, ilk 10)",
+        color: "#f28a19",
+        v: (p) => share(p, p.aboveDays),
+        order: -1,
+      },
+    };
+    const m = byMetric[metric] ?? {
+      title: "Filtreye uyan ürünler — en düşük verim (%, ilk 10)",
+      color: "#70c1aa",
+      v: (p: StokProductRow) => p.score,
+      order: 1 as const,
+    };
+    chart = {
+      title: m.title,
+      type: "bar",
+      layout: "vertical",
+      xKey: "label",
+      unit: "%",
+      data: [...matched]
+        .sort((a, b) => (m.v(a) - m.v(b)) * m.order)
+        .slice(0, 10)
+        .map((p) => ({ label: trunc(`${p.sku} ${p.name}`), v: m.v(p) })),
+      series: [{ key: "v", label: "Oran", color: m.color }],
+    };
+  } else
   switch (metric) {
     case "kritik-alti":
       chart = {
@@ -98,32 +192,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   }
   const { title, ...chartProps } = chart;
 
-  const rows: CompactRow[] = [...d.products]
-    .sort((a, b) => a.score - b.score)
-    .map((p) => ({
-      sku: p.sku,
-      ad: p.name,
-      kritik: p.kritik,
-      guncel: p.current,
-      ort: p.avg,
-      alt: p.belowDays,
-      ust: p.aboveDays,
-      verim: p.score,
-    }));
+  const rows: CompactRow[] = matched.map(toRow);
 
-  const cards = (
+  // Filtre aktifken eşleşen ürün yoksa kartlar gizlenir
+  const noMatch = filtActive && matched.length === 0;
+  const cards = noMatch ? null : (
     <>
-      <StatCard title="Genel Verim" value={pct(d.overallPct)} subtitle={`${d.activeCount} ürün, gün skoru ortalaması`} />
-      <StatCard
-        title="Kritik Altında Geçen Gün Oranı"
-        value={pct(d.belowDayPct)}
-        subtitle="Ürün-gün bazında"
-      />
-      <StatCard title="Aşırı Stokta Geçen Gün Oranı" value={pct(d.aboveDayPct)} subtitle="Ürün-gün bazında" />
+      <StatCard title="Genel Verim" value={pct(overallPct)} subtitle={`${activeCount} ürün, gün skoru ortalaması`} />
+      <StatCard title="Kritik Altında Geçen Gün Oranı" value={pct(belowDayPct)} subtitle="Ürün-gün bazında" />
+      <StatCard title="Aşırı Stokta Geçen Gün Oranı" value={pct(aboveDayPct)} subtitle="Ürün-gün bazında" />
       <StatCard
         title="Şu An Kritik Altı Ürün"
-        value={d.currentBelow.toLocaleString("tr-TR")}
-        subtitle={`${d.activeCount} aktif ürün içinde`}
+        value={currentBelow.toLocaleString("tr-TR")}
+        subtitle={`${activeCount} ürün içinde`}
       />
     </>
   );
@@ -131,17 +212,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const list = (
     <CompactList
       title="Ürün Bazlı Stok Verimliliği"
-      columns={[
-        { key: "sku", label: "Ürün Kodu" },
-        { key: "ad", label: "Ürün Adı" },
-        { key: "kritik", label: "Kritik", align: "right", format: "number" },
-        { key: "guncel", label: "Güncel Stok", align: "right", format: "number" },
-        { key: "ort", label: "Ort. Stok", align: "right", format: "number" },
-        { key: "alt", label: "Kritik Altı Gün", align: "right", format: "number" },
-        { key: "ust", label: "Aşırı Gün", align: "right", format: "number" },
-        { key: "verim", label: "Verim %", align: "right", format: "percent" },
-      ]}
+      columns={COLS}
       rows={rows}
+      filterOptions={options}
     />
   );
 
@@ -173,6 +246,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       title="Stok Verimliliği"
       backHref="/analiz"
       period={period}
+      filterNote={filterNote(colFilters, COLS)}
       chips={CHIPS}
       activeMetric={metric}
       chart={<AnalizChart {...chartProps} title={title} />}
