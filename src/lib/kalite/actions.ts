@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
 import { PRODUCTION_ACCESS_ROLES, STOCK_ACCESS_ROLES } from "@/lib/constants";
 import type {
   KaliteItemTipi,
@@ -39,8 +40,8 @@ async function getOperator() {
   const meta = authUser?.user_metadata ?? {};
   return {
     supabase,
-    operatorId: (meta.selected_operator_id as string | undefined) ?? user.user_id,
-    operatorName: (meta.selected_operator_name as string | undefined) ?? user.full_name ?? null,
+    operatorId: readOperatorId(meta) ?? user.user_id,
+    operatorName: readOperatorName(meta) ?? user.full_name ?? null,
   };
 }
 

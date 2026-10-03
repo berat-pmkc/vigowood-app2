@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { BUCKET_TASK_ATTACHMENTS } from "@/lib/supabase/schema";
 import { getCurrentUser } from "@/lib/auth";
 import { ADMIN_ROLES } from "@/lib/constants";
 import type {
@@ -482,13 +483,13 @@ export async function addTaskAttachment(taskId: string, formData: FormData) {
   const path = `${taskId}/${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
-    .from("task-attachments")
+    .from(BUCKET_TASK_ATTACHMENTS)
     .upload(path, file);
 
   if (uploadError) return { success: false, error: uploadError.message };
 
   const { data: urlData } = supabase.storage
-    .from("task-attachments")
+    .from(BUCKET_TASK_ATTACHMENTS)
     .getPublicUrl(path);
 
   const { error } = await supabase.from("task_attachments").insert({

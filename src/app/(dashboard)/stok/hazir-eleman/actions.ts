@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { hazirElemanGirisSchema } from "@/lib/validations";
 import { STOCK_ACCESS_ROLES } from "@/lib/constants";
+import { readOperatorId } from "@/lib/supabase/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -58,7 +59,7 @@ export async function addHazirElemanStok(formData: {
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
+    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
 
     // Parça kontrolü
     const { data: partData } = await supabase

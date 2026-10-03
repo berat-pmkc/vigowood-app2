@@ -62,7 +62,7 @@ if (!args['no-truncate']) {
 const results = [];
 for (const t of ordered) {
   const [tcols, scols, pk] = await Promise.all([
-    ctx.tgt(`select a.attname as name from pg_attribute a where a.attrelid = ${ql(`${qi(schema)}.${qi(t)}`)}::regclass
+    ctx.tgt(`select a.attname as name, format_type(a.atttypid, null) as typ, a.attnotnull as nn from pg_attribute a where a.attrelid = ${ql(`${qi(schema)}.${qi(t)}`)}::regclass
              and a.attnum > 0 and not a.attisdropped and a.attgenerated = '' order by a.attnum`, { readOnly: true }),
     ctx.src(`select column_name as name from information_schema.columns where table_schema=${ql(SOURCE_SCHEMA)} and table_name=${ql(t)}`),
     ctx.src(`select a.attname as name from pg_index i join pg_attribute a on a.attrelid=i.indrelid and a.attnum = any(i.indkey)
@@ -74,6 +74,14 @@ for (const t of ordered) {
   if (onlyT.length) warn(`${t}: columns only in target (default/null used): ${onlyT.join(', ')}`);
   if (onlyS.length) warn(`${t}: columns only in source (dropped): ${onlyS.join(', ')}`);
   const colList = cols.map(qi).join(', ');
+  // JSON 'null' values in NOT NULL json/jsonb columns would become SQL NULL through populate_record;
+  // take those columns straight from the row's JSON instead.
+  const tinfo = new Map(tcols.map((r) => [r.name, r]));
+  const selList = cols.map((c) => {
+    const ti = tinfo.get(c);
+    if (ti.nn && (ti.typ === 'jsonb' || ti.typ === 'json')) return `(e.j->${ql(c)})::${ti.typ}`;
+    return 'p.' + qi(c);
+  }).join(', ');
   const orderBy = pk.length ? pk.map((r) => qi(r.name)).join(', ') : 'ctid';
 
   let limit = 2000, offset = 0, rowsCopied = 0, page = 0;
@@ -88,7 +96,7 @@ for (const t of ordered) {
     do { tag = '$vw' + crypto.randomBytes(6).toString('hex') + '$'; } while (json.includes(tag));
     await ctx.tgt(
       REPL + `insert into ${qi(schema)}.${qi(t)} (${colList}) overriding system value\n` +
-      `select ${colList} from json_populate_recordset(null::${qi(schema)}.${qi(t)}, ${tag}${json}${tag}::json);`,
+      `select ${selList} from jsonb_array_elements(${tag}${json}${tag}::jsonb) as e(j) cross join lateral jsonb_populate_record(null::${qi(schema)}.${qi(t)}, e.j) p;`,
       { label: `insert ${t}@${offset}` });
     rowsCopied += n; offset += n; page++;
     const bytes = Buffer.byteLength(json);

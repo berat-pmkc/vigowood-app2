@@ -90,8 +90,8 @@ export default function SelectOperatorPage() {
     // Store selected operator in user metadata
     await supabase.auth.updateUser({
       data: {
-        selected_operator_id: operator.user_id,
-        selected_operator_name: operator.full_name,
+        vw_selected_operator_id: operator.user_id,
+        vw_selected_operator_name: operator.full_name,
       },
     });
 

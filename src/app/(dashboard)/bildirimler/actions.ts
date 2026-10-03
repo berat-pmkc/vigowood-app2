@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser, isAdminRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { notificationCreateSchema, type NotificationCreateData } from "@/lib/validations";
+import { readOperatorId } from "@/lib/supabase/schema";
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -20,7 +21,7 @@ async function requireAuth() {
   // Station hesap desteği: operatörün user_id'si
   const supabase = await createClient();
   const { data: { user: authUser } } = await supabase.auth.getUser();
-  const operatorId = authUser?.user_metadata?.selected_operator_id as string | undefined;
+  const operatorId = readOperatorId(authUser?.user_metadata) as string | undefined;
   const effectiveUserId = operatorId || user.user_id;
 
   return { user, effectiveUserId, supabase };

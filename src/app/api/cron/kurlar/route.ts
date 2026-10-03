@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { DB_SCHEMA } from "@/lib/supabase/schema";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
@@ -27,7 +28,8 @@ export async function GET(request: Request) {
     // Supabase admin client (service role — RLS bypass)
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { db: { schema: DB_SCHEMA } }
     );
 
     // Kur ayarlarını DB'den oku (fallback: hardcoded)

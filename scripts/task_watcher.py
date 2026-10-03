@@ -22,6 +22,7 @@ import traceback
 
 try:
     from supabase import create_client
+    from supabase.client import ClientOptions
 except ImportError:
     print("HATA: 'supabase' paketi bulunamadı. Kurulum: pip install supabase")
     sys.exit(1)
@@ -51,7 +52,12 @@ if not ANTHROPIC_API_KEY:
     print("HATA: ANTHROPIC_API_KEY ortam değişkeni gerekli.")
     sys.exit(1)
 
-supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+SUPABASE_DB_SCHEMA = os.environ.get("SUPABASE_DB_SCHEMA", "public")
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_KEY,
+    options=ClientOptions(schema=SUPABASE_DB_SCHEMA),
+)
 anthropic = Anthropic(api_key=ANTHROPIC_API_KEY)
 
 

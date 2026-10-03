@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { DB_SCHEMA } from "./schema";
+import { readOperatorId } from "./schema";
 
 const STATION_EMAILS = [
   "kesim@vigowood.com",
@@ -26,6 +28,7 @@ export async function updateSession(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      db: { schema: DB_SCHEMA },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -60,7 +63,9 @@ export async function updateSession(request: NextRequest) {
 
   // Public paths — no auth required
   const isAuthPage =
-    pathname.startsWith("/login") || pathname.startsWith("/select-operator");
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/select-operator") ||
+    pathname.startsWith("/auth/");
 
   // If not logged in → redirect to login (except auth pages)
   if (!user && !isAuthPage) {
@@ -70,11 +75,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If logged in and on /login → redirect away
-  if (user && pathname === "/login") {
+  if (user && pathname === "/login" && !request.nextUrl.searchParams.has("error")) {
     const url = request.nextUrl.clone();
     if (user.email && STATION_EMAILS.includes(user.email)) {
       // Station account: check if operator selected
-      const hasOperator = user.user_metadata?.selected_operator_id;
+      const hasOperator = readOperatorId(user.user_metadata);
       url.pathname = hasOperator ? "/" : "/select-operator";
     } else {
       url.pathname = "/";
@@ -87,8 +92,9 @@ export async function updateSession(request: NextRequest) {
     user &&
     user.email &&
     STATION_EMAILS.includes(user.email) &&
-    !user.user_metadata?.selected_operator_id &&
-    pathname !== "/select-operator"
+    !readOperatorId(user.user_metadata) &&
+    pathname !== "/select-operator" &&
+    !pathname.startsWith("/auth/")
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/select-operator";

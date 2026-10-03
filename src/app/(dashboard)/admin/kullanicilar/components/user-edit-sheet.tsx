@@ -145,7 +145,7 @@ export function UserEditSheet({
           allowed_modules: useCustomModules ? allowedModules : null,
         });
         if (result.success) {
-          toast.success("Kullanıcı oluşturuldu");
+          toast.success("Kullanıcı oluşturuldu", result.message ? { description: result.message } : undefined);
           onOpenChange(false);
           onSaved();
         } else {
@@ -268,6 +268,9 @@ export function UserEditSheet({
               />
               <p className="text-xs text-muted-foreground">
                 E-posta olan kullanıcılar için giriş şifresi de güncellenir
+              </p>
+              <p className="rounded-md border border-vw-warning/40 bg-vw-warning/10 px-2 py-1.5 text-xs text-vw-dark">
+                Not: Bu hesap ortak giriş sistemi kullanıyor; şifre değişikliği diğer uygulamada (Hasmob HR) da geçerli olur.
               </p>
             </div>
 

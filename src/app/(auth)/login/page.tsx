@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +27,13 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof LoginFormData, string>>>({});
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const err = new URLSearchParams(window.location.search).get("error");
+    if (err === "erisim-yok") {
+      setServerError("Bu hesabın VigoWood uygulamasına erişimi yok.");
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,8 +78,8 @@ export default function LoginPage() {
       if (stationUser?.role === "Hat") {
         await supabase.auth.updateUser({
           data: {
-            selected_operator_id: stationUser.user_id,
-            selected_operator_name: stationUser.full_name,
+            vw_selected_operator_id: stationUser.user_id,
+            vw_selected_operator_name: stationUser.full_name,
           },
         });
         router.push("/");

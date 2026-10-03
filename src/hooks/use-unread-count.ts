@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { DB_SCHEMA } from "@/lib/supabase/schema";
 
 export function useUnreadCount(userId: string | null) {
   const [count, setCount] = useState(0);
@@ -43,12 +44,12 @@ export function useUnreadCount(userId: string | null) {
       .channel("unread-count-" + userId)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
+        { event: "*", schema: DB_SCHEMA, table: "notifications" },
         () => fetchCount()
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notification_reads" },
+        { event: "*", schema: DB_SCHEMA, table: "notification_reads" },
         () => fetchCount()
       )
       .subscribe();

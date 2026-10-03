@@ -4,7 +4,9 @@
 import "server-only";
 
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
 import type { Database, UserRole, Station } from "@/lib/supabase/types";
 
 export type UserProfile = Omit<Database["public"]["Tables"]["users"]["Row"], "password_plain">;
@@ -14,6 +16,14 @@ export type AuthMeta = {
   operatorId: string | undefined;
   operatorName: string | undefined;
 };
+
+/**
+ * Ortak auth altında VigoWood erişimi olmayan hesap: route handler'a yönlendir
+ * (orada signOut yapılır ve /login?error=erisim-yok'a gidilir).
+ */
+function redirectNoAccess(): never {
+  redirect("/auth/erisim-yok");
+}
 
 /**
  * Get the current authenticated user + their profile from public.users
@@ -36,7 +46,10 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
     .eq("auth_id", authUser.id)
     .single();
 
-  if (profile) return profile;
+  if (profile) {
+    if (profile.is_active === false) redirectNoAccess();
+    return profile;
+  }
 
   // auth_id eşleşmezse email ile fallback + auth_id'yi otomatik bağla
   if (authUser.email) {
@@ -47,6 +60,7 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
       .single();
 
     if (emailProfile) {
+      if (emailProfile.is_active === false) redirectNoAccess();
       // auth_id'yi bağla (bir kere)
       if (!emailProfile.auth_id) {
         await supabase
@@ -58,7 +72,8 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
     }
   }
 
-  return null;
+  // Ortak auth: bu auth kullanıcısının VigoWood users tablosunda karşılığı yok
+  redirectNoAccess();
 });
 
 /**
@@ -83,8 +98,8 @@ export const getCurrentUserWithAuth = cache(async (): Promise<{
   return {
     profile,
     auth: {
-      operatorId: authUser?.user_metadata?.selected_operator_id as string | undefined,
-      operatorName: authUser?.user_metadata?.selected_operator_name as string | undefined,
+      operatorId: readOperatorId(authUser?.user_metadata),
+      operatorName: readOperatorName(authUser?.user_metadata),
     },
   };
 });

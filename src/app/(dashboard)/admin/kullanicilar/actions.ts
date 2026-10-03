@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { BUCKET_USER_AVATARS } from "@/lib/supabase/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { userCreateSchema, userUpdateSchema } from "@/lib/validations";
 import { MODULE_KEYS } from "@/lib/constants";
@@ -10,7 +11,25 @@ import type { Database } from "@/lib/supabase/types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 
-type ActionResult = { success: true } | { success: false; error: string };
+type ActionResult =
+  | { success: true; message?: string }
+  | { success: false; error: string };
+
+/** E-postaya göre auth kullanıcısını bulur (sayfalı listeleme). */
+async function findAuthUserByEmail(
+  adminClient: ReturnType<typeof createAdminClient>,
+  email: string
+) {
+  const target = email.trim().toLowerCase();
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`Auth kullanıcıları okunamadı: ${error.message}`);
+    const found = data.users.find((u) => u.email?.toLowerCase() === target);
+    if (found) return found;
+    if (data.users.length < 1000) break;
+  }
+  return null;
+}
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -101,8 +120,48 @@ export async function createUser(
       return { success: false, error: error.message };
     }
 
+    // Ortak auth: şifre + e-posta varsa auth kullanıcısı oluştur / mevcut olana bağla
+    let message: string | undefined;
+    if (parsed.data.email && formData.password_plain) {
+      try {
+        const adminClient = createAdminClient();
+        const existing = await findAuthUserByEmail(adminClient, parsed.data.email);
+        if (existing) {
+          // Mevcut hesaba bağla — şifresine DOKUNMA
+          await supabase
+            .from("users")
+            .update({ auth_id: existing.id, password_plain: null })
+            .eq("user_id", parsed.data.user_id);
+          message =
+            "Bu e-posta için ortak giriş hesabı zaten vardı; mevcut hesaba bağlandı, şifresi değiştirilmedi.";
+        } else {
+          const { data: created, error: createErr } = await adminClient.auth.admin.createUser({
+            email: parsed.data.email,
+            password: formData.password_plain,
+            email_confirm: true,
+          });
+          if (createErr || !created.user) {
+            return {
+              success: false,
+              error: `Kullanıcı kaydedildi fakat giriş hesabı oluşturulamadı: ${createErr?.message ?? "bilinmeyen hata"}`,
+            };
+          }
+          await supabase
+            .from("users")
+            .update({ auth_id: created.user.id })
+            .eq("user_id", parsed.data.user_id);
+          message = "Yeni giriş hesabı oluşturuldu.";
+        }
+      } catch (e) {
+        return {
+          success: false,
+          error: `Kullanıcı kaydedildi fakat giriş hesabı işlenemedi: ${e instanceof Error ? e.message : "bilinmeyen hata"}`,
+        };
+      }
+    }
+
     revalidatePath("/admin/kullanicilar");
-    return { success: true };
+    return { success: true, message };
   } catch (e) {
     return {
       success: false,
@@ -250,12 +309,12 @@ export async function uploadUserAvatar(formData: FormData): Promise<ActionResult
 
     // Clean up old avatar files
     const { data: existingFiles } = await supabase.storage
-      .from("user-avatars")
+      .from(BUCKET_USER_AVATARS)
       .list(userId);
 
     if (existingFiles && existingFiles.length > 0) {
       const filesToRemove = existingFiles.map((f) => `${userId}/${f.name}`);
-      await supabase.storage.from("user-avatars").remove(filesToRemove);
+      await supabase.storage.from(BUCKET_USER_AVATARS).remove(filesToRemove);
     }
 
     // Upload new file
@@ -263,14 +322,14 @@ export async function uploadUserAvatar(formData: FormData): Promise<ActionResult
     const path = `${userId}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
-      .from("user-avatars")
+      .from(BUCKET_USER_AVATARS)
       .upload(path, file);
 
     if (uploadError) return { success: false, error: uploadError.message };
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from("user-avatars")
+      .from(BUCKET_USER_AVATARS)
       .getPublicUrl(path);
 
     // Update user record
@@ -300,12 +359,12 @@ export async function deleteUserAvatar(userId: string): Promise<ActionResult> {
 
     // Delete all files in user's avatar folder
     const { data: existingFiles } = await supabase.storage
-      .from("user-avatars")
+      .from(BUCKET_USER_AVATARS)
       .list(userId);
 
     if (existingFiles && existingFiles.length > 0) {
       const filesToRemove = existingFiles.map((f) => `${userId}/${f.name}`);
-      await supabase.storage.from("user-avatars").remove(filesToRemove);
+      await supabase.storage.from(BUCKET_USER_AVATARS).remove(filesToRemove);
     }
 
     // Set avatar_url to null

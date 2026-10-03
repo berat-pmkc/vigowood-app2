@@ -13,7 +13,7 @@ export function LogoutButton() {
 
     // Clear operator selection from metadata before signing out
     await supabase.auth.updateUser({
-      data: { selected_operator_id: null, selected_operator_name: null },
+      data: { vw_selected_operator_id: null, vw_selected_operator_name: null, selected_operator_id: null, selected_operator_name: null },
     });
 
     await supabase.auth.signOut();

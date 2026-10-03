@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { KRITIK_STOK_DEFAULT_GUN } from "@/lib/constants";
 import { fetchTuketimHizlari } from "@/lib/kritikStok";
 import type { Database, Json } from "@/lib/supabase/types";
+import { DB_SCHEMA } from "@/lib/supabase/schema";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
 /**
@@ -28,9 +29,10 @@ export async function GET(request: Request) {
   const startTime = Date.now();
 
   try {
-    const supabase = createClient<Database>(
+    const supabase = createClient<Database, "public">(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { db: { schema: DB_SCHEMA as "public" } }
     );
 
     // 1. Parametreleri oku

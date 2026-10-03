@@ -73,7 +73,10 @@ for (const p of plan) {
   for (const c of chunks) {
     ci++;
     try {
-      await ctx.tgt(header(schema) + c + footer, { label: p.label });
+      // Many migrations also seed data that references live rows missing from an empty schema; skip FK triggers.
+      // The seeded rows are wiped by copy-data (truncate) anyway.
+      const replica = 'set session_replication_role = replica;\n';
+      await ctx.tgt(replica + header(schema) + c + footer, { label: p.label });
     } catch (e) {
       console.error(`\nFAILED at file #${p.idx}: ${p.label}${chunks.length > 1 ? ` (chunk ${ci}/${chunks.length})` : ''}`);
       console.error(`Transformed SQL: scripts/migrate/out/${schema}/${p.outName}`);

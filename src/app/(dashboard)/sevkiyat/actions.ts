@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sevkiyatCreateSchema, sevkiyatItemSchema } from "@/lib/validations";
 import { SEVKIYAT_ACCESS_ROLES, SEVKIYAT_STATUS, type SevkiyatStatus } from "@/lib/constants";
 import { getShipmentSettings, getCountryByCode } from "@/lib/shipment-settings";
+import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -464,8 +465,8 @@ export async function createSevkiyat(formData: {
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
-    const operatorName = authUser?.user_metadata?.selected_operator_name ?? user.full_name;
+    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
+    const operatorName = readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
     // Son shipment_number bul (ülke bazlı)
@@ -563,8 +564,8 @@ export async function createSevkiyatWithItems(
     if (!country) return { success: false, error: "Geçersiz ülke kodu" };
 
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
-    const operatorName = authUser?.user_metadata?.selected_operator_name ?? user.full_name;
+    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
+    const operatorName = readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
     const { data: lastSevkiyat } = await supabase

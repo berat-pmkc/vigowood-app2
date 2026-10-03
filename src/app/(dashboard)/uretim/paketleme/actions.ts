@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { packSessionCloseSchema } from "@/lib/validations";
 import { PRODUCTION_ACCESS_ROLES, URETIM_ANALIZ_ROLES } from "@/lib/constants";
+import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -204,8 +205,8 @@ export async function createPackSession(sku: string): Promise<ActionResult> {
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
-    const operatorName = authUser?.user_metadata?.selected_operator_name ?? user.full_name;
+    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
+    const operatorName = readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
     // Generate session_id: PKT-YYYYMMDD-HHMMSS format

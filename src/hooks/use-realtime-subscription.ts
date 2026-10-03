@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { DB_SCHEMA } from "@/lib/supabase/schema";
 import { debounce } from "@/lib/debounce";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -68,7 +69,7 @@ export function useRealtimeSubscription({
           "postgres_changes" as never,
           {
             event: sub.event,
-            schema: sub.schema ?? "public",
+            schema: sub.schema ?? DB_SCHEMA,
             table: sub.table,
             ...(sub.filter ? { filter: sub.filter } : {}),
           } as never,

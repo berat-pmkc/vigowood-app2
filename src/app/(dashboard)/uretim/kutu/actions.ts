@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { kutuSessionCreateSchema } from "@/lib/validations";
 import { PRODUCTION_ACCESS_ROLES } from "@/lib/constants";
+import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -197,8 +198,8 @@ export async function createKutuSession(formData: {
 
     // Operatör bilgisi — form'dan gelen veya auth'tan
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = formData.operator_id ?? authUser?.user_metadata?.selected_operator_id ?? user.user_id;
-    const operatorName = formData.operator_name ?? authUser?.user_metadata?.selected_operator_name ?? user.full_name;
+    const operatorId = formData.operator_id ?? readOperatorId(authUser?.user_metadata) ?? user.user_id;
+    const operatorName = formData.operator_name ?? readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
     // Parça bilgisi

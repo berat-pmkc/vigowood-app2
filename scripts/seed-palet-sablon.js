@@ -9,7 +9,8 @@ require("dotenv").config({ path: ".env.local" });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { db: { schema: process.env.NEXT_PUBLIC_SUPABASE_DB_SCHEMA || "public" } }
 );
 
 const EXCEL_PATH = "../data/VIGO WOOD Sevkiyat Planları.xlsx";

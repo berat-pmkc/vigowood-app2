@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { DB_SCHEMA } from "@/lib/supabase/schema";
 
 export function useNotificationRealtime() {
   const router = useRouter();
@@ -14,14 +15,14 @@ export function useNotificationRealtime() {
       .channel("notifications-realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
+        { event: "*", schema: DB_SCHEMA, table: "notifications" },
         () => {
           router.refresh();
         }
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notification_reads" },
+        { event: "*", schema: DB_SCHEMA, table: "notification_reads" },
         () => {
           router.refresh();
         }

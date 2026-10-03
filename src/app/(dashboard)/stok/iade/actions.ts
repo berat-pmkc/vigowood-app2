@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { iadeGirisSchema } from "@/lib/validations";
 import { STOCK_ACCESS_ROLES } from "@/lib/constants";
+import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -62,7 +63,7 @@ export async function addIadeGiris(formData: {
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = authUser?.user_metadata?.selected_operator_id ?? user.user_id;
+    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
 
     // Ürün kontrolü
     const { data: productData } = await supabase
@@ -145,7 +146,7 @@ export async function addIadeGiris(formData: {
         p_depo_id: null,
         p_source_id: iadeId,
         p_operator_id: operatorId,
-        p_operator_name: authUser?.user_metadata?.selected_operator_name ?? user.full_name ?? null,
+        p_operator_name: readOperatorName(authUser?.user_metadata) ?? user.full_name ?? null,
         p_kargo: formData.kargo_firmasi?.trim() || null,
         p_musteri: parsed.data.musteri_bilgisi || null,
         p_not: parsed.data.iade_nedeni || null,
