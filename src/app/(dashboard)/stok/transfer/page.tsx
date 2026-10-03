@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { STOCK_ACCESS_ROLES } from "@/lib/constants";
@@ -94,6 +96,14 @@ export default async function DepoTransferPage() {
 
   return (
     <div className="space-y-4 px-4 pb-20 sm:px-6 md:pb-6">
+      <Link
+        href="/stok/mamul"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Ürün Stok
+      </Link>
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Depo Transferi</h1>
         <p className="text-sm text-muted-foreground">

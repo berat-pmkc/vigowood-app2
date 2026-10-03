@@ -39,6 +39,7 @@ import { Plus, ChevronsUpDown, Check, Loader2 } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import { iadeGirisSchema, type IadeGirisData } from "@/lib/validations";
 import { getActiveProducts, addIadeGiris } from "../actions";
+import { KARGO_FIRMALARI } from "@/lib/kalite/constants";
 import { toast } from "sonner";
 
 type ProductOption = {
@@ -54,6 +55,9 @@ export function IadeGirisDialog() {
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [kargoSecim, setKargoSecim] = useState<string>("");
+  const [kargoDiger, setKargoDiger] = useState("");
+  const [siparisNo, setSiparisNo] = useState("");
 
   const {
     register,
@@ -96,11 +100,17 @@ export function IadeGirisDialog() {
         durum: data.durum,
         iade_nedeni: data.iade_nedeni,
         musteri_bilgisi: data.musteri_bilgisi || null,
+        kargo_firmasi:
+          (kargoSecim === "Diğer" ? kargoDiger.trim() || "Diğer" : kargoSecim) || null,
+        siparis_no: siparisNo.trim() || null,
       });
 
       if (result.success) {
         toast.success("İade girişi başarıyla kaydedildi");
         reset();
+        setKargoSecim("");
+        setKargoDiger("");
+        setSiparisNo("");
         setOpen(false);
         setProductsLoaded(false);
       } else {
@@ -121,7 +131,7 @@ export function IadeGirisDialog() {
         <DialogHeader>
           <DialogTitle>İade Girişi</DialogTitle>
           <DialogDescription>
-            İade edilen ürünü kaydedin. Kullanılabilir iadeler stoğa otomatik eklenir.
+            İade edilen ürünü kaydedin. Kullanılabilir iadeler stoğa otomatik eklenir; kullanılamaz olanlar kontrol edilmek üzere uygunsuz stoğa alınır.
           </DialogDescription>
         </DialogHeader>
 
@@ -214,7 +224,7 @@ export function IadeGirisDialog() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Kullanilabilir">Kullanılabilir</SelectItem>
-                  <SelectItem value="Kullanilamaz">Kullanılamaz</SelectItem>
+                  <SelectItem value="Kullanilamaz">Kullanılamaz / Kontrol edilecek</SelectItem>
                 </SelectContent>
               </Select>
               {errors.durum && (
@@ -249,6 +259,41 @@ export function IadeGirisDialog() {
               <p className="text-sm text-destructive">{errors.musteri_bilgisi.message}</p>
             )}
           </div>
+
+          {/* Kargo firması + sipariş no */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Kargo Firması</Label>
+              <Select value={kargoSecim} onValueChange={setKargoSecim}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seçiniz" />
+                </SelectTrigger>
+                <SelectContent>
+                  {KARGO_FIRMALARI.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {k}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="siparis_no">Sipariş No</Label>
+              <Input
+                id="siparis_no"
+                value={siparisNo}
+                onChange={(e) => setSiparisNo(e.target.value)}
+                placeholder="Sipariş numarası"
+              />
+            </div>
+          </div>
+          {kargoSecim === "Diğer" && (
+            <Input
+              value={kargoDiger}
+              onChange={(e) => setKargoDiger(e.target.value)}
+              placeholder="Kargo firması adı"
+            />
+          )}
 
           {/* Submit */}
           <div className="flex justify-end gap-2 pt-2">

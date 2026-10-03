@@ -14,7 +14,7 @@ import {
 /**
  * Kritik Stok Önerisi — Hesaplama Motoru
  * ---------------------------------------------------------------
- * Bu modül, `/api/cron/kritik-stok` içindeki günlük satış hızı (WMA)
+ * Bu modül, `/api/cron/kritik-stok` içindeki günlük tüketim hızı (WMA; stock_movements çıkışları)
  * mantığıyla AYNI ağırlıkları kullanır, ayrıca gerçek üretim/paketleme
  * verisinden bir "tedarik süresi" sinyali türetir. Cron sadece
  * `mamul_stok_kritik` kolonunu günceller; bu modül ise stok/kritik-stok
@@ -76,6 +76,64 @@ function gunFarki(a: string, b: string): number {
   return Math.abs(msA - msB) / (1000 * 60 * 60 * 24);
 }
 
+/** Tüketim sayılmayan stok hareketi kaynakları (depo transferi, kalite ayrımı, fire) */
+export const TUKETIM_DISI_KAYNAKLAR = ["Transfer", "Uygunsuz", "Fire", "Kontrol-Uygun"] as const;
+
+/**
+ * Mamül stok çıkışlarından (stock_movements, qty < 0) SKU bazlı günlük tüketim
+ * hızını (WMA 7/30/90 gün) hesaplar. Transfer / Uygunsuz / Fire / Kontrol-Uygun
+ * kaynaklı hareketler tüketim sayılmaz. Veri yoksa SKU haritada yer almaz.
+ */
+export async function fetchTuketimHizlari(
+  supabase: SupabaseClient<Database>
+): Promise<{ dailyRateMap: Map<string, number>; total90Map: Map<string, number> }> {
+  const now = new Date();
+  const iso = (days: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - days);
+    return d.toISOString().split("T")[0];
+  };
+  const cutoff90ISO = iso(KRITIK_STOK_DEFAULT_LOOKBACK_DAYS);
+  const cutoff30ISO = iso(30);
+  const cutoff7ISO = iso(7);
+  const dislanan = new Set<string>(TUKETIM_DISI_KAYNAKLAR);
+
+  const buckets = new Map<string, { sum7: number; sum30: number; sum90: number }>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("stock_movements")
+      .select("sku, qty, tarih, source")
+      .lt("qty", 0)
+      .not("sku", "is", null)
+      .gte("tarih", cutoff90ISO)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`Stok hareketleri okunamadı: ${error.message}`);
+    for (const row of data ?? []) {
+      if (!row.sku || !row.tarih) continue;
+      if (row.source && dislanan.has(row.source)) continue;
+      const qty = Math.abs(Number(row.qty) || 0);
+      const bucket = buckets.get(row.sku) || { sum7: 0, sum30: 0, sum90: 0 };
+      bucket.sum90 += qty;
+      if (row.tarih >= cutoff30ISO) bucket.sum30 += qty;
+      if (row.tarih >= cutoff7ISO) bucket.sum7 += qty;
+      buckets.set(row.sku, bucket);
+    }
+    if (!data || data.length < PAGE) break;
+  }
+
+  const dailyRateMap = new Map<string, number>();
+  const total90Map = new Map<string, number>();
+  for (const [sku, b] of buckets) {
+    const velocity =
+      (b.sum7 / 7) * WMA_WEIGHT_7D + (b.sum30 / 30) * WMA_WEIGHT_30D + (b.sum90 / 90) * WMA_WEIGHT_90D;
+    dailyRateMap.set(sku, Math.round(velocity * 100) / 100);
+    total90Map.set(sku, b.sum90);
+  }
+  return { dailyRateMap, total90Map };
+}
+
 export async function computeKritikStokOnerileri(
   supabase: SupabaseClient<Database>
 ): Promise<KritikStokOneri[]> {
@@ -84,14 +142,6 @@ export async function computeKritikStokOnerileri(
   const cutoff90 = new Date(now);
   cutoff90.setDate(cutoff90.getDate() - lookback);
   const cutoff90ISO = cutoff90.toISOString().split("T")[0];
-
-  const cutoff30 = new Date(now);
-  cutoff30.setDate(cutoff30.getDate() - 30);
-  const cutoff30ISO = cutoff30.toISOString().split("T")[0];
-
-  const cutoff7 = new Date(now);
-  cutoff7.setDate(cutoff7.getDate() - 7);
-  const cutoff7ISO = cutoff7.toISOString().split("T")[0];
 
   // ---------- Varsayılan tampon gün ayarı ----------
   const { data: settingsData } = await supabase
@@ -119,33 +169,8 @@ export async function computeKritikStokOnerileri(
       .map((r) => [r.sku, Number(r.miktar ?? 0)])
   );
 
-  // ---------- Satış verisi (son 90 gün) — WMA ----------
-  const { data: salesData } = await supabase
-    .from("satis_satirlari")
-    .select("sku, miktar, tarih")
-    .eq("is_hizmet", false)
-    .not("sku", "is", null)
-    .gte("tarih", cutoff90ISO);
-
-  const skuBuckets = new Map<string, { sum7: number; sum30: number; sum90: number }>();
-  for (const row of salesData ?? []) {
-    if (!row.sku || !row.tarih) continue;
-    const qty = Math.abs(Number(row.miktar) || 0);
-    const bucket = skuBuckets.get(row.sku) || { sum7: 0, sum30: 0, sum90: 0 };
-    bucket.sum90 += qty;
-    if (row.tarih >= cutoff30ISO) bucket.sum30 += qty;
-    if (row.tarih >= cutoff7ISO) bucket.sum7 += qty;
-    skuBuckets.set(row.sku, bucket);
-  }
-
-  const dailyRateMap = new Map<string, number>();
-  const sales90Map = new Map<string, number>();
-  for (const [sku, b] of skuBuckets) {
-    const velocity =
-      (b.sum7 / 7) * WMA_WEIGHT_7D + (b.sum30 / 30) * WMA_WEIGHT_30D + (b.sum90 / 90) * WMA_WEIGHT_90D;
-    dailyRateMap.set(sku, Math.round(velocity * 100) / 100);
-    sales90Map.set(sku, b.sum90);
-  }
+  // ---------- Tüketim verisi (son 90 gün, stock_movements çıkışları) — WMA ----------
+  const { dailyRateMap, total90Map: sales90Map } = await fetchTuketimHizlari(supabase);
 
   // ---------- Paketleme verisi (son 90 gün) — tedarik süresi sinyali ----------
   const { data: packData } = await supabase

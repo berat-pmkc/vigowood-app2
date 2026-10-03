@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { nakitGirisTakipSchema, type NakitGirisTakipData } from "@/lib/validations";
 import { FINANCE_ROLES } from "@/lib/constants";
@@ -16,7 +16,7 @@ async function requireFinanceAccess() {
 
 async function requireAdmin() {
   const user = await getCurrentUser();
-  if (!user || user.role !== "Yönetici") {
+  if (!user || !isAdminRole(user.role)) {
     throw new Error("Bu işlem sadece yöneticiler tarafından yapılabilir");
   }
   return user;

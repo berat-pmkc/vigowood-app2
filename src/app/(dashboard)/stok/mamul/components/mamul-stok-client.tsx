@@ -6,14 +6,15 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { BarChart3 } from "lucide-react";
-import { KpiCards } from "./kpi-cards";
+import { BarChart3, ArrowRightLeft } from "lucide-react";
+import { formatNumber } from "@/lib/utils";
 import { StokDataTable, type StokProduct } from "./stok-data-table";
 import { HareketlerDataTable, type StokMovement } from "./hareketler-data-table";
 import { useStokMamulRealtime } from "@/hooks/use-stok-mamul-realtime";
 import { LastUpdatedBadge } from "@/components/shared/last-updated-badge";
 
 interface KpiData {
+  productCount: number;
   totalStock: number;
   criticalCount: number;
   todayMovements: number;
@@ -25,6 +26,8 @@ interface MamulStokClientProps {
   seciliDepo: string;
   activeTab: string;
   kpiData: KpiData;
+  /** Depo transferi yetkisi (STOCK_ACCESS_ROLES) */
+  canTransfer: boolean;
   // Stock table
   stokData: StokProduct[];
   stokTotalCount: number;
@@ -51,6 +54,7 @@ export function MamulStokClient({
   depolar,
   seciliDepo,
   kpiData,
+  canTransfer,
   stokData,
   stokTotalCount,
   stokPageIndex,
@@ -145,9 +149,20 @@ export function MamulStokClient({
             {d.ad}
           </button>
         ))}
+        {canTransfer && (
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="h-7 rounded-full px-3 text-xs"
+          >
+            <Link href="/stok/transfer">
+              <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
+              Depo Transferi
+            </Link>
+          </Button>
+        )}
       </div>
-
-      <KpiCards data={kpiData} />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
@@ -155,7 +170,16 @@ export function MamulStokClient({
           <TabsTrigger value="hareketler">Hareketler</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ozet" className="mt-4">
+        <TabsContent value="ozet" className="mt-4 space-y-3">
+          {/* Özet şeridi — tek satır, mobilde yatay kaydırılır */}
+          <div className="overflow-x-auto">
+            <p className="whitespace-nowrap text-sm text-muted-foreground">
+              Ürün: <span className="font-medium text-foreground">{formatNumber(kpiData.productCount)}</span>
+              {" · "}Toplam Stok: <span className="font-medium text-foreground">{formatNumber(kpiData.totalStock)}</span>
+              {" · "}Kritik Altı: <span className="font-medium text-foreground">{formatNumber(kpiData.criticalCount)}</span>
+              {" · "}Bugün Üretim: <span className="font-medium text-foreground">{formatNumber(kpiData.todayProduction)}</span>
+            </p>
+          </div>
           <StokDataTable
             data={stokData}
             totalCount={stokTotalCount}

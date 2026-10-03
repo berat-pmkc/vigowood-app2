@@ -20,6 +20,9 @@ export interface ParcaStok {
   yari_mamul_stok: number;
   hazir_eleman_kritik_stok: number;
   son_hareket_tarihi: string | null;
+  uygunsuz?: number;
+  kontrol_edilen?: number;
+  fire?: number;
 }
 
 interface ParcaStokDataTableProps {
@@ -93,6 +96,42 @@ function getColumns(): ColumnDef<ParcaStok>[] {
           kritik={row.original.hazir_eleman_kritik_stok}
         />
       ),
+      enableSorting: false,
+    },
+    {
+      id: "uygunsuz",
+      header: () => <span className="text-xs font-medium">Uygunsuz</span>,
+      cell: ({ row }) => {
+        const v = row.original.uygunsuz ?? 0;
+        return (
+          <span className={cn("tabular-nums text-sm", v > 0 ? "font-semibold text-[#f28a19]" : "text-muted-foreground")}>
+            {formatNumber(v)}
+          </span>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      id: "kontrol_edilen",
+      header: () => <span className="text-xs font-medium">Kontrol Edilen</span>,
+      cell: ({ row }) => (
+        <span className="tabular-nums text-sm text-muted-foreground">
+          {formatNumber(row.original.kontrol_edilen ?? 0)}
+        </span>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: "fire",
+      header: () => <span className="text-xs font-medium">Fire</span>,
+      cell: ({ row }) => {
+        const v = row.original.fire ?? 0;
+        return (
+          <span className={cn("tabular-nums text-sm", v > 0 ? "font-semibold text-[#ee7683]" : "text-muted-foreground")}>
+            {formatNumber(v)}
+          </span>
+        );
+      },
       enableSorting: false,
     },
   ];

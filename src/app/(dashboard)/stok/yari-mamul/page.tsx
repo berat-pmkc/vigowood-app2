@@ -153,6 +153,36 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
     });
   }
 
+  // ---------- KALİTE BAKİYELERİ (uygunsuz / kontrol edilen / fire) ----------
+  // kalite_bakiye görünümü henüz migrate edilmemiş olabilir: hata → 0 göster.
+  const kaliteMap = new Map<string, { uygunsuz: number; kontrol: number; fire: number }>();
+  if (partIds.length > 0) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: kb, error: kbErr } = await (supabase as any)
+        .from("kalite_bakiye")
+        .select("item_id, uygunsuz_bakiye, kontrol_edilen_toplam, fire_toplam")
+        .eq("item_tipi", "YARI_MAMUL")
+        .in("item_id", partIds);
+      if (!kbErr) {
+        for (const r of (kb ?? []) as {
+          item_id: string;
+          uygunsuz_bakiye: number;
+          kontrol_edilen_toplam: number;
+          fire_toplam: number;
+        }[]) {
+          kaliteMap.set(r.item_id, {
+            uygunsuz: Number(r.uygunsuz_bakiye) || 0,
+            kontrol: Number(r.kontrol_edilen_toplam) || 0,
+            fire: Number(r.fire_toplam) || 0,
+          });
+        }
+      }
+    } catch {
+      /* görünüm yok → sıfırlar */
+    }
+  }
+
   // ---------- ENRICH PARTS ----------
   const parts: ParcaStok[] = partsList.map((p) => ({
     part_id: p.part_id,
@@ -160,6 +190,9 @@ export default async function YariMamulStokPage({ searchParams }: PageProps) {
     yari_mamul_stok: p.yari_mamul_stok,
     hazir_eleman_kritik_stok: p.hazir_eleman_kritik_stok,
     son_hareket_tarihi: lastMovementMap.get(p.part_id) || null,
+    uygunsuz: kaliteMap.get(p.part_id)?.uygunsuz ?? 0,
+    kontrol_edilen: kaliteMap.get(p.part_id)?.kontrol ?? 0,
+    fire: kaliteMap.get(p.part_id)?.fire ?? 0,
   }));
 
   // ---------- BUILD MOVEMENTS ----------

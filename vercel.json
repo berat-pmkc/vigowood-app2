@@ -4,24 +4,12 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/trendyol-orders?secret=${CRON_SECRET}",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/trendyol-settlements?secret=${CRON_SECRET}",
-      "schedule": "0 7 * * *"
-    },
-    {
       "path": "/api/cron/kurlar?secret=${CRON_SECRET}",
       "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/kritik-stok?secret=${CRON_SECRET}",
       "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/dia-satis?secret=${CRON_SECRET}",
-      "schedule": "10 15 * * *"
     }
   ]
 }

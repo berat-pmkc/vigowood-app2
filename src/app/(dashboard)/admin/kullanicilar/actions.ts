@@ -81,14 +81,10 @@ export async function createUser(
       }
     }
 
-    // Validate allowed_modules keys
-    const allowedModules = formData.allowed_modules ?? null;
-    if (allowedModules) {
-      const invalid = allowedModules.filter((m) => !MODULE_KEYS.includes(m as any));
-      if (invalid.length > 0) {
-        return { success: false, error: `Geçersiz modül anahtarı: ${invalid.join(", ")}` };
-      }
-    }
+    // Bilinmeyen modül anahtarları (ör. kaldırılan satis/pazaryeri) sessizce elenir
+    const allowedModules = formData.allowed_modules
+      ? formData.allowed_modules.filter((m) => MODULE_KEYS.includes(m as any))
+      : null;
 
     const { error } = await supabase.from("users").insert({
       user_id: parsed.data.user_id,
@@ -160,14 +156,10 @@ export async function updateUser(
       }
     }
 
-    // Validate allowed_modules keys
-    const allowedModules = formData.allowed_modules !== undefined ? formData.allowed_modules : undefined;
-    if (allowedModules) {
-      const invalid = allowedModules.filter((m) => !MODULE_KEYS.includes(m as any));
-      if (invalid.length > 0) {
-        return { success: false, error: `Geçersiz modül anahtarı: ${invalid.join(", ")}` };
-      }
-    }
+    // Bilinmeyen modül anahtarları sessizce elenir
+    const allowedModules = formData.allowed_modules
+      ? formData.allowed_modules.filter((m) => MODULE_KEYS.includes(m as any))
+      : formData.allowed_modules;
 
     const { data: guncellenen, error } = await supabase
       .from("users")

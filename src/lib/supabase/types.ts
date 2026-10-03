@@ -5331,6 +5331,7 @@ export type Database = {
       task_status: "scheduled" | "queue" | "in_progress" | "done"
       user_role:
         | "Yönetici"
+        | "Üretim ve Planlama Sorumlusu"
         | "Endüstri Mühendisi"
         | "E-Ticaret Müdürü"
         | "Dış Ticaret Müdürü"
@@ -5560,6 +5561,7 @@ export const Constants = {
       task_status: ["scheduled", "queue", "in_progress", "done"],
       user_role: [
         "Yönetici",
+        "Üretim ve Planlama Sorumlusu",
         "Endüstri Mühendisi",
         "E-Ticaret Müdürü",
         "Dış Ticaret Müdürü",

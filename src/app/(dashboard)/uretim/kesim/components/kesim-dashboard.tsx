@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { KaliteButtons } from "@/components/shared/kalite/kalite-buttons";
 import { KesimSummaryCards } from "./kesim-summary-cards";
 import { MachineStatusBar } from "./machine-status-bar";
 import { KesimRecords } from "./kesim-records";
@@ -109,7 +110,7 @@ export function KesimDashboard({
 
       {/* Header + Machine Status */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="bg-blue-50 p-2 rounded-lg">
               <Scissors className="w-5 h-5 text-blue-600" />
@@ -119,7 +120,8 @@ export function KesimDashboard({
               <p className="text-sm text-muted-foreground">Lazer kesim istasyonu</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <KaliteButtons istasyon="kesim" />
             {analizGorebilir && (
               <Button asChild variant="outline" className="h-11 px-4">
                 <Link href="/uretim/kesim/rapor">

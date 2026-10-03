@@ -18,7 +18,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
-import { SEVKIYAT_ACCESS_ROLES } from "@/lib/constants";
+import { SEVKIYAT_ACCESS_ROLES, isAdminRole } from "@/lib/constants";
 import {
   renderReportHtml,
   type Block,
@@ -98,7 +98,7 @@ export async function GET(
 
   // Planı yalnızca sahibi veya yönetici görebilir
   const sahibi = data.olusturan === user.user_id;
-  const yonetici = user.role === "Yönetici";
+  const yonetici = isAdminRole(user.role);
   if (!sahibi && !yonetici) {
     return hataSayfasi(
       "Yetkiniz yok",

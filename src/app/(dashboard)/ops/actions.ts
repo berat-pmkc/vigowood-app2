@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
+import { ADMIN_ROLES } from "@/lib/constants";
 import type {
   TaskStatus,
   TaskPriority,
@@ -369,7 +370,7 @@ export async function updateTask(
 
 export async function deleteTask(taskId: string) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Sadece yöneticiler görev silebilir" };
   }
 
@@ -514,7 +515,7 @@ export async function addTaskAttachment(taskId: string, formData: FormData) {
 
 export async function deleteTaskAttachment(attachmentId: string) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Yetkiniz yok" };
   }
 
@@ -746,7 +747,7 @@ export async function updateAgent(
   data: { status?: AgentStatus; is_active?: boolean; description?: string }
 ) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Yetkiniz yok" };
   }
 
@@ -842,7 +843,7 @@ export async function getOutputs(filters?: {
 
 export async function deleteOutput(outputId: string) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Yetkiniz yok" };
   }
 
@@ -943,7 +944,7 @@ export async function updateTaskTemplate(
 
 export async function deleteTaskTemplate(id: string) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Yetkiniz yok" };
   }
 
@@ -1057,7 +1058,7 @@ export async function updateRecurringTask(
 
 export async function deleteRecurringTask(id: string) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Yetkiniz yok" };
   }
 
@@ -1205,7 +1206,7 @@ export async function getAgentMemories(agentCode: string) {
 
 export async function deleteAgentMemory(memoryId: string) {
   const user = await requireUser();
-  if (user.role !== "Yönetici" && user.role !== "Endüstri Mühendisi") {
+  if (!ADMIN_ROLES.includes(user.role)) {
     return { success: false, error: "Yetkiniz yok" };
   }
 

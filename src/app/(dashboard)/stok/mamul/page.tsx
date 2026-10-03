@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth";
+import { STOCK_ACCESS_ROLES } from "@/lib/constants";
 import { MamulStokClient } from "./components/mamul-stok-client";
 import type { StokProduct } from "./components/stok-data-table";
 import type { StokMovement } from "./components/hareketler-data-table";
@@ -34,6 +36,8 @@ export const metadata: Metadata = { title: "Ürün Stok" };
 export default async function MamulStokPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const supabase = await createClient();
+  const user = await getCurrentUser();
+  const canTransfer = !!user && STOCK_ACCESS_ROLES.includes(user.role);
 
   const activeTab = params.tab === "hareketler" ? "hareketler" : "ozet";
   // "" = tüm depolar (ana depo)
@@ -276,7 +280,9 @@ export default async function MamulStokPage({ searchParams }: PageProps) {
         activeTab={activeTab}
         depolar={depolar}
         seciliDepo={seciliDepo}
+        canTransfer={canTransfer}
         kpiData={{
+          productCount: allActiveProducts.length,
           totalStock,
           criticalCount,
           todayMovements: todayMovementCount,

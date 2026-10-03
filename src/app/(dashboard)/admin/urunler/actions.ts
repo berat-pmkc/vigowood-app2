@@ -184,12 +184,11 @@ export async function exportProducts(): Promise<
 }
 
 /**
- * Ürün silme. Sabit (RESTRICT/NO ACTION) FK'lerle korunan finansal/fiyatlama
- * tablolarında kayıt varsa silme engellenir — bu veriler sessizce
+ * Ürün silme. Sabit (RESTRICT/NO ACTION) FK'lerle korunan tablolarda kayıt varsa silme engellenir — bu veriler sessizce
  * silinmez. assembly_steps ve step_bom (ürünün kendi reçetesi) ürünle
  * birlikte cascade silinir; ancak bu adımlardan biri başka bir ürünün
  * reçetesinde ASM- referansı olarak kullanılıyorsa (DAG güvenliği) silme
- * engellenir. stock_movements, satış geçmişi, sku_mappings gibi salt metin
+ * engellenir. stock_movements gibi salt metin
  * (soft) referanslı geçmiş veriler dokunulmadan (orphan ama korunmuş)
  * bırakılır.
  */
@@ -203,31 +202,11 @@ export async function deleteProduct(sku: string): Promise<ActionResult> {
     // .from(table) yerine her tablo ayrı sorgulanıyor.)
     const blockingResults = await Promise.all([
       supabase.from("kesim_talepleri").select("sku").eq("sku", sku).limit(1),
-      supabase
-        .from("marketplace_listings")
-        .select("sku")
-        .eq("sku", sku)
-        .limit(1),
-      supabase.from("pricing_snapshots").select("sku").eq("sku", sku).limit(1),
-      supabase
-        .from("product_box_dimensions")
-        .select("sku")
-        .eq("sku", sku)
-        .limit(1),
-      supabase
-        .from("product_target_prices")
-        .select("sku")
-        .eq("sku", sku)
-        .limit(1),
     ]);
 
     const blockingLabels: string[] = [];
     const blockingLabelsAll = [
       "Kesim Talepleri",
-      "Pazaryeri İlanları",
-      "Fiyat Geçmişi",
-      "Fiyatlama Kutu Ölçüleri",
-      "Fiyatlama Hedef Fiyatları",
     ];
     for (let i = 0; i < blockingResults.length; i++) {
       const { data, error } = blockingResults[i];

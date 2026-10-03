@@ -9,8 +9,6 @@ import {
   Layers,
   Component,
   RotateCcw,
-  ArrowRightLeft,
-  ShoppingCart,
   Truck,
   BarChart3,
   Users,
@@ -23,27 +21,19 @@ import {
   DollarSign,
   Receipt,
   Coins,
-  FileText,
-  Target,
-  Megaphone,
   Landmark,
   CreditCard,
   PieChart,
-  Store,
-  ShoppingBag,
-  Globe,
   Kanban,
   Bot,
   FileOutput,
   Activity,
-  Tags,
   Container,
-  PlugZap,
   AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole, ModuleKey } from "@/lib/constants";
-import { ALWAYS_VISIBLE_MODULES } from "@/lib/constants";
+import { ALWAYS_VISIBLE_MODULES, ADMIN_EQUIVALENT_ROLES } from "@/lib/constants";
 
 export type NavItem = {
   title: string;
@@ -60,9 +50,8 @@ export type NavGroup = {
 
 /** All roles that can see management/office sections */
 const MANAGEMENT_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
-  "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
   "Muhasebe",
   "Pazaryeri Sorumlusu",
@@ -72,14 +61,15 @@ const MANAGEMENT_ROLES: UserRole[] = [
 
 const ALL_INTERNAL: UserRole[] = [...MANAGEMENT_ROLES, "Hat"];
 
-const SEVK_ROLES: UserRole[] = ["Yönetici", "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"];
+const SEVK_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "Dış Ticaret Müdürü"];
 
-const FINANCE_ROLES: UserRole[] = ["Yönetici", "Muhasebe", "E-Ticaret Müdürü"];
+const FINANCE_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Muhasebe"];
 
-const MARKETPLACE_ROLES: UserRole[] = ["Yönetici", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Pazaryeri Sorumlusu"];
+/** Yönetici-eşdeğeri + Endüstri Mühendisi */
+const ADMIN_ENG_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Endüstri Mühendisi"];
 
 /** Onay sayfasını görebilecek roller */
-const APPROVAL_NAV_ROLES: UserRole[] = ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Dış Ticaret Müdürü"];
+const APPROVAL_NAV_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Endüstri Mühendisi", "Dış Ticaret Müdürü"];
 
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -122,29 +112,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Yarı Mamül", href: "/stok/yari-mamul", icon: Layers, roles: ALL_INTERNAL },
       { title: "Hazır Eleman", href: "/stok/hazir-eleman", icon: Component, roles: ALL_INTERNAL },
       { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: ALL_INTERNAL },
-      { title: "Depo Transferi", href: "/stok/transfer", icon: ArrowRightLeft, roles: ALL_INTERNAL },
       { title: "Stok Sayımı", href: "/stok/sayim", icon: ClipboardList, roles: ALL_INTERNAL },
       { title: "Kritik Stok", href: "/stok/kritik-stok", icon: AlertTriangle, roles: ALL_INTERNAL },
-    ],
-  },
-  {
-    label: "Satış",
-    items: [
-      { title: "Satışlar", href: "/satis", icon: ShoppingCart, roles: MANAGEMENT_ROLES },
-      { title: "Raporlar", href: "/satis/raporlar", icon: FileText, roles: MANAGEMENT_ROLES },
-      { title: "Pazarlama", href: "/satis/pazarlama", icon: Target, roles: MANAGEMENT_ROLES },
-      { title: "Kampanyalar", href: "/satis/kampanyalar", icon: Megaphone, roles: MANAGEMENT_ROLES },
-      { title: "DİA Entegrasyonu", href: "/satis/dia", icon: PlugZap, roles: MANAGEMENT_ROLES },
-      { title: "Ayarlar", href: "/satis/ayarlar", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
-    ],
-  },
-  {
-    label: "Pazaryeri",
-    items: [
-      { title: "Genel Bakış", href: "/pazaryeri/genel", icon: Store, roles: MARKETPLACE_ROLES },
-      { title: "Fiyatlama", href: "/pazaryeri/fiyatlama", icon: Tags, roles: MARKETPLACE_ROLES },
-      { title: "Trendyol", href: "/pazaryeri/trendyol", icon: ShoppingBag, roles: MARKETPLACE_ROLES },
-      { title: "vigowood.com", href: "/pazaryeri/vigowood-com", icon: Globe, roles: MARKETPLACE_ROLES },
     ],
   },
   {
@@ -154,9 +123,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Planlama", href: "/sevkiyat/planlama", icon: Container, roles: SEVK_ROLES },
       { title: "Şablonlar", href: "/sevkiyat/sablonlar", icon: LayoutTemplate, roles: SEVK_ROLES },
       { title: "Fiyatlar", href: "/sevkiyat/fiyatlar", icon: DollarSign, roles: SEVK_ROLES },
-      { title: "Maliyetler", href: "/sevkiyat/maliyetler", icon: Receipt, roles: ["Yönetici", "Endüstri Mühendisi"] },
+      { title: "Maliyetler", href: "/sevkiyat/maliyetler", icon: Receipt, roles: ADMIN_ENG_ROLES },
       { title: "Kurlar", href: "/sevkiyat/kurlar", icon: Coins, roles: SEVK_ROLES },
-      { title: "Ayarlar", href: "/sevkiyat/ayarlar", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
+      { title: "Ayarlar", href: "/sevkiyat/ayarlar", icon: Settings, roles: ADMIN_ENG_ROLES },
     ],
   },
   {
@@ -172,20 +141,20 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Analiz",
     items: [
       { title: "Raporlar", href: "/analiz", icon: BarChart3, roles: MANAGEMENT_ROLES },
-      { title: "Maliyet Analizi", href: "/maliyet", icon: Calculator, roles: ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Muhasebe"] },
+      { title: "Maliyet Analizi", href: "/maliyet", icon: Calculator, roles: [...ADMIN_ENG_ROLES, "Muhasebe"] },
     ],
   },
   {
     label: "Personel",
     items: [
-      { title: "Personel Listesi", href: "/personel/liste", icon: ClipboardList, roles: ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Hat"] },
-      { title: "Yoklama", href: "/personel", icon: Users, roles: ["Yönetici", "Endüstri Mühendisi", "E-Ticaret Müdürü", "Dış Ticaret Müdürü", "Hat"] },
+      { title: "Personel Listesi", href: "/personel/liste", icon: ClipboardList, roles: [...ADMIN_ENG_ROLES, "Dış Ticaret Müdürü", "Hat"] },
+      { title: "Yoklama", href: "/personel", icon: Users, roles: [...ADMIN_ENG_ROLES, "Dış Ticaret Müdürü", "Hat"] },
     ],
   },
   {
     label: "Yönetim",
     items: [
-      { title: "Admin", href: "/admin", icon: Settings, roles: ["Yönetici", "Endüstri Mühendisi"] },
+      { title: "Admin", href: "/admin", icon: Settings, roles: ADMIN_ENG_ROLES },
       { title: "Bildirimler", href: "/bildirimler", icon: Bell, roles: "all" },
     ],
   },
@@ -197,8 +166,6 @@ const GROUP_LABEL_TO_MODULE: Record<string, ModuleKey> = {
   "Ops Center": "ops_center",
   "Üretim": "uretim",
   "Stok": "stok",
-  "Satış": "satis",
-  "Pazaryeri": "pazaryeri",
   "Sevkiyat": "sevkiyat",
   "Muhasebe": "muhasebe",
   "Analiz": "analiz",

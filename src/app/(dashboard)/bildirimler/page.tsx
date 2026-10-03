@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserWithAuth } from "@/lib/auth";
+import { getCurrentUserWithAuth, isAdminRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BildirimlerClient } from "./components/bildirimler-client";
 
@@ -14,7 +14,7 @@ export default async function BildirimlerPage() {
   const supabase = await createClient();
 
   const effectiveUserId = auth.operatorId || profile.user_id;
-  const isAdmin = profile.role === "Yönetici";
+  const isAdmin = isAdminRole(profile.role);
 
   // Tüm bildirimler (en yeni önce)
   const { data: notifications } = await supabase

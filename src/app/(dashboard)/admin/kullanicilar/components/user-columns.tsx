@@ -28,7 +28,7 @@ import { formatDate } from "@/lib/utils";
 import { setUserActive } from "../actions";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-type UserRole = "Yönetici" | "Endüstri Mühendisi" | "E-Ticaret Müdürü" | "Dış Ticaret Müdürü" | "Üretim" | "Hat" | "Muhasebe" | "Sevkiyat Sorumlusu" | "Pazaryeri Sorumlusu" | "Mimar";
+type UserRole = "Yönetici" | "Üretim ve Planlama Sorumlusu" | "Endüstri Mühendisi" | "E-Ticaret Müdürü" | "Dış Ticaret Müdürü" | "Üretim" | "Hat" | "Muhasebe" | "Sevkiyat Sorumlusu" | "Pazaryeri Sorumlusu" | "Mimar";
 import type { UserWithLastSignIn } from "../page";
 
 interface ColumnOptions {
@@ -38,6 +38,7 @@ interface ColumnOptions {
 
 const roleBadgeColors: Record<UserRole, string> = {
   "Yönetici": "bg-red-100 text-red-800 border-red-200",
+  "Üretim ve Planlama Sorumlusu": "bg-purple-100 text-purple-800 border-purple-200",
   "Endüstri Mühendisi": "bg-purple-100 text-purple-800 border-purple-200",
   "E-Ticaret Müdürü": "bg-blue-100 text-blue-800 border-blue-200",
   "Dış Ticaret Müdürü": "bg-indigo-100 text-indigo-800 border-indigo-200",

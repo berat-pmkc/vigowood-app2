@@ -121,13 +121,9 @@ export async function getStationOperators(stationEmail: string) {
 }
 
 /** Role groups for routing */
-export const ADMIN_ROLES: UserRole[] = [
-  "Yönetici",
-  "Endüstri Mühendisi",
-];
+export { ADMIN_ROLES, ADMIN_EQUIVALENT_ROLES, isAdminRole } from "@/lib/constants";
 
 export const OFFICE_ROLES: UserRole[] = [
-  "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
   "Muhasebe",
   "Pazaryeri Sorumlusu",

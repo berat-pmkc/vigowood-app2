@@ -9,6 +9,7 @@ import { NewSessionDialog } from "./new-session-dialog";
 import { CloseSessionDialog } from "./close-session-dialog";
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import { KaliteButtons } from "@/components/shared/kalite/kalite-buttons";
 import { SummaryCards } from "./summary-cards";
 
 import { PaketlemeAnaliz } from "./paketleme-analiz";
@@ -91,7 +92,7 @@ export function PaketlemeDashboard({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Package className="w-6 h-6" />
@@ -101,7 +102,8 @@ export function PaketlemeDashboard({
             Paketleme seansları ve analiz
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <KaliteButtons istasyon="paketleme" />
           <Button
             variant="outline"
             onClick={() => setCompletedSheetOpen(true)}

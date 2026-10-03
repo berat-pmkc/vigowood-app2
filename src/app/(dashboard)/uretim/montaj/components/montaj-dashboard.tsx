@@ -10,6 +10,7 @@ import { NewSessionDialog } from "./new-session-dialog";
 import { CloseSessionDialog } from "./close-session-dialog";
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
+import { KaliteButtons } from "@/components/shared/kalite/kalite-buttons";
 import { SummaryCards } from "./summary-cards";
 import { MontajAnaliz } from "./montaj-analiz";
 import { PackageReadyDialog } from "./package-ready-widget";
@@ -75,7 +76,7 @@ export function MontajDashboard({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Wrench className="w-6 h-6" />
@@ -85,7 +86,8 @@ export function MontajDashboard({
             Montaj seansları ve analiz
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <KaliteButtons istasyon="montaj" />
           <Button
             variant="outline"
             onClick={() => setPackageReadyOpen(true)}

@@ -24,7 +24,7 @@ import {
   SprayCan,
   Wrench,
 } from "lucide-react";
-import type { UserRole } from "@/lib/constants";
+import { ADMIN_ROLES, type UserRole } from "@/lib/constants";
 import { DashboardRealtimeWrapper } from "./components/dashboard-realtime-wrapper";
 import { PeriodFilter } from "./components/period-filter";
 import { UretimUyariKarti, type UretimUyari } from "./components/uretim-uyari-karti";
@@ -178,7 +178,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     hazir_eleman_kritik_stok: number;
   }>;
 
-  const isAdmin = ["Yönetici", "Endüstri Mühendisi"].includes(userRole);
+  const isAdmin = ADMIN_ROLES.includes(userRole);
 
   // Kullanıcıya hedeflenmiş açık üretim uyarıları.
   // RLS zaten yalnızca kendi uyarılarını döndürüyor, ek filtre gerekmiyor.

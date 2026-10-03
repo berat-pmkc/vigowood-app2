@@ -31,9 +31,24 @@ export const COLORS = {
   black: "#000000",
 } as const;
 
+/** Tam yönetici yetkisi olan roller (SQL karşılığı: is_admin()) */
+export const ADMIN_EQUIVALENT_ROLES = [
+  "Yönetici",
+  "E-Ticaret Müdürü",
+  "Üretim ve Planlama Sorumlusu",
+] as const;
+
+export function isAdminRole(role: string | null | undefined): boolean {
+  return !!role && (ADMIN_EQUIVALENT_ROLES as readonly string[]).includes(role);
+}
+
+/** Yönetici + Endüstri Mühendisi (SQL karşılığı: is_admin_or_engineer()) */
+export const ADMIN_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Endüstri Mühendisi"];
+
 // User roles
 export const USER_ROLES = [
   "Yönetici",
+  "Üretim ve Planlama Sorumlusu",
   "Endüstri Mühendisi",
   "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
@@ -327,16 +342,15 @@ export const IADE_DURUM_COLORS: Record<IadeDurum, { bg: string; text: string }> 
 
 // Stok erişim rolleri
 export const STOCK_ACCESS_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
-  "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
   "Muhasebe",
 ];
 
 // Üretim erişim rolleri
 export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
   "Hat",
   "Üretim",
@@ -357,12 +371,12 @@ export const PRODUCTION_ACCESS_ROLES: UserRole[] = [
  * kullanılıyor.
  */
 export const URETIM_ANALIZ_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
 ];
 
 export const PRODUCTION_CANCEL_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
 ];
 
@@ -396,16 +410,15 @@ export const SEVKIYAT_STATUS_BORDER_COLORS: Record<SevkiyatStatus, string> = {
 
 // Sevkiyat erişim rolleri
 export const SEVKIYAT_ACCESS_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
   "Sevkiyat Sorumlusu",
-  "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
 ];
 
 // Sevkiyat maliyet görüntüleme rolleri (sadece admin/mühendis)
 export const SEVKIYAT_COST_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
 ];
 
@@ -481,105 +494,6 @@ export const FIRMA_TIPI_LABELS: Record<FirmaTipi, string> = {
   contact: "İletişim",
 };
 
-// ─── Satış Sabitleri ──────────────────────────────────────────
-// @deprecated DB'den okunuyor (app_settings), fallback olarak kalıyor
-
-/** @deprecated DB'den okunuyor (app_settings.satis_kanallari). Fallback olarak kalıyor. */
-export const SALES_CHANNELS = [
-  "TRENDYOL",
-  "VIGOWOOD",
-  "HEPSIBURADA",
-  "AMAZON",
-  "HAS-DE",
-  "HAS-UK",
-  "HAS-ABD",
-  "N11",
-  "TEMU",
-  "PAZARAMA",
-  "ÇİÇEKSEPETİ",
-  "ETSY",
-  "TOPTAN",
-  "DIGER",
-  "MAĞAZA",
-  "FUAR",
-] as const;
-
-export type SalesChannel = (typeof SALES_CHANNELS)[number];
-
-/** @deprecated DB'den okunuyor (app_settings.satis_kanallari). Fallback olarak kalıyor. */
-export const SALES_CHANNEL_LABELS: Record<string, string> = {
-  TRENDYOL: "Trendyol",
-  VIGOWOOD: "VigoWood",
-  HEPSIBURADA: "Hepsiburada",
-  AMAZON: "Amazon",
-  "HAS-DE": "HAS Almanya",
-  "HAS-UK": "HAS İngiltere",
-  "HAS-ABD": "HAS Amerika",
-  N11: "N11",
-  TEMU: "Temu",
-  PAZARAMA: "Pazarama",
-  ÇİÇEKSEPETİ: "Çiçek Sepeti",
-  ETSY: "Etsy",
-  TOPTAN: "Toptan",
-  DIGER: "Diğer",
-  MAĞAZA: "Mağaza",
-  FUAR: "Fuar",
-};
-
-/** @deprecated DB'den okunuyor (app_settings.satis_kanallari ihracat flag). Fallback olarak kalıyor. */
-export const EXPORT_CHANNELS = ["HAS-DE", "HAS-UK", "HAS-ABD"] as const;
-
-/** @deprecated DB'den okunuyor (app_settings.hizmet_skulari). Fallback olarak kalıyor. */
-export const SERVICE_SKUS = [
-  "KARGO",
-  "HIZMET",
-  "YEDEK PARCA",
-  "TS-M",
-  "FIYAT FARKI",
-  "DIS KUTU",
-  "KOLI",
-  "KUTU",
-  "MONTAJ",
-  "AMBALAJ",
-] as const;
-
-/** @deprecated DB'den okunuyor. isExportChannelFromSettings kullanın. Fallback olarak kalıyor. */
-export function isExportChannel(channel: string): boolean {
-  return channel.startsWith("HAS-");
-}
-
-/** @deprecated DB'den okunuyor. isServiceSkuFromSettings kullanın. Fallback olarak kalıyor. */
-export function isServiceSku(sku: string): boolean {
-  if (!sku) return false;
-  const upper = sku.toUpperCase().trim();
-  return SERVICE_SKUS.some((s) => upper === s || upper.startsWith(s + " "));
-}
-
-/** Satış erişim rolleri */
-export const SATIS_ACCESS_ROLES: UserRole[] = [
-  "Yönetici",
-  "Endüstri Mühendisi",
-  "E-Ticaret Müdürü",
-  "Dış Ticaret Müdürü",
-  "Muhasebe",
-  "Pazaryeri Sorumlusu",
-  "Mimar",
-  "Sevkiyat Sorumlusu",
-];
-
-/** @deprecated DB'den okunuyor (app_settings.pazaryeri_secenekleri). Fallback olarak kalıyor. */
-export const PAZARYERI_OPTIONS = [
-  "vigowood.com",
-  "Trendyol",
-  "Hepsiburada",
-  "Amazon",
-  "N11",
-  "Temu",
-  "Pazarama",
-  "Çiçek Sepeti",
-  "Etsy",
-] as const;
-
 // ─── Muhasebe & Finans Sabitleri ────────────────────────────
 
 /** Kutu türleri (Karton Şablonlar) */
@@ -588,9 +502,8 @@ export type KutuTuru = (typeof KUTU_TURLERI)[number];
 
 /** Muhasebe erişim rolleri (Yönetici + Muhasebe + E-Ticaret Müdürü) */
 export const FINANCE_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Muhasebe",
-  "E-Ticaret Müdürü",
 ];
 
 /** Ödeme türleri */
@@ -821,9 +734,8 @@ export const ATTENDANCE_DEPARTMENT_COLORS: Record<AttendanceDepartment, { bg: st
 
 /** Personel erişim rolleri (Yönetici + Endüstri Mühendisi + Müdürler + Hat) */
 export const PERSONEL_ACCESS_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
-  "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
   "Hat",
 ];
@@ -856,14 +768,6 @@ export function isStationEmail(email: string | undefined): boolean {
   if (!email) return false;
   return STATION_EMAILS.includes(email as (typeof STATION_EMAILS)[number]);
 }
-
-// ─── Pazaryeri Erişim Rolleri ───────────────────────────────────
-export const MARKETPLACE_ACCESS_ROLES: UserRole[] = [
-  "Yönetici",
-  "E-Ticaret Müdürü",
-  "Dış Ticaret Müdürü",
-  "Pazaryeri Sorumlusu",
-];
 
 // ─── Kritik Stok Hesaplama Sabitleri ───────────────────────────
 export const KRITIK_STOK_DEFAULT_GUN = 30;
@@ -1090,9 +994,8 @@ export const TASK_ACTIVITY_LABELS: Record<TaskActivityAction, string> = {
 
 /** Onay yetkisi olan roller */
 export const APPROVAL_ROLES: UserRole[] = [
-  "Yönetici",
+  ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
-  "E-Ticaret Müdürü",
   "Dış Ticaret Müdürü",
 ];
 
@@ -1323,98 +1226,6 @@ export const ALERT_STATUS_COLORS: Record<AlertStatus, { bg: string; text: string
   muted: { bg: "bg-gray-100", text: "text-gray-500" },
 };
 
-// =============================================
-// Pazaryeri Fiyatlama Sabitleri
-// =============================================
-
-/** KDV oranı — sistem sabiti, KDV dahil fiyattan KDV çıkarma */
-export const VARSAYILAN_KDV_ORANI = 0.10; // %10
-
-/** Varsayılan stopaj oranı — pazaryeri bazında değiştirilebilir */
-export const VARSAYILAN_STOPAJ_ORANI = 0.01; // %1
-
-/** Hedef fiyat tipleri */
-export const HEDEF_FIYAT_TIPLERI = [
-  "perakende",
-  "toptan",
-] as const;
-
-export const HEDEF_FIYAT_TIPI_LABELS: Record<string, string> = {
-  perakende: "Perakende",
-  toptan: "Toptan",
-};
-
-/** Pazaryeri kodları */
-export const MARKETPLACE_CODES = [
-  "TY", "HB", "CS", "N11", "PZM", "IDE", "VW", "TEMU", "AMZ", "TDV",
-] as const;
-
-export const MARKETPLACE_LABELS: Record<string, string> = {
-  TY: "Trendyol",
-  HB: "Hepsiburada",
-  CS: "ÇiçekSepeti",
-  N11: "N11",
-  PZM: "Pazarama",
-  IDE: "İdefix",
-  VW: "VigoWood",
-  TEMU: "TEMU",
-  AMZ: "Amazon",
-  TDV: "TDV",
-};
-
-/** Fiyatlama hesaplama fonksiyonları */
-export function hesaplaHamFiyat(
-  satisFiyati: number,
-  komisyonOrani: number,
-  reklamOrani: number,
-  kargoMaliyeti: number,
-  kdvOrani: number = VARSAYILAN_KDV_ORANI,
-): number {
-  // Vergi = Satış - Satış/1.1 (KDV dahil → KDV çıkarma)
-  const vergiOrani = kdvOrani / (1 + kdvOrani); // ~0.0909
-  const ham = satisFiyati * (1 - komisyonOrani - vergiOrani - reklamOrani) - kargoMaliyeti;
-  return Math.round(ham * 100) / 100;
-}
-
-export function hesaplaStopaj(
-  satisFiyati: number,
-  stopajOrani: number = VARSAYILAN_STOPAJ_ORANI,
-  kdvOrani: number = VARSAYILAN_KDV_ORANI,
-): number {
-  // Stopaj = (Satış/1.1) × stopaj_orani
-  return Math.round(((satisFiyati / (1 + kdvOrani)) * stopajOrani) * 100) / 100;
-}
-
-export function hesaplaVergi(
-  satisFiyati: number,
-  kdvOrani: number = VARSAYILAN_KDV_ORANI,
-): number {
-  // Vergi = Satış - Satış/(1+KDV)
-  return Math.round((satisFiyati - satisFiyati / (1 + kdvOrani)) * 100) / 100;
-}
-
-export function hesaplaKarMarji(
-  hamFiyat: number,
-  hedefFiyat: number,
-  satisFiyati: number,
-): number {
-  if (satisFiyati <= 0) return 0;
-  return Math.round(((hamFiyat - hedefFiyat) / satisFiyati) * 10000) / 10000;
-}
-
-export function hesaplaDesiFiyat(
-  desi: number,
-  desiTablosu: Record<string, number>,
-): number {
-  // Desi tablosundan VLOOKUP benzeri — desi'ye en yakın üst değeri bul
-  const keys = Object.keys(desiTablosu).map(Number).sort((a, b) => a - b);
-  for (const key of keys) {
-    if (desi <= key) return desiTablosu[String(key)];
-  }
-  // Tablodaki en büyük değeri döndür
-  return keys.length > 0 ? desiTablosu[String(keys[keys.length - 1])] : 0;
-}
-
 // ─── Modül Erişim Yönetimi ─────────────────────────────
 
 export const MODULE_KEYS = [
@@ -1422,8 +1233,6 @@ export const MODULE_KEYS = [
   "ops_center",
   "uretim",
   "stok",
-  "satis",
-  "pazaryeri",
   "sevkiyat",
   "muhasebe",
   "analiz",
@@ -1438,8 +1247,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   ops_center: "Ops Center",
   uretim: "Üretim",
   stok: "Stok",
-  satis: "Satış",
-  pazaryeri: "Pazaryeri",
   sevkiyat: "Sevkiyat",
   muhasebe: "Muhasebe",
   analiz: "Analiz",
@@ -1452,16 +1259,17 @@ export const ALWAYS_VISIBLE_MODULES: ModuleKey[] = ["ana_sayfa"];
 
 /** Rol bazlı varsayılan modül listesi — navigation.ts'deki role mapping'den türetildi */
 export const ROLE_DEFAULT_MODULES: Record<UserRole, ModuleKey[]> = {
-  "Yönetici": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
-  "Endüstri Mühendisi": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "analiz", "personel", "yonetim"],
-  "E-Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
-  "Dış Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "satis", "pazaryeri", "sevkiyat", "analiz", "personel", "yonetim"],
+  "Yönetici": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
+  "Üretim ve Planlama Sorumlusu": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
+  "Endüstri Mühendisi": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "analiz", "personel", "yonetim"],
+  "E-Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
+  "Dış Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "analiz", "personel", "yonetim"],
   "Üretim": ["ana_sayfa", "ops_center", "uretim", "yonetim"],
   "Hat": ["ana_sayfa", "ops_center", "uretim", "stok", "personel", "yonetim"],
-  "Muhasebe": ["ana_sayfa", "ops_center", "stok", "satis", "muhasebe", "analiz", "yonetim"],
-  "Sevkiyat Sorumlusu": ["ana_sayfa", "ops_center", "stok", "satis", "sevkiyat", "analiz", "yonetim"],
-  "Pazaryeri Sorumlusu": ["ana_sayfa", "ops_center", "stok", "satis", "pazaryeri", "analiz", "yonetim"],
-  "Mimar": ["ana_sayfa", "ops_center", "stok", "satis", "analiz", "yonetim"],
+  "Muhasebe": ["ana_sayfa", "ops_center", "stok", "muhasebe", "analiz", "yonetim"],
+  "Sevkiyat Sorumlusu": ["ana_sayfa", "ops_center", "stok", "sevkiyat", "analiz", "yonetim"],
+  "Pazaryeri Sorumlusu": ["ana_sayfa", "ops_center", "stok", "analiz", "yonetim"],
+  "Mimar": ["ana_sayfa", "ops_center", "stok", "analiz", "yonetim"],
 };
 
 // ─── Yoklama Durumları ──────────────────────────────────────

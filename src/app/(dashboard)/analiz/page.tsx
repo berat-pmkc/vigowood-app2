@@ -1,974 +1,316 @@
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
-import { AnalizDashboard } from "./components/analiz-dashboard";
-import { getMaliyetAyarlari } from "@/lib/maliyet";
-import type { LaborCostData } from "./components/production-labor-cost";
-import type { StockValueData } from "./components/stock-value";
-import type { OverviewCommandData } from "./components/overview-command";
-import type { MontajOzet, MontajOperator, MontajGun } from "./components/montaj-analiz";
-import type { KarlilikRow, KarlilikKpi } from "./components/karlilik-tab";
-import { MONTH_LABELS } from "./components/overview-trend-chart";
-import type { PeriodType, TabType } from "./actions";
-import type { OverviewKpiData } from "./components/overview-kpi-cards";
-import type { DailyOverviewData } from "./components/overview-production-chart";
-import type { MonthlyTrendData } from "./components/overview-trend-chart";
-import type { ProductionKpiData } from "./components/production-kpi-cards";
-import type { DailyProductionData } from "./components/production-daily-chart";
-import type { EfficiencyData } from "./components/production-efficiency";
-import type { SalesKpiData } from "./components/sales-kpi-cards";
-import type { ChannelSalesData } from "./components/sales-channel-chart";
-import type { TopProductRow } from "./components/sales-top-products";
-import type { StockKpiData } from "./components/stock-kpi-cards";
-import type { StockMovementData } from "./components/stock-movement-chart";
-import type { CriticalStockRow } from "./components/stock-critical-table";
-import { isExportChannel } from "@/lib/constants";
-
-// ─── Period Helper (Europe/Istanbul, UTC+3) ─────────────────────
-const TR_TZ = "Europe/Istanbul";
-/** TR yerel tarihini YYYY-MM-DD verir (sunucu UTC olsa bile). */
-function trBugun(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: TR_TZ });
-}
-/** YYYY-MM-DD stringine gün ekler/çıkarır (TZ-güvenli). */
-function tarihKaydir(gunStr: string, delta: number): string {
-  const [y, m, d] = gunStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + delta);
-  return dt.toISOString().split("T")[0];
-}
-function getPeriodDates(period: PeriodType): {
-  start: string | null;
-  end: string | null;
-} {
-  const todayStr = trBugun();
-  const [y, m, d] = todayStr.split("-").map(Number);
-  switch (period) {
-    case "today":
-      return { start: todayStr, end: todayStr };
-    case "week": {
-      const base = new Date(Date.UTC(y, m - 1, d));
-      const dow = base.getUTCDay(); // 0=Pazar
-      const pazartesiyeKadar = dow === 0 ? 6 : dow - 1;
-      return { start: tarihKaydir(todayStr, -pazartesiyeKadar), end: todayStr };
-    }
-    case "month":
-      return { start: `${y}-${String(m).padStart(2, "0")}-01`, end: todayStr };
-    case "all":
-      return { start: null, end: null };
-  }
-}
-
-/** Bir önceki dönem (delta karşılaştırması için). */
-function getPrevPeriodDates(period: PeriodType): { start: string; end: string } | null {
-  const todayStr = trBugun();
-  const [y, m] = todayStr.split("-").map(Number);
-  switch (period) {
-    case "today": {
-      const y1 = tarihKaydir(todayStr, -1);
-      return { start: y1, end: y1 };
-    }
-    case "week": {
-      const cur = getPeriodDates("week");
-      if (!cur.start) return null;
-      return { start: tarihKaydir(cur.start, -7), end: tarihKaydir(cur.start, -1) };
-    }
-    case "month": {
-      const buAyIlk = `${y}-${String(m).padStart(2, "0")}-01`;
-      const oncekiIlk = new Date(Date.UTC(y, m - 2, 1)).toISOString().split("T")[0];
-      return { start: oncekiIlk, end: tarihKaydir(buAyIlk, -1) };
-    }
-    case "all":
-      return null;
-  }
-}
-
-// ─── 30 day helper ──────────────────────────────────────────────
-function getLast30DaysMap<T>(init: () => T): Map<string, T> {
-  const map = new Map<string, T>();
-  const todayStr = trBugun();
-  for (let i = 30; i >= 0; i--) {
-    map.set(tarihKaydir(todayStr, -i), init());
-  }
-  return map;
-}
-
-// ─── Page ───────────────────────────────────────────────────────
-interface PageProps {
-  searchParams: Promise<{ tab?: string; period?: string }>;
-}
+import { redirect } from "next/navigation";
+import { ADMIN_ROLES, OFFICE_ROLES, getCurrentUser } from "@/lib/auth";
+import { resolvePeriod, type ResolvedPeriod } from "@/lib/periods";
+import { AnalizLayout } from "./_shared/analiz-layout";
+import { AnalizChart, type AnalizChartProps } from "./_shared/analiz-chart";
+import type { MetricChip } from "./_shared/metric-chips";
+import { StatCard, StatSlot } from "./_shared/stat-card";
+import { buildSeries, resolveGranularity } from "./_shared/series";
+import { deltaPct, fmtNum, round } from "./_shared/utils";
+import {
+  getBirimSure,
+  getKalite,
+  getKesim,
+  getMontaj,
+  getProductNames,
+  getStokCikis,
+  getStokVerimlilik,
+  getUretim,
+  type BirimSureData,
+  type KaliteData,
+  type KesimData,
+  type MontajData,
+  type StokVerimlilikData,
+  type UretimData,
+} from "./_shared/queries";
+import { computePerformance, type PerformanceData } from "./_shared/performance";
 
 export const metadata: Metadata = { title: "Analiz" };
-
-// Analiz dashboard — 30 saniye cache (sık güncellenen ama hızlı olmalı)
 export const revalidate = 30;
 
-export default async function AnalizPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const period = (params.period || "month") as PeriodType;
-  const tab = (params.tab || "genel") as TabType;
+const CHIPS: MetricChip[] = [
+  { key: "uretim", label: "Üretim" },
+  { key: "montaj", label: "Montaj" },
+  { key: "kesim", label: "Kesim" },
+  { key: "en-cok-satan", label: "En Çok Satan Ürünler" },
+  { key: "satisi-dusen", label: "Satışı Düşen Ürünler" },
+  { key: "stok-verimliligi", label: "Stok Verimliliği" },
+  { key: "birim-sure", label: "Çalışma Birim Süresi" },
+  { key: "personel", label: "Personel Verimliliği" },
+];
 
-  const supabase = await createClient();
-  const { start, end } = getPeriodDates(period);
+type SP = Record<string, string | string[] | undefined>;
 
-  const todayStr = trBugun();
-  const thirtyDaysAgoStr = tarihKaydir(todayStr, -30);
-
-  // 12 ay öncesi (aylık trend için) — TR tabanlı
-  const [ty, tm, td] = todayStr.split("-").map(Number);
-  const twelveMonthsAgoStr = new Date(Date.UTC(ty, tm - 1 - 12, td))
-    .toISOString()
-    .split("T")[0];
-
-  // ─── 14 Parallel Queries ───────────────────────────────────────
-  const [
-    // 1. Pack events today (overview KPI)
-    packTodayResult,
-    // 2. Satis satirlari (period) — for sales KPI + channel + top products
-    satisResult,
-    // 3. Products (active) — for stock KPIs
-    productsResult,
-    // 4. Sevkiyat (pending) — for overview KPI
-    sevkiyatResult,
-    // 5. Pack events (last 30 days) — for overview + production daily chart
-    packLast30Result,
-    // 6. Cut batches (period, tamamlandi) — for production KPI
-    cutBatchesPeriodResult,
-    // 7. Clean (period, tamamlandi) — for production KPI
-    cleanPeriodResult,
-    // 8. Montaj batches (period, tamamlandi) — for production KPI
-    montajPeriodResult,
-    // 9. All parts — for stock KPIs (yarı mamül + hazır eleman)
-    allPartsResult,
-    // 10. Stock movements (last 30 days) — for stock chart
-    stockMovLast30Result,
-    // 11. Products (critical stock) — for stock table
-    criticalStockResult,
-    // 12. Satis satirlari (last 12 months) — for monthly trend
-    satisMonthlyResult,
-    // 13. Cut batches (last 30 days) — for production daily chart
-    cutBatchesLast30Result,
-    // 14. Montaj batches (last 30 days) — for production daily chart
-    montajLast30Result,
-  ] = await Promise.all([
-    // 1 — pack today
-    supabase
-      .from("pack_events")
-      .select("qty")
-      .eq("durum", "tamamlandi")
-      .gte("tarih", todayStr)
-      .lte("tarih", todayStr),
-
-    // 2 — satis period
-    (() => {
-      let q = supabase
-        .from("satis_satirlari")
-        .select(
-          "sku, miktar, toplam_tutar, satis_kanali, fatura_no, tarih, is_hizmet",
-        );
-      if (start) q = q.gte("tarih", start);
-      if (end) q = q.lte("tarih", end);
-      return q;
-    })(),
-
-    // 3 — products active
-    supabase
-      .from("products")
-      .select("sku, urun_adi, stok_aktif, mamul_stok_kritik, aktif_mi")
-      .eq("aktif_mi", true),
-
-    // 4 — sevkiyat pending
-    supabase
-      .from("sevkiyat")
-      .select("sevkiyat_id")
-      .in("durum", ["bekliyor", "hazirlaniyor"]),
-
-    // 5 — pack last 30 days
-    supabase
-      .from("pack_events")
-      .select("tarih, qty, start_time, end_time, worker_count")
-      .eq("durum", "tamamlandi")
-      .gte("tarih", thirtyDaysAgoStr),
-
-    // 6 — cut batches period
-    (() => {
-      let q = supabase
-        .from("cut_batches")
-        .select("cut_id, adet, tarih, baslama_zamani, bitis_zamani")
-        .eq("durum", "tamamlandi");
-      if (start) q = q.gte("tarih", start);
-      if (end) q = q.lte("tarih", end);
-      return q;
-    })(),
-
-    // 7 — clean period
-    (() => {
-      let q = supabase
-        .from("clean")
-        .select("cutline_id, start_time, end_time")
-        .eq("status", "tamamlandi");
-      if (start) q = q.gte("start_time", start);
-      if (end) q = q.lte("start_time", `${end}T23:59:59`);
-      return q;
-    })(),
-
-    // 8 — montaj period (montaj_sessions)
-    (() => {
-      let q = supabase
-        .from("montaj_sessions")
-        .select("session_id, qty, start_time, end_time, net_sure_dk, worker_count, workers")
-        .eq("durum", "tamamlandi");
-      if (start) q = q.gte("created_at", start);
-      if (end) q = q.lte("created_at", `${end}T23:59:59`);
-      return q;
-    })(),
-
-    // 9 — all_parts
-    supabase
-      .from("all_parts")
-      .select(
-        "part_id, part_type, yari_mamul_stok, hazir_eleman_aktif_stok, hazir_eleman_kritik_stok",
-      ),
-
-    // 10 — stock movements last 30 days (limit to prevent huge payloads)
-    supabase
-      .from("stock_movements")
-      .select("tarih, qty")
-      .gte("tarih", thirtyDaysAgoStr)
-      .limit(5000),
-
-    // 11 — critical stock products
-    supabase
-      .from("products")
-      .select("sku, urun_adi, stok_aktif, mamul_stok_kritik")
-      .eq("aktif_mi", true)
-      .not("mamul_stok_kritik", "is", null)
-      .order("stok_aktif", { ascending: true })
-      .limit(100),
-
-    // 12 — satis last 12 months (monthly trend)
-    supabase
-      .from("satis_satirlari")
-      .select("tarih, toplam_tutar, sku, miktar, is_hizmet")
-      .gte("tarih", twelveMonthsAgoStr),
-
-    // 13 — cut batches last 30 days
-    supabase
-      .from("cut_batches")
-      .select("tarih, adet")
-      .eq("durum", "tamamlandi")
-      .gte("tarih", thirtyDaysAgoStr),
-
-    // 14 — montaj last 30 days (montaj_sessions)
-    supabase
-      .from("montaj_sessions")
-      .select("created_at, qty")
-      .eq("durum", "tamamlandi")
-      .gte("created_at", thirtyDaysAgoStr),
-  ]);
-
-  // ─── Data Processing ──────────────────────────────────────────
-
-  // ── Overview KPI ──
-  const packTodayRows = (packTodayResult.data || []) as { qty: number }[];
-  const gunlukUretim = packTodayRows.reduce(
-    (s, r) => s + (Number(r.qty) || 0),
-    0,
-  );
-
-  const satisRows = (satisResult.data || []) as {
-    sku: string | null;
-    miktar: number;
-    toplam_tutar: number;
-    satis_kanali: string | null;
-    fatura_no: string | null;
-    tarih: string | null;
-    is_hizmet: boolean;
-  }[];
-  const donemSatis = satisRows.reduce(
-    (s, r) => s + (r.toplam_tutar || 0),
-    0,
-  );
-
-  const productsRows = (productsResult.data || []) as {
-    sku: string;
-    urun_adi: string | null;
-    stok_aktif: number;
-    mamul_stok_kritik: number | null;
-    aktif_mi: boolean;
-  }[];
-  const mamulStok = productsRows.reduce(
-    (s, r) => s + (r.stok_aktif || 0),
-    0,
-  );
-
-  const bekleyenSevkiyat = (sevkiyatResult.data || []).length;
-
-  const overviewKpi: OverviewKpiData = {
-    gunlukUretim,
-    donemSatis,
-    mamulStok,
-    bekleyenSevkiyat,
-    donemKar: 0,
-  };
-
-  // ── Overview Daily Chart (production + sales, last 30 days) ──
-  const dailyOverviewMap = getLast30DaysMap(() => ({
-    uretim: 0,
-    satis: 0,
-  }));
-
-  const packLast30Rows = (packLast30Result.data || []) as {
-    tarih: string | null;
-    qty: number;
-    start_time: string | null;
-    end_time: string | null;
-    worker_count: number | null;
-  }[];
-  for (const r of packLast30Rows) {
-    if (!r.tarih) continue;
-    const day = String(r.tarih).split("T")[0];
-    const existing = dailyOverviewMap.get(day);
-    if (existing) existing.uretim += Number(r.qty) || 0;
+async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await p;
+  } catch (e) {
+    console.error("[analiz]", e);
+    return fallback;
   }
+}
 
-  // Satis daily from monthly result (last 12 months includes last 30 days)
-  const satisMonthlyRows = (satisMonthlyResult.data || []) as {
-    tarih: string | null;
-    toplam_tutar: number;
-    sku: string | null;
-    miktar: number | null;
-    is_hizmet: boolean | null;
-  }[];
-  for (const r of satisMonthlyRows) {
-    if (!r.tarih) continue;
-    const day = r.tarih.split("T")[0];
-    const existing = dailyOverviewMap.get(day);
-    if (existing) existing.satis += r.toplam_tutar || 0;
-  }
+const EMPTY_URETIM: UretimData = { total: 0, byDay: {}, bySku: {} };
+const EMPTY_MONTAJ: MontajData = { total: 0, finalTotal: 0, sessions: 0, byDay: {}, byStep: {} };
+const EMPTY_KESIM: KesimData = { plates: 0, parts: 0, platesByDay: {}, partsByDay: {} };
+const EMPTY_BIRIM: BirimSureData = {
+  montajAvg: null,
+  paketlemeAvg: null,
+  montajByDay: {},
+  paketlemeByDay: {},
+  byStep: [],
+};
+const EMPTY_STOK: StokVerimlilikData = { overallPct: null, byDay: {}, activeCount: 0, below: 0, above: 0 };
+const EMPTY_KALITE: KaliteData = { available: false, fire: { urun: 0, yariMamul: 0, plaka: 0, total: 0 } };
+const EMPTY_PERF: PerformanceData = { overallPct: null, people: [], stepStandards: [] };
 
-  const overviewDaily: DailyOverviewData[] = Array.from(
-    dailyOverviewMap.entries(),
-  )
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({
-      date,
-      uretim: v.uretim,
-      satis: Math.round(v.satis),
-    }));
+/** Önceki dönem yoksa (Tümü) sorgu atma */
+function prevOf<T>(p: ResolvedPeriod, fn: (f: string, t: string) => Promise<T>, fallback: T): Promise<T | null> {
+  if (!p.prevFrom || !p.prevTo) return Promise.resolve(null);
+  return safe(fn(p.prevFrom, p.prevTo), fallback);
+}
 
-  // ── Overview Monthly Trend ──
-  const monthlyMap = new Map<string, number>();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(Date.UTC(ty, tm - 1 - i, 1));
-    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-    monthlyMap.set(key, 0);
-  }
+const trunc = (s: string, n = 26) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-  for (const r of satisMonthlyRows) {
-    if (!r.tarih) continue;
-    const key = r.tarih.substring(0, 7); // "YYYY-MM"
-    const existing = monthlyMap.get(key);
-    if (existing !== undefined) {
-      monthlyMap.set(key, existing + (r.toplam_tutar || 0));
-    }
-  }
+async function buildChart(
+  metric: string,
+  period: ResolvedPeriod,
+  sp: SP,
+  d: {
+    uretim: UretimData;
+    montaj: MontajData;
+    kesim: KesimData;
+    birim: BirimSureData;
+    stok: StokVerimlilikData;
+    perf: PerformanceData;
+  },
+): Promise<AnalizChartProps & { title: string }> {
+  const { from, to } = period;
+  const g = resolveGranularity(sp.g, from, to);
 
-  // ── Kâr (yalnızca Genel sekmesinde — maliyet motoru) ──
-  // ── Kâr: maliyet önbelleğinden (urun_maliyet_cache) — motor canlı çalışmaz (performans) ──
-  const karByMonth = new Map<string, number>();
-  let donemKar = 0;
-  let donemMaliyet = 0;
-  if (tab === "genel") {
-    const periodQty = new Map<string, number>();
-    for (const r of satisRows) {
-      if (!r.sku || r.is_hizmet) continue;
-      periodQty.set(r.sku, (periodQty.get(r.sku) || 0) + (r.miktar || 0));
-    }
-    if (periodQty.size > 0) {
-      const { data: cacheRows } = await supabase
-        .from("urun_maliyet_cache").select("sku, birim_maliyet")
-        .in("sku", [...periodQty.keys()]);
-      const birimMap = new Map<string, number>(
-        (cacheRows ?? []).map((c) => [c.sku as string, Number(c.birim_maliyet) || 0]),
-      );
-      let dMal = 0;
-      for (const [sku, q] of periodQty) dMal += (birimMap.get(sku) ?? 0) * q;
-      donemMaliyet = dMal;
-      donemKar = donemSatis - dMal;
-    }
-  }
-  overviewKpi.donemKar = donemKar;
-
-  const overviewMonthly: MonthlyTrendData[] = Array.from(
-    monthlyMap.entries(),
-  ).map(([key, ciro]) => ({
-    month: MONTH_LABELS[parseInt(key.split("-")[1]) - 1],
-    ciro: Math.round(ciro),
-    kar: Math.round(karByMonth.get(key) ?? 0),
-  }));
-
-  // ── Production KPI ──
-  const cutBatchesPeriod = (cutBatchesPeriodResult.data || []) as {
-    cut_id: string;
-    adet: number;
-    tarih: string | null;
-    baslama_zamani: string | null;
-    bitis_zamani: string | null;
-  }[];
-  const cleanPeriod = (cleanPeriodResult.data || []) as {
-    cutline_id: string;
-    start_time: string | null;
-    end_time: string | null;
-  }[];
-  const montajPeriod = (montajPeriodResult.data || []) as {
-    session_id: string;
-    qty: number;
-    start_time: string | null;
-    end_time: string | null;
-    net_sure_dk: number | null;
-    worker_count: number | null;
-    workers: { id: string; name: string }[] | null;
-  }[];
-  const packPeriodQty = packLast30Rows
-    .filter((r) => {
-      if (!start) return true;
-      if (!r.tarih) return false;
-      const day = String(r.tarih).split("T")[0];
-      return day >= start && (!end || day <= end);
-    })
-    .reduce((s, r) => s + (Number(r.qty) || 0), 0);
-
-  const productionKpi: ProductionKpiData = {
-    kesimCount: cutBatchesPeriod.length,
-    temizlikCount: cleanPeriod.length,
-    montajCount: montajPeriod.length,
-    paketlemeAdet: packPeriodQty,
-  };
-
-  // ── Production Daily Chart (stacked, last 30 days) ──
-  const prodDailyMap = getLast30DaysMap(() => ({
-    kesim: 0,
-    temizlik: 0,
-    montaj: 0,
-    paketleme: 0,
-  }));
-
-  // Kesim
-  const cutLast30 = (cutBatchesLast30Result.data || []) as {
-    tarih: string | null;
-    adet: number;
-  }[];
-  for (const r of cutLast30) {
-    if (!r.tarih) continue;
-    const day = String(r.tarih).split("T")[0];
-    const existing = prodDailyMap.get(day);
-    if (existing) existing.kesim += Number(r.adet) || 0;
-  }
-
-  // Temizlik — use cleanPeriod data filtered for last 30 days
-  for (const r of cleanPeriod) {
-    if (!r.start_time) continue;
-    const day = r.start_time.split("T")[0];
-    const existing = prodDailyMap.get(day);
-    if (existing) existing.temizlik += 1;
-  }
-
-  // Montaj (montaj_sessions)
-  const montajLast30 = (montajLast30Result.data || []) as {
-    created_at: string | null;
-    qty: number;
-  }[];
-  for (const r of montajLast30) {
-    if (!r.created_at) continue;
-    const day = r.created_at.split("T")[0];
-    const existing = prodDailyMap.get(day);
-    if (existing) existing.montaj += Number(r.qty) || 0;
-  }
-
-  // Paketleme
-  for (const r of packLast30Rows) {
-    if (!r.tarih) continue;
-    const day = String(r.tarih).split("T")[0];
-    const existing = prodDailyMap.get(day);
-    if (existing) existing.paketleme += Number(r.qty) || 0;
-  }
-
-  const productionDaily: DailyProductionData[] = Array.from(
-    prodDailyMap.entries(),
-  )
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, ...v }));
-
-  // ── Production Efficiency ──
-  // Medyan süre (dk). net süre varsa onu kullan; uç kayıtları (≤1 / >240 dk) ele.
-  function medyanSure(
-    items: { dk?: number | null; start: string | null; end: string | null }[],
-  ): number {
-    const xs: number[] = [];
-    for (const item of items) {
-      let dk = item.dk != null && item.dk > 0 ? item.dk : NaN;
-      if (isNaN(dk)) {
-        if (!item.start || !item.end) continue;
-        const s = new Date(item.start).getTime();
-        const e = new Date(item.end).getTime();
-        if (isNaN(s) || isNaN(e) || e <= s) continue;
-        dk = (e - s) / 60000;
-      }
-      if (dk <= 1 || dk > 240) continue;
-      xs.push(dk);
-    }
-    if (xs.length === 0) return 0;
-    xs.sort((a, b) => a - b);
-    const o = Math.floor(xs.length / 2);
-    return xs.length % 2 ? xs[o] : (xs[o - 1] + xs[o]) / 2;
-  }
-
-  const productionEfficiency: EfficiencyData[] = [
-    {
-      istasyon: "Kesim",
-      ortSureDk: medyanSure(
-        cutBatchesPeriod.map((r) => ({
-          start: r.baslama_zamani,
-          end: r.bitis_zamani,
-        })),
-      ),
-    },
-    {
-      istasyon: "Temizlik",
-      ortSureDk: medyanSure(
-        cleanPeriod.map((r) => ({
-          start: r.start_time,
-          end: r.end_time,
-        })),
-      ),
-    },
-    {
-      istasyon: "Montaj",
-      ortSureDk: medyanSure(
-        montajPeriod.map((r) => ({
-          dk: r.net_sure_dk,
-          start: r.start_time,
-          end: r.end_time,
-        })),
-      ),
-    },
-    {
-      istasyon: "Paketleme",
-      ortSureDk: medyanSure(
-        packLast30Rows
-          .filter((r) => {
-            if (!start) return true;
-            if (!r.tarih) return false;
-            const day = String(r.tarih).split("T")[0];
-            return day >= start && (!end || day <= end);
-          })
-          .map((r) => ({ start: r.start_time, end: r.end_time })),
-      ),
-    },
-  ].filter((e) => e.ortSureDk > 0);
-
-  // ── Üretim İşçilik Maliyeti (yalnızca Üretim sekmesinde) ──
-  let laborCost: LaborCostData = {
-    montajToplam: 0, paketToplam: 0, toplam: 0, adet: 0,
-    montajBirim: 0, paketBirim: 0, birim: 0,
-  };
-  if (tab === "uretim") {
-    const ayar = await getMaliyetAyarlari();
-    const tutar = (dk: number, kisi: number, rate: number) => (dk * kisi) / 60 * rate;
-    let montajTut = 0;
-    for (const r of montajPeriod) {
-      let dk = Number(r.net_sure_dk ?? 0);
-      if (dk <= 0 && r.start_time && r.end_time) {
-        const st = new Date(r.start_time).getTime();
-        const en = new Date(r.end_time).getTime();
-        if (en > st) dk = (en - st) / 60000;
-      }
-      if (dk <= 1 || dk > 1440) continue;
-      const kisiM = Number(r.worker_count ?? 1) || 1;
-      const qM = Number(r.qty) || 0;
-      if (qM > 0 && (dk * kisiM) / qM > 30) continue; // uç birim-süre elenir
-      montajTut += tutar(dk, kisiM, ayar.montajSaatUcreti);
-    }
-    let paketTut = 0;
-    for (const r of packLast30Rows) {
-      if (start && r.tarih) {
-        const day = String(r.tarih).split("T")[0];
-        if (!(day >= start && (!end || day <= end))) continue;
-      }
-      if (!r.start_time || !r.end_time) continue;
-      const st = new Date(r.start_time).getTime();
-      const en = new Date(r.end_time).getTime();
-      if (!(en > st)) continue;
-      const dk = (en - st) / 60000;
-      if (dk <= 1 || dk > 1440) continue;
-      const kisiP = Number(r.worker_count ?? 1) || 1;
-      const qP = Number(r.qty) || 0;
-      if (qP > 0 && (dk * kisiP) / qP > 30) continue; // uç birim-süre elenir
-      paketTut += tutar(dk, kisiP, ayar.paketlemeSaatUcreti);
-    }
-    const adet = packPeriodQty;
-    laborCost = {
-      montajToplam: montajTut,
-      paketToplam: paketTut,
-      toplam: montajTut + paketTut,
-      adet,
-      montajBirim: adet > 0 ? montajTut / adet : 0,
-      paketBirim: adet > 0 ? paketTut / adet : 0,
-      birim: adet > 0 ? (montajTut + paketTut) / adet : 0,
-    };
-  }
-
-  // ── Montaj Analizi (yönetim odaklı, sade) — yalnızca Üretim sekmesinde ──
-  let montajOzet: MontajOzet = { adet: 0, dkAdet: 0, tlAdet: 0, operatorSayisi: 0, saat: 0 };
-  let montajOperatorler: MontajOperator[] = [];
-  let montajGunluk: MontajGun[] = [];
-  if (tab === "uretim") {
-    const ayar = await getMaliyetAyarlari();
-    const opMap = new Map<string, { adet: number; dkKisi: number; qtySum: number; saatDk: number }>();
-    const gunMap = new Map<string, number>();
-    let toplamAdet = 0;
-    let toplamDkKisi = 0;
-    let toplamQty = 0;
-    for (const r of montajPeriod) {
-      const q = Number(r.qty) || 0;
-      if (q <= 0) continue;
-      let dk = Number(r.net_sure_dk ?? 0);
-      if (dk <= 0 && r.start_time && r.end_time) {
-        const st = new Date(r.start_time).getTime();
-        const en = new Date(r.end_time).getTime();
-        if (en > st) dk = (en - st) / 60000;
-      }
-      if (dk <= 1 || dk > 1440) continue;
-      const kisi = Number(r.worker_count ?? 1) || 1;
-      if ((dk * kisi) / q > 30) continue; // uç birim-süre elenir
-      toplamAdet += q;
-      toplamDkKisi += dk * kisi;
-      toplamQty += q;
-      // günlük
-      if (r.start_time) {
-        const gun = String(r.start_time).slice(0, 10);
-        gunMap.set(gun, (gunMap.get(gun) || 0) + q);
-      }
-      // operatör (workers listesindeki her kişiye tam adet kredisi)
-      for (const w of r.workers ?? []) {
-        const ad = w.name || w.id;
-        const o = opMap.get(ad) || { adet: 0, dkKisi: 0, qtySum: 0, saatDk: 0 };
-        o.adet += q;
-        o.dkKisi += dk * kisi;
-        o.qtySum += q;
-        o.saatDk += dk;
-        opMap.set(ad, o);
-      }
-    }
-    const dkAdet = toplamQty > 0 ? toplamDkKisi / toplamQty : 0;
-    montajOzet = {
-      adet: toplamAdet,
-      dkAdet: Number(dkAdet.toFixed(2)),
-      tlAdet: Number(((dkAdet / 60) * ayar.montajSaatUcreti).toFixed(2)),
-      operatorSayisi: opMap.size,
-      saat: Math.round(toplamDkKisi / 60),
-    };
-    montajOperatorler = [...opMap.entries()]
-      .map(([ad, o]) => ({
-        ad,
-        adet: o.adet,
-        saat: Math.round(o.saatDk / 60),
-        dkAdet: Number((o.qtySum > 0 ? o.dkKisi / o.qtySum : 0).toFixed(2)),
-      }))
-      .sort((a, b) => b.adet - a.adet);
-    montajGunluk = [...gunMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([tarih, adet]) => ({ tarih, adet }));
-  }
-
-  // ── Genel Özet Komuta Merkezi (KPI kartları + önceki döneme göre değişim) ──
-  let overviewCmd: OverviewCommandData = {
-    paketleme: 0, montaj: 0, kesim: 0, ciro: 0, maliyet: 0, kar: 0, marj: 0,
-    bekleyenSevkiyat: 0,
-    deltas: { paketleme: null, montaj: null, kesim: null, ciro: null },
-  };
-  if (tab === "genel") {
-    const montajPeriodQty = montajPeriod.reduce((t, r) => t + (Number(r.qty) || 0), 0);
-    const kesimPeriodAdet = cutBatchesPeriod.reduce((t, r) => t + (Number(r.adet) || 0), 0);
-
-    let deltas: OverviewCommandData["deltas"] = {
-      paketleme: null, montaj: null, kesim: null, ciro: null,
-    };
-    const prev = getPrevPeriodDates(period);
-    if (prev) {
-      const [pPack, pMontaj, pCut, pSatis] = await Promise.all([
-        supabase.from("pack_events").select("qty").eq("durum", "tamamlandi").gte("tarih", prev.start).lte("tarih", prev.end),
-        supabase.from("montaj_sessions").select("qty").eq("durum", "tamamlandi").gte("created_at", prev.start).lte("created_at", `${prev.end}T23:59:59`),
-        supabase.from("cut_batches").select("adet").eq("durum", "tamamlandi").gte("tarih", prev.start).lte("tarih", prev.end),
-        supabase.from("satis_satirlari").select("toplam_tutar").gte("tarih", prev.start).lte("tarih", prev.end),
+  switch (metric) {
+    case "montaj":
+      return {
+        title: "Montaj (adım adedi)",
+        type: "bar",
+        xKey: "label",
+        data: buildSeries(from, to, g, { v: d.montaj.byDay }),
+        series: [{ key: "v", label: "Montaj", color: "#8d9d70" }],
+      };
+    case "kesim":
+      return {
+        title: "Kesim",
+        type: "composed",
+        xKey: "label",
+        data: buildSeries(from, to, g, { plates: d.kesim.platesByDay, parts: d.kesim.partsByDay }),
+        series: [
+          { key: "plates", label: "Plaka", color: "#3368b1", type: "bar", yAxisId: "left" },
+          { key: "parts", label: "Parça", color: "#f28a19", type: "line", yAxisId: "right" },
+        ],
+      };
+    case "en-cok-satan": {
+      const [cikis, names] = await Promise.all([
+        safe(getStokCikis(from, to), { total: 0, bySku: {}, byDay: {} }),
+        safe(getProductNames(), new Map<string, string>()),
       ]);
-      const topla = (res: { data: unknown }, f: string) =>
-        ((res.data as Record<string, unknown>[]) || []).reduce((t, r) => t + (Number(r[f]) || 0), 0);
-      const pP = topla(pPack, "qty");
-      const pM = topla(pMontaj, "qty");
-      const pK = topla(pCut, "adet");
-      const pC = topla(pSatis, "toplam_tutar");
-      const d = (cur: number, onceki: number) => (onceki > 0 ? ((cur - onceki) / onceki) * 100 : null);
-      deltas = {
-        paketleme: d(packPeriodQty, pP),
-        montaj: d(montajPeriodQty, pM),
-        kesim: d(kesimPeriodAdet, pK),
-        ciro: d(donemSatis, pC),
+      const top = Object.entries(cikis.bySku)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([sku, qty]) => ({ label: trunc(names.get(sku) ?? sku), qty }));
+      return {
+        title: "En çok satan 10 ürün (stok çıkışı, adet)",
+        type: "bar",
+        layout: "vertical",
+        xKey: "label",
+        data: top,
+        series: [{ key: "qty", label: "Adet", color: "#3368b1" }],
       };
     }
-
-    overviewCmd = {
-      paketleme: packPeriodQty,
-      montaj: montajPeriodQty,
-      kesim: kesimPeriodAdet,
-      ciro: donemSatis,
-      maliyet: donemMaliyet,
-      kar: donemKar,
-      marj: donemSatis > 0 ? (donemKar / donemSatis) * 100 : 0,
-      bekleyenSevkiyat,
-      deltas,
-    };
-  }
-
-  // ── Sales KPI ──
-  const toplamCiro = satisRows.reduce(
-    (s, r) => s + (r.toplam_tutar || 0),
-    0,
-  );
-  const uniqueFaturalar = new Set(
-    satisRows.map((r) => r.fatura_no).filter(Boolean),
-  );
-  const trSatis = satisRows
-    .filter(
-      (r) => !r.satis_kanali || !isExportChannel(r.satis_kanali),
-    )
-    .reduce((s, r) => s + (r.toplam_tutar || 0), 0);
-  const ihracatSatis = satisRows
-    .filter(
-      (r) => r.satis_kanali && isExportChannel(r.satis_kanali),
-    )
-    .reduce((s, r) => s + (r.toplam_tutar || 0), 0);
-
-  const salesKpi: SalesKpiData = {
-    toplamCiro,
-    siparisSayisi: uniqueFaturalar.size,
-    trSatis,
-    ihracatSatis,
-  };
-
-  // ── Sales Channel Chart ──
-  const channelMap = new Map<string, number>();
-  for (const r of satisRows) {
-    const kanal = r.satis_kanali || "Diğer";
-    channelMap.set(kanal, (channelMap.get(kanal) || 0) + (r.toplam_tutar || 0));
-  }
-  const salesChannel: ChannelSalesData[] = Array.from(channelMap.entries())
-    .map(([kanal, tutar]) => ({ kanal, tutar: Math.round(tutar) }))
-    .sort((a, b) => b.tutar - a.tutar);
-
-  // ── Sales Top Products ──
-  const skuMap = new Map<string, { adet: number; tutar: number }>();
-  for (const r of satisRows) {
-    if (!r.sku || r.is_hizmet) continue;
-    const existing = skuMap.get(r.sku) || { adet: 0, tutar: 0 };
-    existing.adet += r.miktar || 0;
-    existing.tutar += r.toplam_tutar || 0;
-    skuMap.set(r.sku, existing);
-  }
-
-  const productNameMap = new Map<string, string>();
-  for (const p of productsRows) {
-    productNameMap.set(p.sku, p.urun_adi || "");
-  }
-
-  const salesTopProducts: TopProductRow[] = Array.from(skuMap.entries())
-    .map(([sku, v]) => ({
-      sku,
-      urunAdi: productNameMap.get(sku) || "",
-      toplamAdet: v.adet,
-      toplamTutar: v.tutar,
-    }))
-    .sort((a, b) => b.toplamAdet - a.toplamAdet)
-    .slice(0, 10);
-
-  // ── Kârlılık (sadece sekme seçiliyse hesapla — maliyet motoru ağır) ──
-  let karlilikKpi: KarlilikKpi = { ciro: 0, maliyet: 0, kar: 0, marj: 0, eksikSayi: 0 };
-  const karlilikRows: KarlilikRow[] = [];
-  if (tab === "karlilik" && skuMap.size > 0) {
-    const { data: cacheRows } = await supabase
-      .from("urun_maliyet_cache").select("sku, birim_maliyet, eksik")
-      .in("sku", [...skuMap.keys()]);
-    const maliyetHarita = new Map<string, { birimMaliyet: number; eksik: boolean }>(
-      (cacheRows ?? []).map((c) => [c.sku as string, { birimMaliyet: Number(c.birim_maliyet) || 0, eksik: !!c.eksik }]),
-    );
-    let cSum = 0;
-    let mSum = 0;
-    let eksikSayi = 0;
-    for (const [sku, v] of skuMap) {
-      const mal = maliyetHarita.get(sku);
-      const eksik = !mal || mal.eksik;
-      const birimMaliyet = mal ? mal.birimMaliyet : null;
-      const toplamMaliyet = birimMaliyet != null ? birimMaliyet * v.adet : 0;
-      const kar = v.tutar - toplamMaliyet;
-      const marj = v.tutar > 0 ? (kar / v.tutar) * 100 : 0;
-      cSum += v.tutar;
-      if (birimMaliyet != null) mSum += toplamMaliyet;
-      if (eksik) eksikSayi++;
-      karlilikRows.push({
-        sku,
-        urunAdi: productNameMap.get(sku) || "",
-        adet: v.adet,
-        ciro: v.tutar,
-        birimMaliyet,
-        toplamMaliyet,
-        kar,
-        marj,
-        eksik,
-      });
-    }
-    karlilikRows.sort((a, b) => b.kar - a.kar);
-    const karSum = cSum - mSum;
-    karlilikKpi = {
-      ciro: cSum,
-      maliyet: mSum,
-      kar: karSum,
-      marj: cSum > 0 ? (karSum / cSum) * 100 : 0,
-      eksikSayi,
-    };
-  }
-
-  // ── Stock KPI ──
-  const kritikUrun = productsRows.filter(
-    (p) =>
-      p.mamul_stok_kritik != null &&
-      (p.stok_aktif || 0) < p.mamul_stok_kritik,
-  ).length;
-
-  const allParts = (allPartsResult.data || []) as {
-    part_id: string;
-    part_type: string;
-    yari_mamul_stok: number | null;
-    hazir_eleman_aktif_stok: number | null;
-    hazir_eleman_kritik_stok: number | null;
-  }[];
-  const yariMamulCesit = allParts.filter(
-    (p) => p.part_type === "YARIMAMUL" && (p.yari_mamul_stok || 0) > 0,
-  ).length;
-  const kritikHazirEleman = allParts.filter(
-    (p) =>
-      p.part_type !== "YARIMAMUL" &&
-      p.hazir_eleman_kritik_stok != null &&
-      p.hazir_eleman_kritik_stok > 0 &&
-      (p.hazir_eleman_aktif_stok || 0) < p.hazir_eleman_kritik_stok,
-  ).length;
-
-  const stockKpi: StockKpiData = {
-    mamulStok,
-    kritikUrun,
-    yariMamulCesit,
-    kritikHazirEleman,
-  };
-
-  // ── Stock Movement Chart ──
-  const stockMovMap = getLast30DaysMap(() => ({ giris: 0, cikis: 0 }));
-  const stockMovRows = (stockMovLast30Result.data || []) as {
-    tarih: string | null;
-    qty: number;
-  }[];
-  for (const r of stockMovRows) {
-    if (!r.tarih) continue;
-    const day = r.tarih.split("T")[0];
-    const existing = stockMovMap.get(day);
-    if (existing) {
-      if (Number(r.qty) > 0) {
-        existing.giris += Number(r.qty);
-      } else {
-        existing.cikis += Math.abs(Number(r.qty));
+    case "satisi-dusen": {
+      if (!period.prevFrom || !period.prevTo) {
+        return { title: "Satışı düşen ürünler", xKey: "label", data: [], series: [], emptyText: "Tüm zamanlar için karşılaştırma yok" };
       }
+      const [cur, prev, names] = await Promise.all([
+        safe(getStokCikis(from, to), { total: 0, bySku: {}, byDay: {} }),
+        safe(getStokCikis(period.prevFrom, period.prevTo), { total: 0, bySku: {}, byDay: {} }),
+        safe(getProductNames(), new Map<string, string>()),
+      ]);
+      const rows = Object.entries(prev.bySku)
+        .filter(([, p]) => p >= 5)
+        .map(([sku, p]) => {
+          const c = cur.bySku[sku] ?? 0;
+          return { label: trunc(names.get(sku) ?? sku), pct: round(((c - p) / p) * 100, 1) };
+        })
+        .filter((r) => r.pct < 0)
+        .sort((a, b) => a.pct - b.pct)
+        .slice(0, 10);
+      return {
+        title: "Satışı düşen ürünler (önceki döneme göre değişim %)",
+        type: "bar",
+        layout: "vertical",
+        xKey: "label",
+        unit: "%",
+        data: rows,
+        series: [{ key: "pct", label: "Değişim", color: "#ee7683" }],
+        emptyText: "Düşüş gösteren ürün yok",
+      };
     }
+    case "stok-verimliligi":
+      return {
+        title: "Stok verimliliği (kritik – 2×kritik bandındaki ürün %)",
+        type: "area",
+        xKey: "label",
+        unit: "%",
+        data: buildSeries(from, to, g, { pct: d.stok.byDay }, "avg"),
+        series: [{ key: "pct", label: "Verimlilik", color: "#70c1aa" }],
+      };
+    case "birim-sure":
+      return {
+        title: "Çalışma birim süresi (kişi-dk / adet)",
+        type: "line",
+        xKey: "label",
+        unit: " dk",
+        data: buildSeries(from, to, g, { montaj: d.birim.montajByDay, paketleme: d.birim.paketlemeByDay }, "avg"),
+        series: [
+          { key: "montaj", label: "Montaj", color: "#8d9d70" },
+          { key: "paketleme", label: "Paketleme", color: "#3368b1" },
+        ],
+      };
+    case "personel":
+      return {
+        title: "Personel verimliliği (ilk 10, %)",
+        type: "bar",
+        layout: "vertical",
+        xKey: "label",
+        unit: "%",
+        data: d.perf.people.slice(0, 10).map((p) => ({ label: trunc(p.name), pct: p.pct })),
+        series: [{ key: "pct", label: "Performans", color: "#70c1aa" }],
+      };
+    case "uretim":
+    default:
+      return {
+        title: "Üretim (paketlenen adet)",
+        type: "bar",
+        xKey: "label",
+        data: buildSeries(from, to, g, { v: d.uretim.byDay }),
+        series: [{ key: "v", label: "Paketleme", color: "#cdbd9d" }],
+      };
   }
+}
 
-  const stockMovement: StockMovementData[] = Array.from(
-    stockMovMap.entries(),
-  )
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, v]) => ({ date, giris: v.giris, cikis: v.cikis }));
+export default async function AnalizPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (![...ADMIN_ROLES, ...OFFICE_ROLES].includes(user.role)) redirect("/");
 
-  // ── Stock Critical Table ──
-  const criticalRows = (criticalStockResult.data || []) as {
-    sku: string;
-    urun_adi: string | null;
-    stok_aktif: number;
-    mamul_stok_kritik: number | null;
-  }[];
-  const stockCritical: CriticalStockRow[] = criticalRows
-    .filter(
-      (r) =>
-        r.mamul_stok_kritik != null &&
-        (r.stok_aktif || 0) < r.mamul_stok_kritik,
-    )
-    .map((r) => ({
-      sku: r.sku,
-      urunAdi: r.urun_adi || "",
-      mevcut: r.stok_aktif || 0,
-      kritikEsik: r.mamul_stok_kritik || 0,
-    }))
-    .sort((a, b) => a.mevcut - a.kritikEsik - (b.mevcut - b.kritikEsik))
-    .slice(0, 15);
+  const sp = await searchParams;
+  const period = resolvePeriod(sp);
+  const { from, to } = period;
+  const metricRaw = Array.isArray(sp.m) ? sp.m[0] : sp.m;
+  const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
 
-  // ── Stok Envanter Değeri (yalnızca Stok sekmesinde — maliyet motoru) ──
-  let stockValue: StockValueData = { toplam: 0, eksikSayi: 0, urunler: [] };
-  if (tab === "stok") {
-    const { data: cacheRows } = await supabase
-      .from("urun_maliyet_cache").select("sku, birim_maliyet, eksik")
-      .in("sku", productsRows.map((p) => p.sku));
-    const cm = new Map<string, { birimMaliyet: number; eksik: boolean }>(
-      (cacheRows ?? []).map((c) => [c.sku as string, { birimMaliyet: Number(c.birim_maliyet) || 0, eksik: !!c.eksik }]),
-    );
-    const list: StockValueData["urunler"] = [];
-    let toplam = 0;
-    let eksik = 0;
-    for (const p of productsRows) {
-      const m = cm.get(p.sku);
-      if (!m || m.eksik) eksik++;
-      const bm = m ? m.birimMaliyet : null;
-      const adet = p.stok_aktif || 0;
-      if (bm == null || bm <= 0 || adet <= 0) continue;
-      const deger = bm * adet;
-      toplam += deger;
-      list.push({ sku: p.sku, urunAdi: p.urun_adi || "", adet, birimMaliyet: bm, deger });
-    }
-    list.sort((a, b) => b.deger - a.deger);
-    stockValue = { toplam, eksikSayi: eksik, urunler: list.slice(0, 10) };
-  }
+  const [uretim, uretimPrev, montaj, montajPrev, kesim, kesimPrev, birim, stok, perf, kalite] = await Promise.all([
+    safe(getUretim(from, to), EMPTY_URETIM),
+    prevOf(period, getUretim, EMPTY_URETIM),
+    safe(getMontaj(from, to), EMPTY_MONTAJ),
+    prevOf(period, getMontaj, EMPTY_MONTAJ),
+    safe(getKesim(from, to), EMPTY_KESIM),
+    prevOf(period, getKesim, EMPTY_KESIM),
+    safe(getBirimSure(from, to), EMPTY_BIRIM),
+    safe(getStokVerimlilik(from, to), EMPTY_STOK),
+    safe(computePerformance(from, to), EMPTY_PERF),
+    safe(getKalite(from, to), EMPTY_KALITE),
+  ]);
 
-  // ─── Render ────────────────────────────────────────────────────
-  return (
-    <div className="px-4 pb-6 sm:px-6">
-      <AnalizDashboard
-        period={period}
-        tab={tab}
-        overviewKpi={overviewKpi}
-        overviewCmd={overviewCmd}
-        overviewDaily={overviewDaily}
-        overviewMonthly={overviewMonthly}
-        productionKpi={productionKpi}
-        productionDaily={productionDaily}
-        productionEfficiency={productionEfficiency}
-        laborCost={laborCost}
-        montajOzet={montajOzet}
-        montajOperatorler={montajOperatorler}
-        montajGunluk={montajGunluk}
-        salesKpi={salesKpi}
-        salesChannel={salesChannel}
-        salesTopProducts={salesTopProducts}
-        stockKpi={stockKpi}
-        stockMovement={stockMovement}
-        stockCritical={stockCritical}
-        stockValue={stockValue}
-        karlilikKpi={karlilikKpi}
-        karlilikRows={karlilikRows}
+  const { title: chartTitle, ...chartProps } = await buildChart(metric, period, sp, {
+    uretim,
+    montaj,
+    kesim,
+    birim,
+    stok,
+    perf,
+  });
+
+  const dk = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} dk`);
+
+  const cards = (
+    <>
+      <StatCard
+        title="Üretim"
+        href="/analiz/uretim"
+        value={fmtNum(uretim.total)}
+        subtitle="Paketlenen ürün (adet)"
+        delta={uretimPrev ? deltaPct(uretim.total, uretimPrev.total) : null}
       />
-    </div>
+      <StatCard
+        title="Montaj"
+        href="/analiz/montaj"
+        value={fmtNum(montaj.total)}
+        subtitle={`${fmtNum(montaj.sessions)} seans · son adım ${fmtNum(montaj.finalTotal)} adet`}
+        delta={montajPrev ? deltaPct(montaj.total, montajPrev.total) : null}
+      />
+      <StatCard
+        title="Kesim"
+        href="/analiz/kesim"
+        value={`${fmtNum(kesim.plates)} plaka`}
+        subtitle={`${fmtNum(kesim.parts)} parça`}
+        delta={kesimPrev ? deltaPct(kesim.plates, kesimPrev.plates) : null}
+      />
+      <StatCard
+        title="Birim Süre"
+        href="/analiz/birim-sure"
+        topLeft={<StatSlot label="Montaj" value={dk(birim.montajAvg)} small />}
+        topRight={<StatSlot label="Paketleme" value={dk(birim.paketlemeAvg)} small />}
+        subtitle="Kişi-dk / adet (adet ağırlıklı ortalama)"
+      />
+      <StatCard
+        title="Stok Verimliliği"
+        href="/analiz/stok-verimliligi"
+        value={stok.overallPct === null ? "—" : `%${stok.overallPct.toLocaleString("tr-TR")}`}
+        subtitle={
+          stok.activeCount
+            ? `${stok.activeCount} üründen kritik altı ${stok.below}, 2×kritik üstü ${stok.above}`
+            : "Kritik seviyesi tanımlı ürün yok"
+        }
+      />
+      <StatCard
+        title="Personel Performans"
+        href="/analiz/personel"
+        topLeft={
+          <StatSlot label="Genel" value={perf.overallPct === null ? "—" : `%${perf.overallPct.toLocaleString("tr-TR")}`} />
+        }
+        topRight={
+          <div className="space-y-0.5 text-right">
+            {perf.stepStandards.slice(0, 3).map((s) => (
+              <div key={s.stepId} className="text-[11px] text-[#5e5747]">
+                <span className="text-muted-foreground">{s.stepId}</span>{" "}
+                <span className="font-semibold">{s.stdDk.toLocaleString("tr-TR")} dk/adet</span>
+              </div>
+            ))}
+          </div>
+        }
+        subtitle={`${perf.people.length} kişi`}
+      />
+      <StatCard
+        title="Fire"
+        href="/analiz/fire"
+        topLeft={<StatSlot label="Ürün" value={fmtNum(kalite.fire.urun)} />}
+        topCenter={<StatSlot label="Yarı Mamul" value={fmtNum(kalite.fire.yariMamul)} />}
+        topRight={<StatSlot label="Plaka" value={fmtNum(kalite.fire.plaka)} />}
+        subtitle={kalite.available ? "Kalite kayıtlarından" : "Kalite kayıtları henüz yok"}
+      />
+    </>
+  );
+
+  return (
+    <AnalizLayout
+      title="Analiz"
+      period={period}
+      chips={CHIPS}
+      activeMetric={metric}
+      chart={<AnalizChart {...chartProps} title={chartTitle} />}
+      cards={cards}
+    />
   );
 }

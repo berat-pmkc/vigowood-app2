@@ -46,6 +46,8 @@ export async function addIadeGiris(formData: {
   durum: string;
   iade_nedeni: string;
   musteri_bilgisi: string | null;
+  kargo_firmasi?: string | null;
+  siparis_no?: string | null;
 }): Promise<ActionResult> {
   try {
     const user = await requireStockAccess();
@@ -100,7 +102,10 @@ export async function addIadeGiris(formData: {
       iade_nedeni: parsed.data.iade_nedeni,
       musteri_bilgisi: parsed.data.musteri_bilgisi || null,
       operator: operatorId,
-    });
+      kargo_firmasi: formData.kargo_firmasi?.trim() || null,
+      siparis_no: formData.siparis_no?.trim() || null,
+      kontrol_durumu: parsed.data.durum === "Kullanilamaz" ? "bekliyor" : null,
+    } as never);
 
     if (insertError) return { success: false, error: insertError.message };
 
@@ -125,6 +130,32 @@ export async function addIadeGiris(formData: {
         .eq("sku", parsed.data.sku);
 
       if (updateError) return { success: false, error: updateError.message };
+    }
+
+    // Kullanılamaz iade → kontrol edilmek üzere uygunsuz ürün stoğuna girer.
+    // Mamül stoğuna hiç girmediği için stoktan düşülmez.
+    if (parsed.data.durum === "Kullanilamaz") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: kaliteError } = await (supabase as any).rpc("kalite_uygunsuz_giris", {
+        p_item_tipi: "URUN",
+        p_item_id: parsed.data.sku,
+        p_qty: parsed.data.qty,
+        p_kaynak: "iade",
+        p_stoktan_dus: false,
+        p_depo_id: null,
+        p_source_id: iadeId,
+        p_operator_id: operatorId,
+        p_operator_name: authUser?.user_metadata?.selected_operator_name ?? user.full_name ?? null,
+        p_kargo: formData.kargo_firmasi?.trim() || null,
+        p_musteri: parsed.data.musteri_bilgisi || null,
+        p_not: parsed.data.iade_nedeni || null,
+      });
+      if (kaliteError) {
+        return {
+          success: false,
+          error: `İade kaydedildi ancak uygunsuz stoğa alınamadı: ${kaliteError.message}`,
+        };
+      }
     }
 
     revalidatePath("/stok/iade");

@@ -56,3 +56,6 @@ supabase/.temp/
 
 .vercel
 .claude/
+
+# migration script output
+scripts/migrate/out/

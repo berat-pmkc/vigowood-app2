@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { KRITIK_STOK_DEFAULT_GUN, WMA_WEIGHT_7D, WMA_WEIGHT_30D, WMA_WEIGHT_90D } from "@/lib/constants";
+import { KRITIK_STOK_DEFAULT_GUN } from "@/lib/constants";
+import { fetchTuketimHizlari } from "@/lib/kritikStok";
 import type { Database, Json } from "@/lib/supabase/types";
 import { rateLimit, getRateLimitKey } from "@/lib/rate-limit";
 
@@ -45,56 +46,18 @@ export async function GET(request: Request) {
 
     const kritikGun = Number(settingsMap.get("kritik_stok_gun")) || KRITIK_STOK_DEFAULT_GUN;
 
-    // 2. Son 90 günün satışlarını satis_satirlari'dan çek (WMA)
-    const now = new Date();
-    const cutoff90 = new Date(now);
-    cutoff90.setDate(cutoff90.getDate() - 90);
-    const cutoff90ISO = cutoff90.toISOString().split("T")[0];
-
-    const cutoff30 = new Date(now);
-    cutoff30.setDate(cutoff30.getDate() - 30);
-    const cutoff30ISO = cutoff30.toISOString().split("T")[0];
-
-    const cutoff7 = new Date(now);
-    cutoff7.setDate(cutoff7.getDate() - 7);
-    const cutoff7ISO = cutoff7.toISOString().split("T")[0];
-
-    const { data: salesData, error: salesErr } = await supabase
-      .from("satis_satirlari")
-      .select("sku, miktar, tarih")
-      .eq("is_hizmet", false)
-      .not("sku", "is", null)
-      .gte("tarih", cutoff90ISO);
-
-    if (salesErr) {
-      return NextResponse.json({ error: `Satış verileri okunamadı: ${salesErr.message}` }, { status: 500 });
-    }
-
-    // SKU bazında 3 kova topla: 7g, 30g, 90g
-    const skuBuckets = new Map<string, { sum7: number; sum30: number; sum90: number }>();
-    for (const row of salesData ?? []) {
-      if (!row.sku || !row.tarih) continue;
-      const qty = Math.abs(Number(row.miktar) || 0);
-      const bucket = skuBuckets.get(row.sku) || { sum7: 0, sum30: 0, sum90: 0 };
-
-      bucket.sum90 += qty;
-      if (row.tarih >= cutoff30ISO) bucket.sum30 += qty;
-      if (row.tarih >= cutoff7ISO) bucket.sum7 += qty;
-
-      skuBuckets.set(row.sku, bucket);
-    }
-
-    // WMA hesapla: (sum7/7 × 0.20) + (sum30/30 × 0.50) + (sum90/90 × 0.30)
-    const dailyRateMap = new Map<string, number>();
-    for (const [sku, b] of skuBuckets) {
-      const velocity = (b.sum7 / 7) * WMA_WEIGHT_7D + (b.sum30 / 30) * WMA_WEIGHT_30D + (b.sum90 / 90) * WMA_WEIGHT_90D;
-      dailyRateMap.set(sku, Math.round(velocity * 100) / 100);
+    // 2. Son 90 günün mamül stok çıkışlarından (stock_movements) tüketim hızı (WMA)
+    let dailyRateMap: Map<string, number>;
+    try {
+      ({ dailyRateMap } = await fetchTuketimHizlari(supabase));
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Tüketim verileri okunamadı" }, { status: 500 });
     }
 
     // 3. Ürünleri güncelle
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("sku, aktif_mi")
+      .select("sku, aktif_mi, gunluk_satis")
       .eq("aktif_mi", true);
 
     if (prodErr) {
@@ -107,10 +70,14 @@ export async function GET(request: Request) {
 
     for (const prod of products ?? []) {
       const dailyRate = dailyRateMap.get(prod.sku) || 0;
-      const kritikStok = Math.ceil(dailyRate * kritikGun);
 
-      if (dailyRate > 0) productsWithSales++;
-      else productsWithoutSales++;
+      // Pencerede hiç tüketim verisi yoksa mevcut gunluk_satis / mamul_stok_kritik ezilmez
+      if (dailyRate <= 0) {
+        productsWithoutSales++;
+        continue;
+      }
+      productsWithSales++;
+      const kritikStok = Math.ceil(dailyRate * kritikGun);
 
       const { error: upErr } = await supabase
         .from("products")
@@ -171,7 +138,8 @@ export async function GET(request: Request) {
     const partKritikMap = new Map<string, number>();
 
     for (const prod of products ?? []) {
-      const prodKritik = (dailyRateMap.get(prod.sku) || 0) * kritikGun;
+      // Tüketim verisi olmayan ürünlerde mevcut gunluk_satis değeri kullanılır
+      const prodKritik = (dailyRateMap.get(prod.sku) || Number(prod.gunluk_satis) || 0) * kritikGun;
       if (prodKritik === 0) continue;
 
       const stepIds = skuToSteps.get(prod.sku) || [];

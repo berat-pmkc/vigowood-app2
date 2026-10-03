@@ -3,18 +3,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { STOCK_ACCESS_ROLES } from "@/lib/constants";
 
-const STOCK_ACCESS_ROLES = [
-  "Yönetici",
-  "Endüstri Mühendisi",
-  "E-Ticaret Müdürü",
-  "Dış Ticaret Müdürü",
-  "Muhasebe",
-] as const;
 
 async function requireStockAccess() {
   const user = await getCurrentUser();
-  if (!user || !STOCK_ACCESS_ROLES.includes(user.role as (typeof STOCK_ACCESS_ROLES)[number])) {
+  if (!user || !STOCK_ACCESS_ROLES.includes(user.role)) {
     throw new Error("Bu işlem için yetkiniz yok");
   }
   return user;
