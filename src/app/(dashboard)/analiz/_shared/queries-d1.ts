@@ -3,7 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { trDay, tsBounds } from "@/lib/periods";
 import { fetchAll } from "./utils";
-import { isSalesSource } from "./queries";
+import { excludeHazir, getHazirPartIds, isSalesSource } from "./queries";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -40,18 +40,22 @@ export async function getKaliteRows(
 ): Promise<KaliteRowsResult> {
   try {
     const s = await sb();
-    const data = await fetchAll<any>((lo, hi) => {
-      let q = s
-        .from("kalite_hareketleri")
-        .select(
-          "tarih, item_tipi, item_id, item_adi, stok_turu, qty, islem, kaynak, operator_name, kargo_firmasi, musteri",
-        )
-        .order("id");
-      if (stokTuru) q = q.eq("stok_turu", stokTuru);
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
-      return q.range(lo, hi);
-    });
+    const [all, hazir] = await Promise.all([
+      fetchAll<any>((lo, hi) => {
+        let q = s
+          .from("kalite_hareketleri")
+          .select(
+            "tarih, item_tipi, item_id, item_adi, stok_turu, qty, islem, kaynak, operator_name, kargo_firmasi, musteri",
+          )
+          .order("id");
+        if (stokTuru) q = q.eq("stok_turu", stokTuru);
+        if (from) q = q.gte("tarih", from);
+        if (to) q = q.lte("tarih", to);
+        return q.range(lo, hi);
+      }),
+      getHazirPartIds(),
+    ]);
+    const data = excludeHazir(all, hazir);
     const rows: KaliteRow[] = data.map((r: any) => ({
       tarih: trDay(r.tarih) ?? "",
       item_tipi: String(r.item_tipi ?? ""),

@@ -67,7 +67,8 @@ export function FireDialog({
     setLoadingParts(true);
     getUrunYariMamulleri(item.id).then((r) => {
       if (r.success) {
-        setParts(r.data);
+        // Yan malzemeler (hazır eleman) şimdilik fire kapsamı dışında; yalnızca yarı mamuller.
+        setParts(r.data.filter((p) => p.part_type === "YARIMAMUL"));
         setPartQty({});
       } else {
         toast.error(r.error);

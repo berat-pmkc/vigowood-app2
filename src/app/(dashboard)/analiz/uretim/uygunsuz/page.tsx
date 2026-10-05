@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../../_shared/focus";
 import { buildSeries, resolveGranularity } from "../../_shared/series";
 import { fmtNum } from "../../_shared/utils";
 import {
@@ -39,6 +40,20 @@ const CHIPS: MetricChip[] = [
   { key: "kargo", label: "Kargo Firmasına Göre" },
   { key: "urun", label: "Ürüne Göre" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    iade: { cards: ["iade"], cols: [] },
+    uretim: { cards: ["uretim"], cols: [] },
+    stok: { cards: [], cols: [] },
+    "tip-urun": { cards: ["total"], cols: [] },
+    "tip-ym": { cards: ["ym"], cols: [] },
+    kargo: { cards: ["kargo"], cols: [] },
+    urun: { cards: ["top"], cols: [] },
+  },
+  cols: {},
+};
 
 type SP = Record<string, string | string[] | undefined>;
 const URETIM_KAYNAK = ["paketleme", "montaj", "kesim"];
@@ -89,6 +104,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
   // kolon filtreleri: kart + grafik + liste hepsi filtrelenmiş kayıtlardan türer
   const colFilters = parseColumnFilters(sp, COLS);
   const active = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const all = pickByFilters(allUnfiltered, toRow, colFilters);
   const options = distinctOptions(allUnfiltered.map(toRow), COLS);
 
@@ -155,32 +171,31 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
     .sort((a, b) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0))
     .map(toRow);
 
-  // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir
-  const hide = (empty: boolean) => active && empty;
+  // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (active && empty);
   const cards = (
     <>
-      {!hide(total === 0) && <StatCard title="Toplam Uygunsuz Ürün" value={fmtNum(total)} subtitle="Adet" />}
-      {!hide(totalYm === 0) && (
-        <StatCard title="Toplam Uygunsuz Yarı Mamul" value={fmtNum(totalYm)} subtitle="Adet" />
-      )}
-      {!hide(!topProduct) && (
-        <StatCard
-          title="En Çok Gelen Ürün"
-          value={topProduct ? fmtNum(topProduct[1]) : "—"}
-          subtitle={topProduct ? `${topProduct[0]} · ${nameOf(topProduct[0])}` : "Kayıt yok"}
-        />
-      )}
-      {!hide(iade === 0) && <StatCard title="İade Kaynaklı" value={fmtNum(iade)} subtitle="Adet" />}
-      {!hide(uretim === 0) && (
-        <StatCard title="Üretim Kaynaklı" value={fmtNum(uretim)} subtitle="Paketleme, montaj, kesim" />
-      )}
-      {!hide(!kargoTop) && (
-        <StatCard
-          title="En Çok Uygunsuzluk Çıkan Kargo"
-          value={kargoTop ? kargoTop[0] : "—"}
-          subtitle={kargoTop ? `${fmtNum(kargoTop[1])} adet` : "Kargo bilgisi yok"}
-        />
-      )}
+      <StatCard title="Toplam Uygunsuz Ürün" empty={mut("total", total === 0)} value={fmtNum(total)} subtitle="Adet" />
+      <StatCard title="Toplam Uygunsuz Yarı Mamul" empty={mut("ym", totalYm === 0)} value={fmtNum(totalYm)} subtitle="Adet" />
+      <StatCard
+        title="En Çok Gelen Ürün"
+        empty={mut("top", !topProduct)}
+        value={topProduct ? fmtNum(topProduct[1]) : "—"}
+        subtitle={topProduct ? `${topProduct[0]} · ${nameOf(topProduct[0])}` : "Kayıt yok"}
+      />
+      <StatCard title="İade Kaynaklı" empty={mut("iade", iade === 0)} value={fmtNum(iade)} subtitle="Adet" />
+      <StatCard
+        title="Üretim Kaynaklı"
+        empty={mut("uretim", uretim === 0)}
+        value={fmtNum(uretim)}
+        subtitle="Paketleme, montaj, kesim"
+      />
+      <StatCard
+        title="En Çok Uygunsuzluk Çıkan Kargo"
+        empty={mut("kargo", !kargoTop)}
+        value={kargoTop ? kargoTop[0] : "—"}
+        subtitle={kargoTop ? `${fmtNum(kargoTop[1])} adet` : "Kargo bilgisi yok"}
+      />
     </>
   );
 
@@ -190,6 +205,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
       backHref="/analiz/uretim"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={

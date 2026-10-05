@@ -24,6 +24,7 @@ interface Row extends SummaryItem {
 function SummaryTooltip({ active, payload }: { active?: boolean; payload?: { payload: Row }[] }) {
   if (!active || !payload?.length) return null;
   const r = payload[0].payload;
+  if (r.muted) return null;
   let change: React.ReactNode = null;
   if (r.prev !== null && r.cur !== null && r.prev !== 0) {
     const pct = ((r.cur - r.prev) / r.prev) * 100;
@@ -60,13 +61,13 @@ export default function SummaryChartInner({ items, hasPrev, query }: Omit<Summar
   }, []);
 
   const data: Row[] = items.map((it) => {
-    const c = it.cur ?? 0;
-    const p = hasPrev ? (it.prev ?? 0) : 0;
+    const c = it.muted ? 0 : (it.cur ?? 0);
+    const p = hasPrev && !it.muted ? (it.prev ?? 0) : 0;
     const max = Math.max(c, p);
     return {
       ...it,
       curH: max > 0 ? (c / max) * 100 : 0,
-      prevH: hasPrev && it.prev !== null ? (max > 0 ? (p / max) * 100 : 0) : null,
+      prevH: hasPrev && !it.muted && it.prev !== null ? (max > 0 ? (p / max) * 100 : 0) : null,
     };
   });
 
@@ -99,7 +100,7 @@ export default function SummaryChartInner({ items, hasPrev, query }: Omit<Summar
             content={(p) => {
               const { x, y, width, index } = p as unknown as { x: number; y: number; width: number; index: number };
               const r = data[index];
-              if (!r) return null;
+              if (!r || r.muted) return null;
               return (
                 <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={mobile ? 9 : 11} fontWeight={600} fill="#474237">
                   {fmt(r.cur, r.unit, mobile)}

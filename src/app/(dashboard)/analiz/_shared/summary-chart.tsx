@@ -17,6 +17,8 @@ export interface SummaryItem {
   cur: number | null;
   /** null = önceki dönem yok / hesaplanamadı */
   prev: number | null;
+  /** true: odak dışı; kategori eksende kalır ama çubuk/etiket gösterilmez */
+  muted?: boolean;
 }
 
 export interface SummaryChartProps {

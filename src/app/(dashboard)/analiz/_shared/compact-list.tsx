@@ -31,6 +31,8 @@ interface CompactListProps {
   emptyText?: string;
   /** Metin kolonları için filtrelenmemiş ayrık değerler (sunucudan; ≤50 değer) */
   filterOptions?: Record<string, string[]>;
+  /** Odak modu: listelenen kolonlar odakta; diğerlerinin başlığı soluk, hücreleri boş görünür (kolon ve filtre chip'leri yerinde kalır). */
+  visibleColumns?: string[];
 }
 
 const FIRST = 5;
@@ -63,6 +65,7 @@ export function CompactList({
   activeGranularity,
   emptyText = "Bu dönemde kayıt yok",
   filterOptions,
+  visibleColumns,
 }: CompactListProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -72,6 +75,7 @@ export function CompactList({
   const allShown = visible >= rows.length;
   const g = activeGranularity ?? (searchParams.get("g") as Granularity | null);
 
+  const isMuted = (key: string) => !!visibleColumns && !visibleColumns.includes(key);
   const filters = parseColumnFilters(searchParams, columns);
   const activeCols = columns.filter((c) => filters[c.key]);
 
@@ -157,7 +161,7 @@ export function CompactList({
                   key={c.key}
                   className={`whitespace-nowrap px-4 py-1 font-medium ${
                     c.align === "right" ? "text-right" : "text-left"
-                  }`}
+                  } ${isMuted(c.key) ? "opacity-40" : ""}`}
                 >
                   <span className={`inline-flex items-center gap-1 ${c.align === "right" ? "flex-row-reverse" : ""}`}>
                     <span>{c.label}</span>
@@ -191,7 +195,7 @@ export function CompactList({
                       c.align === "right" ? "text-right tabular-nums" : "text-left"
                     }`}
                   >
-                    {fmt(r[c.key] ?? null, c.format)}
+                    {isMuted(c.key) ? "" : fmt(r[c.key] ?? null, c.format)}
                   </td>
                 ))}
               </tr>

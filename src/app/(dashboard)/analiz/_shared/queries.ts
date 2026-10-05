@@ -18,6 +18,28 @@ async function sb(): Promise<any> {
   return await createClient();
 }
 
+/**
+ * Yan malzemeler (hazır eleman: vida, menteşe, mıknatıs...) şimdilik kalite raporlarının dışında.
+ * Yalnızca ürün, yarı mamul ve plaka kayıtları gösterilir.
+ */
+export async function getHazirPartIds(): Promise<Set<string>> {
+  try {
+    const s = await sb();
+    const rows = await fetchAll<{ part_id: string }>((lo, hi) =>
+      s.from("all_parts").select("part_id").eq("part_type", "HAZIR").order("part_id").range(lo, hi),
+    );
+    return new Set(rows.map((r) => r.part_id));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Hazır eleman olan YARI_MAMUL kalite kayıtlarını çıkarır. */
+export function excludeHazir<T extends { item_tipi?: unknown; item_id?: unknown }>(rows: T[], hazir: Set<string>): T[] {
+  if (hazir.size === 0) return rows;
+  return rows.filter((r) => !(String(r.item_tipi ?? "") === "YARI_MAMUL" && hazir.has(String(r.item_id ?? ""))));
+}
+
 function add(map: DayMap, key: string | null, v: number) {
   if (!key) return;
   map[key] = (map[key] ?? 0) + v;
@@ -380,12 +402,16 @@ export async function getKalite(from: string | null, to: string | null): Promise
   const zero: KaliteData = { available: false, fire: { urun: 0, yariMamul: 0, plaka: 0, total: 0 } };
   try {
     const s = await sb();
-    const rows = await fetchAll<Record<string, any>>((lo, hi) => {
-      let q = s.from("kalite_hareketleri").select("*").eq("stok_turu", "FIRE");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
-      return q.range(lo, hi);
-    });
+    const [all, hazir] = await Promise.all([
+      fetchAll<Record<string, any>>((lo, hi) => {
+        let q = s.from("kalite_hareketleri").select("*").eq("stok_turu", "FIRE");
+        if (from) q = q.gte("tarih", from);
+        if (to) q = q.lte("tarih", to);
+        return q.range(lo, hi);
+      }),
+      getHazirPartIds(),
+    ]);
+    const rows = excludeHazir(all, hazir);
     const fire = { urun: 0, yariMamul: 0, plaka: 0, total: 0 };
     for (const r of rows) {
       const n = Math.abs(Number(r.qty ?? r.miktar ?? r.adet ?? 0));

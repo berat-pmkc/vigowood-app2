@@ -25,6 +25,7 @@ import {
   type StokVerimlilikData,
   type UretimData,
 } from "./_shared/queries";
+import { resolveFocus, type FocusMap } from "./_shared/focus";
 import { computePerformance, type PerformanceData } from "./_shared/performance";
 
 export const metadata: Metadata = { title: "Analiz" };
@@ -41,6 +42,21 @@ const CHIPS: MetricChip[] = [
   { key: "birim-sure", label: "Çalışma Birim Süresi" },
   { key: "personel", label: "Personel Verimliliği" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "ozet",
+  chips: {
+    uretim: { cards: ["uretim"], cols: [] },
+    montaj: { cards: ["montaj"], cols: [] },
+    kesim: { cards: ["kesim"], cols: [] },
+    "en-cok-satan": { cards: [], cols: [] },
+    "satisi-dusen": { cards: [], cols: [] },
+    "stok-verimliligi": { cards: ["stok"], cols: [] },
+    "birim-sure": { cards: ["birim-sure"], cols: [] },
+    personel: { cards: ["personel"], cols: [] },
+  },
+  cols: {},
+};
 
 type SP = Record<string, string | string[] | undefined>;
 
@@ -213,6 +229,8 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
 
   const isOzet = metric === "ozet";
+  const focus = resolveFocus(FOCUS, metric, {}, [], CHIPS);
+  const mut = (k: string) => !focus.showCard(k);
   const [uretim, uretimPrev, montaj, montajPrev, kesim, kesimPrev, birim, stok, perf, kalite, birimPrev, stokPrev, perfPrev, kalitePrev] = await Promise.all([
     safe(getUretim(from, to), EMPTY_URETIM),
     prevOf(period, getUretim, EMPTY_URETIM),
@@ -267,6 +285,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
     <>
       <StatCard
         title="Üretim"
+        empty={mut("uretim")}
         href="/analiz/uretim"
         value={fmtNum(uretim.total)}
         subtitle="Paketlenen ürün (adet)"
@@ -274,6 +293,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       />
       <StatCard
         title="Montaj"
+        empty={mut("montaj")}
         href="/analiz/montaj"
         value={fmtNum(montaj.total)}
         subtitle={`${fmtNum(montaj.sessions)} seans · son adım ${fmtNum(montaj.finalTotal)} adet`}
@@ -281,6 +301,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       />
       <StatCard
         title="Kesim"
+        empty={mut("kesim")}
         href="/analiz/kesim"
         value={`${fmtNum(kesim.plates)} plaka`}
         subtitle={`${fmtNum(kesim.parts)} parça`}
@@ -288,6 +309,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       />
       <StatCard
         title="Birim Süre"
+        empty={mut("birim-sure")}
         href="/analiz/birim-sure"
         topLeft={<StatSlot label="Montaj" value={dk(birim.montajAvg)} small />}
         topRight={<StatSlot label="Paketleme" value={dk(birim.paketlemeAvg)} small />}
@@ -295,6 +317,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       />
       <StatCard
         title="Stok Verimliliği"
+        empty={mut("stok")}
         href="/analiz/stok-verimliligi"
         value={stok.overallPct === null ? "—" : `%${stok.overallPct.toLocaleString("tr-TR")}`}
         subtitle={
@@ -305,6 +328,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       />
       <StatCard
         title="Personel Performans"
+        empty={mut("personel")}
         href="/analiz/personel"
         topLeft={
           <StatSlot label="Genel" value={perf.overallPct === null ? "—" : `%${perf.overallPct.toLocaleString("tr-TR")}`} />
@@ -323,6 +347,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       />
       <StatCard
         title="Fire"
+        empty={mut("fire")}
         href="/analiz/fire"
         topLeft={<StatSlot label="Ürün" value={fmtNum(kalite.fire.urun)} />}
         topCenter={<StatSlot label="Yarı Mamul" value={fmtNum(kalite.fire.yariMamul)} />}
@@ -340,6 +365,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       activeMetric={metric}
       chart={chartNode}
       cards={cards}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
     />
   );
 }

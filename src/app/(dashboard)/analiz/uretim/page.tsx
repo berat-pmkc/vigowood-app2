@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
 import { getProductNames } from "../_shared/queries";
@@ -36,6 +37,7 @@ export const metadata: Metadata = { title: "Üretim | Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "miktar", label: "Üretim Miktarı" },
   { key: "birim-sure", label: "Birim Süre" },
   { key: "adam-saat", label: "Adam Saat" },
@@ -56,9 +58,32 @@ const COLS: CompactColumn[] = [
   { key: "fire", label: "Fire", align: "right", format: "number" },
   { key: "cikis", label: "Stoktan Çıkış", align: "right", format: "number" },
   { key: "stok", label: "Güncel Stok", align: "right", format: "number" },
+  { key: "adam", label: "Adam Saat", align: "right", format: "number" },
   { key: "birim", label: "Birim Süre", align: "right", format: "dk" },
   { key: "perf", label: "Performans", align: "right", format: "percent" },
 ];
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    miktar: { cards: ["miktar"], cols: ["uretim"] },
+    "birim-sure": { cards: ["birim"], cols: ["birim", "perf"] },
+    "adam-saat": { cards: ["adam"], cols: ["adam"] },
+    uygunsuz: { cards: ["uygunsuz"], cols: ["uyg"] },
+    kontrol: { cards: ["kontrol"], cols: ["kon"] },
+    fire: { cards: ["fire"], cols: ["fire"] },
+  },
+  cols: {
+    uretim: { cards: ["miktar"], chip: "miktar" },
+    uyg: { cards: ["uygunsuz"], chip: "uygunsuz" },
+    kon: { cards: ["kontrol"], chip: "kontrol" },
+    fire: { cards: ["fire"], chip: "fire" },
+    cikis: { cards: [] },
+    stok: { cards: [] },
+    adam: { cards: ["adam"], chip: "adam-saat" },
+    birim: { cards: ["birim"], chip: "birim-sure" },
+    perf: { cards: [] },
+  },
+};
 const EMPTY_PROD: ProdRows = { pack: [], montaj: [] };
 const EMPTY_STD: StandardTimes = { montaj: new Map(), paketleme: new Map() };
 
@@ -175,6 +200,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
     fire: a.fire,
     cikis: a.cikis,
     stok: stok.get(a.sku) ?? 0,
+    adam: a.man > 0 ? round(a.man / 60, 1) : null,
     birim: a.packed > 0 && a.man > 0 ? round(a.man / a.packed, 2) : null,
     perf: a.known > 0 ? round((a.earned / a.known) * 100, 1) : null,
   });
@@ -182,6 +208,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   // ── Kolon filtreleri: kart + grafik + liste eşleşen (kova × ürün) kayıtlarından türer
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const matched = pickByFilters(accList, toRow, colFilters);
   const options = distinctOptions(accList.map(toRow), COLS);
   const selKeys = new Set(matched.map((a) => `${a.bucket}|${a.sku}`));
@@ -219,7 +246,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   };
 
   let chart: AnalizChartProps & { title: string };
-  switch (metric) {
+  switch (focus.chartMetric) {
     case "birim-sure": {
       const unitByDay: Record<string, number> = {};
       for (const [d, man] of Object.entries(manByDay)) {
@@ -288,59 +315,53 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
 
   const dk = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} dk`);
 
-  // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir
-  const hide = (empty: boolean) => filtActive && empty;
+  // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
-      {!hide(T.packed === 0) && (
-        <StatCard
-          title="Toplam Üretim Miktarı"
-          value={fmtNum(T.packed)}
-          subtitle="Paketlenen ürün (adet)"
-          delta={Tp ? deltaPct(T.packed, Tp.packed) : null}
-        />
-      )}
-      {!hide(T.unit === null) && (
-        <StatCard
-          title="Birim Süre"
-          value={dk(T.unit === null ? null : round(T.unit, 2))}
-          subtitle="Montaj + paketleme kişi-dk / adet"
-          delta={Tp && T.unit !== null && Tp.unit !== null ? deltaPct(T.unit, Tp.unit) : null}
-          inverseDelta
-        />
-      )}
-      {!hide(T.man === 0) && (
-        <StatCard
-          title="Adam Saat"
-          value={`${fmtNum(T.man / 60, 1)} sa`}
-          subtitle="Montaj + paketleme toplam"
-          delta={Tp ? deltaPct(T.man, Tp.man) : null}
-        />
-      )}
-      {!hide(uygunsuz === 0) && (
-        <StatCard
-          title="Uygunsuz Ürün Miktarı"
-          href={`/analiz/uretim/uygunsuz${qs}`}
-          value={fmtNum(uygunsuz)}
-          subtitle="Ayrıntı için dokunun"
-        />
-      )}
-      {!hide(kontrol === 0) && (
-        <StatCard
-          title="Kontrol Edilen Uygunsuz Ürün"
-          href={`/analiz/uretim/kontrol${qs}`}
-          value={fmtNum(kontrol)}
-          subtitle="Ayrıntı için dokunun"
-        />
-      )}
-      {!hide(fire === 0) && (
-        <StatCard
-          title="Fire Ürün Miktarı"
-          href={`/analiz/fire${qs}`}
-          value={fmtNum(fire)}
-          subtitle="Ayrıntı için dokunun"
-        />
-      )}
+      <StatCard
+        title="Toplam Üretim Miktarı"
+        empty={mut("miktar", T.packed === 0)}
+        value={fmtNum(T.packed)}
+        subtitle="Paketlenen ürün (adet)"
+        delta={Tp ? deltaPct(T.packed, Tp.packed) : null}
+      />
+      <StatCard
+        title="Birim Süre"
+        empty={mut("birim", T.unit === null)}
+        value={dk(T.unit === null ? null : round(T.unit, 2))}
+        subtitle="Montaj + paketleme kişi-dk / adet"
+        delta={Tp && T.unit !== null && Tp.unit !== null ? deltaPct(T.unit, Tp.unit) : null}
+        inverseDelta
+      />
+      <StatCard
+        title="Adam Saat"
+        empty={mut("adam", T.man === 0)}
+        value={`${fmtNum(T.man / 60, 1)} sa`}
+        subtitle="Montaj + paketleme toplam"
+        delta={Tp ? deltaPct(T.man, Tp.man) : null}
+      />
+      <StatCard
+        title="Uygunsuz Ürün Miktarı"
+        empty={mut("uygunsuz", uygunsuz === 0)}
+        href={`/analiz/uretim/uygunsuz${qs}`}
+        value={fmtNum(uygunsuz)}
+        subtitle="Ayrıntı için dokunun"
+      />
+      <StatCard
+        title="Kontrol Edilen Uygunsuz Ürün"
+        empty={mut("kontrol", kontrol === 0)}
+        href={`/analiz/uretim/kontrol${qs}`}
+        value={fmtNum(kontrol)}
+        subtitle="Ayrıntı için dokunun"
+      />
+      <StatCard
+        title="Fire Ürün Miktarı"
+        empty={mut("fire", fire === 0)}
+        href={`/analiz/fire${qs}`}
+        value={fmtNum(fire)}
+        subtitle="Ayrıntı için dokunun"
+      />
     </>
   );
 
@@ -350,6 +371,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
       backHref="/analiz"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={
@@ -368,6 +390,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
           columns={COLS}
           rows={rows}
           filterOptions={options}
+          visibleColumns={focus.visibleColumns}
         />
       }
     />

@@ -13,6 +13,7 @@ import {
 } from "@/lib/periods";
 import { fetchAll, parseWorkers, round } from "./utils";
 import type { ChartRow } from "./series";
+import { excludeHazir, getHazirPartIds } from "./queries";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -92,18 +93,21 @@ export interface KaliteRow {
 export async function getKaliteRows(from: string | null, to: string | null): Promise<KaliteRow[]> {
   try {
     const s = await sb();
-    const rows = await fetchAll<any>((lo, hi) => {
-      let q = s
-        .from("kalite_hareketleri")
-        .select(
-          "id, tarih, item_tipi, item_id, stok_turu, qty, islem, kaynak, source_id, parent_id, operator_id, operator_name",
-        )
-        .order("id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
-      return q.range(lo, hi);
-    });
-    return rows.map((r: any) => ({ ...r, qty: Number(r.qty ?? 0) }));
+    const [rows, hazir] = await Promise.all([
+      fetchAll<any>((lo, hi) => {
+        let q = s
+          .from("kalite_hareketleri")
+          .select(
+            "id, tarih, item_tipi, item_id, stok_turu, qty, islem, kaynak, source_id, parent_id, operator_id, operator_name",
+          )
+          .order("id");
+        if (from) q = q.gte("tarih", from);
+        if (to) q = q.lte("tarih", to);
+        return q.range(lo, hi);
+      }),
+      getHazirPartIds(),
+    ]);
+    return excludeHazir(rows, hazir).map((r: any) => ({ ...r, qty: Number(r.qty ?? 0) }));
   } catch {
     return [];
   }

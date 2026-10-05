@@ -14,6 +14,8 @@ interface StatCardProps {
   delta?: number | null;
   /** true ise artış kötü (ör. fire, birim süre) */
   inverseDelta?: boolean;
+  /** Odak dışı / verisiz: çerçeve + başlık kalır, değer "—" (soluk), sayı/alt başlık/delta yok, tıklanmaz */
+  empty?: boolean;
 }
 
 export function StatCard({
@@ -26,7 +28,18 @@ export function StatCard({
   topRight,
   delta,
   inverseDelta,
+  empty,
 }: StatCardProps) {
+  if (empty) {
+    return (
+      <div className="flex h-full min-h-[120px] flex-col rounded-xl border border-[#a99c7d]/20 bg-white p-4 opacity-60 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#a99c7d]">{title}</p>
+        <div className="mt-2">
+          <span className="text-2xl font-bold text-muted-foreground sm:text-3xl">—</span>
+        </div>
+      </div>
+    );
+  }
   const hasSlots = topLeft || topCenter || topRight;
 
   const body = (

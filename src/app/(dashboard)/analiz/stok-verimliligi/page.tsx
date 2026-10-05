@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { round } from "../_shared/utils";
 import {
@@ -27,6 +28,7 @@ export const metadata: Metadata = { title: "Stok Verimliliği | Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "genel", label: "Genel" },
   { key: "kritik-alti", label: "Kritik Altı" },
   { key: "asiri", label: "Aşırı Stok" },
@@ -45,6 +47,24 @@ const COLS: CompactColumn[] = [
   { key: "ust", label: "Aşırı Gün", align: "right", format: "number" },
   { key: "verim", label: "Verim %", align: "right", format: "percent" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    genel: { cards: ["genel"], cols: ["verim"] },
+    "kritik-alti": { cards: ["altgun", "simdi"], cols: ["kritik", "guncel", "alt"] },
+    asiri: { cards: ["ustgun"], cols: ["kritik", "ort", "ust"] },
+    urun: { cards: ["genel"], cols: ["verim"] },
+  },
+  cols: {
+    kritik: { cards: [] },
+    guncel: { cards: ["simdi"] },
+    ort: { cards: [] },
+    alt: { cards: ["altgun"], chip: "kritik-alti" },
+    ust: { cards: ["ustgun"], chip: "asiri" },
+    verim: { cards: ["genel"], chip: "genel" },
+  },
+};
 
 const toRow = (p: StokProductRow): CompactRow => ({
   sku: p.sku,
@@ -91,6 +111,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   // Kolon filtreleri: kart + grafik + liste eşleşen ürünlerden türer
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const sortedAll = [...d.products].sort((a, b) => a.score - b.score);
   const matched = pickByFilters(sortedAll, toRow, colFilters);
   const options = distinctOptions(sortedAll.map(toRow), COLS);
@@ -129,7 +150,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         order: -1,
       },
     };
-    const m = byMetric[metric] ?? {
+    const m = byMetric[focus.chartMetric] ?? {
       title: "Filtreye uyan ürünler — en düşük verim (%, ilk 10)",
       color: "#70c1aa",
       v: (p: StokProductRow) => p.score,
@@ -148,7 +169,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       series: [{ key: "v", label: "Oran", color: m.color }],
     };
   } else
-  switch (metric) {
+  switch (focus.chartMetric) {
     case "kritik-alti":
       chart = {
         title: "Kritik altındaki ürün oranı (%)",
@@ -194,15 +215,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const rows: CompactRow[] = matched.map(toRow);
 
-  // Filtre aktifken eşleşen ürün yoksa kartlar gizlenir
+  // Odak dışı / eşleşen ürün yoksa kartlar boş görünür
   const noMatch = filtActive && matched.length === 0;
-  const cards = noMatch ? null : (
+  const mut = (k: string) => noMatch || !focus.showCard(k);
+  const cards = (
     <>
-      <StatCard title="Genel Verim" value={pct(overallPct)} subtitle={`${activeCount} ürün, gün skoru ortalaması`} />
-      <StatCard title="Kritik Altında Geçen Gün Oranı" value={pct(belowDayPct)} subtitle="Ürün-gün bazında" />
-      <StatCard title="Aşırı Stokta Geçen Gün Oranı" value={pct(aboveDayPct)} subtitle="Ürün-gün bazında" />
+      <StatCard title="Genel Verim" empty={mut("genel")} value={pct(overallPct)} subtitle={`${activeCount} ürün, gün skoru ortalaması`} />
+      <StatCard title="Kritik Altında Geçen Gün Oranı" empty={mut("altgun")} value={pct(belowDayPct)} subtitle="Ürün-gün bazında" />
+      <StatCard title="Aşırı Stokta Geçen Gün Oranı" empty={mut("ustgun")} value={pct(aboveDayPct)} subtitle="Ürün-gün bazında" />
       <StatCard
         title="Şu An Kritik Altı Ürün"
+        empty={mut("simdi")}
         value={currentBelow.toLocaleString("tr-TR")}
         subtitle={`${activeCount} ürün içinde`}
       />
@@ -215,6 +238,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       columns={COLS}
       rows={rows}
       filterOptions={options}
+      visibleColumns={focus.visibleColumns}
     />
   );
 
@@ -247,6 +271,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       backHref="/analiz"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={<AnalizChart {...chartProps} title={title} />}

@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
 import {
@@ -35,6 +36,7 @@ export const metadata: Metadata = { title: "Montaj | Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "adet", label: "İş Adımı Adedi" },
   { key: "birim-sure", label: "Birim Süre" },
   { key: "calisan", label: "Çalışan Sayısı" },
@@ -181,6 +183,24 @@ const COLS: CompactColumn[] = [
   { key: "fire", label: "Fire", align: "right", format: "number" },
   { key: "birim", label: "Birim Süre", align: "right", format: "dk" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    adet: { cards: ["adet"], cols: ["adet"] },
+    "birim-sure": { cards: ["birim"], cols: ["birim"] },
+    calisan: { cards: ["calisan"], cols: [] },
+    uygunsuz: { cards: ["uygunsuz", "kontrol"], cols: ["uygunsuz", "kontrol"] },
+    fire: { cards: ["fire"], cols: ["fire"] },
+  },
+  cols: {
+    adet: { cards: ["adet"], chip: "adet" },
+    uygunsuz: { cards: ["uygunsuz"], chip: "uygunsuz" },
+    kontrol: { cards: ["kontrol"], chip: "uygunsuz" },
+    fire: { cards: ["fire"], chip: "fire" },
+    birim: { cards: ["birim"], chip: "birim-sure" },
+  },
+};
 
 type Gran = ReturnType<typeof resolveGranularity>;
 
@@ -406,6 +426,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const accs = buildAccs(sessions, kalite, g);
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const matched = pickByFilters(accs, (a) => toRow(a, g), colFilters);
   const options = distinctOptions(accs.map((a) => toRow(a, g)), COLS);
   const rows = matched.map((a) => toRow(a, g));
@@ -415,62 +436,56 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const prev = !filtActive && prevSessions && prevKalite ? summarize(prevSessions, prevKalite) : null;
   void EMPTY;
 
-  const { title, ...chartProps } = buildChart(metric, period, sp, cur);
+  const { title, ...chartProps } = buildChart(focus.chartMetric, period, sp, cur);
 
-  const hide = (empty: boolean) => filtActive && empty;
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
-      {!hide(cur.qty === 0) && (
-        <StatCard
-          title="Toplam İş Adımı Adedi"
-          value={fmtNum(cur.qty)}
-          subtitle={`${fmtNum(cur.sessions)} seans`}
-          delta={prev ? deltaPct(cur.qty, prev.qty) : null}
-        />
-      )}
-      {!hide(cur.avgWorkers === null) && (
-        <StatCard
-          title="Ortalama Çalışan Sayısı"
-          value={cur.avgWorkers === null ? "—" : cur.avgWorkers.toLocaleString("tr-TR")}
-          subtitle="Çalışılan gün başına farklı kişi"
-          delta={prev && cur.avgWorkers !== null ? deltaPct(cur.avgWorkers, prev.avgWorkers) : null}
-        />
-      )}
-      {!hide(cur.birim === null) && (
-        <StatCard
-          title="Birim Süre"
-          value={cur.birim === null ? "—" : `${cur.birim.toLocaleString("tr-TR")} dk`}
-          subtitle="dk / adet, adet ağırlıklı"
-          delta={prev && cur.birim !== null ? deltaPct(cur.birim, prev.birim) : null}
-          inverseDelta
-        />
-      )}
-      {!hide(cur.uygunsuz === 0) && (
-        <StatCard
-          title="Toplam Uygunsuz (YM + Ürün)"
-          value={fmtNum(cur.uygunsuz)}
-          subtitle="Montajdan uygunsuza giren"
-          delta={prev ? deltaPct(cur.uygunsuz, prev.uygunsuz) : null}
-          inverseDelta
-        />
-      )}
-      {!hide(cur.kontrol === 0) && (
-        <StatCard
-          title="Kontrol Edilen Uygunsuz"
-          value={fmtNum(cur.kontrol)}
-          subtitle="Kontrol kararı verilen adet"
-          delta={prev ? deltaPct(cur.kontrol, prev.kontrol) : null}
-        />
-      )}
-      {!hide(cur.fire === 0) && (
-        <StatCard
-          title="Fire (YM + Ürün)"
-          value={fmtNum(cur.fire)}
-          subtitle="Montaj kaynaklı fire"
-          delta={prev ? deltaPct(cur.fire, prev.fire) : null}
-          inverseDelta
-        />
-      )}
+      <StatCard
+        title="Toplam İş Adımı Adedi"
+        empty={mut("adet", cur.qty === 0)}
+        value={fmtNum(cur.qty)}
+        subtitle={`${fmtNum(cur.sessions)} seans`}
+        delta={prev ? deltaPct(cur.qty, prev.qty) : null}
+      />
+      <StatCard
+        title="Ortalama Çalışan Sayısı"
+        empty={mut("calisan", cur.avgWorkers === null)}
+        value={cur.avgWorkers === null ? "—" : cur.avgWorkers.toLocaleString("tr-TR")}
+        subtitle="Çalışılan gün başına farklı kişi"
+        delta={prev && cur.avgWorkers !== null ? deltaPct(cur.avgWorkers, prev.avgWorkers) : null}
+      />
+      <StatCard
+        title="Birim Süre"
+        empty={mut("birim", cur.birim === null)}
+        value={cur.birim === null ? "—" : `${cur.birim.toLocaleString("tr-TR")} dk`}
+        subtitle="dk / adet, adet ağırlıklı"
+        delta={prev && cur.birim !== null ? deltaPct(cur.birim, prev.birim) : null}
+        inverseDelta
+      />
+      <StatCard
+        title="Toplam Uygunsuz (YM + Ürün)"
+        empty={mut("uygunsuz", cur.uygunsuz === 0)}
+        value={fmtNum(cur.uygunsuz)}
+        subtitle="Montajdan uygunsuza giren"
+        delta={prev ? deltaPct(cur.uygunsuz, prev.uygunsuz) : null}
+        inverseDelta
+      />
+      <StatCard
+        title="Kontrol Edilen Uygunsuz"
+        empty={mut("kontrol", cur.kontrol === 0)}
+        value={fmtNum(cur.kontrol)}
+        subtitle="Kontrol kararı verilen adet"
+        delta={prev ? deltaPct(cur.kontrol, prev.kontrol) : null}
+      />
+      <StatCard
+        title="Fire (YM + Ürün)"
+        empty={mut("fire", cur.fire === 0)}
+        value={fmtNum(cur.fire)}
+        subtitle="Montaj kaynaklı fire"
+        delta={prev ? deltaPct(cur.fire, prev.fire) : null}
+        inverseDelta
+      />
     </>
   );
 
@@ -483,6 +498,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         columns={COLS}
         rows={rows}
         filterOptions={options}
+        visibleColumns={focus.visibleColumns}
       />
       <p className="px-1 text-[11px] text-muted-foreground">
         Ekip seanslarında adet, çalışan sayısına eşit bölünerek her kişiye yazılır. Uygunsuz/fire kayıtları seans
@@ -497,6 +513,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       backHref="/analiz"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={<AnalizChart {...chartProps} title={title} />}

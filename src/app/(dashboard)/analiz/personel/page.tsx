@@ -15,6 +15,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { fmtNum, round } from "../_shared/utils";
 import { getBirimSure, type BirimSureData } from "../_shared/queries";
 import {
@@ -31,11 +32,28 @@ export const metadata: Metadata = { title: "Personel Verimliliği | Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "performans", label: "Performans %" },
   { key: "adam-saat", label: "Adam Saat" },
   { key: "birim-sure", label: "Birim Süre" },
-  { key: "genel", label: "Genel" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    performans: { cards: ["perf"], cols: ["kazanilan", "harcanan", "pct"] },
+    "adam-saat": { cards: ["saat"], cols: ["saat"] },
+    "birim-sure": { cards: ["birim"], cols: ["adet", "harcanan"] },
+  },
+  cols: {
+    saat: { cards: ["saat"], chip: "adam-saat" },
+    adet: { cards: [] },
+    kazanilan: { cards: ["perf"] },
+    harcanan: { cards: ["saat"] },
+    pct: { cards: ["perf"], chip: "performans" },
+    adim: { cards: [] },
+  },
+};
 
 type SP = Record<string, string | string[] | undefined>;
 
@@ -70,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const period = resolvePeriod(sp);
   const { from, to } = period;
   const metricRaw = Array.isArray(sp.m) ? sp.m[0] : sp.m;
-  const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : "genel";
+  const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const kisiRaw = Array.isArray(sp.kisi) ? sp.kisi[0] : sp.kisi;
 
   const [perf, std, birim, stepStats] = await Promise.all([
@@ -92,6 +110,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   });
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const options = distinctOptions(perf.people.map(toRow), COLS);
   const people = pickByFilters(perf.people, toRow, colFilters);
 
@@ -173,9 +192,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   );
 
   let chart;
-  if (metric === "performans") chart = perfChart;
-  else if (metric === "adam-saat") chart = hoursChart;
-  else if (metric === "birim-sure") chart = unitChart;
+  if (focus.chartMetric === "performans") chart = perfChart;
+  else if (focus.chartMetric === "adam-saat") chart = hoursChart;
+  else if (focus.chartMetric === "birim-sure") chart = unitChart;
   else
     chart = (
       <div className="space-y-4">
@@ -185,31 +204,28 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       </div>
     );
 
-  // Filtre aktifken eşleşen kişi yoksa / değer hesaplanamıyorsa kartlar gizlenir
-  const hide = (empty: boolean) => filtActive && empty;
+  // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
-      {!hide(people.length === 0) && (
-        <StatCard
-          title="Personel Adam Saat Çalışma Süresi"
-          value={`${fmtNum(totalHours, 1)} sa`}
-          subtitle={`${people.length} kişi, net seans süresi (mola düşülmüş)`}
-        />
-      )}
-      {!hide(montajAvg === null) && (
-        <StatCard
-          title="Ortalama Birim Süre"
-          value={montajAvg === null ? "—" : `${montajAvg.toLocaleString("tr-TR")} dk`}
-          subtitle="Montaj, dk / adet (adet ağırlıklı)"
-        />
-      )}
-      {!hide(overallPct === null) && (
-        <StatCard
-          title="Genel Performans"
-          value={overallPct === null ? "—" : `%${overallPct.toLocaleString("tr-TR")}`}
-          subtitle="Kazanılan ÷ harcanan süre"
-        />
-      )}
+      <StatCard
+        title="Personel Adam Saat Çalışma Süresi"
+        empty={mut("saat", people.length === 0)}
+        value={`${fmtNum(totalHours, 1)} sa`}
+        subtitle={`${people.length} kişi, net seans süresi (mola düşülmüş)`}
+      />
+      <StatCard
+        title="Ortalama Birim Süre"
+        empty={mut("birim", montajAvg === null)}
+        value={montajAvg === null ? "—" : `${montajAvg.toLocaleString("tr-TR")} dk`}
+        subtitle="Montaj, dk / adet (adet ağırlıklı)"
+      />
+      <StatCard
+        title="Genel Performans"
+        empty={mut("perf", overallPct === null)}
+        value={overallPct === null ? "—" : `%${overallPct.toLocaleString("tr-TR")}`}
+        subtitle="Kazanılan ÷ harcanan süre"
+      />
     </>
   );
 
@@ -222,6 +238,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         columns={COLS}
         rows={rows}
         filterOptions={options}
+        visibleColumns={focus.visibleColumns}
       />
       <div className="rounded-xl border border-[#a99c7d]/30 bg-[#f0ede1]/60 p-4 text-xs text-[#5e5747]">
         <h3 className="mb-1.5 text-sm font-semibold text-[#474237]">Performans Formülü (Hesaplama Notu)</h3>
@@ -256,6 +273,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       backHref="/analiz"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={chart}

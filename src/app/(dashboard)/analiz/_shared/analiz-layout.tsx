@@ -4,6 +4,7 @@ import { ArrowLeft, Filter } from "lucide-react";
 import type { ResolvedPeriod } from "@/lib/periods";
 import { PeriodBar } from "./period-bar";
 import { MetricChips, type MetricChip } from "./metric-chips";
+import { FocusBadge } from "./focus-badge";
 
 interface AnalizLayoutProps {
   title: string;
@@ -20,6 +21,8 @@ interface AnalizLayoutProps {
   cardsClassName?: string;
   /** Kolon filtresi aktifse: "Filtre uygulandı: ..." notu (kart ve grafikler filtrelenmiştir) */
   filterNote?: string | null;
+  /** Odak modu: "Odak: ..." etiketleri ve × ile silinecek URL parametreleri */
+  focus?: { labels: string[]; clearKeys: string[] } | null;
 }
 
 export function AnalizLayout({
@@ -33,6 +36,7 @@ export function AnalizLayout({
   list,
   cardsClassName = "grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4",
   filterNote,
+  focus,
 }: AnalizLayoutProps) {
   return (
     <div className="space-y-4">
@@ -58,6 +62,14 @@ export function AnalizLayout({
           <Filter className="mt-0.5 h-3.5 w-3.5 shrink-0" fill="#3368b1" />
           <span>{filterNote} — kartlar ve grafik filtreye göre hesaplanır</span>
         </p>
+      )}
+
+      {focus && focus.labels.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Suspense fallback={null}>
+            <FocusBadge labels={focus.labels} clearKeys={focus.clearKeys} />
+          </Suspense>
+        </div>
       )}
 
       {chips && chips.length > 0 && (

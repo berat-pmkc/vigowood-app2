@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
 import {
@@ -35,6 +36,7 @@ export const metadata: Metadata = { title: "Kesim | Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "plaka", label: "Plaka Adedi" },
   { key: "parca", label: "Parça Adedi" },
   { key: "sure", label: "Planlanan Süre" },
@@ -110,10 +112,31 @@ const COLS: CompactColumn[] = [
   { key: "part", label: "Parça Kodu" },
   { key: "plates", label: "Plaka Adedi", align: "right", format: "number" },
   { key: "parts", label: "Parça Adedi", align: "right", format: "number" },
+  { key: "sure", label: "Planlanan Süre (sa)", align: "right", format: "number" },
   { key: "uygunsuz", label: "Uygunsuz", align: "right", format: "number" },
   { key: "fire", label: "Fire", align: "right", format: "number" },
   { key: "donusum", label: "Dönüşüm", align: "right", format: "number" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    plaka: { cards: ["plaka"], cols: ["plates"] },
+    parca: { cards: ["parca"], cols: ["parts"] },
+    sure: { cards: ["sure"], cols: ["sure"] },
+    uygunsuz: { cards: ["uygunsuz"], cols: ["uygunsuz"] },
+    fire: { cards: ["fire"], cols: ["fire"] },
+    donusum: { cards: ["donusum"], cols: ["donusum"] },
+  },
+  cols: {
+    plates: { cards: ["plaka"], chip: "plaka" },
+    parts: { cards: ["parca"], chip: "parca" },
+    sure: { cards: ["sure"], chip: "sure" },
+    uygunsuz: { cards: ["uygunsuz"], chip: "uygunsuz" },
+    fire: { cards: ["fire"], chip: "fire" },
+    donusum: { cards: ["donusum"], chip: "donusum" },
+  },
+};
 
 type Gran = ReturnType<typeof resolveGranularity>;
 
@@ -214,6 +237,7 @@ const toRow = (a: Acc, g: Gran): CompactRow => ({
   part: a.part,
   plates: round(a.plates, 1),
   parts: round(a.parts, 1),
+  sure: round(a.plannedMin / 60, 1),
   uygunsuz: round(a.m.uygunsuz, 1),
   fire: round(a.m.fire, 1),
   donusum: round(a.m.donusum, 1),
@@ -282,6 +306,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const accs = buildAccs(detay, kalite, g);
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const matched = pickByFilters(accs, (a) => toRow(a, g), colFilters);
   const options = distinctOptions(accs.map((a) => toRow(a, g)), COLS);
   const rows = matched.map((a) => toRow(a, g));
@@ -291,7 +316,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   // Önceki dönem kıyası filtreye uygulanamaz; filtre aktifken gizlenir
   const prev = !filtActive && prevDetay && prevKalite ? summarize(prevDetay, prevKalite) : null;
   const prevK = !filtActive ? prevKalite : null;
-  const { title, ...chartProps } = buildChart(metric, period, sp, cur);
+  const { title, ...chartProps } = buildChart(focus.chartMetric, period, sp, cur);
 
   // Uygunsuz YM: yalnızca yarı mamul; fire: plaka + yarı mamul
   const uyg = fsum ? fsum.ymUygunsuz : aggregateKalite(kalite, "kesim", ["YARI_MAMUL"]).uygunsuz;
@@ -302,59 +327,53 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const firePlaka = cur.k.fireByTip.PLAKA;
   const hours = cur.plannedMin / 60;
 
-  const hide = (empty: boolean) => filtActive && empty;
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
-      {!hide(cur.plates === 0) && (
-        <StatCard
-          title="Kesilen Plaka"
-          value={fmtNum(cur.plates)}
-          subtitle="Tamamlanan kesim adedi"
-          delta={prev ? deltaPct(cur.plates, prev.plates) : null}
-        />
-      )}
-      {!hide(cur.parts === 0) && (
-        <StatCard
-          title="Kesilen Parça"
-          value={fmtNum(cur.parts)}
-          subtitle="Kesim satırları toplamı"
-          delta={prev ? deltaPct(cur.parts, prev.parts) : null}
-        />
-      )}
-      {!hide(cur.plannedMin === 0) && (
-        <StatCard
-          title="Planlanan Kesim Süresi"
-          value={`${fmtNum(hours, 1)} saat`}
-          subtitle="Plaka adedi × plakanın makine kesim süresi"
-          delta={prev ? deltaPct(cur.plannedMin, prev.plannedMin) : null}
-        />
-      )}
-      {!hide(uyg === 0) && (
-        <StatCard
-          title="Uygunsuz YM"
-          value={fmtNum(uyg)}
-          subtitle="Kesimden uygunsuza giren yarı mamul"
-          delta={uygPrev !== null ? deltaPct(uyg, uygPrev) : null}
-          inverseDelta
-        />
-      )}
-      {!hide(donusum === 0) && (
-        <StatCard
-          title="Dönüştürülen YM"
-          value={fmtNum(donusum)}
-          subtitle="Dönüşüm kaynağı olarak çıkan adet"
-          delta={donusumPrev !== null ? deltaPct(donusum, donusumPrev) : null}
-        />
-      )}
-      {!hide(cur.k.fire === 0) && (
-        <StatCard
-          title="Fire"
-          value={fmtNum(cur.k.fire)}
-          subtitle={`Plaka ${fmtNum(firePlaka)} · Yarı mamul ${fmtNum(fireYm)}`}
-          delta={prev ? deltaPct(cur.k.fire, prev.k.fire) : null}
-          inverseDelta
-        />
-      )}
+      <StatCard
+        title="Kesilen Plaka"
+        empty={mut("plaka", cur.plates === 0)}
+        value={fmtNum(cur.plates)}
+        subtitle="Tamamlanan kesim adedi"
+        delta={prev ? deltaPct(cur.plates, prev.plates) : null}
+      />
+      <StatCard
+        title="Kesilen Parça"
+        empty={mut("parca", cur.parts === 0)}
+        value={fmtNum(cur.parts)}
+        subtitle="Kesim satırları toplamı"
+        delta={prev ? deltaPct(cur.parts, prev.parts) : null}
+      />
+      <StatCard
+        title="Planlanan Kesim Süresi"
+        empty={mut("sure", cur.plannedMin === 0)}
+        value={`${fmtNum(hours, 1)} saat`}
+        subtitle="Plaka adedi × plakanın makine kesim süresi"
+        delta={prev ? deltaPct(cur.plannedMin, prev.plannedMin) : null}
+      />
+      <StatCard
+        title="Uygunsuz YM"
+        empty={mut("uygunsuz", uyg === 0)}
+        value={fmtNum(uyg)}
+        subtitle="Kesimden uygunsuza giren yarı mamul"
+        delta={uygPrev !== null ? deltaPct(uyg, uygPrev) : null}
+        inverseDelta
+      />
+      <StatCard
+        title="Dönüştürülen YM"
+        empty={mut("donusum", donusum === 0)}
+        value={fmtNum(donusum)}
+        subtitle="Dönüşüm kaynağı olarak çıkan adet"
+        delta={donusumPrev !== null ? deltaPct(donusum, donusumPrev) : null}
+      />
+      <StatCard
+        title="Fire"
+        empty={mut("fire", cur.k.fire === 0)}
+        value={fmtNum(cur.k.fire)}
+        subtitle={`Plaka ${fmtNum(firePlaka)} · Yarı mamul ${fmtNum(fireYm)}`}
+        delta={prev ? deltaPct(cur.k.fire, prev.k.fire) : null}
+        inverseDelta
+      />
     </>
   );
 
@@ -367,6 +386,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         columns={COLS}
         rows={rows}
         filterOptions={options}
+        visibleColumns={focus.visibleColumns}
       />
       <p className="px-1 text-[11px] text-muted-foreground">
         Planlanan süre gerçek ölçüm değil, plakanın tanımlı makine kesim süresine dayanır (kesimde gerçek süre kaydı
@@ -381,6 +401,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       backHref="/analiz"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={<AnalizChart {...chartProps} title={title} />}

@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { resolveGranularity, buildSeries } from "../_shared/series";
 import { fmtNum, round } from "../_shared/utils";
 import { getBirimSure, getProductNames, type BirimSureData } from "../_shared/queries";
@@ -24,6 +25,7 @@ export const metadata: Metadata = { title: "Çalışma Birim Süresi | Analiz" }
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "montaj", label: "Montaj" },
   { key: "paketleme", label: "Paketleme" },
   { key: "adim", label: "Adım Bazlı" },
@@ -100,6 +102,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const toRow = (r: Item): CompactRow => ({ ad: r.label, adet: round(r.qty, 0), avg: r.avg, std: r.std, fark: r.fark });
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const TIMES = ["avg", "std", "fark"];
+  const focusMap: FocusMap = {
+    defaultChip: "tumu",
+    chips: {
+      montaj: { cards: ["montaj"], cols: TIMES },
+      paketleme: { cards: ["paketleme"], cols: TIMES },
+      adim: { cards: ["yavas", "hizli"], cols: TIMES },
+      urun: { cards: ["paketleme"], cols: TIMES },
+    },
+    cols: {
+      avg: { cards: listIsUrun ? ["paketleme"] : ["montaj", "yavas", "hizli"], chip: listIsUrun ? "paketleme" : "montaj" },
+      std: { cards: listIsUrun ? [] : ["yavas", "hizli"] },
+      fark: { cards: listIsUrun ? [] : ["yavas", "hizli"], chip: listIsUrun ? undefined : "adim" },
+    },
+  };
+  const focus = resolveFocus(focusMap, metric, colFilters, COLS, CHIPS);
   const listAll: Item[] = [...(listIsUrun ? urunRows : stepRows)].sort((a, b) => b.qty - a.qty);
   const matched = pickByFilters(listAll, toRow, colFilters);
   const options = distinctOptions(listAll.map(toRow), COLS);
@@ -135,7 +153,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   // Grafik
   let chart: AnalizChartProps & { title: string };
-  if (filtActive && (metric === "montaj" || metric === "paketleme")) {
+  if (filtActive && (metric === "tumu" || metric === "montaj" || metric === "paketleme")) {
     // Gün bazlı seri kalem kırılımı içermez; filtre altında eşleşen kalemlerin birim süresi gösterilir
     const isP = metric === "paketleme";
     chart = {
@@ -155,7 +173,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         { key: "std", label: "Standart", color: "#adb5be" },
       ],
     };
-  } else if (metric === "paketleme") {
+  } else if (focus.chartMetric === "paketleme") {
     chart = {
       title: "Paketleme birim süresi (dk / adet)",
       type: "line",
@@ -164,7 +182,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       data: buildSeries(from, to, g, { v: birim.paketlemeByDay }, "avg"),
       series: [{ key: "v", label: "Paketleme", color: "#3368b1" }],
     };
-  } else if (metric === "adim") {
+  } else if (focus.chartMetric === "adim") {
     chart = {
       title: "En yavaş 10 adım (dk / adet) ve standartları",
       type: "bar",
@@ -180,7 +198,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         { key: "std", label: "Standart", color: "#adb5be" },
       ],
     };
-  } else if (metric === "urun") {
+  } else if (focus.chartMetric === "urun") {
     chart = {
       title: "En yavaş 10 ürün — paketleme (dk / adet) ve standartları",
       type: "bar",
@@ -210,22 +228,24 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const listRows: CompactRow[] = matched.map(toRow);
 
-  // Filtre aktifken anlamlı verisi olmayan (ilgisiz listeye ait) kartlar gizlenir
-  const hide = (empty: boolean) => filtActive && empty;
+  // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
-      {!hide(montajAvg === null) && (
-        <StatCard title="Montaj Birim Süre" value={dk(montajAvg)} subtitle="dk / adet, adet ağırlıklı" />
-      )}
-      {!hide(paketlemeAvg === null) && (
-        <StatCard title="Paketleme Birim Süre" value={dk(paketlemeAvg)} subtitle="dk / adet, adet ağırlıklı" />
-      )}
-      {!(filtActive && (listIsUrun || !slowest)) && (
-        <StatCard title="En Yavaş Adım" value={slowCard.value} subtitle={slowCard.subtitle} />
-      )}
-      {!(filtActive && (listIsUrun || !fastest)) && (
-        <StatCard title="En Hızlı Adım" value={fastCard.value} subtitle={fastCard.subtitle} />
-      )}
+      <StatCard
+        title="Montaj Birim Süre"
+        empty={mut("montaj", montajAvg === null)}
+        value={dk(montajAvg)}
+        subtitle="dk / adet, adet ağırlıklı"
+      />
+      <StatCard
+        title="Paketleme Birim Süre"
+        empty={mut("paketleme", paketlemeAvg === null)}
+        value={dk(paketlemeAvg)}
+        subtitle="dk / adet, adet ağırlıklı"
+      />
+      <StatCard title="En Yavaş Adım" empty={mut("yavas", listIsUrun || !slowest)} value={slowCard.value} subtitle={slowCard.subtitle} />
+      <StatCard title="En Hızlı Adım" empty={mut("hizli", listIsUrun || !fastest)} value={fastCard.value} subtitle={fastCard.subtitle} />
     </>
   );
 
@@ -236,6 +256,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         columns={COLS.map((c) => (c.key === "ad" ? { ...c, label: listIsUrun ? "Ürün" : "Adım" } : c))}
         rows={listRows}
         filterOptions={options}
+        visibleColumns={focus.visibleColumns}
       />
       <p className="px-1 text-[11px] text-muted-foreground">
         Standart süre: son 180 gündeki tüm seansların birim süre medyanı. En yavaş/en hızlı adım, en az 5 adet
@@ -255,6 +276,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         COLS.map((c) => (c.key === "ad" ? { ...c, label: listIsUrun ? "Ürün" : "Adım" } : c)),
       )}
       chips={CHIPS}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       activeMetric={metric}
       chart={<AnalizChart {...chartProps} title={title} />}
       cards={cards}

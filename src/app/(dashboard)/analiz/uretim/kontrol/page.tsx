@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../../_shared/focus";
 import { buildSeries, resolveGranularity } from "../../_shared/series";
 import { fmtNum } from "../../_shared/utils";
 import {
@@ -35,6 +36,16 @@ const CHIPS: MetricChip[] = [
   { key: "sokum", label: "Söküm" },
   { key: "fire", label: "Fire" },
 ];
+
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    uygun: { cards: ["uygun"], cols: [] },
+    sokum: { cards: ["sokum"], cols: [] },
+    fire: { cards: ["fire"], cols: [] },
+  },
+  cols: {},
+};
 
 const KARAR_LABEL = { uygun: "Uygun", sokum: "Söküm", fire: "Fire", diger: "Diğer" } as const;
 type SP = Record<string, string | string[] | undefined>;
@@ -86,6 +97,7 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
   const kontrolAll = kal.rows.filter(isKontrolAny);
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   // kart + grafik + liste filtrelenmiş kontrol kayıtlarından türer
   const kontrol = pickByFilters(kontrolAll, toRow, colFilters);
   const options = distinctOptions(kontrolAll.map(toRow), COLS);
@@ -134,20 +146,18 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
   const qU = qtyOf("uygun");
   const qS = qtyOf("sokum");
   const qF = qtyOf("fire");
+  const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
-      {!(filtActive && qU === 0) && (
-        <StatCard title="Uygun'a Dönen" value={fmtNum(qU)} subtitle="Satılabilir stoğa geri alınan" />
-      )}
-      {!(filtActive && qS === 0) && <StatCard title="Söküme Giden" value={fmtNum(qS)} subtitle="Parçalarına ayrılan" />}
-      {!(filtActive && qF === 0) && <StatCard title="Fire'ye Ayrılan" value={fmtNum(qF)} subtitle="Fire stoğuna alınan" />}
-      {!filtActive && (
-        <StatCard
-          title="Bekleyen Uygunsuz Bakiye"
-          value={fmtNum(bakiye)}
-          subtitle="Şu an kontrol bekleyen (tüm zamanlar)"
-        />
-      )}
+      <StatCard title="Uygun'a Dönen" empty={mut("uygun", qU === 0)} value={fmtNum(qU)} subtitle="Satılabilir stoğa geri alınan" />
+      <StatCard title="Söküme Giden" empty={mut("sokum", qS === 0)} value={fmtNum(qS)} subtitle="Parçalarına ayrılan" />
+      <StatCard title="Fire'ye Ayrılan" empty={mut("fire", qF === 0)} value={fmtNum(qF)} subtitle="Fire stoğuna alınan" />
+      <StatCard
+        title="Bekleyen Uygunsuz Bakiye"
+        empty={mut("bakiye", true) || !focus.all}
+        value={fmtNum(bakiye)}
+        subtitle="Şu an kontrol bekleyen (tüm zamanlar)"
+      />
     </>
   );
 
@@ -157,6 +167,7 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
       backHref="/analiz/uretim"
       period={period}
       filterNote={filterNote(colFilters, COLS)}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={

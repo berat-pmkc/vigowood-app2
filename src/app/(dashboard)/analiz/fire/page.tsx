@@ -14,6 +14,7 @@ import {
   parseColumnFilters,
   pickByFilters,
 } from "../_shared/column-filters";
+import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { fmtNum, round } from "../_shared/utils";
 import { getUretim } from "../_shared/queries";
@@ -31,6 +32,7 @@ export const metadata: Metadata = { title: "Fire | Analiz" };
 export const revalidate = 30;
 
 const CHIPS: MetricChip[] = [
+  { key: "tumu", label: "Tümü" },
   { key: "en-cok", label: "En Çok Fire" },
   { key: "en-az", label: "En Az Fire" },
   { key: "firesiz", label: "Firesiz Ürünler" },
@@ -38,6 +40,18 @@ const CHIPS: MetricChip[] = [
   { key: "yari-mamul", label: "Yarı Mamul" },
   { key: "plaka", label: "Plaka" },
 ];
+const FOCUS: FocusMap = {
+  defaultChip: "tumu",
+  chips: {
+    "en-cok": { cards: ["urun", "ym", "plaka"], cols: [] },
+    "en-az": { cards: ["urun", "ym", "plaka"], cols: [] },
+    firesiz: { cards: ["firesiz", "firesiz-uretim"], cols: [] },
+    urun: { cards: ["urun", "oran"], cols: [] },
+    "yari-mamul": { cards: ["ym"], cols: [] },
+    plaka: { cards: ["plaka"], cols: [] },
+  },
+  cols: {},
+};
 const TIP_OF: Record<string, string> = { urun: "URUN", "yari-mamul": "YARI_MAMUL", plaka: "PLAKA" };
 
 type SP = Record<string, string | string[] | undefined>;
@@ -92,6 +106,7 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
   const firesizFilters = isFiresiz ? parseColumnFilters(sp, FIRESIZ_COLS) : {};
   const fireActive = hasActiveFilters(fireFilters);
   const firesizActive = hasActiveFilters(firesizFilters);
+  const focus = resolveFocus(FOCUS, metric, {}, FIRE_COLS, CHIPS);
   const note = isFiresiz ? filterNote(firesizFilters, FIRESIZ_COLS) : filterNote(fireFilters, FIRE_COLS);
 
   // Kart + grafik + liste filtrelenmiş fire kayıtlarından türer
@@ -132,7 +147,7 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
   const firesiz = pickByFilters(firesizAll, toFiresizRow, firesizFilters);
 
   let chart: AnalizChartProps & { title: string };
-  if (metric === "en-cok") {
+  if (metric === "en-cok" || metric === "tumu") {
     chart = {
       title: "En çok fire veren 10 kalem (adet)",
       type: "bar",
@@ -215,29 +230,31 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
   // Filtre aktifken anlamlı verisi olmayan kartlar gizlenir
   const ymFire = sumTip("YARI_MAMUL");
   const plakaFire = sumTip("PLAKA");
-  const cards = firesizActive ? (
-    <>
-      <StatCard title="Firesiz Ürün" value={fmtNum(firesiz.length)} subtitle="Filtreye uyan ürün sayısı" />
-      <StatCard
-        title="Firesiz Ürün Üretimi"
-        value={fmtNum(firesiz.reduce((a, r) => a + r.qty, 0))}
-        subtitle="Adet"
-      />
-    </>
-  ) : (
-    <>
-      {(!fireActive || urunFire > 0) && <StatCard title="Ürün Firesi" value={fmtNum(urunFire)} subtitle="Adet" />}
-      {(!fireActive || ymFire > 0) && <StatCard title="Yarı Mamul Firesi" value={fmtNum(ymFire)} subtitle="Adet" />}
-      {(!fireActive || plakaFire > 0) && <StatCard title="Plaka Firesi" value={fmtNum(plakaFire)} subtitle="Adet" />}
-      {(!fireActive || (rate !== null && urunFire > 0)) && (
+  const mut = (k: string, empty = false) => !focus.showCard(k) || empty;
+  const cards =
+    metric === "firesiz" || firesizActive ? (
+      <>
+        <StatCard title="Firesiz Ürün" empty={mut("firesiz")} value={fmtNum(firesiz.length)} subtitle="Filtreye uyan ürün sayısı" />
+        <StatCard
+          title="Firesiz Ürün Üretimi"
+          empty={mut("firesiz-uretim")}
+          value={fmtNum(firesiz.reduce((a, r) => a + r.qty, 0))}
+          subtitle="Adet"
+        />
+      </>
+    ) : (
+      <>
+        <StatCard title="Ürün Firesi" empty={mut("urun", fireActive && urunFire === 0)} value={fmtNum(urunFire)} subtitle="Adet" />
+        <StatCard title="Yarı Mamul Firesi" empty={mut("ym", fireActive && ymFire === 0)} value={fmtNum(ymFire)} subtitle="Adet" />
+        <StatCard title="Plaka Firesi" empty={mut("plaka", fireActive && plakaFire === 0)} value={fmtNum(plakaFire)} subtitle="Adet" />
         <StatCard
           title="Fire Oranı"
+          empty={mut("oran", fireActive && (rate === null || urunFire === 0))}
           value={rate === null ? "—" : `%${rate.toLocaleString("tr-TR")}`}
           subtitle={`Ürün firesi / üretim (${fmtNum(rateDen)} adet)`}
         />
-      )}
-    </>
-  );
+      </>
+    );
 
   return (
     <AnalizLayout
@@ -245,6 +262,7 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
       backHref="/analiz"
       period={period}
       filterNote={note}
+      focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
       chart={
