@@ -560,6 +560,8 @@ steps.push(step('10.1 satir_yeniden_aktif: sayac sifirlanir, uretilen yeniden sa
   v_plan2 := ${S}.talimat_plan_getir_veya_olustur(${S}.talimat_bugun());
   s9 := ${kaydet(`jsonb_build_object('plan_id',v_plan2,'personel_id',w1,'istasyon','montaj','sku','LS031','istenen_miktar',5)`)};
   ${su}
+  -- 156: sayaç talimatın verildiği an başlar; satırı 10 dk önce verilmiş gibi göster
+  update ${S}.talimat_satirlar set sayac_baslangic = now() - interval '10 minutes' where satir_id = s9;
   insert into ${S}.montaj_sessions (session_id, sku, step_id, step_name, seq_no, durum, operator_id, operator_name, start_time, end_time, qty, is_final_step)
     values ('TEST-SY-M1','LS031','TEST-STEP','Test adim',1,'tamamlandi',w1,'Test Personel', now() - interval '3 minutes', now() - interval '2 minutes', 5, true);
   ${as('planner')}
@@ -580,6 +582,16 @@ steps.push(step('10.1 satir_yeniden_aktif: sayac sifirlanir, uretilen yeniden sa
 steps.push(expectErr('10.2 satir_yeniden_aktif: miktar > 0 olmali', 'planner', `perform ${S}.talimat_satir_yeniden_aktif(s9, 0);`, 'Geçerli bir istenen miktar'));
 steps.push(expectErr('10.3 satir_yeniden_aktif: planlayici degil', 'station', `perform ${S}.talimat_satir_yeniden_aktif(s9, 4);`, ''));
 steps.push(expectErr('10.4 satir_yeniden_aktif: pasif plan', 'planner', `perform ${S}.talimat_satir_yeniden_aktif(s7, 4);`, 'PLAN_PASIF'));
+steps.push(step('10.5 talimattan once kapanan uretim sayilmaz (156)', 'planner', `
+  v_plan2 := ${S}.talimat_plan_getir_veya_olustur(${S}.talimat_bugun());
+  ${su}
+  insert into ${S}.pack_events (session_id, tarih, sku, qty, durum, start_time, end_time, operator_id, operator_name)
+    values ('TEST-SY-P0', now() - interval '20 minutes', 'MKOS41', 125, 'tamamlandi', now() - interval '20 minutes', now() - interval '8 minutes', w2, 'Test Personel');
+  ${as('planner')}
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan2,'personel_id',w2,'istasyon','paketleme','sku','MKOS41','istenen_miktar',100)`)};
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=s10)=0`, 'talimattan onceki uretim sayildi')}
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where satir_id=s10)='aktif'`, 'aktif degil')}
+`));
 
 const body = `
 declare
