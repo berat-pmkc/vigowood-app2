@@ -88,4 +88,8 @@ if (!curSchemas.includes(schema)) {
   for (const old of curSchemas) if (!String(after.db_schema).split(',').map((x) => x.trim()).includes(old)) warn(`existing schema "${old}" missing after PATCH!`);
 } else log('6. PostgREST already exposes the schema');
 
+// 7. PostgREST schema cache: new tables/views/functions are invisible to the API until reloaded.
+await ctx.tgt(`notify pgrst, 'reload schema';`, { label: 'pgrst reload' });
+log('7. PostgREST schema cache reloaded');
+
 log('\nfinalize done. Frontend must use the schema: createClient(url, key, { db: { schema: "' + schema + '" } }).');

@@ -89,3 +89,6 @@ for (const p of plan) {
   log(`  ok #${p.idx} ${p.label}`);
 }
 log(`\nAll ${done} migration files applied to ${schema}.`);
+// New objects are invisible to the REST API until PostgREST reloads its schema cache.
+await ctx.tgt(`notify pgrst, 'reload schema';`, { label: 'pgrst reload' });
+log('PostgREST schema cache reloaded.');
