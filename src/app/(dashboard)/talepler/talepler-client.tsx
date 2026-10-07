@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTalepBildirimGorunurluk } from "@/hooks/use-talep-bildirim-gorunurluk";
 import { toast } from "sonner";
 import {
   CalendarClock,
@@ -155,6 +156,9 @@ export function TaleplerClient({
     ],
     debounceMs: 1200,
   });
+
+  const satirAnahtari = talepler.map((t) => t.talep_id).join(",");
+  const { okunmamisTalepler } = useTalepBildirimGorunurluk(satirAnahtari);
 
   // ── filtreler ──
   const [arama, setArama] = useState("");
@@ -540,7 +544,15 @@ export function TaleplerClient({
                         />
                       )}
                     </td>
-                    <td className="px-2 py-2.5 font-semibold tabular-nums">#{t.talep_no}</td>
+                    <td className="px-2 py-2.5 font-semibold tabular-nums">
+                      #{t.talep_no}
+                      {okunmamisTalepler.get(t.talep_id) && (
+                        <span className="mt-1 flex items-center gap-1 text-[10px] font-bold text-[#ee7683]">
+                          <span className="size-2 rounded-full bg-[#ee7683]" aria-hidden />
+                          {okunmamisTalepler.get(t.talep_id)?.olay === "yeni" ? "Yeni" : "Değişti"}
+                        </span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-2 py-2.5 tabular-nums">{formatDate(t.created_at)}</td>
                     <td className="px-2 py-2.5">{t.olusturan_adi ?? t.olusturan}</td>
                     <td className="min-w-[180px] px-2 py-2.5">

@@ -55,7 +55,7 @@ export function DashboardShell({
             onLogout={handleLogout}
           />
           <SidebarInset className="min-w-0">
-            <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} avatarUrl={avatarUrl} />
+            <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} userRole={userRole} avatarUrl={avatarUrl} />
             <TalimatBanner />
             <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6">
               {children}

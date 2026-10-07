@@ -7,12 +7,16 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useUnreadCount } from "@/hooks/use-unread-count";
 import { RealtimeIndicator } from "@/components/shared/realtime-indicator";
+import { TalepBildirimBell } from "@/components/layout/talep-bildirim-bell";
+import { TALEP_CREATOR_ROLES } from "@/lib/talimat/constants";
+import type { UserRole } from "@/lib/constants";
 import { UserAvatar } from "@/components/shared/user-avatar";
 
 type TopNavbarProps = {
   displayName: string;
   displayRole: string;
   userId?: string;
+  userRole?: UserRole;
   avatarUrl?: string | null;
 };
 
@@ -25,7 +29,7 @@ function getTodayString() {
   });
 }
 
-export function TopNavbar({ displayName, displayRole, userId, avatarUrl }: TopNavbarProps) {
+export function TopNavbar({ displayName, displayRole, userId, userRole, avatarUrl }: TopNavbarProps) {
   const unreadCount = useUnreadCount(userId ?? null);
 
   return (
@@ -40,6 +44,8 @@ export function TopNavbar({ displayName, displayRole, userId, avatarUrl }: TopNa
         {/* Right side — user info + notifications + date */}
         <div className="flex items-center gap-3">
           <RealtimeIndicator />
+
+          {userRole && TALEP_CREATOR_ROLES.includes(userRole) && <TalepBildirimBell />}
 
           <Button variant="ghost" size="icon" asChild className="relative">
             <Link href="/bildirimler">

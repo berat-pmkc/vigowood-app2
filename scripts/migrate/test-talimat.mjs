@@ -426,6 +426,37 @@ steps.push(step('5.17 istasyon users.station den otomatik (trigger)', 'planner',
   ${assert(`(select istasyon from ${S}.talimat_satirlar where satir_id=s10)='kesim'`, 'acik istasyon ezildi')}
 `));
 
+// ---------------- 5c) talep bildirimleri (zil) ----------------
+steps.push(step('5.18 talep bildirimi: yeni talep planlayiciya, actor haric', 'office', `
+  tid := ${S}.talep_olustur('LS051', null, 7, null, null);
+  ${su}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and olay='yeni' and alici_user_id=${ql(officeId)})=0`, 'actor kendine bildirim aldi')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and olay='yeni' and alici_user_id=${ql(plannerId)})=1`, 'planlayici yeni bildirimi almadi')}
+  ${as('planner')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid)>=1`, 'planlayici kendi bildirimini goremiyor')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and alici_user_id<>${ql(plannerId)})=0`, 'RLS: baskasinin bildirimi gorunuyor')}
+`));
+steps.push(step('5.19 talep bildirimi: degisiklik sahibe, goruldu, 30 dk temizlik', 'planner', `
+  ${su}
+  update ${S}.talepler set created_at = now() - interval '20 minutes' where talep_id = tid;
+  ${as('planner')}
+  perform ${S}.talep_guncelle(tid, '{"aciklama":"zil testi"}'::jsonb, false);
+  ${su}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and olay='degisti' and alici_user_id=${ql(officeId)})=1`, 'sahip degisti bildirimi almadi')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and olay='degisti' and alici_user_id=${ql(plannerId)})=0`, 'actor degisti bildirimi aldi')}
+  ${as('office')}
+  tmpn := ${S}.talep_bildirim_goruldu(array(select id from ${S}.talep_bildirimleri where talep_id=tid));
+  ${assert(`tmpn >= 1`, 'goruldu isaretlenmedi')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and goruldu_at is null)=0`, 'okunmamis kaldi')}
+  ${as('planner')}
+  tmpn := ${S}.talep_bildirim_goruldu(array(select id from ${S}.talep_bildirimleri where talep_id=tid and alici_user_id=${ql(plannerId)}));
+  ${su}
+  update ${S}.talep_bildirimleri set goruldu_at = now() - interval '31 minutes' where talep_id=tid and alici_user_id=${ql(officeId)};
+  perform ${S}.talep_bildirim_temizle();
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and alici_user_id=${ql(officeId)})=0`, '30 dk sonra silinmedi')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and alici_user_id=${ql(plannerId)} and goruldu_at is not null)>=1`, 'taze goruldu satiri silindi')}
+`));
+
 // ---------------- 7) kopyala ----------------
 steps.push(step('7.1 talimat_kopyala_hafta (gelecek hafta)', 'planner', `
   v_plan2 := ${S}.talimat_kopyala_hafta(v_plan, ${S}.talimat_bugun() + 7);
