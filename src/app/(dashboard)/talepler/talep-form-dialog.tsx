@@ -96,7 +96,6 @@ export function TalepFormDialog({ open, onClose, depolar, talep, planner, onDone
   const dogrula = (): boolean => {
     if (!urun) return void toast.error("Ürün seçin"), false;
     if (miktarSayi !== null && (!Number.isFinite(miktarSayi) || miktarSayi <= 0)) return void toast.error("Miktar sıfırdan büyük olmalı"), false;
-    if (!termin) return void toast.error("Termin tarihi seçin"), false;
     return true;
   };
 
@@ -107,7 +106,7 @@ export function TalepFormDialog({ open, onClose, depolar, talep, planner, onDone
       sku: urun.sku,
       hedefDepoId: depoId || null,
       istenenMiktar: miktarSayi,
-      terminTarihi: termin,
+      terminTarihi: termin || null,
       aciklama: aciklama.trim() || null,
     });
     setBusy(false);
@@ -203,7 +202,7 @@ export function TalepFormDialog({ open, onClose, depolar, talep, planner, onDone
             </div>
 
             <div>
-              <Label>Termin tarihi</Label>
+              <Label>Termin tarihi (isteğe bağlı)</Label>
               <Input type="date" value={termin} onChange={(e) => setTermin(e.target.value)} />
             </div>
 

@@ -19,7 +19,8 @@ export function parseRpcHata(message: string): { kod?: TalimatHataKodu; mesaj: s
 export function ardisikSkuIhlalleri(
   satirlar: Array<Pick<TalimatSatir, "sira" | "sku">>,
 ): Array<{ sira: number; sku: string }> {
-  const sirali = [...satirlar].sort((a, b) => a.sira - b.sira);
+  // Ürünsüz (boş) satırlar atlanır: sunucu kuralıyla aynı
+  const sirali = satirlar.filter((s) => s.sku).sort((a, b) => a.sira - b.sira);
   const ihlaller: Array<{ sira: number; sku: string }> = [];
   for (let i = 1; i < sirali.length; i++) {
     const onceki = sirali[i - 1].sku;
@@ -37,10 +38,11 @@ export function ekleyinceArdisikOlur(
   sku: string,
   hedefSira: number | null,
 ): boolean {
-  const sirali = [...mevcut].sort((a, b) => a.sira - b.sira);
-  const idx = hedefSira == null ? sirali.length : Math.min(Math.max(hedefSira - 1, 0), sirali.length);
-  const onceki = idx > 0 ? sirali[idx - 1]?.sku : null;
-  const sonraki = idx < sirali.length ? sirali[idx]?.sku : null;
+  const tum = [...mevcut].sort((a, b) => a.sira - b.sira);
+  const idx = hedefSira == null ? tum.length : Math.min(Math.max(hedefSira - 1, 0), tum.length);
+  // Ürünsüz (boş) satırlar atlanır: en yakın dolu komşulara bakılır
+  const onceki = tum.slice(0, idx).reverse().find((x) => x.sku)?.sku ?? null;
+  const sonraki = tum.slice(idx).find((x) => x.sku)?.sku ?? null;
   return onceki === sku || sonraki === sku;
 }
 
@@ -101,6 +103,11 @@ export function gunEkle(tarih: string, gun: number): string {
   return d.toLocaleDateString("sv-SE");
 }
 
+/** Ürünsüz (ve plakasız) satır: personel eklendi ama iş henüz seçilmedi; tablette görünmez, özetlerde sayılmaz */
+export function satirBos(s: Pick<TalimatSatir, "sku" | "plaka_id">): boolean {
+  return !s.sku && !s.plaka_id;
+}
+
 /**
  * İstemci tarafı filtre (sunucu filtreleriyle aynı mantık; çevrimdışı/realtime listelerde kullanılır).
  * oncelik1SeansBaslamamis: sira=1 ve (bugun|hafta) seansı yok.
@@ -114,9 +121,9 @@ export function satirFiltrele(satirlar: TalimatSatir[], f: TalimatSatirFiltre): 
       const hay = `${s.sku ?? ""} ${s.urun_adi ?? ""} ${s.plaka_id ?? ""}`.toLocaleLowerCase("tr");
       if (!hay.includes(q)) return false;
     }
-    if (f.sadeceOncelik1 && s.sira !== 1) return false;
+    if (f.sadeceOncelik1 && (s.sira !== 1 || satirBos(s))) return false;
     if (f.oncelik1SeansBaslamamis) {
-      if (s.sira !== 1) return false;
+      if (s.sira !== 1 || satirBos(s)) return false;
       const basladi = (f.seansKapsami ?? "bugun") === "hafta" ? s.hafta_seans_var : s.bugun_seans_var;
       if (basladi) return false;
     }

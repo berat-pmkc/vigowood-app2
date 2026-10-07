@@ -28,13 +28,11 @@ import {
   Plus,
   Search,
   Send,
-  UserPlus,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -60,7 +58,7 @@ import {
   talimatYayinla,
 } from "@/lib/talimat/actions";
 import { PLAN_DURUM_LABEL, TALIMAT_ISTASYONLAR } from "@/lib/talimat/constants";
-import { gunEkle, personeleGoreGrupla, satirFiltrele } from "@/lib/talimat/helpers";
+import { gunEkle, personeleGoreGrupla, satirBos, satirFiltrele } from "@/lib/talimat/helpers";
 import type {
   SatirKaydetGirdi,
   TalimatPersonel,
@@ -72,6 +70,7 @@ import type {
 } from "@/lib/talimat/types";
 import { cn, formatDate } from "@/lib/utils";
 import { PasifDialog, type PasifHedef } from "./pasif-dialog";
+import { PersonelEkle } from "./personel-ekle";
 import { SatirRow, type SatirIslemleri } from "./satir-row";
 import { YayinDialog } from "./yayin-dialog";
 import { YayinGecmisi } from "./yayin-gecmisi";
@@ -230,6 +229,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     yenile();
   };
 
+  /** Seçilen personellerin her birine ürünsüz (boş) bir satır açar; ürün sonra seçilir */
+  const personelleriEkle = async (personelIdleri: string[]) => {
+    if (!plan) return;
+    let eklenen = 0;
+    for (const pid of personelIdleri) {
+      const r = await satirKaydet({ plan_id: plan.plan_id, personel_id: pid });
+      if (r.success) eklenen++;
+      else toast.error(`${personelAdlari.get(pid) ?? pid}: ${hataMesaji(r)}`);
+    }
+    if (eklenen > 0) toast.success(`${eklenen} personel eklendi. Ürünleri yanlarından seçebilirsiniz.`);
+    yenile();
+  };
+
   const [pasifHedef, setPasifHedef] = useState<PasifHedef | null>(null);
   const [silHedef, setSilHedef] = useState<TalimatSatir | null>(null);
   const [yayinAcik, setYayinAcik] = useState(false);
@@ -320,10 +332,10 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     yenile();
   };
 
-  const [personelAcik, setPersonelAcik] = useState(false);
   const eklenebilir = personeller.filter((p) => !eklenmisPersonel.has(p.user_id));
 
-  const tumListePasif = !!plan && satirlar.length > 0 && satirlar.every((s) => s.etkin_pasif);
+  const doluSatirlar = satirlar.filter((s) => !satirBos(s));
+  const tumListePasif = !!plan && doluSatirlar.length > 0 && doluSatirlar.every((s) => s.etkin_pasif);
 
   return (
     <TooltipProvider>
@@ -559,36 +571,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
             {/* Personel ekle + toplu pasif */}
             {editable && (
               <div className="flex flex-wrap items-center gap-2">
-                <Popover open={personelAcik} onOpenChange={setPersonelAcik}>
-                  <PopoverTrigger asChild>
-                    <Button size="sm" className="bg-vw-primary text-vw-dark hover:bg-vw-side">
-                      <UserPlus className="mr-1.5 h-4 w-4" /> Personel ekle
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Personel ara..." />
-                      <CommandList>
-                        <CommandEmpty>Eklenebilecek personel yok</CommandEmpty>
-                        <CommandGroup>
-                          {eklenebilir.map((p) => (
-                            <CommandItem
-                              key={p.user_id}
-                              value={`${p.full_name} ${p.user_id}`}
-                              onSelect={async () => {
-                                setPersonelAcik(false);
-                                await satirEkle(p.user_id);
-                              }}
-                            >
-                              <span className="flex-1 truncate">{p.full_name}</span>
-                              <span className="text-[11px] text-muted-foreground">{p.station ?? p.role}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <PersonelEkle eklenebilir={eklenebilir} onEkle={personelleriEkle} />
                 {tumListePasif ? (
                   <Button
                     variant="outline"
@@ -699,11 +682,12 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                           </tr>
                           <SortableContext items={g.satirlar.map((s) => s.satir_id)} strategy={verticalListSortingStrategy}>
                             {g.satirlar.map((s) => {
-                              const komsular = tamListe.filter((x) => x.sira === s.sira - 1 || x.sira === s.sira + 1);
+                              // Ürünsüz (boş) satırlar atlanır: en yakın dolu önceki/sonraki satır
+                              const onceki = [...tamListe].reverse().find((x) => x.sira < s.sira && x.sku);
+                              const sonraki = tamListe.find((x) => x.sira > s.sira && x.sku);
                               const engelli: Record<string, string> = {};
-                              for (const k of komsular) {
-                                if (k.sku) engelli[k.sku] = k.sira < s.sira ? "Önceki satırda aynı ürün var" : "Sonraki satırda aynı ürün var";
-                              }
+                              if (onceki?.sku) engelli[onceki.sku] = "Önceki satırda aynı ürün var";
+                              if (sonraki?.sku) engelli[sonraki.sku] = "Sonraki satırda aynı ürün var";
                               return (
                                 <SatirRow
                                   key={s.satir_id}
@@ -740,9 +724,18 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
         <AlertDialog open={!!silHedef} onOpenChange={(o) => !o && setSilHedef(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Satır silinsin mi?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {silHedef && satirlar.filter((x) => x.personel_id === silHedef.personel_id).length <= 1
+                  ? "Personel listeden çıkarılsın mı?"
+                  : "Satır silinsin mi?"}
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 {silHedef?.personel_adi} · {silHedef?.sira}. sıra {silHedef?.sku ? `(${silHedef.sku})` : ""} silinecek, diğer sıralar yukarı kayacak.
+                {silHedef && satirlar.filter((x) => x.personel_id === silHedef.personel_id).length <= 1 && (
+                  <span className="mt-1 block font-medium text-[#c0424f]">
+                    Bu personelin son satırı: personel listeden de çıkarılacak.
+                  </span>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

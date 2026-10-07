@@ -96,6 +96,8 @@ export async function getPlanSatirlari(planId: string, f: TalimatSatirFiltre = {
     const a = aramaTemizle(f.arama);
     q = q.or(`sku.ilike.%${a}%,urun_adi.ilike.%${a}%,plaka_id.ilike.%${a}%`);
   }
+  // Ürünsüz (boş) satırlar "1. sıra" filtrelerinde sayılmaz
+  if (f.sadeceOncelik1 || f.oncelik1SeansBaslamamis) q = q.or("sku.not.is.null,plaka_id.not.is.null");
   if (f.sadeceOncelik1) q = q.eq("sira", 1);
   if (f.oncelik1SeansBaslamamis) {
     q = q.eq("sira", 1).eq((f.seansKapsami ?? "bugun") === "hafta" ? "hafta_seans_var" : "bugun_seans_var", false);
@@ -239,6 +241,8 @@ export async function getTabletListe(personelId: string): Promise<TalimatTabletL
       .eq("plan_id", planId)
       .eq("personel_id", personelId)
       .eq("etkin_pasif", false)
+      // ürünsüz (boş) satırlar tablette görünmez
+      .or("sku.not.is.null,plaka_id.not.is.null")
       .order("sira", { ascending: true }),
     sb
       .from("talimat_yayin_hedefler")

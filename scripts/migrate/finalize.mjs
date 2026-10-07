@@ -39,7 +39,9 @@ if (!yes) die('Plan only. Re-run with --yes to apply.', 2);
 await ctx.tgt(`grant usage on schema ${S} to anon, authenticated, service_role;
 grant all on all tables in schema ${S} to anon, authenticated, service_role;
 grant all on all sequences in schema ${S} to anon, authenticated, service_role;
-grant all on all functions in schema ${S} to anon, authenticated, service_role;`, { label: 'grants' });
+grant all on all functions in schema ${S} to service_role;`, { label: 'grants' });
+// Functions: anon/authenticated EXECUTE comes from the schema default privileges at creation time;
+// a blanket grant here would undo the migrations' explicit REVOKEs on internal helpers (148).
 log('1. grants done');
 
 // 2. realtime

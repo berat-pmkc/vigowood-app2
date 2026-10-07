@@ -121,6 +121,33 @@ steps[steps.length - 1] = expectErr('1.12 dogrudan yazma ardisik tetikleyici (de
 steps.push(expectErr('1.13 gecersiz personel (Yonetici)', 'planner',
   `perform ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id','VW001','sku','LS031')`)};`, 'Geçersiz personel'));
 
+steps.push(step('1.14 bos satir (ürünsüz personel): ekle, doldur, tablette yok, ozette sayilmaz', 'planner', `
+  select satir_sayisi, personel_sayisi into m, k from ${S}.talimat_plan_ozet where plan_id=v_plan;
+  s9 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5)`)};
+  ${assert(`(select sku is null and plaka_id is null and sira=1 from ${S}.talimat_satirlar where satir_id=s9)`, 'bos satir olusmadi')}
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5)`)};
+  ${assert(`${sat('s10')}=2`, 'ikinci bos satir sira 2 degil')}
+  -- tablet sorgusu (getTabletListe) sku/plaka ister
+  ${assert(`not exists (select 1 from ${S}.talimat_satir_ilerleme where plan_id=v_plan and personel_id=w5 and (sku is not null or plaka_id is not null))`, 'bos satir tablet filtresinden gecti')}
+  ${assert(`(select satir_sayisi=m and personel_sayisi=k from ${S}.talimat_plan_ozet where plan_id=v_plan)`, 'bos satir ozette sayildi')}
+  ${assert(`(select uretilen=0 and urun_adi is null from ${S}.talimat_satir_ilerleme where satir_id=s9)`, 'bos satir ilerleme')}
+  perform ${kaydet(`jsonb_build_object('satir_id',s9,'sku','LS031','istenen_miktar',4)`)};
+  ${assert(`(select sku='LS031' from ${S}.talimat_satirlar where satir_id=s9)`, 'sku doldurulamadi')}
+  ${assert(`(select satir_sayisi=m+1 and personel_sayisi=k+1 from ${S}.talimat_plan_ozet where plan_id=v_plan)`, 'dolu satir ozete girmedi')}
+  -- ardisik kural bos satiri yok sayar: LS031, bos, LS031 hatali olmali
+  perform ${kaydet(`jsonb_build_object('satir_id',s10,'sku','LS051')`)};
+  perform ${kaydet(`jsonb_build_object('satir_id',s10,'sku',null)`)};
+  begin
+    perform ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5,'sku','LS031')`)};
+    raise exception 'NO_ERROR_RAISED';
+  exception when others then
+    if sqlerrm not like 'ARDISIK_SKU%' then raise; end if;
+  end;
+  perform ${S}.talimat_satir_sil(s10);
+  perform ${S}.talimat_satir_sil(s9);
+  ${assert(`not exists (select 1 from ${S}.talimat_satirlar where plan_id=v_plan and personel_id=w5)`, 'w5 satirlari silinmedi')}
+`));
+
 // ---------------- 2) goruntuler ----------------
 steps.push(step('2.1 ilerleme/ozet/etkin/katki goruntuleri', 'planner', `
   select count(*) into n from ${S}.talimat_satir_ilerleme where plan_id=v_plan;
@@ -204,6 +231,30 @@ steps.push(step('3.9 bildirimsiz yayin', 'planner', `
 `));
 steps.push(step('3.10 talimat_tablet_plan(w1) = plan', 'station', `
   ${assert(`${S}.talimat_tablet_plan(w1) = v_plan`, 'tablet plan farkli')}
+`));
+
+steps.push(step('3.11 yayinda bos satir: yayin/bildirim/snapshot disinda', 'planner', `
+  select count(*) into n from ${S}.notifications where kind='talimat_degisiklik';
+  s9 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5)`)};
+  ${assert(`not (select degisti from ${S}.talimat_satirlar where satir_id=s9)`, 'bos satir degisti isaretlendi')}
+  begin
+    perform ${S}.talimat_yayinla(v_plan, true, null, false, 'degisenler');
+    raise exception 'NO_ERROR_RAISED';
+  exception when others then
+    if sqlerrm not like 'Yayınlanacak değişiklik yok%' then raise; end if;
+  end;
+  -- doldurunca degisen olur, yayina girer
+  perform ${kaydet(`jsonb_build_object('satir_id',s9,'sku','LS031')`)};
+  j := ${S}.talimat_yayinla(v_plan, false, null, false, 'degisenler');
+  ${assert(`(j->>'personel_sayisi')::int=1 and (j->>'satir_sayisi')::int=1`, 'doldurulan satir yayina girmedi')}
+  -- bos satir silmek yayin degisikligi degil
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5)`)};
+  perform ${S}.talimat_satir_sil(s10);
+  ${assert(`not (select w5 = any (degisen_personeller) from ${S}.talimat_planlar where plan_id=v_plan)`, 'bos satir silme degisen isaretledi')}
+  perform ${S}.talimat_satir_sil(s9);
+  j := ${S}.talimat_yayinla(v_plan, false, null, false, 'degisenler');
+  ${su}
+  ${assert(`(select count(*) from ${S}.notifications where kind='talimat_degisiklik') = n`, 'bildirim yazildi')}
 `));
 
 // ---------------- 4) guncellik + pasif ----------------
@@ -436,12 +487,14 @@ steps.push(step('6.6 pasif plan tablette gorunmez (seans yok)', 'station', `
 
 const body = `
 declare
-  v_plan uuid; v_plan2 uuid; s1 uuid; s2 uuid; s3 uuid; s4 uuid; s5 uuid; s6 uuid; s7 uuid; s8 uuid; s9 uuid;
+  v_plan uuid; v_plan2 uuid; s1 uuid; s2 uuid; s3 uuid; s4 uuid; s5 uuid; s6 uuid; s7 uuid; s8 uuid; s9 uuid; s10 uuid;
   y1 uuid; y2 uuid; y3 uuid; y4 uuid; y5 uuid; y6 uuid; t1 uuid; t2 uuid; t3 uuid; tid uuid;
   n int; m int; k int; tmpn numeric; flag boolean; d date; j jsonb; plk text; tmp text; tmp2 text;
   w1 text := 'VW016'; w2 text := 'VW018'; w3 text := 'VW020'; w4 text := 'VW022'; w5 text := 'VW021';
   other text; out text := '';
 begin
+  -- Prova schema'sinda elle olusturulmus plan/satirlar testi bozmasin (tum islem rollback edilir)
+  delete from ${S}.talimat_planlar;
   select sku into other from ${S}.products where sku not in ('LS031','LS051','MKOS41') order by sku limit 1;
   if other is null then select sku into other from ${S}.products where sku not in ('LS031','LS051','MKOS41') limit 1; end if;
   out := out || 'diger_sku=' || coalesce(other,'-') || ' planner=${plannerId} office=${officeId} station=${stationId}' || E'\\n';
