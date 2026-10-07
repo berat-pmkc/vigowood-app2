@@ -1,6 +1,6 @@
 /**
  * Talep okuma sorguları (sunucu tarafı). RLS: okuma = ofis rolleri + üretim erişimi.
- * Sıralama: en eski önce, yeni talepler en altta.
+ * Sıralama: varsayılan en yeni önce (TalepFiltre.sirala ile değiştirilebilir).
  */
 import "server-only";
 
@@ -18,11 +18,12 @@ function aramaTemizle(q: string): string {
 /** Talep listesi (talep_durum görünümü). { talepler, toplam } döner. */
 export async function getTalepler(f: TalepFiltre = {}): Promise<{ talepler: Talep[]; toplam: number }> {
   const sb = await talimatDb();
-  let q = sb.from("talep_durum").select("*", { count: "exact" }).order("created_at", { ascending: true });
+  let q = sb.from("talep_durum").select("*", { count: "exact" }).order("created_at", { ascending: f.sirala === "eski" });
 
   if (f.durumlar && f.durumlar.length) q = q.in("durum", f.durumlar);
   if (f.kapali === true) q = q.not("kapanis", "is", null);
   if (f.kapali === false) q = q.is("kapanis", null);
+  if (f.kaldirilmamis) q = q.is("kaldirildi_at", null);
   if (f.sku) q = q.eq("sku", f.sku);
   if (f.olusturan) q = q.eq("olusturan", f.olusturan);
   if (f.depoId) q = q.eq("hedef_depo_id", f.depoId);

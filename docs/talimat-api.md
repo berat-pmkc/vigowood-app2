@@ -159,3 +159,10 @@ Okuma: `has_production_access() OR is_office_user()`. Doğrudan yazma: planlayı
 - `pack_events.durum='tamamlandi'`, `cut_batches.durum='tamamlandi'`, `montaj_sessions.durum='tamamlandi'` kapanmış kayıt sayılır; açık paketleme `durum='paketlemede'`.
 - Supabase `database types` yeni tabloları içermez; kod tipsiz client kullanır (`talimatDb()`). Types yeniden üretilince sıkılaştırılabilir.
 - Mevcut admin-eşdeğeri RLS için `is_admin_or_engineer()` kullanılıyor (planlayıcı = admin-eşdeğeri + Endüstri Mühendisi).
+
+## 9. Talepler "Kaldır" akışı + istasyon otomatiği (SQL 150)
+
+- `talepler.kaldirildi_at/kaldiran`; `talep_durum.kaldirildi_at` (görünümün son kolonu). Kapalı talep (`kapanis` dolu) kullanıcı "Kaldır" diyene dek **aktif listede soluk, en altta** kalır; `kaldirildi_at` dolunca yalnız geçmiş sekmelerinde görünür (geçmiş sekmeler kaldırılmış/kaldırılmamış tüm kapalıları gösterir). `talep_yeniden_ac` (trigger) `kaldirildi_at`'ı temizler.
+- RPC: `talep_kaldir(uuid)`, `talep_kaldir_toplu(uuid[]) -> int` (açan veya planlayıcı; yalnız kapalı talepler). Action: `talepKaldir`, `talepKaldirToplu`. Sorgu: `TalepFiltre.kaldirilmamis` (aktif liste), `sirala` (varsayılan yeni önce).
+- `talimat_satirlar` INSERT trigger'ı: `istasyon` boş ve `plaka_id` yoksa `users.station`'dan türetilir (`talimat_istasyon_esle`: Kesim/Montaj/Paketleme [+ " Hattı"]; diğerleri NULL). İstemci karşılığı: `helpers.istasyonEsle`.
+- Derin bağlantılar: `/talepler?talep=<id>[&degisiklik=1]` (doğru sekme, filtre temizleme, kaydırma + 3 sn vurgu; satır `id="talep-<id>"` + `data-talep-id`), `/ops/board/mavi-yaka?hafta=<pazartesi>&satir=<satir_id>` (satır `id="satir-<id>"` + `data-satir-id`).

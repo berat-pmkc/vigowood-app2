@@ -2,13 +2,13 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { TALIMAT_PLANNER_ROLES, TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
 import { haftaBaslangici } from "@/lib/talimat/helpers";
-import { getPlanByHafta, getPlanSatirlari, getTalimatPersoneller, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
+import { getPlanByHafta, getPlanSatirEklenme, getPlanSatirlari, getTalimatPersoneller, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
 import type { UrunStokSecenek } from "@/lib/talimat/types";
 import { MaviYakaClient } from "./mavi-yaka-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function MaviYakaPage({ searchParams }: { searchParams: Promise<{ hafta?: string }> }) {
+export default async function MaviYakaPage({ searchParams }: { searchParams: Promise<{ hafta?: string; satir?: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const role = user.role as string;
@@ -23,9 +23,10 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
 
   const [plan, personeller] = await Promise.all([getPlanByHafta(hafta), getTalimatPersoneller()]);
 
-  const [satirlar, yayinlar] = plan
-    ? await Promise.all([getPlanSatirlari(plan.plan_id), getYayinlar(plan.plan_id, 20)])
-    : [[], []];
+  const [satirlar, yayinlar, eklenme] = plan
+    ? await Promise.all([getPlanSatirlari(plan.plan_id), getYayinlar(plan.plan_id, 20), getPlanSatirEklenme(plan.plan_id)])
+    : [[], [], {} as Record<string, string>];
+  const vurguSatir = params.satir && /^[0-9a-f-]{36}$/i.test(params.satir) ? params.satir : null;
 
   const skular = [...new Set(satirlar.map((s) => s.sku).filter((s): s is string => !!s))];
   const stokListe = await getUrunStoklari(skular);
@@ -42,6 +43,8 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
       personeller={personeller}
       stoklar={stoklar}
       planner={planner}
+      eklenme={eklenme}
+      vurguSatir={vurguSatir}
     />
   );
 }

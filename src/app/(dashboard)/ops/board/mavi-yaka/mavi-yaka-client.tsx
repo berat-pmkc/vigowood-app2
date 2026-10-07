@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -18,23 +18,29 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   Copy,
   EyeOff,
+  MoreHorizontal,
   PauseCircle,
   PlayCircle,
   Plus,
   Search,
   Send,
+  SlidersHorizontal,
+  Wand2,
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   AlertDialog,
@@ -58,7 +64,7 @@ import {
   talimatYayinla,
 } from "@/lib/talimat/actions";
 import { PLAN_DURUM_LABEL, TALIMAT_ISTASYONLAR } from "@/lib/talimat/constants";
-import { gunEkle, personeleGoreGrupla, satirBos, satirFiltrele } from "@/lib/talimat/helpers";
+import { gunEkle, istasyonEsle, personeleGoreGrupla, satirBos, satirFiltrele } from "@/lib/talimat/helpers";
 import type {
   SatirKaydetGirdi,
   TalimatPersonel,
@@ -84,6 +90,10 @@ interface Props {
   personeller: TalimatPersonel[];
   stoklar: Record<string, UrunStokSecenek["depo_stoklari"]>;
   planner: boolean;
+  /** satir_id -> ilk eklenme zamanı (personel grupları: ilk eklenen üstte) */
+  eklenme: Record<string, string>;
+  /** Derin bağlantı (?satir=<id>): grubu aç, satıra kaydır, 3 sn vurgula */
+  vurguSatir: string | null;
 }
 
 const PLAN_RENK: Record<string, string> = {
@@ -109,7 +119,7 @@ function hataMesaji(r: { error: string; code?: string }): string {
   return r.error;
 }
 
-export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, personeller, stoklar, planner }: Props) {
+export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, personeller, stoklar, planner, eklenme, vurguSatir }: Props) {
   const router = useRouter();
   const yenile = useCallback(() => router.refresh(), [router]);
 
@@ -186,10 +196,15 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
       .map(([pid, liste]) => {
         const sira = yerelSira[pid];
         const sirali = sira ? [...liste].sort((a, b) => sira.indexOf(a.satir_id) - sira.indexOf(b.satir_id)) : liste;
-        return { pid, ad: liste[0]?.personel_adi ?? pid, istasyon: liste[0]?.personel_istasyon ?? null, satirlar: sirali };
+        // Grup sırası: personelin ilk eklenen satırının zamanı (yeni eklenen personel en üstte)
+        const ilk = liste.reduce((m, x) => {
+          const t = eklenme[x.satir_id] ?? "";
+          return !m || (t && t < m) ? t || m : m;
+        }, "");
+        return { pid, ad: liste[0]?.personel_adi ?? pid, istasyon: liste[0]?.personel_istasyon ?? null, satirlar: sirali, ilk };
       })
-      .sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
-  }, [gorunenSatirlar, yerelSira]);
+      .sort((a, b) => b.ilk.localeCompare(a.ilk) || a.ad.localeCompare(b.ad, "tr"));
+  }, [gorunenSatirlar, yerelSira, eklenme]);
 
   const eklenmisPersonel = useMemo(() => new Set(satirlar.map((s) => s.personel_id)), [satirlar]);
   const personelAdlari = useMemo(() => {
@@ -224,7 +239,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
 
   const satirEkle = async (personelId: string) => {
     if (!plan) return;
-    const r = await satirKaydet({ plan_id: plan.plan_id, personel_id: personelId });
+    const ist = istasyonEsle(personelIstasyonu.get(personelId));
+    const r = await satirKaydet({ plan_id: plan.plan_id, personel_id: personelId, ...(ist ? { istasyon: ist } : {}) });
     if (!r.success) toast.error(hataMesaji(r));
     yenile();
   };
@@ -234,7 +250,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     if (!plan) return;
     let eklenen = 0;
     for (const pid of personelIdleri) {
-      const r = await satirKaydet({ plan_id: plan.plan_id, personel_id: pid });
+      const ist = istasyonEsle(personelIstasyonu.get(pid));
+      const r = await satirKaydet({ plan_id: plan.plan_id, personel_id: pid, ...(ist ? { istasyon: ist } : {}) });
       if (r.success) eklenen++;
       else toast.error(`${personelAdlari.get(pid) ?? pid}: ${hataMesaji(r)}`);
     }
@@ -246,6 +263,82 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
   const [silHedef, setSilHedef] = useState<TalimatSatir | null>(null);
   const [yayinAcik, setYayinAcik] = useState(false);
   const [kopyaOnay, setKopyaOnay] = useState(false);
+  const [filtreAcik, setFiltreAcik] = useState(false);
+  const [istasyonOnay, setIstasyonOnay] = useState(false);
+  const [kapaliGruplar, setKapaliGruplar] = useState<Set<string>>(new Set());
+  const grupToggle = (pid: string) =>
+    setKapaliGruplar((p) => {
+      const n = new Set(p);
+      if (n.has(pid)) n.delete(pid);
+      else n.add(pid);
+      return n;
+    });
+
+  const filtreSayisi = (personelFiltre ? 1 : 0) + (istasyon ? 1 : 0) + toggles.size + (personelKumesi ? 1 : 0);
+
+  // ── istasyonu personele göre düzelt (aday: istasyon boş [=montaj varsayılan] veya 'montaj' ama personelin istasyonu başka) ──
+  const personelIstasyonu = useMemo(() => new Map(personeller.map((p) => [p.user_id, p.station])), [personeller]);
+  const istasyonAdaylari = useMemo(
+    () =>
+      satirlar.flatMap((s) => {
+        if (s.plaka_id) return [];
+        const hedef = istasyonEsle(personelIstasyonu.get(s.personel_id) ?? s.personel_istasyon);
+        if (!hedef) return [];
+        const uygun = s.istasyon === null ? hedef !== "montaj" : s.istasyon === "montaj" && hedef !== "montaj";
+        return uygun ? [{ satir: s, hedef }] : [];
+      }),
+    [satirlar, personelIstasyonu],
+  );
+  const istasyonlariDuzelt = async () => {
+    setBusy(true);
+    let ok = 0;
+    for (const { satir, hedef } of istasyonAdaylari) {
+      const r = await satirKaydet({ satir_id: satir.satir_id, istasyon: hedef });
+      if (r.success) ok++;
+      else toast.error(`${satir.personel_adi ?? satir.personel_id}: ${hataMesaji(r)}`);
+    }
+    setBusy(false);
+    setIstasyonOnay(false);
+    if (ok > 0) toast.success(`${ok} satırın istasyonu personele göre düzeltildi`);
+    yenile();
+  };
+
+  // ── derin bağlantı: filtreleri temizle, grubu aç, satıra kaydır, 3 sn vurgula ──
+  const [parlayanSatir, setParlayanSatir] = useState<string | null>(null);
+  const islenenSatir = useRef<string | null>(null);
+  const filtreTemizlendi = useRef<string | null>(null);
+  useEffect(() => {
+    if (!vurguSatir || islenenSatir.current === vurguSatir) return;
+    const hedef = satirlar.find((x) => x.satir_id === vurguSatir);
+    if (!hedef) return;
+    if (!gorunenSatirlar.some((x) => x.satir_id === vurguSatir)) {
+      if (filtreTemizlendi.current !== vurguSatir) {
+        filtreTemizlendi.current = vurguSatir;
+        filtreTemizle();
+        toast.info("Filtreler temizlendi");
+      }
+      return;
+    }
+    islenenSatir.current = vurguSatir;
+    setKapaliGruplar((p) => {
+      if (!p.has(hedef.personel_id)) return p;
+      const n = new Set(p);
+      n.delete(hedef.personel_id);
+      return n;
+    });
+    let deneme = 0;
+    const git = () => {
+      const el = document.getElementById(`satir-${vurguSatir}`);
+      if (!el) {
+        if (deneme++ < 15) setTimeout(git, 100);
+        return;
+      }
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      setParlayanSatir(vurguSatir);
+      setTimeout(() => setParlayanSatir((p) => (p === vurguSatir ? null : p)), 3000);
+    };
+    setTimeout(git, 150);
+  }, [vurguSatir, satirlar, gorunenSatirlar]);
 
   const islem: SatirIslemleri = useMemo(
     () => ({
@@ -340,25 +433,85 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
   return (
     <TooltipProvider>
       <div className="space-y-3">
-        {/* Başlık */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/ops/board">
-              <ArrowLeft className="mr-1 h-4 w-4" /> Geri
-            </Link>
-          </Button>
+        {/* Başlık: büyük ana buton solda, ikincil işlemler sağda kompakt */}
+        <div className="flex flex-wrap items-center gap-4">
+          {editable && plan && <PersonelEkle eklenebilir={eklenebilir} onEkle={personelleriEkle} />}
           <div>
             <h1 className="text-2xl font-bold text-vw-dark">Mavi Yaka Görev İş Talimatları</h1>
             <p className="text-sm text-muted-foreground">
               Haftalık personel planı{!planner && " (salt okunur)"}
             </p>
           </div>
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+              <Link href="/ops/board">
+                <ArrowLeft className="mr-1 h-4 w-4" /> Geri
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
               <Link href="/talepler">
                 <ClipboardList className="mr-1.5 h-4 w-4" /> Talepler
               </Link>
             </Button>
+            {planner && plan && plan.durum !== "pasif" && (
+              <>
+                <Button variant="outline" size="sm" disabled={busy} onClick={() => setYayinAcik(true)}>
+                  <Send className="mr-1.5 h-4 w-4" /> Yayınla
+                  {plan.degisen_satir_sayisi > 0 && (
+                    <span className="ml-1.5 rounded-full bg-vw-deep px-1.5 text-[11px] text-white">{plan.degisen_satir_sayisi}</span>
+                  )}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" aria-label="Diğer işlemler">
+                      <MoreHorizontal className="mr-1 h-4 w-4" /> İşlemler
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuItem onClick={() => setGuncelAcik(true)}>
+                      <Check className="mr-2 h-4 w-4" /> Güncel işaretle
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={busy}
+                      onClick={async () => {
+                        const r = await talimatYayinla({ planId: plan.plan_id, bildirimGonder: false, hedef: plan.durum === "taslak" ? "herkes" : "degisenler" });
+                        if (!r.success) toast.error(hataMesaji(r));
+                        else toast.success("Liste bildirimsiz yenilendi");
+                        yenile();
+                      }}
+                    >
+                      <Send className="mr-2 h-4 w-4" /> Bildirimsiz yenile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={busy} onClick={() => setKopyaOnay(true)}>
+                      <Copy className="mr-2 h-4 w-4" /> Bu haftayı kopyala → yeni hafta
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={istasyonAdaylari.length === 0} onClick={() => setIstasyonOnay(true)}>
+                      <Wand2 className="mr-2 h-4 w-4" /> İstasyonları personele göre düzelt
+                      {istasyonAdaylari.length > 0 && <span className="ml-auto text-[11px] text-muted-foreground">{istasyonAdaylari.length}</span>}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {tumListePasif ? (
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          const r = await talimatPasifKaldir({ kapsam: "liste", planId: plan.plan_id });
+                          if (!r.success) toast.error(hataMesaji(r));
+                          else toast.success("Liste pasifi kaldırıldı");
+                          yenile();
+                        }}
+                      >
+                        <PlayCircle className="mr-2 h-4 w-4" /> Tüm listeyi aktifleştir
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={() => setPasifHedef({ kapsam: "liste", ids: [], baslik: "Tüm liste (bütün personel) pasif edilecek" })}
+                      >
+                        <PauseCircle className="mr-2 h-4 w-4" /> Tüm listeyi pasif et
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
         </div>
 
@@ -398,62 +551,6 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
             >
               {plan.guncel_mi ? `Güncel: ${formatDate(plan.guncel_bitis)} tarihine kadar` : "Liste güncel değil"}
             </Badge>
-          )}
-
-          {planner && plan && plan.durum !== "pasif" && (
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <Popover open={guncelAcik} onOpenChange={setGuncelAcik}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Check className="mr-1.5 h-4 w-4" /> Güncel işaretle
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 space-y-2" align="end">
-                  <div className="text-sm font-medium">Kaç gün güncel kalsın?</div>
-                  <select
-                    value={guncelGun}
-                    onChange={(e) => setGuncelGun(e.target.value)}
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7].map((g) => (
-                      <option key={g} value={g}>
-                        {g} gün ({formatDate(gunEkle(new Date().toLocaleDateString("sv-SE"), g - 1))} tarihine kadar)
-                      </option>
-                    ))}
-                  </select>
-                  <Button size="sm" className="w-full bg-vw-deep text-white hover:bg-vw-dark" onClick={guncelle}>
-                    İşaretle
-                  </Button>
-                </PopoverContent>
-              </Popover>
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => setKopyaOnay(true)}>
-                <Copy className="mr-1.5 h-4 w-4" /> Bu haftayı kopyala → yeni hafta
-              </Button>
-              <Button
-                size="sm"
-                disabled={busy}
-                className="bg-vw-deep text-white hover:bg-vw-dark"
-                onClick={() => setYayinAcik(true)}
-              >
-                <Send className="mr-1.5 h-4 w-4" /> Yayınla
-                {plan.degisen_satir_sayisi > 0 && (
-                  <span className="ml-1.5 rounded-full bg-white/25 px-1.5 text-[11px]">{plan.degisen_satir_sayisi}</span>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={async () => {
-                  const r = await talimatYayinla({ planId: plan.plan_id, bildirimGonder: false, hedef: plan.durum === "taslak" ? "herkes" : "degisenler" });
-                  if (!r.success) toast.error(hataMesaji(r));
-                  else toast.success("Liste bildirimsiz yenilendi");
-                  yenile();
-                }}
-              >
-                Bildirimsiz yenile
-              </Button>
-            </div>
           )}
         </Card>
 
@@ -502,118 +599,118 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
               </span>
             </div>
 
-            {/* Filtre çubuğu */}
-            <Card className="gap-2 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={arama}
-                    onChange={(e) => setArama(e.target.value)}
-                    placeholder="Personel, ürün kodu veya adı ara"
-                    className="h-9 pl-8"
-                  />
+            {/* Arama + Filtreler (tek arama kutusu; tüm filtreler yan panelde) */}
+            <div className="mb-4 flex flex-wrap items-center gap-2 border-b pb-3">
+              <div className="relative min-w-[200px] flex-1 sm:max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={arama}
+                  onChange={(e) => setArama(e.target.value)}
+                  placeholder="Personel, ürün kodu veya adı ara"
+                  className="h-9 pl-8"
+                />
+              </div>
+              <Button variant="outline" size="sm" className="h-9" onClick={() => setFiltreAcik(true)}>
+                <SlidersHorizontal className="mr-1.5 h-4 w-4" /> Filtreler
+                {filtreSayisi > 0 && (
+                  <span className="ml-1.5 rounded-full bg-vw-deep px-1.5 text-[11px] font-semibold text-white">{filtreSayisi}</span>
+                )}
+              </Button>
+              {filtreAktif && (
+                <Button variant="ghost" size="sm" className="h-9" onClick={filtreTemizle}>
+                  <X className="mr-1 h-4 w-4" /> Temizle
+                </Button>
+              )}
+              {personelKumesi && (
+                <span className="rounded-full border border-[#c0424f] px-3 py-0.5 text-xs font-medium text-[#c0424f]">
+                  Görmeyen {personelKumesi.length} personel
+                </span>
+              )}
+            </div>
+
+            <Sheet open={filtreAcik} onOpenChange={setFiltreAcik}>
+              <SheetContent side="right" className="w-full gap-0 sm:max-w-sm">
+                <SheetHeader>
+                  <SheetTitle>Filtreler</SheetTitle>
+                  <SheetDescription>Listeyi daraltmak için kullanın. Aktif filtre: {filtreSayisi}</SheetDescription>
+                </SheetHeader>
+                <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
+                  <div>
+                    <div className="mb-1 text-xs font-medium">Personel</div>
+                    <select
+                      value={personelFiltre}
+                      onChange={(e) => setPersonelFiltre(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                    >
+                      <option value="">Tüm personel</option>
+                      {[...tumGrup.keys()]
+                        .sort((a, b) => (personelAdlari.get(a) ?? a).localeCompare(personelAdlari.get(b) ?? b, "tr"))
+                        .map((id) => (
+                          <option key={id} value={id}>
+                            {personelAdlari.get(id) ?? id}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs font-medium">İstasyon</div>
+                    <select
+                      value={istasyon}
+                      onChange={(e) => setIstasyon(e.target.value)}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                    >
+                      <option value="">Tüm istasyonlar</option>
+                      {TALIMAT_ISTASYONLAR.map((i) => (
+                        <option key={i.value} value={i.value}>
+                          {i.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs font-medium">Durum</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TOGGLES.map((t) => (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => toggle(t.key)}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                            toggles.has(t.key) ? "border-vw-deep bg-vw-deep text-white" : "border-border hover:bg-muted",
+                          )}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <select
-                  value={personelFiltre}
-                  onChange={(e) => setPersonelFiltre(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                >
-                  <option value="">Tüm personel</option>
-                  {[...tumGrup.keys()]
-                    .sort((a, b) => (personelAdlari.get(a) ?? a).localeCompare(personelAdlari.get(b) ?? b, "tr"))
-                    .map((id) => (
-                      <option key={id} value={id}>
-                        {personelAdlari.get(id) ?? id}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  value={istasyon}
-                  onChange={(e) => setIstasyon(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
-                >
-                  <option value="">Tüm istasyonlar</option>
-                  {TALIMAT_ISTASYONLAR.map((i) => (
-                    <option key={i.value} value={i.value}>
-                      {i.label}
-                    </option>
-                  ))}
-                </select>
-                {filtreAktif && (
-                  <Button variant="ghost" size="sm" onClick={filtreTemizle}>
+                <SheetFooter className="flex-row justify-between border-t">
+                  <Button variant="outline" onClick={filtreTemizle}>
                     <X className="mr-1 h-4 w-4" /> Temizle
                   </Button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {TOGGLES.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => toggle(t.key)}
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                      toggles.has(t.key) ? "border-vw-deep bg-vw-deep text-white" : "border-border hover:bg-muted",
-                    )}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-                {personelKumesi && (
-                  <span className="rounded-full border border-[#c0424f] px-3 py-1 text-xs font-medium text-[#c0424f]">
-                    Görmeyen {personelKumesi.length} personel
-                  </span>
-                )}
-              </div>
-            </Card>
-
-            {/* Personel ekle + toplu pasif */}
-            {editable && (
-              <div className="flex flex-wrap items-center gap-2">
-                <PersonelEkle eklenebilir={eklenebilir} onEkle={personelleriEkle} />
-                {tumListePasif ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      const r = await talimatPasifKaldir({ kapsam: "liste", planId: plan.plan_id });
-                      if (!r.success) toast.error(hataMesaji(r));
-                      else toast.success("Liste pasifi kaldırıldı");
-                      yenile();
-                    }}
-                  >
-                    <PlayCircle className="mr-1.5 h-4 w-4" /> Tüm listeyi aktifleştir
+                  <Button onClick={() => setFiltreAcik(false)} className="bg-vw-deep text-white hover:bg-vw-dark">
+                    Listeyi göster ({gorunenSatirlar.length})
                   </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPasifHedef({ kapsam: "liste", ids: [], baslik: "Tüm liste (bütün personel) pasif edilecek" })}
-                  >
-                    <PauseCircle className="mr-1.5 h-4 w-4" /> Tüm listeyi pasif et
-                  </Button>
-                )}
-              </div>
-            )}
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
 
             {/* Tablo */}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <div className="overflow-x-auto rounded-lg border bg-card">
+              <div className="max-h-[calc(100dvh-14rem)] min-h-[320px] overflow-auto rounded-lg border bg-card">
                 <table className="w-full min-w-[1180px] border-collapse">
-                  <thead className="bg-vw-light text-left text-xs font-semibold uppercase tracking-wide text-vw-deep">
+                  <thead className="text-left text-xs font-semibold uppercase tracking-wide text-vw-deep">
                     <tr>
-                      <th className="px-2 py-2">Sıra</th>
-                      <th className="px-2 py-2">İstasyon</th>
-                      <th className="px-2 py-2">Ürün Kodu</th>
-                      <th className="px-2 py-2">Ürün Adı</th>
-                      <th className="px-2 py-2 text-right">Güncel Stok</th>
-                      <th className="px-2 py-2">Üretim Miktarı</th>
-                      <th className="px-2 py-2">İstenen Miktar</th>
-                      <th className="px-2 py-2 text-right">Fark</th>
-                      <th className="px-2 py-2">Not</th>
-                      <th className="px-2 py-2">Durum</th>
-                      <th className="px-2 py-2" />
+                      {(["Sıra", "İstasyon", "Ürün Kodu", "Ürün Adı", "Güncel Stok", "Üretim Miktarı", "İstenen Miktar", "Fark", "Not", "Durum", ""] as const).map((h, i) => (
+                        <th
+                          key={i}
+                          className={cn("sticky top-0 z-20 h-9 bg-vw-light px-2", (h === "Güncel Stok" || h === "Fark") && "text-right")}
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   {gruplar.length === 0 ? (
@@ -631,9 +728,17 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                       const pasifVar = tamListe.some((s) => s.etkin_pasif);
                       return (
                         <tbody key={g.pid}>
-                          <tr className="border-y bg-vw-primary/30">
-                            <td colSpan={11} className="px-3 py-2">
+                          <tr className="border-y">
+                            <td colSpan={11} className="sticky top-9 z-10 bg-[#e6dfc9] px-3 py-2">
                               <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => grupToggle(g.pid)}
+                                  aria-label={kapaliGruplar.has(g.pid) ? "Grubu aç" : "Grubu kapat"}
+                                  className="rounded p-0.5 hover:bg-black/10"
+                                >
+                                  <ChevronDown className={cn("h-4 w-4 transition-transform", kapaliGruplar.has(g.pid) && "-rotate-90")} />
+                                </button>
                                 <span className="text-sm font-bold text-vw-dark">{g.ad}</span>
                                 {g.istasyon && (
                                   <Badge variant="outline" className="border-vw-side/60 text-[11px] text-vw-deep">
@@ -681,7 +786,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                             </td>
                           </tr>
                           <SortableContext items={g.satirlar.map((s) => s.satir_id)} strategy={verticalListSortingStrategy}>
-                            {g.satirlar.map((s) => {
+                            {!kapaliGruplar.has(g.pid) && g.satirlar.map((s) => {
                               // Ürünsüz (boş) satırlar atlanır: en yakın dolu önceki/sonraki satır
                               const onceki = [...tamListe].reverse().find((x) => x.sira < s.sira && x.sku);
                               const sonraki = tamListe.find((x) => x.sira > s.sira && x.sku);
@@ -697,6 +802,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                                   depoStoklari={s.sku ? stoklar[s.sku] : undefined}
                                   islem={islem}
                                   sirali
+                                  parlak={parlayanSatir === s.satir_id}
                                 />
                               );
                             })}
@@ -752,6 +858,59 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                 }}
               >
                 Sil
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={guncelAcik} onOpenChange={setGuncelAcik}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Listeyi güncel işaretle</DialogTitle>
+              <DialogDescription>Kaç gün güncel kalsın?</DialogDescription>
+            </DialogHeader>
+            <select
+              value={guncelGun}
+              onChange={(e) => setGuncelGun(e.target.value)}
+              className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+            >
+              {[1, 2, 3, 4, 5, 6, 7].map((g) => (
+                <option key={g} value={g}>
+                  {g} gün ({formatDate(gunEkle(new Date().toLocaleDateString("sv-SE"), g - 1))} tarihine kadar)
+                </option>
+              ))}
+            </select>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setGuncelAcik(false)}>
+                Vazgeç
+              </Button>
+              <Button className="bg-vw-deep text-white hover:bg-vw-dark" onClick={guncelle}>
+                İşaretle
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={istasyonOnay} onOpenChange={setIstasyonOnay}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>İstasyonlar personele göre düzeltilsin mi?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {istasyonAdaylari.length} satırın istasyonu, personelin kayıtlı istasyonuna göre değiştirilecek (yalnızca istasyonu boş
+                veya &quot;Montaj&quot; olup personeli başka istasyonda olan satırlar; elle seçilmiş Kesim/Paketleme ve plakalı satırlara dokunulmaz).
+                <ul className="mt-2 max-h-40 list-disc overflow-y-auto pl-5 text-xs">
+                  {istasyonAdaylari.slice(0, 30).map(({ satir, hedef }) => (
+                    <li key={satir.satir_id}>
+                      {satir.personel_adi} · {satir.sira}. sıra → {TALIMAT_ISTASYONLAR.find((i) => i.value === hedef)?.label}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+              <AlertDialogAction className="bg-vw-deep text-white hover:bg-vw-dark" onClick={istasyonlariDuzelt}>
+                Düzelt
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

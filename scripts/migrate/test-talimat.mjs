@@ -398,6 +398,34 @@ steps[steps.length - 1] = step('5.15 acan 10dk sonra talep_sil edemez', 'office'
   end;
 `);
 
+// ---------------- 5b) talep kaldir + istasyon otomatik ----------------
+steps.push(step('5.16 talep_kaldir: kapali talep kaldirilir, yeniden_ac temizler, toplu', 'office', `
+  ${assert(`(select kapanis from ${S}.talepler where talep_id=t1) is not null and (select kaldirildi_at from ${S}.talep_durum where talep_id=t1) is null`, 'baslangic')}
+  perform ${S}.talep_kaldir(t1);
+  ${assert(`(select kaldirildi_at from ${S}.talep_durum where talep_id=t1) is not null and (select kaldiran from ${S}.talepler where talep_id=t1)='${officeId}'`, 'kaldirildi_at yok')}
+  perform ${S}.talep_yeniden_ac(t1);
+  ${assert(`(select kaldirildi_at from ${S}.talep_durum where talep_id=t1) is null`, 'yeniden_ac kaldirildi_at temizlemedi')}
+  ${assert(`${S}.talep_kaldir_toplu(array[t1,t2]) = 0`, 'toplu: acik talepler kaldirilmamali')}
+  perform ${S}.talep_geri_cek(t1, 'tekrar');
+  ${assert(`${S}.talep_kaldir_toplu(array[t1,t2]) = 1`, 'toplu: yalniz kapali olan 1 kaldirilmali')}
+`));
+steps.push(expectErr('5.16b acik talep kaldirilamaz', 'office', `perform ${S}.talep_kaldir(t2);`, 'Yalnızca kapalı talepler'));
+steps.push(expectErr('5.16c yetkisiz (hat hesabi) talep_kaldir', 'station', `perform ${S}.talep_kaldir(t1);`, 'Bu talebi kaldırma yetkiniz yok'));
+steps.push(step('5.17 istasyon users.station den otomatik (trigger)', 'planner', `
+  ${assert(`${S}.talimat_istasyon_esle('Paketleme Hattı')='paketleme' and ${S}.talimat_istasyon_esle('Montaj')='montaj' and ${S}.talimat_istasyon_esle('Kesim')='kesim' and ${S}.talimat_istasyon_esle('Kutu') is null and ${S}.talimat_istasyon_esle(null) is null`, 'esleme')}
+  select user_id into tmp from ${S}.users where station::text in ('Paketleme','Paketleme Hattı') and role::text in ('Üretim','Hat') and is_active
+    and user_id not in (w1,w2,w3,w4,w5) limit 1;
+  select user_id into tmp2 from ${S}.users where station::text in ('Montaj','Montaj Hattı') and role::text in ('Üretim','Hat') and is_active
+    and user_id not in (w1,w2,w3,w4,w5) limit 1;
+  if tmp is null or tmp2 is null then raise exception 'test personeli bulunamadi'; end if;
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',tmp,'sku','LS031')`)};
+  ${assert(`(select istasyon from ${S}.talimat_satirlar where satir_id=s10)='paketleme'`, 'paketleme istasyonu atanmadi')}
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',tmp2)`)};
+  ${assert(`(select istasyon from ${S}.talimat_satirlar where satir_id=s10)='montaj'`, 'montaj istasyonu atanmadi (bos satir)')}
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',tmp,'sku','LS051','istasyon','kesim')`)};
+  ${assert(`(select istasyon from ${S}.talimat_satirlar where satir_id=s10)='kesim'`, 'acik istasyon ezildi')}
+`));
+
 // ---------------- 7) kopyala ----------------
 steps.push(step('7.1 talimat_kopyala_hafta (gelecek hafta)', 'planner', `
   v_plan2 := ${S}.talimat_kopyala_hafta(v_plan, ${S}.talimat_bugun() + 7);

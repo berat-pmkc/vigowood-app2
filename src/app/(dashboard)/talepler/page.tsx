@@ -14,7 +14,7 @@ const TARIH = /^\d{4}-\d{2}-\d{2}$/;
 export default async function TaleplerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sekme?: string; baslangic?: string; bitis?: string; talep?: string }>;
+  searchParams: Promise<{ sekme?: string; baslangic?: string; bitis?: string; talep?: string; degisiklik?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -28,17 +28,22 @@ export default async function TaleplerPage({
   const vurgu = p.talep && /^[0-9a-f-]{36}$/i.test(p.talep) ? p.talep : null;
 
   let sekme: TalepSekme = p.sekme === "tamamlanan" || p.sekme === "tamamlanmayan" ? p.sekme : "aktif";
-  // Bağlantıyla gelen talep kapalıysa uygun sekmeye geç
-  if (vurgu && !p.sekme) {
+  // Derin bağlantı: talep hangi sekmedeyse oraya geç (kapalı + "Kaldır"ılmış -> geçmiş; aksi halde aktif liste)
+  if (vurgu) {
     const t = await getTalep(vurgu);
-    if (t?.kapanis) sekme = (TALEP_KAPALI_TAMAMLANAN as readonly string[]).includes(t.kapanis) ? "tamamlanan" : "tamamlanmayan";
+    if (t) {
+      if (t.kapanis && t.kaldirildi_at) {
+        sekme = (TALEP_KAPALI_TAMAMLANAN as readonly string[]).includes(t.kapanis) ? "tamamlanan" : "tamamlanmayan";
+      } else sekme = "aktif";
+    }
   }
 
-  const baslangic = p.baslangic && TARIH.test(p.baslangic) ? p.baslangic : "";
-  const bitis = p.bitis && TARIH.test(p.bitis) ? p.bitis : "";
+  // Derin bağlantıda tarih filtresi hedefi gizlemesin
+  const baslangic = !vurgu && p.baslangic && TARIH.test(p.baslangic) ? p.baslangic : "";
+  const bitis = !vurgu && p.bitis && TARIH.test(p.bitis) ? p.bitis : "";
 
   const filtre: TalepFiltre = { limit: 500 };
-  if (sekme === "aktif") filtre.kapali = false;
+  if (sekme === "aktif") filtre.kaldirilmamis = true;
   else {
     filtre.kapali = true;
     filtre.durumlar = [...(sekme === "tamamlanan" ? TALEP_KAPALI_TAMAMLANAN : TALEP_KAPALI_TAMAMLANMAYAN)];
@@ -67,6 +72,7 @@ export default async function TaleplerPage({
       baslangic={baslangic}
       bitis={bitis}
       vurgu={vurgu}
+      degisiklikGoster={!!vurgu && p.degisiklik === "1"}
     />
   );
 }

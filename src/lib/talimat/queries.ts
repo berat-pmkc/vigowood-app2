@@ -115,6 +115,16 @@ export async function getPlanSatirlari(planId: string, f: TalimatSatirFiltre = {
   return (data ?? []) as TalimatSatir[];
 }
 
+/** satır_id -> ilk eklenme zamanı (Mavi Yaka'da personel gruplarını "ilk eklenen üstte" sıralamak için) */
+export async function getPlanSatirEklenme(planId: string): Promise<Record<string, string>> {
+  const sb = await talimatDb();
+  const { data, error } = await sb.from("talimat_satirlar").select("satir_id, created_at").eq("plan_id", planId);
+  hataFirlat(error);
+  const m: Record<string, string> = {};
+  for (const r of (data ?? []) as Array<{ satir_id: string; created_at: string }>) m[r.satir_id] = r.created_at;
+  return m;
+}
+
 export async function getSatir(satirId: string): Promise<TalimatSatir | null> {
   const sb = await talimatDb();
   const { data, error } = await sb.from("talimat_satir_ilerleme").select("*").eq("satir_id", satirId).maybeSingle();

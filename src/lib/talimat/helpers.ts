@@ -153,3 +153,23 @@ export function personeleGoreGrupla(satirlar: TalimatSatir[]): Map<string, Talim
   for (const liste of harita.values()) liste.sort((a, b) => a.sira - b.sira);
   return harita;
 }
+
+/**
+ * users.station -> talimat istasyonu (SQL: talimat_istasyon_esle ile aynı).
+ * Kesim/Montaj/Paketleme (+ " Hattı") eşlenir; Temizlik, Kutu, Ofis, Yönetim vb. -> null.
+ */
+export function istasyonEsle(station: string | null | undefined): "kesim" | "montaj" | "paketleme" | null {
+  switch (station) {
+    case "Kesim":
+    case "Kesim Hattı":
+      return "kesim";
+    case "Montaj":
+    case "Montaj Hattı":
+      return "montaj";
+    case "Paketleme":
+    case "Paketleme Hattı":
+      return "paketleme";
+    default:
+      return null;
+  }
+}

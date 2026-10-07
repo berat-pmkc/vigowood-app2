@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { UserPlus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
+import { istasyonEsle } from "@/lib/talimat/helpers";
 import type { TalimatPersonel } from "@/lib/talimat/types";
 
 interface Props {
@@ -71,8 +73,8 @@ export function PersonelEkle({ eklenebilir, onEkle }: Props) {
       }}
     >
       <PopoverTrigger asChild>
-        <Button size="sm" className="bg-vw-primary text-vw-dark hover:bg-vw-side">
-          <UserPlus className="mr-1.5 h-4 w-4" /> Personel ekle
+        <Button size="lg" className="h-12 gap-2 bg-vw-deep px-6 text-base font-semibold text-white shadow-sm hover:bg-vw-dark">
+          <Plus className="h-5 w-5" /> Personel Ekle
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
@@ -103,7 +105,12 @@ export function PersonelEkle({ eklenebilir, onEkle }: Props) {
               >
                 <Checkbox checked={secili.has(p.user_id)} onCheckedChange={() => toggle(p.user_id)} />
                 <span className="flex-1 truncate">{p.full_name}</span>
-                <span className="text-[11px] text-muted-foreground">{p.station ?? p.role}</span>
+                <span className="flex flex-col items-end text-[11px] leading-tight text-muted-foreground">
+                  <span>{p.station ?? p.role}</span>
+                  <span className={istasyonEsle(p.station) ? "font-semibold text-vw-deep" : "text-[#b8650c]"}>
+                    {istasyonEsle(p.station) ? `→ ${TALIMAT_ISTASYON_LABEL[istasyonEsle(p.station)!]}` : "istasyon: seçilmeli"}
+                  </span>
+                </span>
               </label>
             ))
           )}

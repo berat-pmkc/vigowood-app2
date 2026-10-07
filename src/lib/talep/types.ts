@@ -43,6 +43,8 @@ export interface Talep {
   toplam_stok: number;
   /** hedef depo seçiliyse o depodaki stok */
   depo_stok: number | null;
+  /** Kapalı talep kullanıcı tarafından "Kaldır"ıldığında dolar (geçmiş sekmelerine geçer) */
+  kaldirildi_at: string | null;
 }
 
 export interface TalepRevizyon {
@@ -110,6 +112,10 @@ export interface TalepFiltre {
   arama?: string;
   /** true: yalnız kapalılar, false: yalnız açıklar */
   kapali?: boolean;
+  /** true: kaldırılmamışlar (açık talepler + kapalı ama henüz "Kaldır"ılmamışlar = aktif liste) */
+  kaldirilmamis?: boolean;
+  /** varsayılan: yeni önce */
+  sirala?: "yeni" | "eski";
   limit?: number;
   offset?: number;
 }

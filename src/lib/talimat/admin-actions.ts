@@ -71,6 +71,8 @@ export interface TalepBaglanti {
   kirmizi: boolean;
   plan_id: string;
   hafta_baslangic: string;
+  /** Derin bağlantı hedefi: en son haftadaki (tercihen değişmiş) bağlı satır */
+  satir_id: string;
 }
 
 /** Taleplere bağlı iş talimatı satırlarının özeti ("Değişti" rozeti ve "Talimatı gör" bağlantısı için) */
@@ -81,19 +83,23 @@ export async function talepBaglantilariGetir(talepIdleri: string[]): Promise<Act
     const sb = await talimatDb();
     const { data, error } = await sb
       .from("talimat_satir_ilerleme")
-      .select("talep_id, plan_id, hafta_baslangic, kirmizi")
+      .select("talep_id, satir_id, plan_id, hafta_baslangic, kirmizi")
       .in("talep_id", talepIdleri);
     if (error) throw new Error(error.message);
     const harita = new Map<string, TalepBaglanti>();
-    for (const r of (data ?? []) as Array<{ talep_id: string; plan_id: string; hafta_baslangic: string; kirmizi: boolean }>) {
+    for (const r of (data ?? []) as Array<{ talep_id: string; satir_id: string; plan_id: string; hafta_baslangic: string; kirmizi: boolean }>) {
       const m = harita.get(r.talep_id);
-      if (!m) harita.set(r.talep_id, { talep_id: r.talep_id, kirmizi: !!r.kirmizi, plan_id: r.plan_id, hafta_baslangic: r.hafta_baslangic });
-      else {
-        m.kirmizi = m.kirmizi || !!r.kirmizi;
-        if (r.hafta_baslangic > m.hafta_baslangic) {
-          m.hafta_baslangic = r.hafta_baslangic;
-          m.plan_id = r.plan_id;
-        }
+      if (!m) {
+        harita.set(r.talep_id, { talep_id: r.talep_id, kirmizi: !!r.kirmizi, plan_id: r.plan_id, hafta_baslangic: r.hafta_baslangic, satir_id: r.satir_id });
+        continue;
+      }
+      const daSonra = r.hafta_baslangic > m.hafta_baslangic;
+      const ayniHaftaKirmizi = r.hafta_baslangic === m.hafta_baslangic && !!r.kirmizi && !m.kirmizi;
+      m.kirmizi = m.kirmizi || !!r.kirmizi;
+      if (daSonra || ayniHaftaKirmizi) {
+        m.hafta_baslangic = r.hafta_baslangic;
+        m.plan_id = r.plan_id;
+        m.satir_id = r.satir_id;
       }
     }
     return [...harita.values()];

@@ -3,7 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { GripVertical, Link2, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
+import { GripVertical, History, Link2, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,9 +30,11 @@ interface Props {
   depoStoklari: UrunStokSecenek["depo_stoklari"] | undefined;
   islem: SatirIslemleri;
   sirali: boolean;
+  /** Derin bağlantıyla gelinen satır: sarı vurgu (3 sn) */
+  parlak?: boolean;
 }
 
-export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali }: Props) {
+export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali, parlak }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: s.satir_id,
     disabled: !editable || !sirali,
@@ -46,6 +48,8 @@ export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali }: 
   return (
     <tr
       ref={setNodeRef}
+      id={`satir-${s.satir_id}`}
+      data-satir-id={s.satir_id}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "border-b align-top text-sm",
@@ -53,6 +57,7 @@ export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali }: 
         tamam && "opacity-50",
         s.kirmizi && !pasif && "text-[#c0424f]",
         isDragging && "relative z-10 bg-vw-light shadow-lg",
+        parlak && "animate-pulse bg-[#fff59d] opacity-100",
       )}
     >
       {/* Sıra + tutamaç */}
@@ -188,6 +193,14 @@ export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali }: 
             className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-[#3368b1] hover:underline"
           >
             <Link2 className="h-3 w-3" /> Talebi gör
+          </Link>
+        )}
+        {s.talep_id && s.kirmizi && (
+          <Link
+            href={`/talepler?talep=${s.talep_id}&degisiklik=1`}
+            className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold text-[#c0424f] hover:underline"
+          >
+            <History className="h-3 w-3" /> Değişikliği gör
           </Link>
         )}
       </td>

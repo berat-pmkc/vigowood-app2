@@ -123,6 +123,30 @@ export async function talepKapat(
   });
 }
 
+/**
+ * Kapalı talebi listeden "Kaldır": aktif listeden çıkar, geçmiş sekmelerine geçer (açan veya planlayıcı).
+ * Kapalı olmayan talep kaldırılamaz.
+ */
+export async function talepKaldir(talepId: string): Promise<ActionResult> {
+  return sonucaCevir(async () => {
+    await rolGerekli(TALEP_CREATOR_ROLES);
+    await rpcCagir("talep_kaldir", { p_talep: uuid.parse(talepId) });
+    talimatYenile();
+    return undefined;
+  });
+}
+
+/** Toplu "Kaldır". Dönen: kaldırılan talep sayısı (yetkisiz/açık olanlar atlanır). */
+export async function talepKaldirToplu(talepIdleri: string[]): Promise<ActionResult<number>> {
+  return sonucaCevir(async () => {
+    await rolGerekli(TALEP_CREATOR_ROLES);
+    const ids = z.array(uuid).min(1).max(500).parse(talepIdleri);
+    const n = await rpcCagir<number>("talep_kaldir_toplu", { p_talepler: ids });
+    talimatYenile();
+    return Number(n) || 0;
+  });
+}
+
 /** Planlayıcı: "stokta mevcut" kısayolu (talebi kapatır, bağlı satırları pasife alır) */
 export async function talepStoktaMevcut(talepId: string, neden?: string | null): Promise<ActionResult> {
   return sonucaCevir(async () => {
