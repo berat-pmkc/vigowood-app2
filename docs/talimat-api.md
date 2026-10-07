@@ -166,3 +166,8 @@ Okuma: `has_production_access() OR is_office_user()`. Doğrudan yazma: planlayı
 - RPC: `talep_kaldir(uuid)`, `talep_kaldir_toplu(uuid[]) -> int` (açan veya planlayıcı; yalnız kapalı talepler). Action: `talepKaldir`, `talepKaldirToplu`. Sorgu: `TalepFiltre.kaldirilmamis` (aktif liste), `sirala` (varsayılan yeni önce).
 - `talimat_satirlar` INSERT trigger'ı: `istasyon` boş ve `plaka_id` yoksa `users.station`'dan türetilir (`talimat_istasyon_esle`: Kesim/Montaj/Paketleme [+ " Hattı"]; diğerleri NULL). İstemci karşılığı: `helpers.istasyonEsle`.
 - Derin bağlantılar: `/talepler?talep=<id>[&degisiklik=1]` (doğru sekme, filtre temizleme, kaydırma + 3 sn vurgu; satır `id="talep-<id>"` + `data-talep-id`), `/ops/board/mavi-yaka?hafta=<pazartesi>&satir=<satir_id>` (satır `id="satir-<id>"` + `data-satir-id`).
+
+## 10. Sayaç sıfırlama / Tekrar aktif et (SQL 154)
+
+- `talimat_satirlar.sayac_baslangic` (NULL = hafta başı). `talimat_satir_etkin.sayac_bas_ts` = greatest(hafta başı, sayac_baslangic); `talimat_satir_ilerleme` (uretilen, son_seans_at) ve `talimat_satir_katki` yalnız bu andan sonra kapanan seansları sayar. `paketlemeye_hazir` ve `talep_durum` (talep kümülatif üretilen) değişmedi.
+- RPC `talimat_satir_yeniden_aktif(p_satir, p_istenen>0)`: planlayıcı, PLAN_PASIF korumalı; sayac=now(), istenen=p_istenen, tamamlandi->aktif, yayında ise degisti + degisen_personeller. Action: `satirYenidenAktifEt(satirId, istenen)`.

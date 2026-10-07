@@ -85,6 +85,8 @@ export interface TalimatSatir {
   hafta_seans_var: boolean;
   bugun_seans_var: boolean;
   toplam_stok: number;
+  /** Sayaç sıfırlama anı (null = plan haftası başı); üretilen bu andan itibaren sayılır */
+  sayac_baslangic?: string | null;
 }
 
 /** talimat_satir_katki */

@@ -559,6 +559,32 @@ steps.push(step('9.1 ek_seanslar gorunumu: bayrakli seanslar, bayraksiz haric', 
   ${assert(`(select count(*) from ${S}.ek_seanslar where session_id='TEST-EK-M2')=0`, 'bayraksiz seans gorunuyor')}
 `));
 
+// ---------------- 10) sayac sifirla (tekrar aktif et) ----------------
+steps.push(step('10.1 satir_yeniden_aktif: sayac sifirlanir, uretilen yeniden sayilir', 'planner', `
+  v_plan2 := ${S}.talimat_plan_getir_veya_olustur(${S}.talimat_bugun());
+  s9 := ${kaydet(`jsonb_build_object('plan_id',v_plan2,'personel_id',w1,'istasyon','montaj','sku','LS031','istenen_miktar',5)`)};
+  ${su}
+  insert into ${S}.montaj_sessions (session_id, sku, step_id, step_name, seq_no, durum, operator_id, operator_name, start_time, end_time, qty, is_final_step)
+    values ('TEST-SY-M1','LS031','TEST-STEP','Test adim',1,'tamamlandi',w1,'Test Personel', now() - interval '3 minutes', now() - interval '2 minutes', 5, true);
+  ${as('planner')}
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=s9)=5`, 'baslangic uretilen 5 degil')}
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where satir_id=s9)='tamamlandi'`, 'tamamlandi degil')}
+  perform ${S}.talimat_satir_yeniden_aktif(s9, 3);
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=s9)=0`, 'sayac sonrasi uretilen 0 degil')}
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where satir_id=s9)='aktif'`, 'aktif degil')}
+  ${assert(`(select istenen_miktar from ${S}.talimat_satirlar where satir_id=s9)=3 and (select sayac_baslangic from ${S}.talimat_satirlar where satir_id=s9) is not null`, 'istenen/sayac yazilmadi')}
+  ${su}
+  insert into ${S}.montaj_sessions (session_id, sku, step_id, step_name, seq_no, durum, operator_id, operator_name, start_time, end_time, qty, is_final_step)
+    values ('TEST-SY-M2','LS031','TEST-STEP','Test adim',1,'tamamlandi',w1,'Test Personel', now() + interval '1 minute', now() + interval '2 minutes', 3, true);
+  ${as('planner')}
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=s9)=3`, 'yeni uretim sayilmadi')}
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where satir_id=s9)='tamamlandi'`, 'yeniden tamamlanmadi')}
+  ${assert(`(select coalesce(sum(qty),0) from ${S}.talimat_satir_katki where satir_id=s9)=3`, 'katki sayactan baslamiyor')}
+`));
+steps.push(expectErr('10.2 satir_yeniden_aktif: miktar > 0 olmali', 'planner', `perform ${S}.talimat_satir_yeniden_aktif(s9, 0);`, 'Geçerli bir istenen miktar'));
+steps.push(expectErr('10.3 satir_yeniden_aktif: planlayici degil', 'station', `perform ${S}.talimat_satir_yeniden_aktif(s9, 4);`, ''));
+steps.push(expectErr('10.4 satir_yeniden_aktif: pasif plan', 'planner', `perform ${S}.talimat_satir_yeniden_aktif(s7, 4);`, 'PLAN_PASIF'));
+
 const body = `
 declare
   v_plan uuid; v_plan2 uuid; s1 uuid; s2 uuid; s3 uuid; s4 uuid; s5 uuid; s6 uuid; s7 uuid; s8 uuid; s9 uuid; s10 uuid;

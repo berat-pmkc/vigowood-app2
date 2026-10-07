@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
 import { personeleGoreGrupla } from "@/lib/talimat/helpers";
-import type { SatirKaydetGirdi } from "@/lib/talimat/types";
 import type { TalimatSatir } from "@/lib/talimat/types";
 
 function zamanTr(iso: string | null): string {
@@ -25,11 +24,12 @@ interface Props {
   satirlar: TalimatSatir[];
   /** Plan düzenlenebilir mi (tekrar aktif et yalnızca o zaman) */
   editable: boolean;
-  kaydet: (satirId: string, alanlar: Partial<SatirKaydetGirdi>) => Promise<void>;
+  /** Sayacı sıfırlayıp satırı yeniden aktif eder */
+  yenidenAktifEt: (satirId: string, istenen: number) => Promise<void>;
 }
 
 /** Tamamlanan iş talimatı satırları (salt okunur) + "Tekrar aktif et" */
-export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, kaydet }: Props) {
+export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, yenidenAktifEt }: Props) {
   const gruplar = useMemo(
     () =>
       [...personeleGoreGrupla(satirlar).entries()]
@@ -50,12 +50,10 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ka
 
   const onayla = async () => {
     if (!acik) return;
-    const n = deger.trim() === "" ? null : Number(deger.replace(",", "."));
-    if (n !== null && (!Number.isFinite(n) || n <= 0)) return setHata("Geçerli bir miktar girin");
-    if (n !== null && n <= acik.uretilen) return setHata(`Yeni istenen, üretilenden (${acik.uretilen}) büyük olmalı`);
-    if (n === null && acik.durum !== "tamamlandi") return setHata("Yeni istenen miktarı girin");
+    const n = Number(deger.trim().replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return setHata("Geçerli bir miktar girin");
     setBusy(true);
-    await kaydet(acik.satir_id, { istenen_miktar: n, ...(acik.durum === "tamamlandi" ? { durum: "aktif" as const } : {}) });
+    await yenidenAktifEt(acik.satir_id, n);
     setBusy(false);
     setAcik(null);
   };
@@ -130,7 +128,7 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ka
             <DialogHeader>
               <DialogTitle>Talimatı tekrar aktif et</DialogTitle>
               <DialogDescription>
-                {acik?.sku ?? acik?.plaka_id} · üretilen {acik?.uretilen}. Satırı yeniden açmak için yeni istenen miktarı girin.
+                {acik?.sku ?? acik?.plaka_id} · üretilen {acik?.uretilen}. Yeni istenen miktarı girin (önceki miktardan büyük olması gerekmez). Sayaç sıfırlanır; yeni üretim bu andan itibaren sayılır.
               </DialogDescription>
             </DialogHeader>
             <Input

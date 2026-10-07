@@ -122,6 +122,22 @@ export async function satirSil(satirId: string): Promise<ActionResult> {
   });
 }
 
+/**
+ * Tamamlanan satırı "tekrar aktif et": sayaç sıfırlanır (üretilen bu andan itibaren sayılır),
+ * istenen miktar herhangi bir pozitif sayı olabilir. Dönen: satir_id.
+ */
+export async function satirYenidenAktifEt(satirId: string, istenen: number): Promise<ActionResult<string>> {
+  return sonucaCevir(async () => {
+    await rolGerekli(TALIMAT_PLANNER_ROLES);
+    const id = await rpcCagir<string>("talimat_satir_yeniden_aktif", {
+      p_satir: uuid.parse(satirId),
+      p_istenen: z.number().positive("Miktar sıfırdan büyük olmalı").parse(istenen),
+    });
+    talimatYenile();
+    return id;
+  });
+}
+
 /** Personelin TÜM satırlarını verilen sırayla yeniden numaralar (sürükle-bırak) */
 export async function satirSirala(planId: string, personelId: string, satirIdleri: string[]): Promise<ActionResult> {
   return sonucaCevir(async () => {

@@ -61,6 +61,7 @@ import {
   planGetirVeyaOlustur,
   planKopyala,
   satirKaydet,
+  satirYenidenAktifEt,
   satirSil,
   satirSirala,
   talimatPasifKaldir,
@@ -249,6 +250,15 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
   const kaydet = useCallback(
     async (satirId: string, alanlar: Partial<SatirKaydetGirdi>) => {
       const r = await satirKaydet({ satir_id: satirId, ...alanlar });
+      if (!r.success) toast.error(hataMesaji(r));
+      yenile();
+    },
+    [yenile],
+  );
+
+  const yenidenAktifEt = useCallback(
+    async (satirId: string, istenen: number) => {
+      const r = await satirYenidenAktifEt(satirId, istenen);
       if (!r.success) toast.error(hataMesaji(r));
       yenile();
     },
@@ -1038,7 +1048,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
               onOpenChange={setTamamlananAcik}
               satirlar={tamamlananlar}
               editable={editable}
-              kaydet={kaydet}
+              yenidenAktifEt={yenidenAktifEt}
             />
 
             <YayinGecmisi yayinlar={yayinlar} editable={editable} onChanged={yenile} />
