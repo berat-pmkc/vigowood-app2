@@ -33,6 +33,7 @@ import {
   SlidersHorizontal,
   Wand2,
   X,
+  ListChecks, Sigma,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -446,6 +447,16 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
             <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
               <Link href="/ops/board">
                 <ArrowLeft className="mr-1 h-4 w-4" /> Geri
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/ops/board/mavi-yaka/ek-seanslar">
+                <ListChecks className="mr-1.5 h-4 w-4" /> Açılan Ek Seanslar
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/ops/board/mavi-yaka/ek-seanslar/toplam">
+                <Sigma className="mr-1.5 h-4 w-4" /> Toplam Ek Seanslar
               </Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="text-muted-foreground">

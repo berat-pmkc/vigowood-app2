@@ -66,6 +66,8 @@ interface NewSessionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   talimat?: TalimatSeansOnDolu | null;
+  /** "Ek Seans Aç": plan dışı seans — çalışan sabit, ürün serbest */
+  ekSeans?: { personel_id: string; personel_adi: string } | null;
   /** Seans başarıyla başlayınca (dialog kapanmadan önce) */
   onSuccess?: () => void;
 }
@@ -85,7 +87,10 @@ function normalize(s: string): string {
     .trim();
 }
 
-export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: NewSessionDialogProps) {
+export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSuccess }: NewSessionDialogProps) {
+  /** Çıkarılamayan (sabit) çalışan: talimat sahibi veya ek seansı açan */
+  const kilitliPersonel = talimat?.personel_id ?? ekSeans?.personel_id ?? null;
+  const kilitliAd = talimat?.personel_adi ?? ekSeans?.personel_adi ?? null;
   const [products, setProducts] = useState<Product[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -108,6 +113,13 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
   const talimatSatirId = talimat?.satir_id;
   const talimatSku = talimat?.sku;
   const talimatPersonel = talimat?.personel_id;
+  const ekPersonel = ekSeans?.personel_id;
+  useEffect(() => {
+    if (!open || !ekPersonel) return;
+    setSelectedWorkers(new Set([ekPersonel]));
+    setYardimciSayisi(0);
+  }, [open, ekPersonel]);
+
   useEffect(() => {
     if (!open || !talimatSatirId) return;
     setSelectedSku(talimatSku ?? "");
@@ -191,7 +203,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
 
   const toggleWorker = (id: string) => {
     // Talimat çalışanı kendisi: çıkarılamaz
-    if (talimat && id === talimat.personel_id) return;
+    if (kilitliPersonel && id === kilitliPersonel) return;
     setSelectedWorkers((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -217,7 +229,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
     }
     const workers = Array.from(selectedWorkers).map((id) => {
       const op = operators.find((o) => o.user_id === id);
-      return { id, name: op?.full_name ?? (talimat && id === talimat.personel_id ? talimat.personel_adi : id) };
+      return { id, name: op?.full_name ?? (kilitliPersonel && id === kilitliPersonel ? (kilitliAd ?? id) : id) };
     });
 
     setSubmitting(true);
@@ -225,10 +237,14 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
       selectedSku,
       selectedStepId,
       workers,
-      talimat ? { talimatSatirId: talimat.satir_id, yardimciSayisi } : undefined,
+      talimat
+        ? { talimatSatirId: talimat.satir_id, yardimciSayisi }
+        : ekSeans
+          ? { ekSeans: true, yardimciSayisi }
+          : undefined,
     );
     if (result.success) {
-      toast.success("Montaj seansı başlatıldı");
+      toast.success(ekSeans ? "Ek seans başlatıldı" : "Montaj seansı başlatıldı");
       onSuccess?.();
       onOpenChange(false);
     } else {
@@ -267,7 +283,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
             </Button>
           )}
           <DialogTitle className="min-w-0 flex-1 truncate text-base">
-            {activeStep === 1 && !talimat ? "Ürün seç" : "Montaj adımı seç"}
+            {activeStep === 1 && !talimat ? (ekSeans ? "Ek Seans — Ürün seç" : "Ürün seç") : "Montaj adımı seç"}
           </DialogTitle>
           <Button
             variant="ghost" size="icon" className="size-9 shrink-0"
@@ -446,7 +462,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
                           >
                             <Checkbox
                               checked={selectedWorkers.has(op.user_id)}
-                              disabled={talimat?.personel_id === op.user_id}
+                              disabled={kilitliPersonel === op.user_id}
                               onCheckedChange={() => toggleWorker(op.user_id)}
                             />
                             <span className="min-w-0 flex-1 truncate text-sm">{op.full_name}</span>
@@ -459,7 +475,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
                           </p>
                         )}
                       </div>
-                      {talimat && (
+                      {(talimat || ekSeans) && (
                         <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border p-3">
                           <Label htmlFor="yardimci-sayisi" className="text-sm">
                             Listede olmayan yardımcı sayısı

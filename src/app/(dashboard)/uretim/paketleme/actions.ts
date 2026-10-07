@@ -200,9 +200,11 @@ export async function createPackSession(
    * listede olmayan yardımcı sayısı. worker_count = isimli çalışanlar + yardimci_sayisi.
    */
   talimat?: {
-    talimatSatirId: string;
+    talimatSatirId?: string | null;
     workers: Array<{ id: string; name: string }>;
     yardimciSayisi?: number;
+    /** "Ek Seans Aç": plan dışı seans (talimat satırı yok) */
+    ekSeans?: boolean;
   },
 ): Promise<ActionResult> {
   try {
@@ -258,6 +260,7 @@ export async function createPackSession(
       workers: JSON.stringify(talimatWorkers),
       // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
       ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
+      ...(talimat?.ekSeans ? { ek_seans: true } : {}),
       ...(yardimciSayisi > 0 ? { yardimci_sayisi: yardimciSayisi } : {}),
     } as never);
 

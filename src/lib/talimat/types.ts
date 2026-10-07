@@ -203,6 +203,9 @@ export interface TabletAcikSeans {
   duraklama_dk: number | null;
   duraklatma_baslangic: string | null;
   yardimci_sayisi: number | null;
+  /** Ek seans (plan dışı): satir_id boş, personel_id dolu */
+  ek_seans?: boolean;
+  personel_id?: string | null;
 }
 
 /** Tüm çalışanların listesi (tablet "İş Talimatları" ekranı) */

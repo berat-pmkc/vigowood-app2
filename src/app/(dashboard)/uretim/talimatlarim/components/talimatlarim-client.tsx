@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, CheckCheck, ClipboardList, Clock, Loader2, Package, Pause, Play, Scissors, Search,
-  StickyNote, Wrench, X,
+  PlusCircle, StickyNote, Wrench, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,8 @@ import { DB_SCHEMA } from "@/lib/supabase/schema";
 import { tabletTumListeGetir, talimatOnayla } from "@/lib/talimat/actions";
 import { kesimBitirdiVerisiGetir, type KesimBitirdiVerisi } from "@/lib/talimat/tablet-actions";
 import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
-import { ilerlemeYuzdesi } from "@/lib/talimat/helpers";
+import { ilerlemeYuzdesi, istasyonEsle } from "@/lib/talimat/helpers";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { TabletAcikSeans, TalimatSatir, TalimatTabletTum } from "@/lib/talimat/types";
 import { NewSessionDialog as MontajSeansDialog } from "../../montaj/components/new-session-dialog";
 import { NewSessionDialog as PaketlemeSeansDialog } from "../../paketleme/components/new-session-dialog";
@@ -77,6 +78,12 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, baslangicListe,
   const [kesimYukleniyor, setKesimYukleniyor] = useState<string | null>(null);
   const [montajKapat, setMontajKapat] = useState<ActiveMontajSession | null>(null);
   const [paketKapat, setPaketKapat] = useState<ActiveSession | null>(null);
+
+  // Ek seans (plan dışı): önce Montaj/Paketleme seçimi, sonra ilgili seans diyaloğu
+  type EkKisi = { personel_id: string; personel_adi: string; istasyon: string | null };
+  const [ekSecim, setEkSecim] = useState<EkKisi | null>(null);
+  const [ekMontaj, setEkMontaj] = useState<EkKisi | null>(null);
+  const [ekPaket, setEkPaket] = useState<EkKisi | null>(null);
 
   useEffect(() => {
     sesHazirla();
@@ -228,9 +235,22 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, baslangicListe,
   const seansMap = useMemo(() => {
     const m = new Map<string, TabletAcikSeans[]>();
     for (const s of liste?.acik_seanslar ?? []) {
+      if (s.ek_seans) continue;
       const a = m.get(s.satir_id) ?? [];
       a.push(s);
       m.set(s.satir_id, a);
+    }
+    return m;
+  }, [liste]);
+
+  // Ek seanslar personele göre
+  const ekMap = useMemo(() => {
+    const m = new Map<string, TabletAcikSeans[]>();
+    for (const s of liste?.acik_seanslar ?? []) {
+      if (!s.ek_seans || !s.personel_id) continue;
+      const a = m.get(s.personel_id) ?? [];
+      a.push(s);
+      m.set(s.personel_id, a);
     }
     return m;
   }, [liste]);
@@ -413,6 +433,30 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, baslangicListe,
                   )}
                 </div>
 
+                <Button
+                  variant="outline"
+                  className="mt-3 h-12 w-full border-2 border-[#f28a19] text-base font-bold text-[#c26a0c] hover:bg-[#f28a19]/10"
+                  onClick={() => setEkSecim({ personel_id: g.personel_id, personel_adi: g.ad, istasyon: g.istasyon })}
+                >
+                  <PlusCircle className="mr-2 size-5" />
+                  Ek Seans Aç
+                </Button>
+
+                {(ekMap.get(g.personel_id)?.length ?? 0) > 0 && (
+                  <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[#f28a19]/60 p-3">
+                    <p className="text-sm font-bold text-[#c26a0c]">Ek seanslar</p>
+                    {ekMap.get(g.personel_id)!.map((x) => (
+                      <div key={x.session_id} className="space-y-1">
+                        <p className="truncate text-sm font-semibold">
+                          {x.sku}
+                          <span className="ml-2 font-normal text-muted-foreground">{x.urun_adi ?? ""}</span>
+                        </p>
+                        <AcikSeansKarti x={x} onBeklet={beklet} onKapat={seansKapatAc} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <ul className="mt-3 space-y-3">
                   {g.satirlar.map((s) => (
                     <SatirKarti
@@ -435,6 +479,60 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, baslangicListe,
             <p className="py-10 text-center text-lg text-muted-foreground">Çalışan bulunamadı</p>
           )}
         </div>
+      )}
+
+      {/* Ek Seans: Montaj / Paketleme seçimi */}
+      <Dialog open={ekSecim !== null} onOpenChange={(o) => !o && setEkSecim(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Ek Seans — {ekSecim?.personel_adi}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Plan dışı gelen ürün için seans türünü seç.</p>
+          <div className="grid gap-3">
+            {(["montaj", "paketleme"] as const).map((t) => {
+              const varsayilan = ekSecim ? istasyonEsle(ekSecim.istasyon) === t : false;
+              return (
+                <Button
+                  key={t}
+                  variant={varsayilan ? "default" : "outline"}
+                  className={cn("h-16 text-lg font-bold", varsayilan && "bg-vw-primary text-white hover:bg-vw-deep")}
+                  onClick={() => {
+                    if (!ekSecim) return;
+                    if (t === "montaj") setEkMontaj(ekSecim);
+                    else setEkPaket(ekSecim);
+                    setEkSecim(null);
+                  }}
+                >
+                  {t === "montaj" ? <Wrench className="mr-2 size-6" /> : <Package className="mr-2 size-6" />}
+                  {t === "montaj" ? "Montaj" : "Paketleme"}
+                </Button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {ekMontaj && (
+        <MontajSeansDialog
+          open
+          onOpenChange={(o) => !o && setEkMontaj(null)}
+          ekSeans={{ personel_id: ekMontaj.personel_id, personel_adi: ekMontaj.personel_adi }}
+          onSuccess={() => {
+            setEkMontaj(null);
+            void yukle();
+          }}
+        />
+      )}
+      {ekPaket && (
+        <PaketlemeSeansDialog
+          open
+          onOpenChange={(o) => !o && setEkPaket(null)}
+          ekSeans={{ personel_id: ekPaket.personel_id, personel_adi: ekPaket.personel_adi }}
+          onSuccess={() => {
+            setEkPaket(null);
+            void yukle();
+          }}
+        />
       )}
 
       {/* Montaj: Seans Başlat */}

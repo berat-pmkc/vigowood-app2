@@ -661,7 +661,7 @@ export async function createMontajSession(
    * İş talimatından başlatıldıysa: talimat satırı + isimsiz yardımcı sayısı.
    * worker_count = isimli çalışanlar + yardimci_sayisi (birim süre kişi başı kalır).
    */
-  talimat?: { talimatSatirId?: string | null; yardimciSayisi?: number }
+  talimat?: { talimatSatirId?: string | null; yardimciSayisi?: number; ekSeans?: boolean }
 ): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -685,7 +685,7 @@ export async function createMontajSession(
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
     // Talimattan başlatıldıysa seansın sahibi talimattaki çalışan (ilk isimli çalışan)
-    const talimatCalisan = talimat?.talimatSatirId ? workers?.[0] : undefined;
+    const talimatCalisan = talimat?.talimatSatirId || talimat?.ekSeans ? workers?.[0] : undefined;
     const operatorId = talimatCalisan?.id ?? readOperatorId(authUser?.user_metadata) ?? user.user_id;
     const operatorName = talimatCalisan?.name ?? readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
@@ -732,6 +732,7 @@ export async function createMontajSession(
       workers: JSON.stringify(sessionWorkers),
       // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
       ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
+      ...(talimat?.ekSeans ? { ek_seans: true } : {}),
       ...(yardimciSayisi > 0 ? { yardimci_sayisi: yardimciSayisi } : {}),
     } as never);
 

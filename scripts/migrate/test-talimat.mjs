@@ -544,6 +544,21 @@ steps.push(step('6.6 pasif plan tablette gorunmez (seans yok)', 'station', `
   ${assert(`${S}.talimat_tablet_plan(w1) is null or ${S}.talimat_tablet_plan(w1) <> v_plan`, 'pasif plan gorunuyor')}
 `));
 
+// ---------------- 9) ek seans ----------------
+steps.push(step('9.1 ek_seanslar gorunumu: bayrakli seanslar, bayraksiz haric', 'planner', `
+  ${su}
+  insert into ${S}.montaj_sessions (session_id, sku, step_id, step_name, seq_no, durum, operator_id, operator_name, start_time, end_time, qty, ek_seans)
+    values ('TEST-EK-M1','LS031','TEST-STEP','Test adim',1,'tamamlandi',w1,'Test Personel', now() - interval '90 minutes', now() - interval '30 minutes', 5, true),
+           ('TEST-EK-M2','LS031','TEST-STEP','Test adim',1,'montajda',w1,'Test Personel', now() - interval '10 minutes', null, 0, false);
+  insert into ${S}.pack_events (session_id, sku, durum, operator_id, operator_name, start_time, ek_seans)
+    values ('TEST-EK-P1','LS031','paketlemede',w1,'Test Personel', now() - interval '5 minutes', true);
+  ${as('planner')}
+  ${assert(`(select count(*) from ${S}.ek_seanslar where session_id like 'TEST-EK-%')=2`, 'ek_seanslar satir sayisi')}
+  ${assert(`(select net_sure_dk from ${S}.ek_seanslar where session_id='TEST-EK-M1') between 59 and 61`, 'montaj net sure')}
+  ${assert(`(select durum from ${S}.ek_seanslar where session_id='TEST-EK-P1')='acik'`, 'paketleme durum')}
+  ${assert(`(select count(*) from ${S}.ek_seanslar where session_id='TEST-EK-M2')=0`, 'bayraksiz seans gorunuyor')}
+`));
+
 const body = `
 declare
   v_plan uuid; v_plan2 uuid; s1 uuid; s2 uuid; s3 uuid; s4 uuid; s5 uuid; s6 uuid; s7 uuid; s8 uuid; s9 uuid; s10 uuid;

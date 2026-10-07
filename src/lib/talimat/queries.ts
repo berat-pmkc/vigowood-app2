@@ -341,11 +341,11 @@ export async function getTabletTumListe(yedekPersonelId?: string | null): Promis
       .in("talimat_yayinlar.durum", ["gonderildi", "durduruldu"]),
     sb
       .from("montaj_sessions")
-      .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_id, operator_name, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id")
+      .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_id, operator_name, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id, ek_seans")
       .eq("durum", "montajda"),
     sb
       .from("pack_events")
-      .select("session_id, sku, start_time, durum, operator_name, personel, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id")
+      .select("session_id, sku, start_time, durum, operator_name, personel, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id, ek_seans, operator_id")
       .eq("durum", "paketlemede"),
   ]);
   hataFirlat(satirRes.error);
@@ -394,6 +394,20 @@ export async function getTabletTumListe(yedekPersonelId?: string | null): Promis
   const paketSatirlari = satirlar.filter((s) => s.etkin_istasyon === "paketleme" && s.sku);
   const acik: TabletAcikSeans[] = [];
 
+  // Ek seans ürün adları (tek sorgu)
+  const ekSkular = [...new Set(
+    [...(montajRes.data ?? []), ...(paketRes.data ?? [])]
+      .filter((h) => (h as Record<string, unknown>).ek_seans)
+      .map((h) => (h as Record<string, unknown>).sku as string | null)
+      .filter((x): x is string => !!x),
+  )];
+  const skuAdi = new Map<string, string | null>();
+  if (ekSkular.length) {
+    const { data: urunler, error: eu } = await sb.from("products").select("sku, urun_adi").in("sku", ekSkular);
+    hataFirlat(eu);
+    for (const u of urunler ?? []) skuAdi.set(u.sku as string, (u.urun_adi as string | null) ?? null);
+  }
+
   const baglan = (ham: Ham, adaySatirlar: TalimatSatir[], personelMi: (pid: string) => boolean): string | null => {
     const dogrudan = ham.talimat_satir_id as string | null;
     if (dogrudan) return satirById.has(dogrudan) ? dogrudan : null;
@@ -404,6 +418,21 @@ export async function getTabletTumListe(yedekPersonelId?: string | null): Promis
 
   for (const h of (montajRes.data ?? []) as Ham[]) {
     const workers = parseW(h.workers);
+    if (h.ek_seans) {
+      acik.push({
+        session_id: h.session_id as string, tur: "montaj", satir_id: "", ek_seans: true,
+        personel_id: (h.operator_id as string | null) ?? null,
+        sku: (h.sku as string | null) ?? null, urun_adi: skuAdi.get(h.sku as string) ?? null,
+        step_id: (h.step_id as string | null) ?? null, step_name: (h.step_name as string | null) ?? null,
+        seq_no: (h.seq_no as number | null) ?? null, is_final_step: (h.is_final_step as boolean | null) ?? null,
+        start_time: (h.start_time as string | null) ?? null, durum: h.durum as string,
+        operator_name: (h.operator_name as string | null) ?? null, workers,
+        duraklama_dk: (h.duraklama_dk as number | null) ?? null,
+        duraklatma_baslangic: (h.duraklatma_baslangic as string | null) ?? null,
+        yardimci_sayisi: (h.yardimci_sayisi as number | null) ?? null,
+      });
+      continue;
+    }
     const satirId = baglan(h, montajSatirlari, (pid) => h.operator_id === pid || !!workers?.some((w) => w.id === pid));
     if (!satirId) continue;
     acik.push({
@@ -420,6 +449,20 @@ export async function getTabletTumListe(yedekPersonelId?: string | null): Promis
   }
   for (const h of (paketRes.data ?? []) as Ham[]) {
     const workers = parseW(h.workers);
+    if (h.ek_seans) {
+      acik.push({
+        session_id: h.session_id as string, tur: "paketleme", satir_id: "", ek_seans: true,
+        personel_id: (h.operator_id as string | null) ?? null,
+        sku: (h.sku as string | null) ?? null, urun_adi: skuAdi.get(h.sku as string) ?? null,
+        step_id: null, step_name: null, seq_no: null, is_final_step: null,
+        start_time: (h.start_time as string | null) ?? null, durum: h.durum as string,
+        operator_name: (h.operator_name as string | null) ?? null, workers,
+        duraklama_dk: (h.duraklama_dk as number | null) ?? null,
+        duraklatma_baslangic: (h.duraklatma_baslangic as string | null) ?? null,
+        yardimci_sayisi: (h.yardimci_sayisi as number | null) ?? null,
+      });
+      continue;
+    }
     const csv = String(h.personel ?? "").replace(/\s/g, "").split(",").filter(Boolean);
     const satirId = baglan(h, paketSatirlari, (pid) => csv.includes(pid) || !!workers?.some((w) => w.id === pid));
     if (!satirId) continue;

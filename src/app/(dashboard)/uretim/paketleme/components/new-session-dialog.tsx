@@ -56,15 +56,18 @@ interface NewSessionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   talimat?: TalimatPaketOnDolu | null;
+  /** "Ek Seans Aç": plan dışı seans — çalışan sabit, ürün serbest */
+  ekSeans?: { personel_id: string; personel_adi: string } | null;
   /** Seans başarıyla başlayınca (dialog kapanmadan önce) */
   onSuccess?: () => void;
 }
 
-export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: NewSessionDialogProps) {
+export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSuccess }: NewSessionDialogProps) {
   // ── Talimat modu: ürün sabit, çalışan sabit; isteğe bağlı yardımcılar + isimsiz yardımcı sayısı ──
   const [operators, setOperators] = useState<Array<{ user_id: string; full_name: string }>>([]);
   const [yardimcilar, setYardimcilar] = useState<Set<string>>(new Set());
   const [yardimciSayisi, setYardimciSayisi] = useState(0);
+  const [ekYardimci, setEkYardimci] = useState(0);
   useEffect(() => {
     if (!open || !talimat || operators.length > 0) return;
     getPackOperators().then((r) => {
@@ -140,9 +143,19 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
       return;
     }
     setSubmitting(true);
-    const result = await createPackSession(selectedSku);
+    const result = await createPackSession(
+      selectedSku,
+      ekSeans
+        ? {
+            ekSeans: true,
+            workers: [{ id: ekSeans.personel_id, name: ekSeans.personel_adi }],
+            yardimciSayisi: ekYardimci,
+          }
+        : undefined,
+    );
     if (result.success) {
-      toast.success("Seans başlatıldı");
+      toast.success(ekSeans ? "Ek seans başlatıldı" : "Seans başlatıldı");
+      onSuccess?.();
       onOpenChange(false);
     } else {
       toast.error(result.error);
@@ -237,7 +250,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Yeni Paketleme Seansı</DialogTitle>
+          <DialogTitle>{ekSeans ? `Ek Seans — ${ekSeans.personel_adi}` : "Yeni Paketleme Seansı"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-2 overflow-hidden">
@@ -333,6 +346,24 @@ export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: New
               ))}
             </div>
           ) : null}
+
+          {ekSeans && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="pkt-ek-yardimci" className="text-sm">
+                Yardımcı sayısı
+              </Label>
+              <Input
+                id="pkt-ek-yardimci"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={50}
+                value={ekYardimci}
+                onChange={(e) => setEkYardimci(Math.max(0, Math.min(50, Math.floor(Number(e.target.value)) || 0)))}
+                className="h-12 w-24 text-center text-lg"
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
