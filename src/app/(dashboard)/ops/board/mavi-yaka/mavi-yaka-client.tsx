@@ -30,6 +30,7 @@ import {
   Plus,
   Search,
   Send,
+  Trash2,
   SlidersHorizontal,
   Wand2,
   X,
@@ -64,6 +65,7 @@ import {
   talimatPasifKaldir,
   talimatYayinla,
 } from "@/lib/talimat/actions";
+import { satirlariTopluSil } from "@/lib/talimat/toplu-actions";
 import { PLAN_DURUM_LABEL, TALIMAT_ISTASYONLAR } from "@/lib/talimat/constants";
 import { gunEkle, istasyonEsle, personeleGoreGrupla, satirBos, satirFiltrele } from "@/lib/talimat/helpers";
 import type {
@@ -262,6 +264,31 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
 
   const [pasifHedef, setPasifHedef] = useState<PasifHedef | null>(null);
   const [silHedef, setSilHedef] = useState<TalimatSatir | null>(null);
+  const [topluSilHedef, setTopluSilHedef] = useState<{ baslik: string; personelAdi?: string; personelSayisi: number; ids: string[] } | null>(null);
+  const [topluIlerleme, setTopluIlerleme] = useState<{ yapilan: number; toplam: number } | null>(null);
+  const topluSilBaslat = async () => {
+    if (!topluSilHedef || !plan || topluIlerleme) return;
+    const { ids } = topluSilHedef;
+    const PARCA = 10;
+    let silinen = 0;
+    const hatalar: string[] = [];
+    setTopluIlerleme({ yapilan: 0, toplam: ids.length });
+    for (let i = 0; i < ids.length; i += PARCA) {
+      const r = await satirlariTopluSil(plan.plan_id, ids.slice(i, i + PARCA));
+      if (!r.success) {
+        hatalar.push(hataMesaji(r));
+        break;
+      }
+      silinen += r.data.silinen;
+      hatalar.push(...r.data.hatalar);
+      setTopluIlerleme({ yapilan: Math.min(i + PARCA, ids.length), toplam: ids.length });
+    }
+    setTopluIlerleme(null);
+    setTopluSilHedef(null);
+    if (hatalar.length) toast.error(`${silinen} satır silindi, ${hatalar.length} hata: ${hatalar[0]}`);
+    else toast.success(`${silinen} satır silindi`);
+    yenile();
+  };
   const [yayinAcik, setYayinAcik] = useState(false);
   const [kopyaOnay, setKopyaOnay] = useState(false);
   const [filtreAcik, setFiltreAcik] = useState(false);
@@ -519,6 +546,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                         <PauseCircle className="mr-2 h-4 w-4" /> Tüm listeyi pasif et
                       </DropdownMenuItem>
                     )}
+                    <DropdownMenuItem
+                      disabled={satirlar.length === 0}
+                      className="text-[#c0424f] focus:text-[#c0424f]"
+                      onClick={() =>
+                        setTopluSilHedef({
+                          baslik: "Tüm liste temizlensin mi?",
+                          personelSayisi: eklenmisPersonel.size,
+                          ids: satirlar.map((s) => s.satir_id),
+                        })
+                      }
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Tüm listeyi temizle
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
@@ -781,6 +821,23 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                                         <PlayCircle className="mr-1 h-3.5 w-3.5" /> Pasifi kaldır
                                       </Button>
                                     ) : null}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-[#c0424f] hover:text-[#a63744]"
+                                      title="Personeli listeden çıkar"
+                                      aria-label="Personeli listeden çıkar"
+                                      onClick={() =>
+                                        setTopluSilHedef({
+                                          baslik: `${g.ad} listeden çıkarılsın mı?`,
+                                          personelAdi: g.ad,
+                                          personelSayisi: 1,
+                                          ids: tamListe.map((s) => s.satir_id),
+                                        })
+                                      }
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
                                     {!personelPasif && (
                                       <Button
                                         variant="ghost"
@@ -869,6 +926,39 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                 }}
               >
                 Sil
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={!!topluSilHedef} onOpenChange={(o) => !o && !topluIlerleme && setTopluSilHedef(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{topluSilHedef?.baslik}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {topluSilHedef?.personelAdi
+                  ? `${topluSilHedef.personelAdi} personelinin bu haftaki iş talimatı listesindeki ${topluSilHedef.ids.length} satır silinecek. `
+                  : `Bu haftanın iş talimatı listesindeki ${topluSilHedef?.personelSayisi ?? 0} personel / ${topluSilHedef?.ids.length ?? 0} satır silinecek. `}
+                Seanslar, üretim adetleri, stoklar, talepler ve personel kayıtları SİLİNMEZ. Talebe bağlı satırlar silinince ilgili talepler tekrar &apos;Açık&apos; olur.
+                Plan yayındaysa değişiklik bir sonraki Yayınla ile tabletlere gider.
+                {topluIlerleme && (
+                  <span className="mt-2 block font-medium text-vw-dark">
+                    {topluIlerleme.yapilan}/{topluIlerleme.toplam} siliniyor…
+                  </span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={!!topluIlerleme}>Vazgeç</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!!topluIlerleme}
+                className="bg-[#c0424f] text-white hover:bg-[#a63744]"
+                onClick={(e) => {
+                  e.preventDefault();
+                  void topluSilBaslat();
+                }}
+              >
+                {topluIlerleme ? "Siliniyor…" : "Temizle"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
