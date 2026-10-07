@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Search, ArrowLeft, Users, X, Check } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Loader2, Search, ArrowLeft, Users, X, Check, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getActiveProductsWithSteps,
@@ -51,9 +52,22 @@ interface StepInfo {
   bom_count: number;
 }
 
+/** İş talimatından "Seans Başlat": ürün + çalışan önceden dolu */
+export interface TalimatSeansOnDolu {
+  satir_id: string;
+  sku: string;
+  urun_adi: string | null;
+  personel_id: string;
+  personel_adi: string;
+  not_text: string | null;
+}
+
 interface NewSessionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  talimat?: TalimatSeansOnDolu | null;
+  /** Seans başarıyla başlayınca (dialog kapanmadan önce) */
+  onSuccess?: () => void;
 }
 
 /**
@@ -71,7 +85,7 @@ function normalize(s: string): string {
     .trim();
 }
 
-export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) {
+export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: NewSessionDialogProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,17 +101,32 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
   const [stepsCache, setStepsCache] = useState<Map<string, StepInfo[]>>(new Map());
   const [operators, setOperators] = useState<Operator[]>([]);
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
+  /** Listede olmayan yardımcı sayısı (yardimci_sayisi) */
+  const [yardimciSayisi, setYardimciSayisi] = useState(0);
+
+  // Talimattan açıldıysa: ürün + çalışan hazır, doğrudan adım ekranı
+  const talimatSatirId = talimat?.satir_id;
+  const talimatSku = talimat?.sku;
+  const talimatPersonel = talimat?.personel_id;
+  useEffect(() => {
+    if (!open || !talimatSatirId) return;
+    setSelectedSku(talimatSku ?? "");
+    setSelectedStepId("");
+    setActiveStep(2);
+    setSelectedWorkers(new Set(talimatPersonel ? [talimatPersonel] : []));
+    setYardimciSayisi(0);
+  }, [open, talimatSatirId, talimatSku, talimatPersonel]);
 
   useEffect(() => {
     if (open) {
-      if (topProducts.length === 0) {
+      if (topProducts.length === 0 && !talimat) {
         setTopLoading(true);
         getTopMontajProducts(10).then((result) => {
           if (result.success) setTopProducts(result.data);
           setTopLoading(false);
         });
       }
-      if (products.length === 0) {
+      if (products.length === 0 && !talimat) {
         setLoading(true);
         getActiveProductsWithSteps().then((result) => {
           if (result.success) setProducts(result.data);
@@ -118,7 +147,9 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
       setSteps([]);
       setArama("");
       setSelectedWorkers(new Set());
+      setYardimciSayisi(0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, products.length, topProducts.length, operators.length]);
 
   // Adımları SKU seçilir seçilmez yükle
@@ -159,6 +190,8 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
   }, [products, arama]);
 
   const toggleWorker = (id: string) => {
+    // Talimat çalışanı kendisi: çıkarılamaz
+    if (talimat && id === talimat.personel_id) return;
     setSelectedWorkers((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -184,13 +217,19 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
     }
     const workers = Array.from(selectedWorkers).map((id) => {
       const op = operators.find((o) => o.user_id === id);
-      return { id, name: op?.full_name ?? id };
+      return { id, name: op?.full_name ?? (talimat && id === talimat.personel_id ? talimat.personel_adi : id) };
     });
 
     setSubmitting(true);
-    const result = await createMontajSession(selectedSku, selectedStepId, workers);
+    const result = await createMontajSession(
+      selectedSku,
+      selectedStepId,
+      workers,
+      talimat ? { talimatSatirId: talimat.satir_id, yardimciSayisi } : undefined,
+    );
     if (result.success) {
       toast.success("Montaj seansı başlatıldı");
+      onSuccess?.();
       onOpenChange(false);
     } else {
       toast.error(result.error);
@@ -218,7 +257,7 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
       >
         {/* ── Başlık ─────────────────────────────────────── */}
         <DialogHeader className="shrink-0 flex-row items-center gap-2 space-y-0 border-b px-4 py-3">
-          {activeStep === 2 && (
+          {activeStep === 2 && !talimat && (
             <Button
               variant="ghost" size="icon" className="size-9 shrink-0"
               onClick={() => { setActiveStep(1); setSelectedStepId(""); }}
@@ -228,7 +267,7 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
             </Button>
           )}
           <DialogTitle className="min-w-0 flex-1 truncate text-base">
-            {activeStep === 1 ? "Ürün seç" : "Montaj adımı seç"}
+            {activeStep === 1 && !talimat ? "Ürün seç" : "Montaj adımı seç"}
           </DialogTitle>
           <Button
             variant="ghost" size="icon" className="size-9 shrink-0"
@@ -241,7 +280,7 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
 
         {/* ── Kaydırmalı gövde ───────────────────────────── */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {activeStep === 1 ? (
+          {activeStep === 1 && !talimat ? (
             <div className="flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-left-4 duration-200">
               {/* Arama — her zaman görünür, popover içinde değil */}
               <div className="shrink-0 space-y-3 border-b p-4">
@@ -342,8 +381,14 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                   {selectedSku}
                 </span>
                 <p className="truncate text-xs text-muted-foreground">
-                  {selectedProduct?.urun_adi ?? ""}
+                  {selectedProduct?.urun_adi ?? talimat?.urun_adi ?? ""}
                 </p>
+                {talimat?.not_text && (
+                  <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900">
+                    <StickyNote className="mt-0.5 size-4 shrink-0" />
+                    <span className="whitespace-pre-wrap">{talimat.not_text}</span>
+                  </div>
+                )}
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -397,10 +442,11 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                         {operators.map((op) => (
                           <label
                             key={op.user_id}
-                            className="flex cursor-pointer items-center gap-3 rounded-md p-2.5 hover:bg-muted/50"
+                            className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md p-2.5 hover:bg-muted/50"
                           >
                             <Checkbox
                               checked={selectedWorkers.has(op.user_id)}
+                              disabled={talimat?.personel_id === op.user_id}
                               onCheckedChange={() => toggleWorker(op.user_id)}
                             />
                             <span className="min-w-0 flex-1 truncate text-sm">{op.full_name}</span>
@@ -413,6 +459,25 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
                           </p>
                         )}
                       </div>
+                      {talimat && (
+                        <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border p-3">
+                          <Label htmlFor="yardimci-sayisi" className="text-sm">
+                            Listede olmayan yardımcı sayısı
+                          </Label>
+                          <Input
+                            id="yardimci-sayisi"
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            max={50}
+                            value={yardimciSayisi}
+                            onChange={(e) =>
+                              setYardimciSayisi(Math.max(0, Math.min(50, Math.floor(Number(e.target.value)) || 0)))
+                            }
+                            className="h-12 w-24 text-center text-lg"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KaliteButtons } from "@/components/shared/kalite/kalite-buttons";
+import { TalimatButton } from "@/components/shared/talimat/talimat-button";
 import { KesimSummaryCards } from "./kesim-summary-cards";
 import { MachineStatusBar } from "./machine-status-bar";
 import { KesimRecords } from "./kesim-records";
@@ -121,6 +122,7 @@ export function KesimDashboard({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <TalimatButton />
             <KaliteButtons istasyon="kesim" />
             {analizGorebilir && (
               <Button asChild variant="outline" className="h-11 px-4">

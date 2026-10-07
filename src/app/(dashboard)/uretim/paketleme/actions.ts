@@ -193,7 +193,18 @@ export async function getTopPackagedProducts(limit: number = 10) {
 // ─── MUTATION ACTIONS ───────────────────────────────────────────
 
 /** Yeni paketleme seansı oluştur (sadece SKU, qty yok) */
-export async function createPackSession(sku: string): Promise<ActionResult> {
+export async function createPackSession(
+  sku: string,
+  /**
+   * İş talimatından başlatıldıysa: talimat satırı, çalışan (+ isimli yardımcılar) ve
+   * listede olmayan yardımcı sayısı. worker_count = isimli çalışanlar + yardimci_sayisi.
+   */
+  talimat?: {
+    talimatSatirId: string;
+    workers: Array<{ id: string; name: string }>;
+    yardimciSayisi?: number;
+  },
+): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
 
@@ -205,9 +216,11 @@ export async function createPackSession(sku: string): Promise<ActionResult> {
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
-    const operatorName = readOperatorName(authUser?.user_metadata) ?? user.full_name;
+    const talimatWorkers = talimat?.workers ?? [];
+    const operatorId = talimatWorkers[0]?.id ?? readOperatorId(authUser?.user_metadata) ?? user.user_id;
+    const operatorName = talimatWorkers[0]?.name ?? readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
+    const yardimciSayisi = Math.max(0, Math.min(50, Math.floor(Number(talimat?.yardimciSayisi ?? 0)) || 0));
 
     // Generate session_id: PKT-YYYYMMDD-HHMMSS format
     const now = new Date();
@@ -240,13 +253,18 @@ export async function createPackSession(sku: string): Promise<ActionResult> {
       start_time: now.toISOString(),
       operator_id: operatorId,
       operator_name: operatorName,
-      worker_count: 1,
-      workers: JSON.stringify([]),
-    });
+      // Talimat: isimli çalışanlar + listede olmayan yardımcılar (kapanışta yeniden hesaplanır)
+      worker_count: talimatWorkers.length > 0 ? talimatWorkers.length + yardimciSayisi : 1,
+      workers: JSON.stringify(talimatWorkers),
+      // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
+      ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
+      ...(yardimciSayisi > 0 ? { yardimci_sayisi: yardimciSayisi } : {}),
+    } as never);
 
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/uretim/paketleme");
+    revalidatePath("/uretim/talimatlarim");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -272,18 +290,20 @@ export async function closePackSession(
     // Seans bilgileri
     const { data } = await supabase
       .from("pack_events")
-      .select("session_id, durum, sku, start_time, duraklama_dk, duraklatma_baslangic")
+      .select("session_id, durum, sku, start_time, duraklama_dk, duraklatma_baslangic, yardimci_sayisi")
       .eq("session_id", sessionId)
       .single();
 
-    const session = data as {
+    const session = data as unknown as {
       session_id: string;
       durum: string;
       sku: string | null;
       start_time: string | null;
       duraklama_dk: number | null;
       duraklatma_baslangic: string | null;
+      yardimci_sayisi: number | null;
     } | null;
+    const yardimci = Number(session?.yardimci_sayisi ?? 0);
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
     if (session.durum !== "paketlemede") return { success: false, error: "Seans aktif değil" };
@@ -307,7 +327,7 @@ export async function closePackSession(
     if (session.start_time && qty > 0 && workers.length > 0) {
       const diffMs = now.getTime() - new Date(session.start_time).getTime();
       const netMinutes = Math.max(0, diffMs / 60000 - toplamDuraklamaDk);
-      birimDk = Math.round((netMinutes / (qty * workers.length)) * 100) / 100;
+      birimDk = Math.round((netMinutes / (qty * (workers.length + yardimci))) * 100) / 100;
     }
 
     // Update pack_events
@@ -318,7 +338,8 @@ export async function closePackSession(
         status: "Closed",
         end_time: endTime,
         qty: qty,
-        worker_count: workers.length,
+        // isimli çalışanlar + listede olmayan yardımcılar
+        worker_count: workers.length + yardimci,
         workers: workers,
         birim_paketleme_dk: birimDk,
         duraklama_dk: toplamDuraklamaDk,
@@ -496,11 +517,11 @@ export async function updateCompletedSession(
     // Seans bilgileri
     const { data } = await supabase
       .from("pack_events")
-      .select("session_id, durum, sku, start_time, end_time, qty, depo_id, duraklama_dk")
+      .select("session_id, durum, sku, start_time, end_time, qty, depo_id, duraklama_dk, yardimci_sayisi")
       .eq("session_id", sessionId)
       .single();
 
-    const session = data as {
+    const session = data as unknown as {
       session_id: string;
       durum: string;
       sku: string | null;
@@ -509,6 +530,7 @@ export async function updateCompletedSession(
       qty: number;
       depo_id: string | null;
       duraklama_dk: number | null;
+      yardimci_sayisi: number | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -526,7 +548,7 @@ export async function updateCompletedSession(
     if (yeniBaslangic && session.end_time && qty > 0 && workers.length > 0) {
       const diffMs = new Date(session.end_time).getTime() - new Date(yeniBaslangic).getTime();
       const netMinutes = Math.max(0, diffMs / 60000 - Number(session.duraklama_dk ?? 0));
-      birimDk = Math.round((netMinutes / (qty * workers.length)) * 100) / 100;
+      birimDk = Math.round((netMinutes / (qty * (workers.length + Number(session.yardimci_sayisi ?? 0)))) * 100) / 100;
     }
 
     // Update pack_events
@@ -534,7 +556,7 @@ export async function updateCompletedSession(
       .from("pack_events")
       .update({
         qty: qty,
-        worker_count: workers.length,
+        worker_count: workers.length + Number(session.yardimci_sayisi ?? 0),
         workers: workers,
         birim_paketleme_dk: birimDk,
         // Depo değiştirilmediyse mevcut kalsın

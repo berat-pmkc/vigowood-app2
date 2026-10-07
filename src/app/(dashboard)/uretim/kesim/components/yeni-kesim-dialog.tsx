@@ -49,6 +49,21 @@ interface YeniKesimDialogProps {
     kalan_adet: number;
     plaka_adi: string | null;
   } | null;
+  /**
+   * İş talimatı kesim satırında "Bitirdi": plaka + adet + operatör önceden dolu,
+   * kayıt talimat_satir_id ile bağlanır (talimat ilerlemesi buradan hesaplanır).
+   */
+  talimat?: {
+    talimat_satir_id: string;
+    sku: string;
+    plaka_id: string;
+    plaka_adi: string | null;
+    adet: number | null;
+    personel_id: string;
+    personel_adi: string | null;
+  } | null;
+  /** Kesim kaydedilince (dialog kapanmadan önce) */
+  onSuccess?: () => void;
 }
 
 interface ProductOption {
@@ -85,7 +100,7 @@ const MAKINE_CARD_COLORS: Record<string, { bg: string; border: string; activeBg:
   "MAK-3": { bg: "hover:bg-purple-50", border: "border-purple-200", activeBg: "bg-purple-100 border-purple-400" },
 };
 
-export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogProps) {
+export function YeniKesimDialog({ open, onOpenChange, talep, talimat, onSuccess }: YeniKesimDialogProps) {
   // Step 1: Seçimler (makine, ürün, plaka) → Step 2: Adet, operatör, kaydet
   const [step, setStep] = useState<1 | 2>(1);
 
@@ -118,12 +133,18 @@ export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogPr
     if (open) {
       setStep(1);
       setSelectedMakine(null);
-      setSelectedSku(talep?.sku ?? null);
-      setSelectedSkuLabel(talep?.sku ?? "");
+      setSelectedSku(talep?.sku ?? talimat?.sku ?? null);
+      setSelectedSkuLabel(talep?.sku ?? talimat?.sku ?? "");
       setSelectedPlaka(null);
-      setAdet(talep?.kalan_adet && talep.kalan_adet > 0 ? talep.kalan_adet : 1);
-      setSelectedOperator(null);
-      setSelectedOperatorName("");
+      setAdet(
+        talep?.kalan_adet && talep.kalan_adet > 0
+          ? talep.kalan_adet
+          : talimat?.adet && talimat.adet > 0
+            ? Math.min(talimat.adet, 100)
+            : 1,
+      );
+      setSelectedOperator(talimat?.personel_id ?? null);
+      setSelectedOperatorName(talimat?.personel_adi ?? "");
       setSkuSearch("");
       setPlakalar([]);
 
@@ -142,7 +163,7 @@ export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogPr
         setOperatorsLoading(false);
       });
     }
-  }, [open, talep]);
+  }, [open, talep, talimat]);
 
   // When sku selected, load plakalar (plakalar makineye bağlı değil, sadece SKU'ya bağlı)
   useEffect(() => {
@@ -157,13 +178,18 @@ export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogPr
             const eslesen = res.data.find((p) => p.plaka_id === talep.plaka_id);
             if (eslesen) setSelectedPlaka(eslesen);
           }
+          // İş talimatından gelindiyse talimattaki plakayı otomatik seç
+          if (talimat && talimat.sku === selectedSku) {
+            const eslesen = res.data.find((p) => p.plaka_id === talimat.plaka_id);
+            if (eslesen) setSelectedPlaka(eslesen);
+          }
         }
         setPlakalarLoading(false);
       });
     } else {
       setPlakalar([]);
     }
-  }, [selectedSku, talep]);
+  }, [selectedSku, talep, talimat]);
 
   // Auto-advance to step 2 when all selections made
   useEffect(() => {
@@ -184,6 +210,7 @@ export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogPr
     setSaving(true);
     const result = await createCutBatch({
       talep_id: talep?.talep_id ?? null,
+      talimat_satir_id: talimat?.talimat_satir_id ?? null,
       makine_id: selectedMakine,
       sku: selectedSku,
       plaka_id: selectedPlaka.plaka_id,
@@ -194,6 +221,7 @@ export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogPr
 
     if (result.success) {
       toast.success("Kesim kaydedildi");
+      onSuccess?.();
       onOpenChange(false);
     } else {
       toast.error(result.error);
@@ -215,7 +243,7 @@ export function YeniKesimDialog({ open, onOpenChange, talep }: YeniKesimDialogPr
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="flex items-center gap-2">
             <Scissors className="w-5 h-5" />
-            {talep ? "Talep İçin Kesim" : "Yeni Kesim"}
+            {talep ? "Talep İçin Kesim" : talimat ? "Kesim Bitirdi" : "Yeni Kesim"}
           </DialogTitle>
         </DialogHeader>
 

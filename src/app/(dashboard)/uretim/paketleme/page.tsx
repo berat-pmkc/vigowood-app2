@@ -6,6 +6,7 @@ import { PRODUCTION_ACCESS_ROLES, URETIM_ANALIZ_ROLES } from "@/lib/constants";
 import { PaketlemeDashboard } from "./components/paketleme-dashboard";
 import type { ActiveSession } from "./components/session-card";
 import type { CompletedSession } from "./components/completed-sessions";
+import { talimatDb } from "@/lib/talimat/db";
 
 export const metadata: Metadata = { title: "Paketleme" };
 
@@ -18,11 +19,17 @@ export default async function PaketlemePage() {
   const supabase = await createClient();
 
   // Devam eden seanslar
-  const { data: activeData } = await supabase
+  const { data: activeRaw } = await supabase
     .from("pack_events")
-    .select("session_id, sku, start_time, durum, operator_name, duraklama_dk, duraklatma_baslangic")
+    .select("session_id, sku, start_time, durum, operator_name, duraklama_dk, duraklatma_baslangic, workers, yardimci_sayisi, talimat_satir_id")
     .eq("durum", "paketlemede")
     .order("start_time", { ascending: true });
+  // Yeni kolonlar (yardimci_sayisi, talimat_satir_id) henüz database types'ta yok
+  const activeData = activeRaw as unknown as Array<{
+    session_id: string; sku: string | null; start_time: string | null; durum: string;
+    operator_name: string | null; duraklama_dk: number | null; duraklatma_baslangic: string | null;
+    workers: unknown; yardimci_sayisi: number | null; talimat_satir_id: string | null;
+  }> | null;
 
   // Son 62 gün tamamlanan seanslar (geçen ay filtresi için yeterli)
   const sixtyTwoDaysAgo = new Date();
@@ -65,9 +72,23 @@ export default async function PaketlemePage() {
   }));
 
   // Enrich sessions
-  const activeSessions: ActiveSession[] = (activeData ?? []).map((s) => ({
+  // Talimattan başlatılan seanslarda talep açıklaması (not) açık seans kartında gösterilir
+  const aktifHam = activeData ?? [];
+  const notMap = new Map<string, string>();
+  const satirIdleri = [...new Set(aktifHam.map((s) => s.talimat_satir_id).filter(Boolean) as string[])];
+  if (satirIdleri.length > 0) {
+    const sb = await talimatDb();
+    const { data: satirlar } = await sb.from("talimat_satirlar").select("satir_id, not_text").in("satir_id", satirIdleri);
+    for (const r of satirlar ?? []) {
+      if (r.not_text && String(r.not_text).trim()) notMap.set(r.satir_id as string, String(r.not_text));
+    }
+  }
+
+  const activeSessions: ActiveSession[] = aktifHam.map((s) => ({
     ...s,
+    workers: Array.isArray(s.workers) ? (s.workers as Array<{ id: string; name: string }>) : null,
     urun_adi: s.sku ? productMap.get(s.sku) ?? undefined : undefined,
+    not_text: s.talimat_satir_id ? notMap.get(s.talimat_satir_id) ?? null : null,
   }));
 
   const completedSessions: CompletedSession[] = (completedData ?? []).map((s) => ({

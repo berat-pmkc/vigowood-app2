@@ -52,6 +52,16 @@ export function CloseSessionDialog({ session, open, onOpenChange }: CloseSession
   const [qty, setQty] = useState("");
   const [selectedWorkers, setSelectedWorkers] = useState<Set<string>>(new Set());
 
+  // Talimattan başlatılan seansta çalışanlar baştan kayıtlı: kapanışta ön seçili gelsin
+  const oncekiSeansId = session?.session_id;
+  const oncekiCalisanlar = session?.workers;
+  useEffect(() => {
+    if (open && oncekiCalisanlar && oncekiCalisanlar.length > 0) {
+      setSelectedWorkers(new Set(oncekiCalisanlar.map((w) => w.id)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, oncekiSeansId]);
+
   useEffect(() => {
     if (open && operators.length === 0) {
       setLoading(true);

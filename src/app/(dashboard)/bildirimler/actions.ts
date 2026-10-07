@@ -122,7 +122,8 @@ export async function markAllAsRead(): Promise<{ success: true } | { success: fa
     // Kullanıcıya görünen tüm bildirimleri al
     const { data: notifications } = await supabase
       .from("notifications")
-      .select("notif_id, target_user");
+      .select("notif_id, target_user")
+      .or("kind.eq.genel,kind.is.null");
 
     if (!notifications || notifications.length === 0) {
       return { success: true };

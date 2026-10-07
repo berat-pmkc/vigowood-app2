@@ -24,7 +24,8 @@ const ProductTrendChart = dynamic(
   { ssr: false, loading: () => <ChartSkeleton /> }
 );
 import type { ActiveMontajSession } from "./session-card";
-import { cancelMontajSession } from "../actions";
+import { cancelMontajSession, toggleMontajBeklet } from "../actions";
+import { TalimatButton } from "@/components/shared/talimat/talimat-button";
 import { toast } from "sonner";
 import { useMontajSessionRealtime } from "@/hooks/use-montaj-session-realtime";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
@@ -73,6 +74,16 @@ export function MontajDashboard({
     }
   };
 
+  const handleToggleBeklet = async (sessionId: string) => {
+    const beklemede = activeSessions.find((s) => s.session_id === sessionId)?.duraklatma_baslangic;
+    const result = await toggleMontajBeklet(sessionId);
+    if (result.success) {
+      toast.success(beklemede ? "Seans devam ediyor" : "Seans beklemeye alındı");
+    } else {
+      toast.error(result.error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -87,6 +98,7 @@ export function MontajDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <TalimatButton />
           <KaliteButtons istasyon="montaj" />
           <Button
             variant="outline"
@@ -129,6 +141,7 @@ export function MontajDashboard({
           sessions={activeSessions}
           onClose={handleClose}
           onCancel={handleCancel}
+          onToggleBeklet={handleToggleBeklet}
           canCancel={canCancel}
         />
       </section>

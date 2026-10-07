@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { SWRProvider } from "@/components/providers/swr-provider";
+import { TalimatBanner } from "@/components/shared/talimat/talimat-banner";
 import type { UserRole } from "@/lib/constants";
 
 type DashboardShellProps = {
@@ -55,6 +56,7 @@ export function DashboardShell({
           />
           <SidebarInset className="min-w-0">
             <TopNavbar displayName={displayName} displayRole={displayRole} userId={userId} avatarUrl={avatarUrl} />
+            <TalimatBanner />
             <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6">
               {children}
             </main>

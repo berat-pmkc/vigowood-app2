@@ -656,7 +656,12 @@ export async function getCompletedSessions(params: {
 export async function createMontajSession(
   sku: string,
   stepId: string,
-  workers?: Array<{ id: string; name: string }>
+  workers?: Array<{ id: string; name: string }>,
+  /**
+   * İş talimatından başlatıldıysa: talimat satırı + isimsiz yardımcı sayısı.
+   * worker_count = isimli çalışanlar + yardimci_sayisi (birim süre kişi başı kalır).
+   */
+  talimat?: { talimatSatirId?: string | null; yardimciSayisi?: number }
 ): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -679,8 +684,10 @@ export async function createMontajSession(
 
     // Operatör bilgisi
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    const operatorId = readOperatorId(authUser?.user_metadata) ?? user.user_id;
-    const operatorName = readOperatorName(authUser?.user_metadata) ?? user.full_name;
+    // Talimattan başlatıldıysa seansın sahibi talimattaki çalışan (ilk isimli çalışan)
+    const talimatCalisan = talimat?.talimatSatirId ? workers?.[0] : undefined;
+    const operatorId = talimatCalisan?.id ?? readOperatorId(authUser?.user_metadata) ?? user.user_id;
+    const operatorName = talimatCalisan?.name ?? readOperatorName(authUser?.user_metadata) ?? user.full_name;
     const email = authUser?.email ?? user.email;
 
     // Generate session_id: MNT-YYYYMMDD-HHMMSS
@@ -705,6 +712,7 @@ export async function createMontajSession(
     const sessionWorkers = workers && workers.length > 0
       ? workers
       : [{ id: operatorId, name: operatorName }];
+    const yardimciSayisi = Math.max(0, Math.min(50, Math.floor(Number(talimat?.yardimciSayisi ?? 0)) || 0));
 
     // INSERT
     const { error } = await supabase.from("montaj_sessions").insert({
@@ -720,13 +728,17 @@ export async function createMontajSession(
       operator_name: operatorName,
       start_time: now.toISOString(),
       qty: 0,
-      worker_count: sessionWorkers.length,
+      worker_count: sessionWorkers.length + yardimciSayisi,
       workers: JSON.stringify(sessionWorkers),
-    });
+      // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
+      ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
+      ...(yardimciSayisi > 0 ? { yardimci_sayisi: yardimciSayisi } : {}),
+    } as never);
 
     if (error) return { success: false, error: error.message };
 
     revalidatePath("/uretim/montaj");
+    revalidatePath("/uretim/talimatlarim");
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -746,11 +758,11 @@ export async function closeMontajSession(
     // Seans bilgileri
     const { data } = await supabase
       .from("montaj_sessions")
-      .select("session_id, durum, sku, step_id, start_time, operator_id, operator_name, workers")
+      .select("session_id, durum, sku, step_id, start_time, operator_id, operator_name, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi")
       .eq("session_id", sessionId)
       .single();
 
-    const session = data as {
+    const session = data as unknown as {
       session_id: string;
       durum: string;
       sku: string;
@@ -759,10 +771,20 @@ export async function closeMontajSession(
       operator_id: string | null;
       operator_name: string | null;
       workers: unknown;
+      duraklama_dk: number | null;
+      duraklatma_baslangic: string | null;
+      yardimci_sayisi: number | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
     if (session.durum !== "montajda") return { success: false, error: "Seans aktif değil" };
+
+    // Toplam bekleme: biriken + kapanışta hâlâ beklemedeyse açık aralık
+    const toplamDuraklamaDk = Math.max(0, Math.round((
+      Number(session.duraklama_dk ?? 0) +
+      (session.duraklatma_baslangic ? (Date.now() - new Date(session.duraklatma_baslangic).getTime()) / 60000 : 0)
+    ) * 100) / 100);
+    const yardimci = Number(session.yardimci_sayisi ?? 0);
 
     const now = new Date();
     const endTime = now.toISOString();
@@ -812,8 +834,11 @@ export async function closeMontajSession(
         netDk = brutDk;
       }
 
+      // Net = brüt − mola − bekleme (Seansı Beklet)
+      if (netDk !== null) netDk = Math.max(0, Math.round((netDk - toplamDuraklamaDk) * 100) / 100);
+
       if (qty > 0 && workers.length > 0 && netDk !== null) {
-        birimDk = Math.round((netDk / (qty * workers.length)) * 100) / 100;
+        birimDk = Math.round((netDk / (qty * (workers.length + yardimci))) * 100) / 100;
       }
     }
 
@@ -824,13 +849,16 @@ export async function closeMontajSession(
         durum: "tamamlandi",
         end_time: endTime,
         qty,
-        worker_count: workers.length,
+        // isimli çalışanlar + listede olmayan yardımcılar
+        worker_count: workers.length + yardimci,
         workers,
         birim_montaj_dk: birimDk,
         brut_sure_dk: brutDk,
         mola_dk: molaDk,
         net_sure_dk: netDk,
-      })
+        duraklama_dk: toplamDuraklamaDk,
+        duraklatma_baslangic: null,
+      } as never)
       .eq("session_id", sessionId);
 
     if (updateError) return { success: false, error: updateError.message };
@@ -840,6 +868,57 @@ export async function closeMontajSession(
     if (!stockResult.success) {
       return { success: false, error: stockResult.error };
     }
+
+    revalidatePath("/uretim/montaj");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/**
+ * Seansı beklet / devam ettir (toggle) — paketlemedeki toggleDuraklat ile aynı mantık.
+ * Beklemeye alınca duraklatma_baslangic=now; devam edince geçen süre duraklama_dk'ya eklenir.
+ * Aynı operatör beklemedeki seans varken başka seans açabilir; beklemedeki sayısında sınır yok.
+ */
+export async function toggleMontajBeklet(sessionId: string): Promise<ActionResult> {
+  try {
+    await requireProductionAccess();
+    const supabase = await createClient();
+
+    const { data } = await supabase
+      .from("montaj_sessions")
+      .select("durum, duraklama_dk, duraklatma_baslangic")
+      .eq("session_id", sessionId)
+      .single();
+    const session = data as unknown as {
+      durum: string;
+      duraklama_dk: number | null;
+      duraklatma_baslangic: string | null;
+    } | null;
+
+    if (!session) return { success: false, error: "Seans bulunamadı" };
+    if (session.durum !== "montajda") return { success: false, error: "Seans aktif değil" };
+
+    const now = new Date();
+    let update: { duraklatma_baslangic: string | null; duraklama_dk?: number };
+    if (session.duraklatma_baslangic) {
+      const ekDk = Math.max(0, (now.getTime() - new Date(session.duraklatma_baslangic).getTime()) / 60000);
+      update = {
+        duraklatma_baslangic: null,
+        duraklama_dk: Math.round((Number(session.duraklama_dk ?? 0) + ekDk) * 100) / 100,
+      };
+    } else {
+      update = { duraklatma_baslangic: now.toISOString() };
+    }
+
+    const { data: guncellenen, error } = await supabase
+      .from("montaj_sessions")
+      .update(update as never)
+      .eq("session_id", sessionId)
+      .select("session_id");
+    if (error) return { success: false, error: error.message };
+    if (!guncellenen || guncellenen.length === 0) return { success: false, error: "Seans güncellenemedi (yetki)" };
 
     revalidatePath("/uretim/montaj");
     return { success: true };
@@ -917,11 +996,11 @@ export async function updateCompletedMontajSession(
 
     const { data } = await supabase
       .from("montaj_sessions")
-      .select("session_id, durum, sku, step_id, start_time, end_time, qty, operator_id")
+      .select("session_id, durum, sku, step_id, start_time, end_time, qty, operator_id, duraklama_dk, yardimci_sayisi")
       .eq("session_id", sessionId)
       .single();
 
-    const session = data as {
+    const session = data as unknown as {
       session_id: string;
       durum: string;
       sku: string;
@@ -930,6 +1009,8 @@ export async function updateCompletedMontajSession(
       end_time: string | null;
       qty: number;
       operator_id: string | null;
+      duraklama_dk: number | null;
+      yardimci_sayisi: number | null;
     } | null;
 
     if (!session) return { success: false, error: "Seans bulunamadı" };
@@ -980,8 +1061,10 @@ export async function updateCompletedMontajSession(
         molaDk = 0;
         netDk = brutDk;
       }
+      // Seans sırasındaki bekleme (Seansı Beklet) net süreden düşülür
+      if (netDk !== null) netDk = Math.max(0, Math.round((netDk - Number(session.duraklama_dk ?? 0)) * 100) / 100);
       if (qty > 0 && workers.length > 0 && netDk !== null) {
-        birimDk = Math.round((netDk / (qty * workers.length)) * 100) / 100;
+        birimDk = Math.round((netDk / (qty * (workers.length + Number(session.yardimci_sayisi ?? 0)))) * 100) / 100;
       }
     }
 
@@ -990,7 +1073,7 @@ export async function updateCompletedMontajSession(
       .from("montaj_sessions")
       .update({
         qty,
-        worker_count: workers.length,
+        worker_count: workers.length + Number(session.yardimci_sayisi ?? 0),
         workers,
         birim_montaj_dk: birimDk,
         brut_sure_dk: brutDk,

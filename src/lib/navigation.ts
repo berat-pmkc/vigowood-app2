@@ -28,10 +28,12 @@ import {
   FileOutput,
   Container,
   AlertTriangle,
+  ClipboardCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole, ModuleKey } from "@/lib/constants";
 import { ALWAYS_VISIBLE_MODULES, ADMIN_EQUIVALENT_ROLES } from "@/lib/constants";
+import { TALEP_CREATOR_ROLES } from "@/lib/talimat/constants";
 
 export type NavItem = {
   title: string;
@@ -85,6 +87,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Ops Center",
     items: [
       { title: "Görev Panosu", href: "/ops/board", icon: Kanban, roles: "all" },
+      { title: "Talepler", href: "/talepler", icon: ClipboardCheck, roles: TALEP_CREATOR_ROLES },
       { title: "Raporlar", href: "/ops/raporlar", icon: FileOutput, roles: "all" },
     ],
   },

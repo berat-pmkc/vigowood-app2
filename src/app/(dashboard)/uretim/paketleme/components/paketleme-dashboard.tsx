@@ -10,6 +10,7 @@ import { CloseSessionDialog } from "./close-session-dialog";
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 import { KaliteButtons } from "@/components/shared/kalite/kalite-buttons";
+import { TalimatButton } from "@/components/shared/talimat/talimat-button";
 import { SummaryCards } from "./summary-cards";
 
 import { PaketlemeAnaliz } from "./paketleme-analiz";
@@ -103,6 +104,7 @@ export function PaketlemeDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <TalimatButton />
           <KaliteButtons istasyon="paketleme" />
           <Button
             variant="outline"

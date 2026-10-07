@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Wrench, X, Users, AlertTriangle } from "lucide-react";
+import { Clock, Wrench, X, Users, AlertTriangle, Pause, Play, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
 import { parseWorkers } from "../utils";
@@ -21,12 +21,20 @@ export interface ActiveMontajSession {
   durum: string;
   operator_name: string | null;
   workers?: Array<{ id: string; name: string }> | string | null;
+  /** Seansı Beklet: biriken toplam bekleme (dk) */
+  duraklama_dk?: number | null;
+  /** Şu an beklemedeyse bekleme başlangıcı (dolu = Beklemede) */
+  duraklatma_baslangic?: string | null;
+  yardimci_sayisi?: number | null;
+  /** Talimattan başlatıldıysa talep açıklaması */
+  not_text?: string | null;
 }
 
 interface SessionCardProps {
   session: ActiveMontajSession;
   onClose: (session: ActiveMontajSession) => void;
   onCancel: (sessionId: string) => Promise<void> | void;
+  onToggleBeklet?: (sessionId: string) => Promise<void> | void;
   canCancel: boolean;
 }
 
@@ -59,12 +67,17 @@ const YASLANMA_STILI: Record<Yaslanma, { kenar: string; zemin: string; yazi: str
              rozet: "bg-red-100 text-red-800 border-red-300" },
 };
 
-function LiveTimer({ startTime, renk }: { startTime: string; renk: string }) {
+function LiveTimer({
+  startTime, renk, duraklamaDk = 0, duraklatmaBaslangic = null,
+}: { startTime: string; renk: string; duraklamaDk?: number; duraklatmaBaslangic?: string | null }) {
   const [elapsed, setElapsed] = useState("");
 
   useEffect(() => {
     const calc = () => {
-      const diff = Date.now() - new Date(startTime).getTime();
+      // Net süre: bekleme (biriken + açık aralık) düşülür
+      const now = Date.now();
+      const acik = duraklatmaBaslangic ? (now - new Date(duraklatmaBaslangic).getTime()) / 60000 : 0;
+      const diff = now - new Date(startTime).getTime() - (duraklamaDk + acik) * 60000;
       if (diff < 0) return "0dk";
       const totalMin = Math.floor(diff / 60000);
       const hours = Math.floor(totalMin / 60);
@@ -76,22 +89,25 @@ function LiveTimer({ startTime, renk }: { startTime: string; renk: string }) {
     setElapsed(calc());
     const interval = setInterval(() => setElapsed(calc()), 60000);
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, duraklamaDk, duraklatmaBaslangic]);
 
   return <span className={cn("text-sm font-bold tabular-nums", renk)}>{elapsed}</span>;
 }
 
-export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCardProps) {
+export function SessionCard({ session, onClose, onCancel, onToggleBeklet, canCancel }: SessionCardProps) {
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [bekletLoading, setBekletLoading] = useState(false);
   const skuStyle = getSkuBadgeStyle(session.sku);
+  const beklemede = !!session.duraklatma_baslangic;
 
-  const yas = session.start_time ? yaslanmaHesapla(session.start_time) : null;
+  // Beklemedeki seans "unutulmuş" sayılmaz: yaşlanma uyarısı yok
+  const yas = session.start_time && !beklemede ? yaslanmaHesapla(session.start_time) : null;
   const stil = YASLANMA_STILI[yas?.durum ?? "normal"];
 
   return (
     <Card
-      className={cn("relative border-l-[3px]", stil.zemin)}
-      style={{ borderLeftColor: stil.kenar || skuStyle.borderColor }}
+      className={cn("relative border-l-[3px]", stil.zemin, beklemede && "bg-muted/60 opacity-80")}
+      style={{ borderLeftColor: beklemede ? "#a99c7d" : stil.kenar || skuStyle.borderColor }}
     >
       <div className="px-3 py-2">
         {/* Header: SKU + cancel */}
@@ -133,6 +149,12 @@ export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCa
               Son
             </Badge>
           )}
+          {beklemede && (
+            <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] px-1.5 py-0">
+              <Pause className="mr-0.5 inline size-2.5" />
+              Beklemede
+            </Badge>
+          )}
           {yas && yas.durum !== "normal" && (
             <Badge
               variant="outline"
@@ -149,6 +171,13 @@ export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCa
           )}
         </div>
 
+        {session.not_text && (
+          <div className="mb-1.5 flex items-start gap-1 rounded bg-amber-50 px-1.5 py-1 text-[11px] text-amber-900">
+            <StickyNote className="mt-0.5 size-3 shrink-0" />
+            <span className="whitespace-pre-wrap">{session.not_text}</span>
+          </div>
+        )}
+
         {/* Workers */}
         {(() => {
           const workers = parseWorkers(session.workers);
@@ -156,6 +185,7 @@ export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCa
             <div className="flex items-center gap-1 mb-1.5 text-[10px] text-muted-foreground truncate">
               <Users className="w-3 h-3 shrink-0" />
               {workers.map((w) => w.name).join(", ")}
+              {(session.yardimci_sayisi ?? 0) > 0 && ` +${session.yardimci_sayisi} yardımcı`}
             </div>
           ) : null;
         })()}
@@ -166,7 +196,12 @@ export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCa
             <Clock className={cn("w-3.5 h-3.5", stil.yazi)} />
             {session.start_time ? (
               <>
-                <LiveTimer startTime={session.start_time} renk={stil.yazi} />
+                <LiveTimer
+                  startTime={session.start_time}
+                  renk={beklemede ? "text-amber-700" : stil.yazi}
+                  duraklamaDk={Number(session.duraklama_dk ?? 0)}
+                  duraklatmaBaslangic={session.duraklatma_baslangic ?? null}
+                />
                 {yas && !yas.bugunMu && (
                   <span className="text-[10px] text-muted-foreground">
                     {new Date(session.start_time).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}
@@ -177,14 +212,41 @@ export function SessionCard({ session, onClose, onCancel, canCancel }: SessionCa
               <span className="text-muted-foreground text-xs">—</span>
             )}
           </div>
-          <Button
-            size="sm"
-            className="h-7 px-2.5 text-xs bg-vw-success hover:bg-vw-success/90 text-white"
-            onClick={() => onClose(session)}
-          >
-            <Wrench className="w-3 h-3 mr-1" />
-            Kapat
-          </Button>
+          <div className="flex items-center gap-1">
+            {onToggleBeklet && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bekletLoading}
+                className={cn(
+                  "h-10 px-3 text-sm",
+                  beklemede ? "border-emerald-300 text-emerald-700" : "border-amber-300 text-amber-700",
+                )}
+                onClick={async () => {
+                  setBekletLoading(true);
+                  try {
+                    await onToggleBeklet(session.session_id);
+                  } finally {
+                    setBekletLoading(false);
+                  }
+                }}
+              >
+                {beklemede ? (
+                  <><Play className="w-3 h-3 mr-1" />Devam Et</>
+                ) : (
+                  <><Pause className="w-3 h-3 mr-1" />Beklet</>
+                )}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              className="h-10 px-3 text-sm bg-vw-success hover:bg-vw-success/90 text-white"
+              onClick={() => onClose(session)}
+            >
+              <Wrench className="w-3 h-3 mr-1" />
+              Kapat
+            </Button>
+          </div>
         </div>
       </div>
     </Card>

@@ -14,7 +14,9 @@ export function useUnreadCount(userId: string | null) {
     // Kullanıcıya görünen tüm bildirimler
     const { data: notifications } = await supabase
       .from("notifications")
-      .select("notif_id, target_user");
+      .select("notif_id, target_user")
+      // Talimat bildirimleri (tablet banner) genel sayaca girmez
+      .or("kind.eq.genel,kind.is.null");
 
     if (!notifications) return;
 

@@ -116,6 +116,8 @@ export async function createCutBatch(formData: {
   plk_notu: string | null;
   /** Bu kesim bir talebi karşılıyorsa talep numarası — trigger kalan adedi düşer */
   talep_id?: string | null;
+  /** İş talimatı satırından "Bitirdi" ile geldiyse satır kimliği (ilerleme buradan hesaplanır) */
+  talimat_satir_id?: string | null;
 }): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -167,7 +169,9 @@ export async function createCutBatch(formData: {
       baslama_zamani: now,
       bitis_zamani: now,
       talep_id: formData.talep_id ?? null,
-    });
+      // Yeni kolon yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
+      ...(formData.talimat_satir_id ? { talimat_satir_id: formData.talimat_satir_id } : {}),
+    } as never);
 
     if (batchError) return { success: false, error: batchError.message };
 

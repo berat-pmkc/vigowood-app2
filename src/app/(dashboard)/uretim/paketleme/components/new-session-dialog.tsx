@@ -21,9 +21,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronsUpDown, Check, Loader2, Search } from "lucide-react";
+import { ChevronsUpDown, Check, Loader2, Search, StickyNote, Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { getActiveProducts, getTopPackagedProducts, createPackSession } from "../actions";
+import { getActiveProducts, getTopPackagedProducts, createPackSession, getPackOperators } from "../actions";
 import { toast } from "sonner";
 
 interface Product {
@@ -39,12 +42,36 @@ interface TopProduct {
   sessionCount: number;
 }
 
+/** İş talimatından "Seans Başlat": ürün + çalışan önceden dolu */
+export interface TalimatPaketOnDolu {
+  satir_id: string;
+  sku: string;
+  urun_adi: string | null;
+  personel_id: string;
+  personel_adi: string;
+  not_text: string | null;
+}
+
 interface NewSessionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  talimat?: TalimatPaketOnDolu | null;
+  /** Seans başarıyla başlayınca (dialog kapanmadan önce) */
+  onSuccess?: () => void;
 }
 
-export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) {
+export function NewSessionDialog({ open, onOpenChange, talimat, onSuccess }: NewSessionDialogProps) {
+  // ── Talimat modu: ürün sabit, çalışan sabit; isteğe bağlı yardımcılar + isimsiz yardımcı sayısı ──
+  const [operators, setOperators] = useState<Array<{ user_id: string; full_name: string }>>([]);
+  const [yardimcilar, setYardimcilar] = useState<Set<string>>(new Set());
+  const [yardimciSayisi, setYardimciSayisi] = useState(0);
+  useEffect(() => {
+    if (!open || !talimat || operators.length > 0) return;
+    getPackOperators().then((r) => {
+      if (r.success) setOperators(r.data);
+    });
+  }, [open, talimat, operators.length]);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -82,6 +109,31 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
     products.find((p) => p.sku === selectedSku) ??
     topProducts.find((p) => p.sku === selectedSku);
 
+  const talimatBaslat = async () => {
+    if (!talimat) return;
+    setSubmitting(true);
+    const workers = [
+      { id: talimat.personel_id, name: talimat.personel_adi },
+      ...Array.from(yardimcilar).map((id) => ({
+        id,
+        name: operators.find((o) => o.user_id === id)?.full_name ?? id,
+      })),
+    ];
+    const result = await createPackSession(talimat.sku, {
+      talimatSatirId: talimat.satir_id,
+      workers,
+      yardimciSayisi,
+    });
+    if (result.success) {
+      toast.success("Seans başlatıldı");
+      onSuccess?.();
+      onOpenChange(false);
+    } else {
+      toast.error(result.error);
+    }
+    setSubmitting(false);
+  };
+
   const handleSubmit = async () => {
     if (!selectedSku) {
       toast.error("Lütfen bir ürün seçin");
@@ -101,6 +153,85 @@ export function NewSessionDialog({ open, onOpenChange }: NewSessionDialogProps) 
   const handleQuickSelect = (sku: string) => {
     setSelectedSku(sku);
   };
+
+  if (talimat) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="shrink-0 border-b px-4 py-3">
+            <DialogTitle>Paketleme Seansı Başlat</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+            <div className="rounded-lg border bg-muted/40 p-3">
+              <p className="text-lg font-bold">{talimat.sku}</p>
+              <p className="text-sm text-muted-foreground">{talimat.urun_adi ?? ""}</p>
+              <p className="mt-1 text-sm">
+                Çalışan: <strong>{talimat.personel_adi}</strong>
+              </p>
+            </div>
+            {talimat.not_text && (
+              <div className="flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+                <StickyNote className="mt-0.5 size-4 shrink-0" />
+                <span className="whitespace-pre-wrap">{talimat.not_text}</span>
+              </div>
+            )}
+            <div>
+              <p className="mb-1 flex items-center gap-2 text-sm font-medium">
+                <Users className="size-4" />
+                Yardımcılar (isteğe bağlı)
+              </p>
+              <div className="max-h-56 space-y-0.5 overflow-y-auto rounded-lg border p-1">
+                {operators
+                  .filter((o) => o.user_id !== talimat.personel_id)
+                  .map((op) => (
+                    <label key={op.user_id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md p-2.5 hover:bg-muted/50">
+                      <Checkbox
+                        checked={yardimcilar.has(op.user_id)}
+                        onCheckedChange={() =>
+                          setYardimcilar((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(op.user_id)) next.delete(op.user_id);
+                            else next.add(op.user_id);
+                            return next;
+                          })
+                        }
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm">{op.full_name}</span>
+                    </label>
+                  ))}
+                {operators.length === 0 && <p className="py-2 text-center text-sm text-muted-foreground">Yükleniyor...</p>}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+              <Label htmlFor="pkt-yardimci-sayisi" className="text-sm">
+                Listede olmayan yardımcı sayısı
+              </Label>
+              <Input
+                id="pkt-yardimci-sayisi"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={50}
+                value={yardimciSayisi}
+                onChange={(e) => setYardimciSayisi(Math.max(0, Math.min(50, Math.floor(Number(e.target.value)) || 0)))}
+                className="h-12 w-24 text-center text-lg"
+              />
+            </div>
+          </div>
+          <div className="shrink-0 border-t p-3">
+            <Button
+              onClick={talimatBaslat}
+              disabled={submitting}
+              className="h-14 w-full bg-vw-primary text-lg font-bold text-white hover:bg-vw-deep"
+            >
+              {submitting && <Loader2 className="mr-2 size-5 animate-spin" />}
+              Seansı Başlat
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

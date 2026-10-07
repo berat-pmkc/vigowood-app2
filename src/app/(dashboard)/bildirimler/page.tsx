@@ -20,6 +20,8 @@ export default async function BildirimlerPage() {
   const { data: notifications } = await supabase
     .from("notifications")
     .select("notif_id, title, message, target_user, created_by, created_at")
+    // Yalnız genel bildirimler; talimat bildirimleri tablet banner'ında gösterilir
+    .or("kind.eq.genel,kind.is.null")
     .order("created_at", { ascending: false });
 
   // Kullanıcının okuduğu bildirimler

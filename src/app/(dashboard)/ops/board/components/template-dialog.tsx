@@ -168,7 +168,6 @@ export function TemplateDialog({ open, onClose, template, users, agents }: Templ
             <Tabs defaultValue="calisanlar" className="mt-1">
               <TabsList className="h-8">
                 <TabsTrigger value="calisanlar" className="text-xs">Çalışanlar</TabsTrigger>
-                <TabsTrigger value="asistanlar" className="text-xs">Asistanlar</TabsTrigger>
               </TabsList>
               <TabsContent value="calisanlar" className="mt-1">
                 <Select
@@ -187,25 +186,7 @@ export function TemplateDialog({ open, onClose, template, users, agents }: Templ
                     ))}
                   </SelectContent>
                 </Select>
-              </TabsContent>
-              <TabsContent value="asistanlar" className="mt-1">
-                <Select
-                  value={watch("assignee_id") || "unassigned"}
-                  onValueChange={(v) => setValue("assignee_id", v === "unassigned" ? "" : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Asistan seç" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Atanmamış</SelectItem>
-                    {agents.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TabsContent>
+              </TabsContent>
             </Tabs>
           </div>
 

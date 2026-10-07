@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PaketlemeStatusBadge } from "./paketleme-status-badge";
-import { Clock, Package, X, Pause, Play, Timer } from "lucide-react";
+import { Clock, Package, X, Pause, Play, Timer, StickyNote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ActiveSession {
@@ -16,6 +16,11 @@ export interface ActiveSession {
   operator_name: string | null;
   duraklama_dk?: number | null;
   duraklatma_baslangic?: string | null;
+  /** Talimattan başlatıldıysa seansta kayıtlı çalışanlar (kapanışta ön seçili gelir) */
+  workers?: Array<{ id: string; name: string }> | null;
+  yardimci_sayisi?: number | null;
+  /** Talimattan başlatıldıysa talep açıklaması */
+  not_text?: string | null;
 }
 
 interface SessionCardProps {
@@ -118,6 +123,13 @@ export function SessionCard({
             <p className="text-xs text-muted-foreground truncate">{session.urun_adi}</p>
           )}
         </div>
+
+        {session.not_text && (
+          <div className="mb-2 flex items-start gap-1.5 rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-900">
+            <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="whitespace-pre-wrap">{session.not_text}</span>
+          </div>
+        )}
 
         {/* Timer */}
         <div className="flex items-center gap-2 mb-3">

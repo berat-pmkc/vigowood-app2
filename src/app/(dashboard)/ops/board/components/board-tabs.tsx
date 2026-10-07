@@ -23,7 +23,7 @@ export function BoardTabs({ activeTab }: BoardTabsProps) {
         return (
           <Link
             key={tab.key}
-            href={tab.key === "gorevler" ? "/ops/board" : `/ops/board?tab=${tab.key}`}
+            href={tab.key === "gorevler" ? "/ops/board/gorevler" : `/ops/board/gorevler?tab=${tab.key}`}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               isActive
