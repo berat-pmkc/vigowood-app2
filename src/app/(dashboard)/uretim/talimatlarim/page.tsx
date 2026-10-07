@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUserWithAuth } from "@/lib/auth";
 import { TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
-import { tabletListeGetir } from "@/lib/talimat/actions";
+import { tabletTumListeGetir } from "@/lib/talimat/actions";
 import { tabletKontekstGetir } from "@/lib/talimat/tablet-actions";
 import { TalimatlarimClient } from "./components/talimatlarim-client";
 
@@ -22,16 +22,16 @@ export default async function TalimatlarimPage({
   if (!kr.success) redirect("/");
   const kontekst = kr.data;
 
-  // Varsayılan: URL'deki personel, yoksa seçili operatör
-  const personelId = sp.personel || kontekst.varsayilanPersonelId || null;
-  const ilk = personelId ? await tabletListeGetir(personelId) : null;
+  // Vurgulanacak çalışan: URL'deki personel, yoksa seçili operatör (yine de herkes listelenir)
+  const seciliPersonelId = sp.personel || kontekst.varsayilanPersonelId || null;
+  const ilk = await tabletTumListeGetir(seciliPersonelId);
 
   return (
     <TalimatlarimClient
-      personeller={kontekst.personeller}
-      baslangicPersonelId={personelId}
-      baslangicListe={ilk && ilk.success ? ilk.data : null}
-      baslangicHata={ilk && !ilk.success ? ilk.error : null}
+      seciliPersonelId={seciliPersonelId}
+      istasyon={kontekst.station}
+      baslangicListe={ilk.success ? ilk.data : null}
+      baslangicHata={!ilk.success ? ilk.error : null}
     />
   );
 }

@@ -23,6 +23,8 @@ import type {
   TalimatSatir,
   TalimatSatirFiltre,
   TalimatTabletListe,
+  TalimatTabletTum,
+  TabletAcikSeans,
   TalimatYayin,
   TalimatYayinHedefDetay,
   UrunStokSecenek,
@@ -277,6 +279,154 @@ export async function getTabletListe(personelId: string): Promise<TalimatTabletL
     satirlar: (satirRes.data ?? []) as TalimatSatir[],
     guncel: { guncel_mi: !!plan?.guncel_mi, bitis: plan?.guncel_bitis ?? null },
     bekleyen_yayin_idler: bekleyen,
+  };
+}
+
+/**
+ * Tablet: TÜM çalışanların listesi. Plan: yayındaki (bu hafta/öncesi) en yeni plan; yoksa
+ * `yedekPersonelId` için talimat_tablet_plan (pasif plan + açık seans devamı).
+ * Sorgular: plan + satırlar + yayın hedefleri + onaylar + açık montaj + açık paketleme (N+1 yok).
+ */
+export async function getTabletTumListe(yedekPersonelId?: string | null): Promise<TalimatTabletTum> {
+  const sb = await talimatDb();
+  const bos: TalimatTabletTum = { plan: null, satirlar: [], guncel: { guncel_mi: false, bitis: null }, bekleyen: {}, acik_seanslar: [] };
+
+  const bugun = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
+  const { data: yayinda, error: e0 } = await sb
+    .from("talimat_planlar")
+    .select("plan_id")
+    .eq("durum", "yayinda")
+    .lte("hafta_baslangic", bugun)
+    .order("hafta_baslangic", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  hataFirlat(e0);
+  let planId = (yayinda?.plan_id as string | undefined) ?? null;
+  if (!planId && yedekPersonelId) {
+    const { data, error } = await sb.rpc("talimat_tablet_plan", { p_personel: yedekPersonelId });
+    hataFirlat(error);
+    planId = (data as string | null) ?? null;
+  }
+  if (!planId) return bos;
+
+  const [plan, satirRes, hedefRes, montajRes, paketRes] = await Promise.all([
+    getPlan(planId),
+    sb
+      .from("talimat_satir_ilerleme")
+      .select("*")
+      .eq("plan_id", planId)
+      .eq("etkin_pasif", false)
+      .or("sku.not.is.null,plaka_id.not.is.null")
+      .order("personel_id", { ascending: true })
+      .order("sira", { ascending: true }),
+    sb
+      .from("talimat_yayin_hedefler")
+      .select("yayin_id, personel_id, talimat_yayinlar!inner(durum, plan_id, bildirim_gonder, created_at)")
+      .eq("talimat_yayinlar.plan_id", planId)
+      .eq("talimat_yayinlar.bildirim_gonder", true)
+      .in("talimat_yayinlar.durum", ["gonderildi", "durduruldu"]),
+    sb
+      .from("montaj_sessions")
+      .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_id, operator_name, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id")
+      .eq("durum", "montajda"),
+    sb
+      .from("pack_events")
+      .select("session_id, sku, start_time, durum, operator_name, personel, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id")
+      .eq("durum", "paketlemede"),
+  ]);
+  hataFirlat(satirRes.error);
+  hataFirlat(hedefRes.error);
+  hataFirlat(montajRes.error);
+  hataFirlat(paketRes.error);
+
+  const satirlar = (satirRes.data ?? []) as TalimatSatir[];
+
+  // Bekleyen onaylar (personel bazlı)
+  const adaylar = (hedefRes.data ?? []) as unknown as Array<{
+    yayin_id: string; personel_id: string; talimat_yayinlar: { created_at: string };
+  }>;
+  const bekleyen: Record<string, string[]> = {};
+  if (adaylar.length) {
+    const { data: onaylar, error: e3 } = await sb
+      .from("talimat_onaylar")
+      .select("yayin_id, personel_id")
+      .in("yayin_id", [...new Set(adaylar.map((a) => a.yayin_id))]);
+    hataFirlat(e3);
+    const onayli = new Set((onaylar ?? []).map((o) => `${o.yayin_id}|${o.personel_id}`));
+    adaylar
+      .filter((a) => !onayli.has(`${a.yayin_id}|${a.personel_id}`))
+      .sort((a, b) => b.talimat_yayinlar.created_at.localeCompare(a.talimat_yayinlar.created_at))
+      .forEach((a) => {
+        (bekleyen[a.personel_id] ??= []).push(a.yayin_id);
+      });
+  }
+
+  // Açık seansları satırlara bağla: önce talimat_satir_id, yoksa aynı personel + aynı sku
+  type Ham = Record<string, unknown>;
+  const parseW = (w: unknown): Array<{ id: string; name: string }> | null => {
+    if (Array.isArray(w)) return w as Array<{ id: string; name: string }>;
+    if (typeof w === "string") {
+      try {
+        const j = JSON.parse(w);
+        if (Array.isArray(j)) return j;
+      } catch {
+        /* geçersiz JSON */
+      }
+    }
+    return null;
+  };
+  const satirById = new Map(satirlar.map((s) => [s.satir_id, s]));
+  const montajSatirlari = satirlar.filter((s) => s.etkin_istasyon === "montaj" && s.sku);
+  const paketSatirlari = satirlar.filter((s) => s.etkin_istasyon === "paketleme" && s.sku);
+  const acik: TabletAcikSeans[] = [];
+
+  const baglan = (ham: Ham, adaySatirlar: TalimatSatir[], personelMi: (pid: string) => boolean): string | null => {
+    const dogrudan = ham.talimat_satir_id as string | null;
+    if (dogrudan) return satirById.has(dogrudan) ? dogrudan : null;
+    const sku = ham.sku as string | null;
+    if (!sku) return null;
+    return adaySatirlar.find((s) => s.sku === sku && personelMi(s.personel_id))?.satir_id ?? null;
+  };
+
+  for (const h of (montajRes.data ?? []) as Ham[]) {
+    const workers = parseW(h.workers);
+    const satirId = baglan(h, montajSatirlari, (pid) => h.operator_id === pid || !!workers?.some((w) => w.id === pid));
+    if (!satirId) continue;
+    acik.push({
+      session_id: h.session_id as string, tur: "montaj", satir_id: satirId,
+      sku: (h.sku as string | null) ?? null, urun_adi: satirById.get(satirId)!.urun_adi,
+      step_id: (h.step_id as string | null) ?? null, step_name: (h.step_name as string | null) ?? null,
+      seq_no: (h.seq_no as number | null) ?? null, is_final_step: (h.is_final_step as boolean | null) ?? null,
+      start_time: (h.start_time as string | null) ?? null, durum: h.durum as string,
+      operator_name: (h.operator_name as string | null) ?? null, workers,
+      duraklama_dk: (h.duraklama_dk as number | null) ?? null,
+      duraklatma_baslangic: (h.duraklatma_baslangic as string | null) ?? null,
+      yardimci_sayisi: (h.yardimci_sayisi as number | null) ?? null,
+    });
+  }
+  for (const h of (paketRes.data ?? []) as Ham[]) {
+    const workers = parseW(h.workers);
+    const csv = String(h.personel ?? "").replace(/\s/g, "").split(",").filter(Boolean);
+    const satirId = baglan(h, paketSatirlari, (pid) => csv.includes(pid) || !!workers?.some((w) => w.id === pid));
+    if (!satirId) continue;
+    acik.push({
+      session_id: h.session_id as string, tur: "paketleme", satir_id: satirId,
+      sku: (h.sku as string | null) ?? null, urun_adi: satirById.get(satirId)!.urun_adi,
+      step_id: null, step_name: null, seq_no: null, is_final_step: null,
+      start_time: (h.start_time as string | null) ?? null, durum: h.durum as string,
+      operator_name: (h.operator_name as string | null) ?? null, workers,
+      duraklama_dk: (h.duraklama_dk as number | null) ?? null,
+      duraklatma_baslangic: (h.duraklatma_baslangic as string | null) ?? null,
+      yardimci_sayisi: (h.yardimci_sayisi as number | null) ?? null,
+    });
+  }
+
+  return {
+    plan,
+    satirlar,
+    guncel: { guncel_mi: !!plan?.guncel_mi, bitis: plan?.guncel_bitis ?? null },
+    bekleyen,
+    acik_seanslar: acik,
   };
 }
 

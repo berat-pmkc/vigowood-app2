@@ -22,6 +22,7 @@ import {
   getSiraDurumu,
   getTabletBildirimleri,
   getTabletListe,
+  getTabletTumListe,
   getYayinDetay,
   searchUrunler,
   getTalimatAyarlari,
@@ -40,6 +41,7 @@ import type {
   TalimatSatir,
   TalimatSatirFiltre,
   TalimatTabletListe,
+  TalimatTabletTum,
   TalimatYayin,
   TalimatYayinHedefDetay,
   UrunStokSecenek,
@@ -337,6 +339,14 @@ export async function tabletListeGetir(personelId: string): Promise<ActionResult
   return sonucaCevir(async () => {
     await rolGerekli(TALIMAT_VIEW_ROLES);
     return getTabletListe(personelId);
+  });
+}
+
+/** Tablet: tüm çalışanların listesi + açık seanslar (tek çağrı) */
+export async function tabletTumListeGetir(yedekPersonelId?: string | null): Promise<ActionResult<TalimatTabletTum>> {
+  return sonucaCevir(async () => {
+    await rolGerekli(TALIMAT_VIEW_ROLES);
+    return getTabletTumListe(yedekPersonelId);
   });
 }
 

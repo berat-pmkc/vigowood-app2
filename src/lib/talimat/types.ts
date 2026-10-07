@@ -184,6 +184,38 @@ export interface TalimatTabletListe {
   bekleyen_yayin_idler: string[];
 }
 
+/** Talimat satırına bağlı açık montaj/paketleme seansı (tablet) */
+export interface TabletAcikSeans {
+  session_id: string;
+  tur: "montaj" | "paketleme";
+  /** Bağlandığı talimat satırı */
+  satir_id: string;
+  sku: string | null;
+  urun_adi: string | null;
+  step_id: string | null;
+  step_name: string | null;
+  seq_no: number | null;
+  is_final_step: boolean | null;
+  start_time: string | null;
+  durum: string;
+  operator_name: string | null;
+  workers: Array<{ id: string; name: string }> | null;
+  duraklama_dk: number | null;
+  duraklatma_baslangic: string | null;
+  yardimci_sayisi: number | null;
+}
+
+/** Tüm çalışanların listesi (tablet "İş Talimatları" ekranı) */
+export interface TalimatTabletTum {
+  plan: TalimatPlan | null;
+  /** Tüm personelin pasif olmayan satırları (personel, sıra) */
+  satirlar: TalimatSatir[];
+  guncel: { guncel_mi: boolean; bitis: string | null };
+  /** personel_id -> onaylamadığı yayınlar (en yeni önce) */
+  bekleyen: Record<string, string[]>;
+  acik_seanslar: TabletAcikSeans[];
+}
+
 /** Ürün seçici öğesi: stok bilgisiyle */
 export interface UrunStokSecenek {
   sku: string;
