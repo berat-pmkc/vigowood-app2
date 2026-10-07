@@ -841,7 +841,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
             )}
 
             {/* Tablo */}
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <DndContext id="mavi-yaka-dnd" sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <div className="max-h-[calc(100dvh-14rem)] min-h-[320px] overflow-auto rounded-lg border bg-card">
                 <table className="w-full min-w-[1180px] border-collapse">
                   <thead className="text-left text-xs font-semibold uppercase tracking-wide text-vw-deep">
