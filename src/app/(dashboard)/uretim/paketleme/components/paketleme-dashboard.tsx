@@ -104,7 +104,7 @@ export function PaketlemeDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <TalimatButton />
+          <TalimatButton istasyon="paketleme" />
           <KaliteButtons istasyon="paketleme" />
           <Button
             variant="outline"

@@ -98,7 +98,7 @@ export function MontajDashboard({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <TalimatButton />
+          <TalimatButton istasyon="montaj" />
           <KaliteButtons istasyon="montaj" />
           <Button
             variant="outline"

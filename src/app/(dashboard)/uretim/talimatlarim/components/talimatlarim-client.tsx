@@ -43,6 +43,13 @@ function normalize(s: string): string {
     .trim();
 }
 
+const ISTASYON_AD: Record<string, string> = { kesim: "Kesim", montaj: "Montaj", paketleme: "Paketleme" };
+
+/** Satırın bölümü: atanan istasyon, yoksa türetilmiş (plaka → kesim, aksi halde montaj) */
+function satirIstasyonu(s: { istasyon: string | null; etkin_istasyon: string | null }): string | null {
+  return s.istasyon ?? s.etkin_istasyon ?? null;
+}
+
 function istasyonTaban(s: string | null | undefined): string {
   return normalize((s ?? "").replace(/\s+Hattı$/i, ""));
 }
@@ -52,6 +59,8 @@ interface Props {
   seciliPersonelId: string | null;
   /** Oturum açan hesabın istasyonu (ortak istasyon tableti) */
   istasyon: string | null;
+  /** Montaj / paketleme / kesim ekranından gelindiyse sadece o bölümün işleri */
+  varsayilanIstasyon: string | null;
   baslangicListe: TalimatTabletTum | null;
   baslangicHata: string | null;
 }
@@ -63,13 +72,13 @@ interface Grup {
   satirlar: TalimatSatir[];
 }
 
-export function TalimatlarimClient({ seciliPersonelId, istasyon, baslangicListe, baslangicHata }: Props) {
+export function TalimatlarimClient({ seciliPersonelId, istasyon, varsayilanIstasyon, baslangicListe, baslangicHata }: Props) {
   const router = useRouter();
   const [liste, setListe] = useState<TalimatTabletTum | null>(baslangicListe);
   const [hata, setHata] = useState<string | null>(baslangicHata);
   const [onaydaId, setOnaydaId] = useState<string | null>(null);
   const [arama, setArama] = useState("");
-  const [istasyonFiltre, setIstasyonFiltre] = useState<string>("tumu");
+  const [istasyonFiltre, setIstasyonFiltre] = useState<string>(varsayilanIstasyon ?? "tumu");
 
   // Seans / kesim diyalogları
   const [montajSatir, setMontajSatir] = useState<TalimatSatir | null>(null);
@@ -275,17 +284,25 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, baslangicListe,
   const istasyonlar = useMemo(() => {
     const set = new Map<string, string>();
     for (const g of tumGruplar) {
-      if (g.istasyon) set.set(istasyonTaban(g.istasyon), g.istasyon.replace(/\s+Hattı$/i, ""));
+      for (const s of g.satirlar) {
+        const k = satirIstasyonu(s);
+        if (k) set.set(k, ISTASYON_AD[k] ?? k);
+      }
     }
     return [...set.entries()].sort((a, b) => a[1].localeCompare(b[1], "tr"));
   }, [tumGruplar]);
 
   const gruplar = useMemo(() => {
     const q = normalize(arama);
-    return tumGruplar.filter((g) => {
-      if (istasyonFiltre !== "tumu" && istasyonTaban(g.istasyon) !== istasyonFiltre) return false;
-      return !q || normalize(g.ad).includes(q) || normalize(g.personel_id).includes(q);
-    });
+    // İstasyon filtresi satır bazında: montaj ekranından gelen yalnızca montaj işlerini görür
+    return tumGruplar
+      .map((g) =>
+        istasyonFiltre === "tumu" ? g : { ...g, satirlar: g.satirlar.filter((s) => satirIstasyonu(s) === istasyonFiltre) },
+      )
+      .filter((g) => {
+        if (g.satirlar.length === 0) return false;
+        return !q || normalize(g.ad).includes(q) || normalize(g.personel_id).includes(q);
+      });
   }, [tumGruplar, arama, istasyonFiltre]);
 
   // ?personel= / seçili operatör: ilk yüklemede o çalışanın bölümüne kaydır (en üstteyse gerek yok)

@@ -122,7 +122,7 @@ export function KesimDashboard({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <TalimatButton />
+            <TalimatButton istasyon="kesim" />
             <KaliteButtons istasyon="kesim" />
             {analizGorebilir && (
               <Button asChild variant="outline" className="h-11 px-4">

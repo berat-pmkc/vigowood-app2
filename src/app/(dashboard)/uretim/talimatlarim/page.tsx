@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "İş Talimatları" };
 export default async function TalimatlarimPage({
   searchParams,
 }: {
-  searchParams: Promise<{ personel?: string }>;
+  searchParams: Promise<{ personel?: string; istasyon?: string }>;
 }) {
   const ctx = await getCurrentUserWithAuth();
   if (!ctx) redirect("/login");
@@ -30,6 +30,7 @@ export default async function TalimatlarimPage({
     <TalimatlarimClient
       seciliPersonelId={seciliPersonelId}
       istasyon={kontekst.station}
+      varsayilanIstasyon={["kesim", "montaj", "paketleme"].includes(sp.istasyon ?? "") ? sp.istasyon! : null}
       baslangicListe={ilk.success ? ilk.data : null}
       baslangicHata={!ilk.success ? ilk.error : null}
     />
