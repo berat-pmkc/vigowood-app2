@@ -265,6 +265,33 @@ export async function talimatPasifKaldir(girdi: Pick<PasifGirdi, "kapsam" | "pla
   });
 }
 
+export interface TalimatPasifKayit {
+  pasif_id: string;
+  kapsam: "personel" | "liste";
+  personel_id: string | null;
+  baslangic: string;
+  /** 'infinity' = süresiz */
+  bitis: string;
+  neden: string | null;
+}
+
+/** Plandaki iptal edilmemiş personel/liste pasif kayıtları (rozetler için) */
+export async function talimatPasifKayitlari(planId: string): Promise<TalimatPasifKayit[]> {
+  try {
+    await rolGerekli(TALIMAT_VIEW_ROLES);
+    const sb = await talimatDb();
+    const { data, error } = await sb
+      .from("talimat_pasifler")
+      .select("pasif_id,kapsam,personel_id,baslangic,bitis,neden")
+      .eq("plan_id", planId)
+      .is("iptal_at", null);
+    if (error) return [];
+    return (data ?? []) as TalimatPasifKayit[];
+  } catch {
+    return [];
+  }
+}
+
 // ─── Ayarlar ────────────────────────────────────────────────────
 
 const ayarSchema = z.object({

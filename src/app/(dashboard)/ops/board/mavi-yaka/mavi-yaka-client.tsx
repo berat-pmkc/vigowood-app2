@@ -64,6 +64,7 @@ import {
   satirSirala,
   talimatPasifKaldir,
   talimatYayinla,
+  type TalimatPasifKayit,
 } from "@/lib/talimat/actions";
 import { satirlariTopluSil } from "@/lib/talimat/toplu-actions";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -79,7 +80,7 @@ import type {
   UrunStokSecenek,
 } from "@/lib/talimat/types";
 import { cn, formatDate } from "@/lib/utils";
-import { PasifDialog, type PasifHedef } from "./pasif-dialog";
+import { PasifDialog, PasifKaldirDialog, type PasifHedef, type PasifKaldirHedef } from "./pasif-dialog";
 import { PersonelEkle } from "./personel-ekle";
 import { SatirRow, type SatirIslemleri } from "./satir-row";
 import { YayinDialog } from "./yayin-dialog";
@@ -94,6 +95,8 @@ interface Props {
   personeller: TalimatPersonel[];
   stoklar: Record<string, UrunStokSecenek["depo_stoklari"]>;
   planner: boolean;
+  /** Aktif personel/liste pasif kayıtları (rozetler + kaldırma) */
+  pasifKayitlari: TalimatPasifKayit[];
   /** satir_id -> ilk eklenme zamanı (personel grupları: ilk eklenen üstte) */
   eklenme: Record<string, string>;
   /** Derin bağlantı (?satir=<id>): grubu aç, satıra kaydır, 3 sn vurgula */
@@ -123,7 +126,7 @@ function hataMesaji(r: { error: string; code?: string }): string {
   return r.error;
 }
 
-export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, personeller, stoklar, planner, eklenme, vurguSatir }: Props) {
+export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, personeller, stoklar, planner, pasifKayitlari, eklenme, vurguSatir }: Props) {
   const router = useRouter();
   const yenile = useCallback(() => router.refresh(), [router]);
 
@@ -132,6 +135,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     subscriptions: [
       { event: "*", table: "talimat_satirlar" },
       { event: "*", table: "talimat_planlar" },
+      { event: "*", table: "talimat_pasifler" },
       { event: "*", table: "talimat_yayinlar" },
       { event: "*", table: "talimat_onaylar" },
       { event: "*", table: "talepler" },
@@ -294,6 +298,29 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
   }, [secili, tumGrup, personelAdlari]);
 
   const [pasifHedef, setPasifHedef] = useState<PasifHedef | null>(null);
+  const [kaldirHedef, setKaldirHedef] = useState<PasifKaldirHedef | null>(null);
+  const listePasifKaydi = useMemo(() => pasifKayitlari.find((k) => k.kapsam === "liste") ?? null, [pasifKayitlari]);
+  const personelPasifKaydi = useMemo(() => {
+    const m = new Map<string, TalimatPasifKayit>();
+    for (const k of pasifKayitlari) if (k.kapsam === "personel" && k.personel_id) m.set(k.personel_id, k);
+    return m;
+  }, [pasifKayitlari]);
+  const pasifRozetMetni = (k: TalimatPasifKayit, onek: string) =>
+    `${onek} · ${k.neden || "neden yok"} · ${k.bitis && k.bitis !== "infinity" ? formatDate(k.bitis) : "süresiz"}`;
+  /** Pasif kaldırma diyaloğunu hazırla (liste kapsamında tüm personel) */
+  const kaldirAc = (kapsam: "liste" | "personel", pids: string[], baslik: string) => {
+    const hedefPidler = kapsam === "liste" ? [...tumGrup.keys()] : pids;
+    const pasifSatirlar = hedefPidler.flatMap((id) => (tumGrup.get(id) ?? []).filter((s) => s.durum === "pasif").map((s) => s.satir_id));
+    setKaldirHedef({
+      kapsam,
+      baslik,
+      personeller: hedefPidler,
+      pasifSatirlar,
+      listePasifVar: !!listePasifKaydi,
+      personelPasifVar: personelPasifKaydi.size > 0,
+    });
+  };
+  const herhangiPasif = !!listePasifKaydi || personelPasifKaydi.size > 0 || satirlar.some((s) => s.durum === "pasif" || s.etkin_pasif);
   const [silHedef, setSilHedef] = useState<TalimatSatir | null>(null);
   const [topluSilHedef, setTopluSilHedef] = useState<{ baslik: string; personelAdi?: string; personelSayisi: number; ids: string[]; secimler?: { ad: string; satir: number }[] } | null>(null);
   const [topluIlerleme, setTopluIlerleme] = useState<{ yapilan: number; toplam: number } | null>(null);
@@ -560,24 +587,17 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                       {istasyonAdaylari.length > 0 && <span className="ml-auto text-[11px] text-muted-foreground">{istasyonAdaylari.length}</span>}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {tumListePasif ? (
-                      <DropdownMenuItem
-                        onClick={async () => {
-                          const r = await talimatPasifKaldir({ kapsam: "liste", planId: plan.plan_id });
-                          if (!r.success) toast.error(hataMesaji(r));
-                          else toast.success("Liste pasifi kaldırıldı");
-                          yenile();
-                        }}
-                      >
-                        <PlayCircle className="mr-2 h-4 w-4" /> Tüm listeyi aktifleştir
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem
-                        onClick={() => setPasifHedef({ kapsam: "liste", ids: [], baslik: "Tüm liste (bütün personel) pasif edilecek" })}
-                      >
-                        <PauseCircle className="mr-2 h-4 w-4" /> Tüm listeyi pasif et
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem
+                      onSelect={() => setPasifHedef({ kapsam: "liste", ids: [], baslik: "Tüm liste (bütün personel) pasif edilecek" })}
+                    >
+                      <PauseCircle className="mr-2 h-4 w-4" /> Tüm listeyi pasif et
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!herhangiPasif}
+                      onSelect={() => kaldirAc("liste", [], "Tüm listenin pasifi kaldırılacak")}
+                    >
+                      <PlayCircle className="mr-2 h-4 w-4" /> Tüm listenin pasifini kaldır
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={satirlar.length === 0}
                       className="text-[#c0424f] focus:text-[#c0424f]"
@@ -848,27 +868,26 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                                     {g.istasyon}
                                   </Badge>
                                 )}
-                                {personelPasif && <Badge className="border-0 bg-[#cfd8dc] text-[#546e7a]">Pasif</Badge>}
+                                {(() => {
+                                  const pk = personelPasifKaydi.get(g.pid);
+                                  if (pk) return <Badge className="border-0 bg-[#cfd8dc] text-[#546e7a]">{pasifRozetMetni(pk, "Pasif")}</Badge>;
+                                  if (listePasifKaydi) return <Badge className="border-0 bg-[#cfd8dc] text-[#546e7a]">{pasifRozetMetni(listePasifKaydi, "Pasif (tüm liste)")}</Badge>;
+                                  if (personelPasif) return <Badge className="border-0 bg-[#cfd8dc] text-[#546e7a]">Pasif</Badge>;
+                                  if (pasifVar) return <Badge className="border-0 bg-[#eceff1] text-[#546e7a]">{tamListe.filter((x) => x.etkin_pasif).length} satır pasif</Badge>;
+                                  return null;
+                                })()}
                                 <span className="text-xs text-muted-foreground">{tamListe.length} satır</span>
                                 {editable && (
                                   <div className="ml-auto flex items-center gap-1">
                                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => satirEkle(g.pid)}>
                                       <Plus className="mr-1 h-3.5 w-3.5" /> satır
                                     </Button>
-                                    {pasifVar ? (
+                                    {pasifVar || personelPasifKaydi.has(g.pid) || !!listePasifKaydi || tamListe.some((x) => x.durum === "pasif") ? (
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         className="h-7 text-xs"
-                                        onClick={async () => {
-                                          const r1 = await talimatPasifKaldir({ kapsam: "personel", planId: plan.plan_id, ids: [g.pid] });
-                                          const pasifSatirlar = tamListe.filter((s) => s.durum === "pasif").map((s) => s.satir_id);
-                                          if (pasifSatirlar.length)
-                                            await talimatPasifKaldir({ kapsam: "satir", planId: plan.plan_id, ids: pasifSatirlar });
-                                          if (!r1.success) toast.error(hataMesaji(r1));
-                                          else toast.success("Pasif kaldırıldı");
-                                          yenile();
-                                        }}
+                                        onClick={() => kaldirAc("personel", [g.pid], `${g.ad} pasifi kaldırılacak`)}
                                       >
                                         <PlayCircle className="mr-1 h-3.5 w-3.5" /> Pasifi kaldır
                                       </Button>
@@ -890,14 +909,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
-                                    {!personelPasif && (
+                                    {!personelPasif && !personelPasifKaydi.has(g.pid) && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         className="h-7 text-xs"
                                         onClick={() => setPasifHedef({ kapsam: "personel", ids: [g.pid], baslik: `${g.ad} tüm listesi pasif edilecek` })}
                                       >
-                                        <EyeOff className="mr-1 h-3.5 w-3.5" /> Personeli pasif et
+                                        <EyeOff className="mr-1 h-3.5 w-3.5" /> Pasif et
                                       </Button>
                                     )}
                                   </div>
@@ -945,6 +964,30 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                     Seçimi temizle
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    onClick={() =>
+                      setPasifHedef({
+                        kapsam: "personel",
+                        ids: seciliBilgi.liste.map((x) => x.pid),
+                        baslik: `${seciliBilgi.liste.length} personelin listesi pasif edilecek`,
+                      })
+                    }
+                  >
+                    <EyeOff className="mr-1.5 h-4 w-4" /> Seçilenleri pasif et
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    onClick={() =>
+                      kaldirAc("personel", seciliBilgi.liste.map((x) => x.pid), `${seciliBilgi.liste.length} personelin pasifi kaldırılacak`)
+                    }
+                  >
+                    <PlayCircle className="mr-1.5 h-4 w-4" /> Seçilenlerin pasifini kaldır
+                  </Button>
+                  <Button
                     size="sm"
                     className="h-9 bg-[#c0424f] text-white hover:bg-[#a63744]"
                     onClick={() =>
@@ -971,6 +1014,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
           <>
             <YayinDialog open={yayinAcik} plan={plan} gelecekHafta={gelecekHafta} onClose={() => setYayinAcik(false)} onDone={yenile} />
             <PasifDialog planId={plan.plan_id} hedef={pasifHedef} onClose={() => setPasifHedef(null)} onDone={yenile} />
+            <PasifKaldirDialog planId={plan.plan_id} hedef={kaldirHedef} onClose={() => setKaldirHedef(null)} onDone={yenile} />
           </>
         )}
 

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { talimatPasifKayitlari } from "@/lib/talimat/actions";
 import { TALIMAT_PLANNER_ROLES, TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
 import { haftaBaslangici } from "@/lib/talimat/helpers";
 import { getPlanByHafta, getPlanSatirEklenme, getPlanSatirlari, getTalimatPersoneller, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
@@ -23,9 +24,14 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
 
   const [plan, personeller] = await Promise.all([getPlanByHafta(hafta), getTalimatPersoneller()]);
 
-  const [satirlar, yayinlar, eklenme] = plan
-    ? await Promise.all([getPlanSatirlari(plan.plan_id), getYayinlar(plan.plan_id, 20), getPlanSatirEklenme(plan.plan_id)])
-    : [[], [], {} as Record<string, string>];
+  const [satirlar, yayinlar, eklenme, pasifKayitlari] = plan
+    ? await Promise.all([
+        getPlanSatirlari(plan.plan_id),
+        getYayinlar(plan.plan_id, 20),
+        getPlanSatirEklenme(plan.plan_id),
+        talimatPasifKayitlari(plan.plan_id),
+      ])
+    : [[], [], {} as Record<string, string>, []];
   const vurguSatir = params.satir && /^[0-9a-f-]{36}$/i.test(params.satir) ? params.satir : null;
 
   const skular = [...new Set(satirlar.map((s) => s.sku).filter((s): s is string => !!s))];
@@ -44,6 +50,7 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
       stoklar={stoklar}
       planner={planner}
       eklenme={eklenme}
+      pasifKayitlari={pasifKayitlari}
       vurguSatir={vurguSatir}
     />
   );

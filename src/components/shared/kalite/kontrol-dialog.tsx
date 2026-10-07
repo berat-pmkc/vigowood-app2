@@ -60,7 +60,7 @@ export function KontrolDialog({
   const [depoId, setDepoId] = useState("");
   const [depolar, setDepolar] = useState<DepoOption[]>([]);
   const [parts, setParts] = useState<UrunParcasi[]>([]);
-  const [partInputs, setPartInputs] = useState<Record<string, { saglam: string; fire: string }>>({});
+  const [partInputs, setPartInputs] = useState<Record<string, { fire: string; uygunsuz: string }>>({});
   const [loadingParts, setLoadingParts] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -115,17 +115,28 @@ export function KontrolDialog({
   const rows = useMemo(
     () =>
       parts.map((p) => {
-        const inp = partInputs[p.part_id] ?? { saglam: "", fire: "" };
-        const saglam = Number(inp.saglam) || 0;
+        const inp = partInputs[p.part_id] ?? { fire: "", uygunsuz: "" };
         const fire = Number(inp.fire) || 0;
+        const uygunsuz = Number(inp.uygunsuz) || 0;
         const beklenen = p.qty_per * numQty;
-        return { p, inp, saglam, fire, beklenen, kalan: Math.max(beklenen - saglam - fire, 0), asiri: saglam + fire > beklenen };
+        const asiri = fire + uygunsuz > beklenen + 1e-9;
+        return { p, inp, fire, uygunsuz, beklenen, saglam: Math.max(beklenen - fire - uygunsuz, 0), asiri };
       }),
     [parts, partInputs, numQty]
   );
 
-  const setPartInput = (id: string, field: "saglam" | "fire", v: string) =>
-    setPartInputs((s) => ({ ...s, [id]: { ...(s[id] ?? { saglam: "", fire: "" }), [field]: v } }));
+  const toplamlar = useMemo(
+    () => ({
+      saglam: rows.reduce((t, r) => t + r.saglam, 0),
+      fire: rows.reduce((t, r) => t + r.fire, 0),
+      uygunsuz: rows.reduce((t, r) => t + r.uygunsuz, 0),
+    }),
+    [rows]
+  );
+  const sokumHatali = sonuc === "sokum" && rows.some((r) => r.asiri || r.fire < 0 || r.uygunsuz < 0);
+
+  const setPartInput = (id: string, field: "fire" | "uygunsuz", v: string) =>
+    setPartInputs((s) => ({ ...s, [id]: { ...(s[id] ?? { fire: "", uygunsuz: "" }), [field]: v } }));
 
   const handleSubmit = async () => {
     if (!item) return toast.error("Kalem seçiniz");
@@ -143,12 +154,12 @@ export function KontrolDialog({
     } else if (sonuc === "sokum") {
       if (rows.some((r) => r.asiri)) {
         setSubmitting(false);
-        return toast.error("Sağlam + fire beklenen miktarı aşamaz");
+        return toast.error("Fire + uygunsuz parça toplamını aşamaz");
       }
       res = await kontrolSokum({
         sku: item.id,
         qty: numQty,
-        parts: rows.map((r) => ({ part_id: r.p.part_id, saglam: r.saglam, fire: r.fire })),
+        parts: rows.map((r) => ({ part_id: r.p.part_id, fire: r.fire, uygunsuz: r.uygunsuz })),
       });
     } else {
       res = await fireGiris({
@@ -298,22 +309,10 @@ export function KontrolDialog({
                               <p className="truncate text-xs text-muted-foreground">{r.p.part_adi}</p>
                             </div>
                             <span className="shrink-0 text-xs text-muted-foreground">
-                              Beklenen: <b>{fmt(r.beklenen)}</b>
+                              Toplam: <b>{fmt(r.beklenen)}</b>
                             </span>
                           </div>
-                          <div className="mt-2 grid grid-cols-2 gap-2">
-                            <div>
-                              <Label className="text-xs">Sağlam</Label>
-                              <Input
-                                type="number"
-                                inputMode="numeric"
-                                min={0}
-                                value={r.inp.saglam}
-                                onChange={(e) => setPartInput(r.p.part_id, "saglam", e.target.value)}
-                                className="h-11"
-                                placeholder="0"
-                              />
-                            </div>
+                          <div className="mt-2 grid grid-cols-3 gap-2">
                             <div>
                               <Label className="text-xs">Fire</Label>
                               <Input
@@ -322,18 +321,41 @@ export function KontrolDialog({
                                 min={0}
                                 value={r.inp.fire}
                                 onChange={(e) => setPartInput(r.p.part_id, "fire", e.target.value)}
-                                className="h-11"
+                                className="h-12 text-lg"
                                 placeholder="0"
                               />
                             </div>
+                            <div>
+                              <Label className="text-xs">Uygunsuz</Label>
+                              <Input
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                value={r.inp.uygunsuz}
+                                onChange={(e) => setPartInput(r.p.part_id, "uygunsuz", e.target.value)}
+                                className="h-12 text-lg"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="flex flex-col justify-end pb-2">
+                              <span className="text-xs text-muted-foreground">Sağlam</span>
+                              <span className="text-lg font-semibold text-[#3caa35]">{fmt(r.saglam)}</span>
+                            </div>
                           </div>
-                          {r.kalan > 0 && (
-                            <p className="mt-1.5 text-xs text-[#f28a19]">
-                              {fmt(r.kalan)} adet uygunsuz yarı mamule gidecek
+                          {r.asiri && (
+                            <p className="mt-1.5 text-xs font-medium text-destructive">
+                              Fire + uygunsuz toplamı {fmt(r.beklenen)} adedi aşamaz
                             </p>
                           )}
                         </div>
                       ))}
+                      <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                        Toplam: <b className="text-[#3caa35]">Sağlam {fmt(toplamlar.saglam)}</b>
+                        {" · "}
+                        <b className="text-[#ee7683]">Fire {fmt(toplamlar.fire)}</b>
+                        {" · "}
+                        <b className="text-[#f28a19]">Uygunsuz {fmt(toplamlar.uygunsuz)}</b>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -348,7 +370,7 @@ export function KontrolDialog({
             <Button
               className="h-12 bg-[#3368b1] px-6 text-white hover:bg-[#3368b1]/90"
               onClick={handleSubmit}
-              disabled={submitting || !item || !qty}
+              disabled={submitting || !item || !qty || sokumHatali}
             >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Kaydet

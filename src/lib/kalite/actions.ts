@@ -287,7 +287,7 @@ export async function kontrolUygun(input: {
 export async function kontrolSokum(input: {
   sku: string;
   qty: number;
-  parts: { part_id: string; saglam: number; fire: number }[];
+  parts: { part_id: string; fire: number; uygunsuz: number }[];
   not?: string | null;
 }): Promise<Res> {
   try {
@@ -298,7 +298,7 @@ export async function kontrolSokum(input: {
     const r = await callRpc(supabase, "kalite_sokum", {
       p_sku: input.sku,
       p_qty: input.qty,
-      p_parts: input.parts.filter((p) => p.saglam > 0 || p.fire > 0),
+      p_parts: input.parts.filter((p) => p.fire > 0 || p.uygunsuz > 0),
       p_operator_id: operatorId,
       p_operator_name: operatorName,
       p_not: input.not ?? null,
