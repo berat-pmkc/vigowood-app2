@@ -419,6 +419,10 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, varsayilanIstas
           {gruplar.map((g) => {
             const benim = g.personel_id === seciliPersonelId;
             const bekleyen = liste.bekleyen[g.personel_id] ?? [];
+            const aktifSatirlar = g.satirlar.filter((s) => s.etkin_durum !== "tamamlandi");
+            const bitenSatirlar = g.satirlar.filter((s) => s.etkin_durum === "tamamlandi");
+            // Tamamlanan satırın açık seansı varsa kapatılabilsin diye mini kartta gösterilir
+            const bitenAcik = bitenSatirlar.filter((s) => (seansMap.get(s.satir_id)?.length ?? 0) > 0);
             return (
               <section
                 key={g.personel_id}
@@ -433,7 +437,7 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, varsayilanIstas
                 >
                   <h2 className="min-w-0 flex-1 truncate text-xl font-bold">{g.ad}</h2>
                   {benim && <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs font-semibold">Sen</span>}
-                  <span className="text-sm opacity-80">{g.satirlar.length} iş</span>
+                  <span className="text-sm opacity-80">{aktifSatirlar.length} iş</span>
                   {bekleyen.length > 0 && (
                     <Button
                       onClick={() => onayla(g.personel_id, bekleyen[0])}
@@ -475,10 +479,11 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, varsayilanIstas
                 )}
 
                 <ul className="mt-3 space-y-3">
-                  {g.satirlar.map((s) => (
+                  {aktifSatirlar.map((s, i) => (
                     <SatirKarti
                       key={s.satir_id}
                       s={s}
+                      no={i + 1}
                       seanslar={seansMap.get(s.satir_id) ?? []}
                       kesimYukleniyor={kesimYukleniyor === s.satir_id}
                       onKesim={() => kesimBitirdi(s)}
@@ -488,7 +493,55 @@ export function TalimatlarimClient({ seciliPersonelId, istasyon, varsayilanIstas
                       onKapat={seansKapatAc}
                     />
                   ))}
+                  {aktifSatirlar.length === 0 && (
+                    <li className="rounded-xl border-2 border-dashed p-4 text-center text-base text-muted-foreground">
+                      Bekleyen iş yok
+                    </li>
+                  )}
                 </ul>
+
+                {bitenAcik.length > 0 && (
+                  <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[#3caa35]/60 p-3">
+                    <p className="text-sm font-bold text-[#2f8a2a]">Tamamlanan iş — açık seans</p>
+                    {bitenAcik.map((s) => (
+                      <div key={s.satir_id} className="space-y-1">
+                        <p className="truncate text-sm font-semibold">
+                          {s.sku ?? s.plaka_id}
+                          <span className="ml-2 font-normal text-muted-foreground">{s.urun_adi ?? ""}</span>
+                        </p>
+                        {(seansMap.get(s.satir_id) ?? []).map((x) => (
+                          <AcikSeansKarti key={x.session_id} x={x} onBeklet={beklet} onKapat={seansKapatAc} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {bitenSatirlar.length > 0 && (
+                  <details className="mt-3 rounded-xl border bg-card px-3 py-2">
+                    <summary className="min-h-10 cursor-pointer text-base font-semibold text-muted-foreground">
+                      Tamamlananlar ({bitenSatirlar.length})
+                    </summary>
+                    <ul className="mt-2 divide-y text-sm">
+                      {bitenSatirlar.map((s) => (
+                        <li key={s.satir_id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2">
+                          <span className="min-w-0 flex-1 truncate font-medium">
+                            {s.sku ?? s.plaka_id}
+                            <span className="ml-2 font-normal text-muted-foreground">{s.urun_adi ?? ""}</span>
+                          </span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {s.uretilen} / {s.istenen_miktar ?? "—"}
+                          </span>
+                          {s.son_seans_at && (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(s.son_seans_at).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </section>
             );
           })}
@@ -629,9 +682,10 @@ function Chip({ aktif, onClick, children }: { aktif: boolean; onClick: () => voi
 }
 
 function SatirKarti({
-  s, seanslar, kesimYukleniyor, onKesim, onMontaj, onPaket, onBeklet, onKapat,
+  s, no, seanslar, kesimYukleniyor, onKesim, onMontaj, onPaket, onBeklet, onKapat,
 }: {
   s: TalimatSatir;
+  no: number;
   seanslar: TabletAcikSeans[];
   kesimYukleniyor: boolean;
   onKesim: () => void;
@@ -650,12 +704,11 @@ function SatirKarti({
       className={cn(
         "rounded-xl border-2 bg-card p-4 shadow-sm",
         s.kirmizi ? "border-[#ee7683] bg-[#ee7683]/10" : "border-border",
-        bitti && !acikVar && "opacity-50",
       )}
     >
       <div className="flex items-start gap-3">
         <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-vw-primary text-xl font-bold text-white">
-          {s.sira}
+          {no}
         </span>
         <div className="min-w-0 flex-1">
           <p className={cn("text-lg font-bold leading-tight", s.kirmizi && "text-[#b3202f]")}>

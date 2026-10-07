@@ -18,6 +18,7 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
 import {
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -84,6 +85,7 @@ import { PasifDialog, PasifKaldirDialog, type PasifHedef, type PasifKaldirHedef 
 import { PersonelEkle } from "./personel-ekle";
 import { SatirRow, type SatirIslemleri } from "./satir-row";
 import { YayinDialog } from "./yayin-dialog";
+import { TamamlananlarDialog } from "./tamamlananlar-dialog";
 import { YayinGecmisi } from "./yayin-gecmisi";
 
 interface Props {
@@ -109,7 +111,7 @@ const PLAN_RENK: Record<string, string> = {
   pasif: "bg-[#eceff1] text-[#546e7a]",
 };
 
-type Toggle = "oncelik1" | "oncelik1Seanssiz" | "degisen" | "onaysiz" | "pasif" | "tamamlanan";
+type Toggle = "oncelik1" | "oncelik1Seanssiz" | "degisen" | "onaysiz" | "pasif";
 
 const TOGGLES: Array<{ key: Toggle; label: string }> = [
   { key: "oncelik1", label: "Sadece 1. sıra" },
@@ -117,7 +119,6 @@ const TOGGLES: Array<{ key: Toggle; label: string }> = [
   { key: "degisen", label: "Değişenler" },
   { key: "onaysiz", label: "Onay bekleyenler" },
   { key: "pasif", label: "Pasifler" },
-  { key: "tamamlanan", label: "Tamamlananlar" },
 ];
 
 function hataMesaji(r: { error: string; code?: string }): string {
@@ -185,9 +186,9 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
       sadeceDegisen: toggles.has("degisen"),
       sadeceOnaylamayan: toggles.has("onaysiz"),
       sadecePasif: toggles.has("pasif"),
-      sadeceTamamlanan: toggles.has("tamamlanan"),
     };
-    let liste = satirFiltrele(satirlar, f);
+    // Tamamlanan satırlar ana listeden çıkar ("Tamamlananlar" görünümünde listelenir)
+    let liste = satirFiltrele(satirlar, f).filter((s) => s.etkin_durum !== "tamamlandi");
     if (personelKumesi) liste = liste.filter((s) => personelKumesi.includes(s.personel_id));
     const q = arama.trim().toLocaleLowerCase("tr");
     if (q) {
@@ -200,6 +201,12 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
 
   const gruplar = useMemo(() => {
     const harita = personeleGoreGrupla(gorunenSatirlar);
+    // Filtre yokken tüm satırları tamamlanmış personel de görünür kalsın (satır eklenebilsin)
+    if (!arama.trim() && !istasyon && toggles.size === 0 && !personelKumesi) {
+      for (const pid of tumGrup.keys()) {
+        if (!harita.has(pid) && (!personelFiltre || personelFiltre === pid)) harita.set(pid, []);
+      }
+    }
     return [...harita.entries()]
       .map(([pid, liste]) => {
         const sira = yerelSira[pid];
@@ -209,10 +216,11 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
           const t = eklenme[x.satir_id] ?? "";
           return !m || (t && t < m) ? t || m : m;
         }, "");
-        return { pid, ad: liste[0]?.personel_adi ?? pid, istasyon: liste[0]?.personel_istasyon ?? null, satirlar: sirali, ilk };
+        const ilkSatir = liste[0] ?? tumGrup.get(pid)?.[0];
+        return { pid, ad: ilkSatir?.personel_adi ?? pid, istasyon: ilkSatir?.personel_istasyon ?? null, satirlar: sirali, ilk };
       })
       .sort((a, b) => b.ilk.localeCompare(a.ilk) || a.ad.localeCompare(b.ad, "tr"));
-  }, [gorunenSatirlar, yerelSira, eklenme]);
+  }, [gorunenSatirlar, yerelSira, eklenme, tumGrup, arama, istasyon, toggles, personelKumesi, personelFiltre]);
 
   const eklenmisPersonel = useMemo(() => new Set(satirlar.map((s) => s.personel_id)), [satirlar]);
   const personelAdlari = useMemo(() => {
@@ -232,6 +240,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
   }, [yayinlar]);
 
   const degisenSayisi = satirlar.filter((s) => s.degisti).length;
+  const tamamlananlar = useMemo(() => satirlar.filter((s) => s.etkin_durum === "tamamlandi"), [satirlar]);
+  const [tamamlananAcik, setTamamlananAcik] = useState(false);
 
   // ── işlemler ──
   const [busy, setBusy] = useState(false);
@@ -292,7 +302,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     const liste = [...secili].filter((id) => tumGrup.has(id)).map((id) => ({
       pid: id,
       ad: personelAdlari.get(id) ?? id,
-      ids: (tumGrup.get(id) ?? []).map((s) => s.satir_id),
+      // Tamamlanan işler toplu silmede korunur (Tamamlananlar listesinde kalır)
+      ids: (tumGrup.get(id) ?? []).filter((s) => s.etkin_durum !== "tamamlandi").map((s) => s.satir_id),
     }));
     return { liste, satirSayisi: liste.reduce((t, x) => t + x.ids.length, 0) };
   }, [secili, tumGrup, personelAdlari]);
@@ -545,6 +556,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                 <Sigma className="mr-1.5 h-4 w-4" /> Toplam Ek Seanslar
               </Link>
             </Button>
+            {plan && (
+              <Button variant="outline" size="sm" onClick={() => setTamamlananAcik(true)}>
+                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Tamamlananlar
+                {tamamlananlar.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-[#3caa35] px-1.5 text-[11px] text-white">{tamamlananlar.length}</span>
+                )}
+              </Button>
+            )}
             <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
               <Link href="/talepler">
                 <ClipboardList className="mr-1.5 h-4 w-4" /> Talepler
@@ -605,7 +624,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                         setTopluSilHedef({
                           baslik: "Tüm liste temizlensin mi?",
                           personelSayisi: eklenmisPersonel.size,
-                          ids: satirlar.map((s) => s.satir_id),
+                          ids: satirlar.filter((s) => s.etkin_durum !== "tamamlandi").map((s) => s.satir_id),
                         })
                       }
                     >
@@ -695,6 +714,15 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                   className="rounded-full border border-[#f28a19]/40 bg-[#fde8cf] px-3 py-1 font-medium text-[#b8650c]"
                 >
                   {degisenSayisi} yayınlanmamış değişiklik
+                </button>
+              )}
+              {tamamlananlar.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTamamlananAcik(true)}
+                  className="rounded-full border border-[#3caa35]/40 bg-[#e3ecd2] px-3 py-1 font-medium text-[#2f8a2a] hover:bg-[#d3e3b8]"
+                >
+                  {tamamlananlar.length} tamamlanan
                 </button>
               )}
               <span className="text-muted-foreground">
@@ -903,7 +931,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                                           baslik: `${g.ad} listeden çıkarılsın mı?`,
                                           personelAdi: g.ad,
                                           personelSayisi: 1,
-                                          ids: tamListe.map((s) => s.satir_id),
+                                          ids: tamListe.filter((s) => s.etkin_durum !== "tamamlandi").map((s) => s.satir_id),
                                         })
                                       }
                                     >
@@ -1005,6 +1033,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
               </div>
             )}
 
+            <TamamlananlarDialog
+              open={tamamlananAcik}
+              onOpenChange={setTamamlananAcik}
+              satirlar={tamamlananlar}
+              editable={editable}
+              kaydet={kaydet}
+            />
+
             <YayinGecmisi yayinlar={yayinlar} editable={editable} onChanged={yenile} />
           </>
         )}
@@ -1071,7 +1107,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                     ))}
                   </span>
                 )}
-                Seanslar, üretim adetleri, stoklar, talepler ve personel kayıtları SİLİNMEZ. Talebe bağlı satırlar silinince ilgili talepler tekrar &apos;Açık&apos; olur.
+                Tamamlanan işler (Tamamlananlar listesi), seanslar, üretim adetleri, stoklar, talepler ve personel kayıtları SİLİNMEZ. Talebe bağlı satırlar silinince ilgili talepler tekrar &apos;Açık&apos; olur.
                 Plan yayındaysa değişiklik bir sonraki Yayınla ile tabletlere gider.
                 {topluIlerleme && (
                   <span className="mt-2 block font-medium text-vw-dark">
