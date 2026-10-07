@@ -18,6 +18,8 @@ import type {
 async function requireUser() {
   const user = await getCurrentUser();
   if (!user) throw new Error("Yetkisiz erişim");
+  // Ops Center: Üretim/Hat (tablet) erişemez
+  if (user.role === "Üretim" || user.role === "Hat") throw new Error("Yetkisiz erişim");
   return user;
 }
 

@@ -32,7 +32,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole, ModuleKey } from "@/lib/constants";
-import { ALWAYS_VISIBLE_MODULES, ADMIN_EQUIVALENT_ROLES } from "@/lib/constants";
+import { ALWAYS_VISIBLE_MODULES, ADMIN_EQUIVALENT_ROLES, OFFICE_ONLY_ROLES } from "@/lib/constants";
 import { TALEP_CREATOR_ROLES } from "@/lib/talimat/constants";
 
 export type NavItem = {
@@ -61,6 +61,9 @@ const MANAGEMENT_ROLES: UserRole[] = [
 
 const ALL_INTERNAL: UserRole[] = [...MANAGEMENT_ROLES, "Hat"];
 
+/** İade Giriş, Stok Sayımı, Kritik Stok: Hat/Üretim görmez */
+const STOK_OFIS_ROLES: UserRole[] = ALL_INTERNAL.filter((r) => r !== "Hat");
+
 const SEVK_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Endüstri Mühendisi", "Sevkiyat Sorumlusu", "Dış Ticaret Müdürü"];
 
 const FINANCE_ROLES: UserRole[] = [...ADMIN_EQUIVALENT_ROLES, "Muhasebe"];
@@ -86,9 +89,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Ops Center",
     items: [
-      { title: "Görev Panosu", href: "/ops/board", icon: Kanban, roles: "all" },
+      { title: "Görev Panosu", href: "/ops/board", icon: Kanban, roles: OFFICE_ONLY_ROLES },
       { title: "Talepler", href: "/talepler", icon: ClipboardCheck, roles: TALEP_CREATOR_ROLES },
-      { title: "Raporlar", href: "/ops/raporlar", icon: FileOutput, roles: "all" },
+      { title: "Raporlar", href: "/ops/raporlar", icon: FileOutput, roles: OFFICE_ONLY_ROLES },
     ],
   },
   {
@@ -110,9 +113,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Ürün Stok", href: "/stok/mamul", icon: Warehouse, roles: ALL_INTERNAL },
       { title: "Yarı Mamül", href: "/stok/yari-mamul", icon: Layers, roles: ALL_INTERNAL },
       { title: "Hazır Eleman", href: "/stok/hazir-eleman", icon: Component, roles: ALL_INTERNAL },
-      { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: ALL_INTERNAL },
-      { title: "Stok Sayımı", href: "/stok/sayim", icon: ClipboardList, roles: ALL_INTERNAL },
-      { title: "Kritik Stok", href: "/stok/kritik-stok", icon: AlertTriangle, roles: ALL_INTERNAL },
+      { title: "İade Giriş", href: "/stok/iade", icon: RotateCcw, roles: STOK_OFIS_ROLES },
+      { title: "Stok Sayımı", href: "/stok/sayim", icon: ClipboardList, roles: STOK_OFIS_ROLES },
+      { title: "Kritik Stok", href: "/stok/kritik-stok", icon: AlertTriangle, roles: STOK_OFIS_ROLES },
     ],
   },
   {
@@ -146,8 +149,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Personel",
     items: [
-      { title: "Personel Listesi", href: "/personel/liste", icon: ClipboardList, roles: [...ADMIN_ENG_ROLES, "Dış Ticaret Müdürü", "Hat"] },
-      { title: "Yoklama", href: "/personel", icon: Users, roles: [...ADMIN_ENG_ROLES, "Dış Ticaret Müdürü", "Hat"] },
+      { title: "Personel Listesi", href: "/personel/liste", icon: ClipboardList, roles: [...ADMIN_ENG_ROLES, "Dış Ticaret Müdürü"] },
+      { title: "Yoklama", href: "/personel", icon: Users, roles: [...ADMIN_ENG_ROLES, "Dış Ticaret Müdürü"] },
     ],
   },
   {
@@ -160,7 +163,7 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 /** Nav group label → module key mapping */
-const GROUP_LABEL_TO_MODULE: Record<string, ModuleKey> = {
+export const GROUP_LABEL_TO_MODULE: Record<string, ModuleKey> = {
   "Ana Sayfa": "ana_sayfa",
   "Ops Center": "ops_center",
   "Üretim": "uretim",

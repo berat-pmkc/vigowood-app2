@@ -62,6 +62,18 @@ export const USER_ROLES = [
 
 export type UserRole = (typeof USER_ROLES)[number];
 
+/** İstasyon/tablet rolleri (operatör + hat sorumlusu) — ofis/yönetim dışı */
+export const STATION_ROLES: UserRole[] = ["Hat", "Üretim"];
+
+/** Ofis/yönetim rolleri: Üretim ve Hat dışındaki tüm roller */
+export const OFFICE_ONLY_ROLES: UserRole[] = USER_ROLES.filter(
+  (r) => r !== "Üretim" && r !== "Hat",
+);
+
+export function isStationRole(role: string | null | undefined): boolean {
+  return role === "Üretim" || role === "Hat";
+}
+
 // Production flow stages
 export const PRODUCTION_STAGES = [
   "Kesim",
@@ -732,12 +744,11 @@ export const ATTENDANCE_DEPARTMENT_COLORS: Record<AttendanceDepartment, { bg: st
   "Paketleme Hatti": { bg: "bg-orange-100", text: "text-orange-800" },
 };
 
-/** Personel erişim rolleri (Yönetici + Endüstri Mühendisi + Müdürler + Hat) */
+/** Personel erişim rolleri (Yönetici + Endüstri Mühendisi + Dış Ticaret Müdürü); Hat/Üretim erişemez */
 export const PERSONEL_ACCESS_ROLES: UserRole[] = [
   ...ADMIN_EQUIVALENT_ROLES,
   "Endüstri Mühendisi",
   "Dış Ticaret Müdürü",
-  "Hat",
 ];
 
 // Kullanıcı istasyonları (matches station enum in DB)
@@ -1264,8 +1275,8 @@ export const ROLE_DEFAULT_MODULES: Record<UserRole, ModuleKey[]> = {
   "Endüstri Mühendisi": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "analiz", "personel", "yonetim"],
   "E-Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "muhasebe", "analiz", "personel", "yonetim"],
   "Dış Ticaret Müdürü": ["ana_sayfa", "ops_center", "uretim", "stok", "sevkiyat", "analiz", "personel", "yonetim"],
-  "Üretim": ["ana_sayfa", "ops_center", "uretim", "yonetim"],
-  "Hat": ["ana_sayfa", "ops_center", "uretim", "stok", "personel", "yonetim"],
+  "Üretim": ["ana_sayfa", "uretim", "yonetim"],
+  "Hat": ["ana_sayfa", "uretim", "stok", "yonetim"],
   "Muhasebe": ["ana_sayfa", "ops_center", "stok", "muhasebe", "analiz", "yonetim"],
   "Sevkiyat Sorumlusu": ["ana_sayfa", "ops_center", "stok", "sevkiyat", "analiz", "yonetim"],
   "Pazaryeri Sorumlusu": ["ana_sayfa", "ops_center", "stok", "analiz", "yonetim"],

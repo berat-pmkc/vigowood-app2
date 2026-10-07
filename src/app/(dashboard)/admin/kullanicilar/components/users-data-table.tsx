@@ -7,7 +7,8 @@ import {
   getCoreRowModel,
   type SortingState,
 } from "@tanstack/react-table";
-import { Plus } from "lucide-react";
+import { Plus, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/shared/data-table";
 import { DataTablePagination } from "@/components/shared/data-table-pagination";
@@ -138,6 +139,12 @@ export function UsersDataTable({
             onActiveChange={(v) => navigate({ active: v || undefined, page: "0" })}
           />
         </div>
+        <Button asChild variant="outline" size="sm" className="shrink-0">
+          <Link href="/admin/kullanicilar/yetki-tablosu">
+            <ShieldCheck className="mr-1 h-4 w-4" />
+            Yetki Tablosu
+          </Link>
+        </Button>
         <Button onClick={handleCreate} size="sm" className="shrink-0">
           <Plus className="mr-1 h-4 w-4" />
           Yeni Kullanıcı

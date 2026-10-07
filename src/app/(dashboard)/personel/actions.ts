@@ -18,6 +18,7 @@ async function requirePersonelAccess() {
 export async function getEmployeeList(): Promise<
   { user_id: string; full_name: string; station: string | null }[]
 > {
+  await requirePersonelAccess();
   const supabase = await createClient();
 
   const { data, error } = await supabase
