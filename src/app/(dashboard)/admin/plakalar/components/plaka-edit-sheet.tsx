@@ -33,6 +33,8 @@ interface PlakaEditSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
+  /** Yeni plaka açılırken önceden seçili ürün (SKU) */
+  defaultSku?: string | null;
 }
 
 export function PlakaEditSheet({
@@ -41,6 +43,7 @@ export function PlakaEditSheet({
   open,
   onOpenChange,
   onSaved,
+  defaultSku,
 }: PlakaEditSheetProps) {
   const [isPending, startTransition] = useTransition();
   const isCreate = mode === "create";
@@ -88,7 +91,7 @@ export function PlakaEditSheet({
         tipi: null,
         renk: null,
         kesim_sureleri: {},
-        sku: null,
+        sku: defaultSku ? [defaultSku] : null,
       });
     } else if (plaka) {
       const ks = (plaka.kesim_sureleri ?? {}) as Record<string, number | null>;
@@ -106,7 +109,7 @@ export function PlakaEditSheet({
         sku: plaka.sku ?? null,
       });
     }
-  }, [plaka, isCreate, reset, open]);
+  }, [plaka, isCreate, reset, open, defaultSku]);
 
   const onSubmit = (data: PlakaCreateData) => {
     startTransition(async () => {

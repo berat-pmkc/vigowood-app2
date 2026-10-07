@@ -6,6 +6,7 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
   distinctOptions,
@@ -17,11 +18,12 @@ import {
 import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { fmtNum, round } from "../_shared/utils";
-import { getUretim } from "../_shared/queries";
+import { getUretim, type UretimData } from "../_shared/queries";
 import {
   getActiveSkus,
   getKaliteRows,
   kaynakLabel,
+  periodQuery,
   safe,
   TIP_LABELS,
   trunc,
@@ -94,10 +96,17 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const g = resolveGranularity(sp.g, from, to);
 
-  const [kal, uretim, aktif] = await Promise.all([
-    safe(getKaliteRows(from, to, "FIRE"), { available: false, rows: [] as KaliteRow[] }),
-    safe(getUretim(from, to), { total: 0, byDay: {}, bySku: {} }),
+  const hasPrev = !!period.prevFrom && !!period.prevTo;
+  const filtersOn = hasActiveFilters(parseColumnFilters(sp, FIRE_COLS));
+  const needPrev = metric === CHIPS[0].key && hasPrev && !filtersOn;
+  const EMPTY_KAL = { available: false, rows: [] as KaliteRow[] };
+  const EMPTY_URETIM: UretimData = { total: 0, byDay: {}, bySku: {} };
+  const [kal, uretim, aktif, kalPrev, uretimPrev] = await Promise.all([
+    safe(getKaliteRows(from, to, "FIRE"), EMPTY_KAL),
+    safe(getUretim(from, to), EMPTY_URETIM),
     safe(getActiveSkus(), new Map<string, string>()),
+    needPrev ? safe(getKaliteRows(period.prevFrom, period.prevTo, "FIRE"), EMPTY_KAL) : Promise.resolve(null),
+    needPrev ? safe(getUretim(period.prevFrom, period.prevTo), EMPTY_URETIM) : Promise.resolve(null),
   ]);
 
   const allFires = kal.rows;
@@ -196,6 +205,23 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
   }
   const { title: chartTitle, ...chartProps } = chart;
 
+  const sumPrev = (t: string) => kalPrev?.rows.filter((r) => r.item_tipi === t).reduce((a, r) => a + r.qty, 0) ?? null;
+  const prevUrun = sumPrev("URUN");
+  const prevRate =
+    prevUrun !== null && uretimPrev && uretimPrev.total > 0 ? round((prevUrun / uretimPrev.total) * 100, 2) : null;
+  const summaryItems: SummaryItem[] = [
+    { key: "urun", label: "Ürün Firesi", short: "Ürün", unit: "adet", lowerBetter: true, cur: urunFire, prev: prevUrun },
+    { key: "ym", label: "Yarı Mamul Firesi", short: "Y.Mamul", unit: "adet", lowerBetter: true, cur: sumTip("YARI_MAMUL"), prev: sumPrev("YARI_MAMUL") },
+    { key: "plaka", label: "Plaka Firesi", short: "Plaka", unit: "adet", lowerBetter: true, cur: sumTip("PLAKA"), prev: sumPrev("PLAKA") },
+    { key: "oran", label: "Fire Oranı", short: "Oran", unit: "%", lowerBetter: true, cur: rate, prev: prevRate },
+  ];
+  const chartNode =
+    metric === CHIPS[0].key ? (
+      <SummaryChart title={`Fire Özeti — ${period.label}`} items={summaryItems} hasPrev={needPrev} query={periodQuery(sp)} />
+    ) : (
+      <AnalizChart {...chartProps} title={chartTitle} />
+    );
+
   // liste
   const tipFilter = TIP_OF[metric];
   const byDate = (a: KaliteRow, b: KaliteRow) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0);
@@ -267,7 +293,7 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
       activeMetric={metric}
       chart={
         <>
-          <AnalizChart {...chartProps} title={chartTitle} />
+          {chartNode}
           {!kal.available && <p className="text-xs text-muted-foreground">Kalite verisi henüz yok</p>}
         </>
       }

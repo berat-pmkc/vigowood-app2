@@ -6,6 +6,7 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
   distinctOptions,
@@ -17,6 +18,7 @@ import {
 import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
+import { periodQuery } from "../_shared/queries-d1";
 import {
   addTo,
   aggregateKalite,
@@ -438,6 +440,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const { title, ...chartProps } = buildChart(focus.chartMetric, period, sp, cur);
 
+  const mk = (k: string) => !focus.showCard(k);
+  const summaryItems: SummaryItem[] = [
+    { key: "adet", label: "İş Adımı Adedi", short: "Adet", unit: "adet", cur: cur.qty, prev: prev?.qty ?? null, muted: mk("adet") },
+    { key: "calisan", label: "Ort. Çalışan", short: "Çalışan", unit: "kişi", cur: cur.avgWorkers, prev: prev?.avgWorkers ?? null, muted: mk("calisan") },
+    { key: "birim", label: "Birim Süre", short: "B.Süre", unit: "dk", lowerBetter: true, cur: cur.birim, prev: prev?.birim ?? null, muted: mk("birim") },
+    { key: "uygunsuz", label: "Uygunsuz", short: "Uygunsuz", unit: "adet", lowerBetter: true, cur: cur.uygunsuz, prev: prev?.uygunsuz ?? null, muted: mk("uygunsuz") },
+    { key: "kontrol", label: "Kontrol Edilen", short: "Kontrol", unit: "adet", cur: cur.kontrol, prev: prev?.kontrol ?? null, muted: mk("kontrol") },
+    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: cur.fire, prev: prev?.fire ?? null, muted: mk("fire") },
+  ];
+  const chartNode =
+    focus.chartMetric === CHIPS[0].key ? (
+      <SummaryChart title={`Montaj Özeti — ${period.label}`} items={summaryItems} hasPrev={!!prev} query={periodQuery(sp)} />
+    ) : (
+      <AnalizChart {...chartProps} title={title} />
+    );
+
   const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
@@ -516,7 +534,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
-      chart={<AnalizChart {...chartProps} title={title} />}
+      chart={chartNode}
       cards={cards}
       list={list}
     />

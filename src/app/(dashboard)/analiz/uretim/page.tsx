@@ -6,6 +6,8 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
+import { getYanMalzeme, type YanMalzemeData } from "../_shared/queries-d3";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
   distinctOptions,
@@ -28,6 +30,7 @@ import {
   isKontrol,
   isUygunsuzGiris,
   periodQs,
+  periodQuery,
   safe,
   type KaliteRow,
   type ProdRows,
@@ -85,6 +88,7 @@ const FOCUS: FocusMap = {
   },
 };
 const EMPTY_PROD: ProdRows = { pack: [], montaj: [] };
+const EMPTY_YAN: YanMalzemeData = { parts: new Map(), rows: [] };
 const EMPTY_STD: StandardTimes = { montaj: new Map(), paketleme: new Map() };
 
 function sum(rows: KaliteRow[], pred: (r: KaliteRow) => boolean, abs = false) {
@@ -122,8 +126,13 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const g = resolveGranularity(sp.g, from, to);
   const qs = periodQs(sp);
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  const hasPrev = !!period.prevFrom && !!period.prevTo;
+  // Önceki dönem kalite/yan malzeme değerleri yalnızca Tümü özet grafiği için (filtre yokken) gerekli
+  const needPrev = metric === CHIPS[0].key && !filtActive && hasPrev;
 
-  const [prodAll, prodPrev, kalAll, stdT, cikis, stok, names] = await Promise.all([
+  const [prodAll, prodPrev, kalAll, stdT, cikis, stok, names, yan, kalPrev, yanPrev] = await Promise.all([
     safe(getProdRows(from, to), EMPTY_PROD),
     period.prevFrom && period.prevTo
       ? safe<ProdRows | null>(getProdRows(period.prevFrom, period.prevTo), EMPTY_PROD)
@@ -133,6 +142,9 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
     safe(getStokCikisRows(from, to), [] as { day: string; sku: string; qty: number }[]),
     safe(getGuncelStok(), new Map<string, number>()),
     safe(getProductNames(), new Map<string, string>()),
+    safe(getYanMalzeme(from, to), EMPTY_YAN),
+    needPrev ? safe(getKaliteRows(period.prevFrom, period.prevTo), { available: false, rows: [] as KaliteRow[] }) : Promise.resolve(null),
+    needPrev ? safe(getYanMalzeme(period.prevFrom, period.prevTo), EMPTY_YAN) : Promise.resolve(null),
   ]);
 
   // ── Liste (kova × sku)
@@ -206,8 +218,6 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   });
 
   // ── Kolon filtreleri: kart + grafik + liste eşleşen (kova × ürün) kayıtlarından türer
-  const colFilters = parseColumnFilters(sp, COLS);
-  const filtActive = hasActiveFilters(colFilters);
   const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const matched = pickByFilters(accList, toRow, colFilters);
   const options = distinctOptions(accList.map(toRow), COLS);
@@ -233,6 +243,10 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   const uygunsuz = sum(kal.rows, isUygunsuzGiris);
   const kontrol = sum(kal.rows, isKontrol, true);
   const fire = sum(kal.rows, isFireUrun);
+
+  const yanTotal = yan.rows.reduce((a, r) => a + r.qty, 0);
+  const yanKinds = new Set(yan.rows.map((r) => r.partId)).size;
+  const yanPrevTotal = yanPrev ? yanPrev.rows.reduce((a, r) => a + r.qty, 0) : null;
 
   // ── Grafik
   const packByDay = dayMap(prod.pack, (r) => r.day, (r) => r.qty);
@@ -313,6 +327,28 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
   }
   const { title: chartTitle, ...chartProps } = chart;
 
+  const mutedKey = (k: string) => !focus.showCard(k);
+  const summaryItems: SummaryItem[] = [
+    { key: "miktar", label: "Üretim Miktarı", short: "Üretim", unit: "adet", cur: T.packed, prev: Tp?.packed ?? null, muted: mutedKey("miktar") },
+    { key: "birim", label: "Birim Süre", short: "B.Süre", unit: "dk", lowerBetter: true, cur: T.unit === null ? null : round(T.unit, 2), prev: Tp?.unit ?? null, muted: mutedKey("birim") },
+    { key: "adam", label: "Adam Saat", short: "Adam sa", unit: "sa", cur: round(T.man / 60, 1), prev: Tp ? round(Tp.man / 60, 1) : null, muted: mutedKey("adam") },
+    { key: "uygunsuz", label: "Uygunsuz", short: "Uygunsuz", unit: "adet", lowerBetter: true, cur: uygunsuz, prev: kalPrev && !filtActive ? sum(kalPrev.rows, isUygunsuzGiris) : null, muted: mutedKey("uygunsuz"), href: "/analiz/uretim/uygunsuz" },
+    { key: "kontrol", label: "Kontrol Edilen", short: "Kontrol", unit: "adet", cur: kontrol, prev: kalPrev && !filtActive ? sum(kalPrev.rows, isKontrol, true) : null, muted: mutedKey("kontrol"), href: "/analiz/uretim/kontrol" },
+    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: fire, prev: kalPrev && !filtActive ? sum(kalPrev.rows, isFireUrun) : null, muted: mutedKey("fire"), href: "/analiz/fire" },
+    { key: "yan", label: "Yan Malzeme", short: "Yan M.", unit: "adet", cur: yanTotal, prev: yanPrevTotal, muted: mutedKey("yan") || filtActive, href: "/analiz/uretim/yan-malzeme" },
+  ];
+  const chartNode =
+    focus.chartMetric === CHIPS[0].key ? (
+      <SummaryChart
+        title={`Üretim Özeti — ${period.label}`}
+        items={summaryItems}
+        hasPrev={hasPrev && !filtActive}
+        query={periodQuery(sp)}
+      />
+    ) : (
+      <AnalizChart {...chartProps} title={chartTitle} />
+    );
+
   const dk = (v: number | null) => (v === null ? "—" : `${v.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} dk`);
 
   // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
@@ -362,6 +398,14 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
         value={fmtNum(fire)}
         subtitle="Ayrıntı için dokunun"
       />
+      <StatCard
+        title="Yan Malzeme Kullanımı"
+        empty={mut("yan", true)}
+        href={`/analiz/uretim/yan-malzeme${qs}`}
+        value={fmtNum(yanTotal)}
+        subtitle={`${fmtNum(yanKinds)} çeşit · reçeteden teorik`}
+        delta={yanPrevTotal !== null ? deltaPct(yanTotal, yanPrevTotal) : null}
+      />
     </>
   );
 
@@ -376,7 +420,7 @@ export default async function UretimPage({ searchParams }: { searchParams: Promi
       activeMetric={metric}
       chart={
         <>
-          <AnalizChart {...chartProps} title={chartTitle} />
+          {chartNode}
           {!kal.available && <p className="text-xs text-muted-foreground">Kalite verisi henüz yok</p>}
         </>
       }

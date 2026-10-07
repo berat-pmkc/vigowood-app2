@@ -404,7 +404,7 @@ export async function getKalite(from: string | null, to: string | null): Promise
     const s = await sb();
     const [all, hazir] = await Promise.all([
       fetchAll<Record<string, any>>((lo, hi) => {
-        let q = s.from("kalite_hareketleri").select("*").eq("stok_turu", "FIRE");
+        let q = s.from("kalite_hareketleri_aktif").select("*").eq("stok_turu", "FIRE");
         if (from) q = q.gte("tarih", from);
         if (to) q = q.lte("tarih", to);
         return q.range(lo, hi);

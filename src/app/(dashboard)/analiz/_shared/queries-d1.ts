@@ -43,7 +43,7 @@ export async function getKaliteRows(
     const [all, hazir] = await Promise.all([
       fetchAll<any>((lo, hi) => {
         let q = s
-          .from("kalite_hareketleri")
+          .from("kalite_hareketleri_aktif")
           .select(
             "tarih, item_tipi, item_id, item_adi, stok_turu, qty, islem, kaynak, operator_name, kargo_firmasi, musteri",
           )
@@ -82,7 +82,7 @@ export async function getUygunsuzBakiye(): Promise<number> {
     const s = await sb();
     const data = await fetchAll<{ qty: number | null }>((lo, hi) =>
       s
-        .from("kalite_hareketleri")
+        .from("kalite_hareketleri_aktif")
         .select("qty")
         .eq("stok_turu", "UYGUNSUZ")
         .eq("item_tipi", "URUN")
@@ -272,3 +272,8 @@ export function periodQs(sp: SPx): string {
 }
 
 export const trunc = (s: string, n = 26) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/** Özet grafiği bağlantılarına eklenecek dönem sorgusu ("period=..&from=..", başında ? yok) */
+export function periodQuery(sp: SPx): string {
+  return periodQs(sp).replace(/^\?/, "");
+}

@@ -5,6 +5,7 @@ import { resolvePeriod } from "@/lib/periods";
 import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { StatCard } from "../_shared/stat-card";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
@@ -20,6 +21,7 @@ import { fmtNum, round } from "../_shared/utils";
 import { getBirimSure, getProductNames, type BirimSureData } from "../_shared/queries";
 import { getStandardTimes, type StandardTimes } from "../_shared/performance";
 import { getPaketlemeBySku, safe } from "../_shared/queries-d2";
+import { periodQuery } from "../_shared/queries-d1";
 
 export const metadata: Metadata = { title: "Çalışma Birim Süresi | Analiz" };
 export const revalidate = 30;
@@ -67,11 +69,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const g = resolveGranularity(sp.g, from, to);
 
-  const [birim, std, pack, names] = await Promise.all([
+  const hasPrev = !!period.prevFrom && !!period.prevTo;
+  const needPrev = hasPrev && metric === CHIPS[0].key && !hasActiveFilters(parseColumnFilters(sp, COLS));
+  const [birim, std, pack, names, birimPrev] = await Promise.all([
     safe(getBirimSure(from, to), EMPTY_BIRIM),
     safe(getStandardTimes(), EMPTY_STD),
     safe(getPaketlemeBySku(from, to), [] as { sku: string; qty: number; avgDk: number }[]),
     safe(getProductNames(), new Map<string, string>()),
+    needPrev ? safe(getBirimSure(period.prevFrom, period.prevTo), EMPTY_BIRIM) : Promise.resolve(null),
   ]);
 
   // Adım ve ürün satırları (standart + fark)
@@ -133,6 +138,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   // Kartlar: en yavaş / en hızlı adım (kendi standardına göre fark %)
   const comparable = stepsF.filter((r) => r.fark !== null && r.qty >= 5);
   const pool = comparable.length ? comparable : stepsF.filter((r) => r.fark !== null);
+  const prevStepRows = birimPrev
+    ? birimPrev.byStep.map((s) => ({ avg: s.avgDk, qty: s.qty, fark: farkPct(s.avgDk, std.montaj.get(s.stepId)) }))
+    : null;
+  const prevPool = prevStepRows
+    ? (() => {
+        const c = prevStepRows.filter((r) => r.fark !== null && r.qty >= 5);
+        return c.length ? c : prevStepRows.filter((r) => r.fark !== null);
+      })()
+    : null;
+  const prevSlowest = prevPool ? [...prevPool].sort((a, b) => (b.fark ?? 0) - (a.fark ?? 0))[0] : undefined;
+  const prevFastest = prevPool ? [...prevPool].sort((a, b) => (a.fark ?? 0) - (b.fark ?? 0))[0] : undefined;
   const slowest = [...pool].sort((a, b) => (b.fark ?? 0) - (a.fark ?? 0))[0];
   const fastest = [...pool].sort((a, b) => (a.fark ?? 0) - (b.fark ?? 0))[0];
   const stepCard = (r: typeof slowest | undefined) =>
@@ -153,7 +169,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   // Grafik
   let chart: AnalizChartProps & { title: string };
-  if (filtActive && (metric === "tumu" || metric === "montaj" || metric === "paketleme")) {
+  if (filtActive && (metric === "montaj" || metric === "paketleme")) {
     // Gün bazlı seri kalem kırılımı içermez; filtre altında eşleşen kalemlerin birim süresi gösterilir
     const isP = metric === "paketleme";
     chart = {
@@ -226,6 +242,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   }
   const { title, ...chartProps } = chart;
 
+  const mk = (k: string) => !focus.showCard(k);
+  const summaryItems: SummaryItem[] = [
+    { key: "montaj", label: "Montaj", short: "Montaj", unit: "dk", lowerBetter: true, cur: montajAvg, prev: birimPrev?.montajAvg ?? null, muted: mk("montaj") },
+    { key: "paketleme", label: "Paketleme", short: "Paketl.", unit: "dk", lowerBetter: true, cur: paketlemeAvg, prev: birimPrev?.paketlemeAvg ?? null, muted: mk("paketleme") },
+    { key: "yavas", label: "En Yavaş Adım", short: "Yavaş", unit: "dk", lowerBetter: true, cur: listIsUrun ? null : (slowest?.avg ?? null), prev: prevSlowest?.avg ?? null, muted: mk("yavas") || listIsUrun },
+    { key: "hizli", label: "En Hızlı Adım", short: "Hızlı", unit: "dk", lowerBetter: true, cur: listIsUrun ? null : (fastest?.avg ?? null), prev: prevFastest?.avg ?? null, muted: mk("hizli") || listIsUrun },
+  ];
+  const chartNode =
+    focus.chartMetric === CHIPS[0].key ? (
+      <SummaryChart title={`Birim Süre Özeti — ${period.label}`} items={summaryItems} hasPrev={!!birimPrev} query={periodQuery(sp)} />
+    ) : (
+      <AnalizChart {...chartProps} title={title} />
+    );
+
   const listRows: CompactRow[] = matched.map(toRow);
 
   // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
@@ -278,7 +308,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       chips={CHIPS}
       focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       activeMetric={metric}
-      chart={<AnalizChart {...chartProps} title={title} />}
+      chart={chartNode}
       cards={cards}
       list={list}
       cardsClassName="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"

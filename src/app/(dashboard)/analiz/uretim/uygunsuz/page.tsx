@@ -6,6 +6,7 @@ import { AnalizLayout } from "../../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../../_shared/analiz-chart";
 import type { MetricChip } from "../../_shared/metric-chips";
 import { StatCard } from "../../_shared/stat-card";
+import { SummaryChart, type SummaryItem } from "../../_shared/summary-chart";
 import { CompactList, type CompactColumn, type CompactRow } from "../../_shared/compact-list";
 import {
   distinctOptions,
@@ -21,6 +22,7 @@ import {
   getKaliteRows,
   isUygunsuzGirisAny,
   kaynakLabel,
+  periodQuery,
   safe,
   TIP_LABELS,
   trunc,
@@ -86,6 +88,18 @@ function groupSum(rows: KaliteRow[], key: (r: KaliteRow) => string) {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
+function cardValues(rows: KaliteRow[]) {
+  const sumBy = (pred: (r: KaliteRow) => boolean) => rows.filter(pred).reduce((a, r) => a + r.qty, 0);
+  return {
+    total: sumBy((r) => r.item_tipi === "URUN"),
+    totalYm: sumBy((r) => r.item_tipi === "YARI_MAMUL"),
+    top: groupSum(rows, (r) => r.item_id)[0]?.[1] ?? 0,
+    iade: sumBy((r) => r.kaynak === "iade"),
+    uretim: sumBy((r) => URETIM_KAYNAK.includes(r.kaynak ?? "")),
+    kargo: groupSum(rows.filter((r) => r.kargo_firmasi), (r) => r.kargo_firmasi as string)[0]?.[1] ?? 0,
+  };
+}
+
 export default async function UygunsuzPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -98,12 +112,18 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const g = resolveGranularity(sp.g, from, to);
 
-  const kal = await safe(getKaliteRows(from, to, "UYGUNSUZ"), { available: false, rows: [] as KaliteRow[] });
+  const colFilters = parseColumnFilters(sp, COLS);
+  const active = hasActiveFilters(colFilters);
+  const hasPrev = !!period.prevFrom && !!period.prevTo;
+  const needPrev = metric === CHIPS[0].key && !active && hasPrev;
+  const EMPTY_KAL = { available: false, rows: [] as KaliteRow[] };
+  const [kal, kalPrev] = await Promise.all([
+    safe(getKaliteRows(from, to, "UYGUNSUZ"), EMPTY_KAL),
+    needPrev ? safe(getKaliteRows(period.prevFrom, period.prevTo, "UYGUNSUZ"), EMPTY_KAL) : Promise.resolve(null),
+  ]);
   const allUnfiltered = kal.rows.filter(isUygunsuzGirisAny);
 
   // kolon filtreleri: kart + grafik + liste hepsi filtrelenmiş kayıtlardan türer
-  const colFilters = parseColumnFilters(sp, COLS);
-  const active = hasActiveFilters(colFilters);
   const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const all = pickByFilters(allUnfiltered, toRow, colFilters);
   const options = distinctOptions(allUnfiltered.map(toRow), COLS);
@@ -167,6 +187,28 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
   }
   const { title: chartTitle, ...chartProps } = chart;
 
+  const pv = kalPrev ? cardValues(kalPrev.rows.filter(isUygunsuzGirisAny)) : null;
+  const mk = (k: string) => !focus.showCard(k);
+  const summaryItems: SummaryItem[] = [
+    { key: "total", label: "Uygunsuz Ürün", short: "Ürün", unit: "adet", lowerBetter: true, cur: total, prev: pv?.total ?? null, muted: mk("total") },
+    { key: "ym", label: "Uygunsuz Yarı Mamul", short: "Y.Mamul", unit: "adet", lowerBetter: true, cur: totalYm, prev: pv?.totalYm ?? null, muted: mk("ym") },
+    { key: "top", label: "En Çok Gelen Ürün", short: "En çok", unit: "adet", lowerBetter: true, cur: topProduct?.[1] ?? 0, prev: pv?.top ?? null, muted: mk("top") },
+    { key: "iade", label: "İade Kaynaklı", short: "İade", unit: "adet", lowerBetter: true, cur: iade, prev: pv?.iade ?? null, muted: mk("iade") },
+    { key: "uretim", label: "Üretim Kaynaklı", short: "Üretim", unit: "adet", lowerBetter: true, cur: uretim, prev: pv?.uretim ?? null, muted: mk("uretim") },
+    { key: "kargo", label: "En Çok Kargo", short: "Kargo", unit: "adet", lowerBetter: true, cur: kargoTop?.[1] ?? 0, prev: pv?.kargo ?? null, muted: mk("kargo") },
+  ];
+  const chartNode =
+    focus.chartMetric === CHIPS[0].key ? (
+      <SummaryChart
+        title={`Uygunsuz Özeti — ${period.label}`}
+        items={summaryItems}
+        hasPrev={needPrev}
+        query={periodQuery(sp)}
+      />
+    ) : (
+      <AnalizChart {...chartProps} title={chartTitle} />
+    );
+
   const rows: CompactRow[] = [...filtered]
     .sort((a, b) => (a.tarih < b.tarih ? 1 : a.tarih > b.tarih ? -1 : 0))
     .map(toRow);
@@ -210,7 +252,7 @@ export default async function UygunsuzPage({ searchParams }: { searchParams: Pro
       activeMetric={metric}
       chart={
         <>
-          <AnalizChart {...chartProps} title={chartTitle} />
+          {chartNode}
           {!kal.available && <p className="text-xs text-muted-foreground">Kalite verisi henüz yok</p>}
         </>
       }

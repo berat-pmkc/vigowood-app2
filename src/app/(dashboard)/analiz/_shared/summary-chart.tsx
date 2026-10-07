@@ -3,14 +3,14 @@
 import dynamic from "next/dynamic";
 import { ChartSkeleton } from "@/components/shared/chart-skeleton";
 
-export type SummaryUnit = "adet" | "dk" | "%" | "plaka";
+export type SummaryUnit = "adet" | "dk" | "%" | "plaka" | "sa" | "kişi" | "çeşit";
 
 export interface SummaryItem {
   key: string;
   label: string;
   /** Mobil kısa etiket */
   short: string;
-  href: string;
+  href?: string;
   unit: SummaryUnit;
   /** Düşük olan daha iyi (Birim Süre, Fire) */
   lowerBetter?: boolean;

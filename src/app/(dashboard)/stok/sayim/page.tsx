@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { YeniSayimDialog } from "./components/yeni-sayim-dialog";
-import { ClipboardList, TriangleAlert } from "lucide-react";
+import { ClipboardList, PencilLine, TriangleAlert } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,15 @@ export default async function SayimListePage() {
             Fiziksel sayımla bakiyeleri gerçek miktara sabitleyin
           </p>
         </div>
-        <YeniSayimDialog />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/stok/sayim/duzenleme">
+              <PencilLine className="mr-2 size-4" />
+              Stok Düzenleme
+            </Link>
+          </Button>
+          <YeniSayimDialog />
+        </div>
       </div>
 
       {(eksiBakiye > 0 || sifirBakiye > 0) && (
@@ -132,6 +140,7 @@ export default async function SayimListePage() {
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
           <li>Sayım açarsınız; sistem o andaki miktarları dondurur.</li>
           <li>Depoda sayarken ekrandan girersiniz veya Excel şablonunu doldurup yüklersiniz.</li>
+          <li>Sayım başladığından bitene kadar o kaleme giren hareketler (üretim, kalite, iade) sayılan miktarın üstüne otomatik eklenir. Uygunsuz ve fire adetlerini de satırdan girebilirsiniz.</li>
           <li>&quot;Sayımı Uygula&quot; dediğinizde fark, kaynağı <b>Sayım</b> olan bir
               hareket olarak deftere yazılır ve bakiye sayılan değere sabitlenir.</li>
         </ol>

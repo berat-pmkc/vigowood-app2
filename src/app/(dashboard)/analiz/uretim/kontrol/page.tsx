@@ -5,6 +5,7 @@ import { formatTrDate, resolvePeriod } from "@/lib/periods";
 import { AnalizLayout } from "../../_shared/analiz-layout";
 import { AnalizChart } from "../../_shared/analiz-chart";
 import type { MetricChip } from "../../_shared/metric-chips";
+import { SummaryChart, type SummaryItem } from "../../_shared/summary-chart";
 import { StatCard } from "../../_shared/stat-card";
 import { CompactList, type CompactColumn, type CompactRow } from "../../_shared/compact-list";
 import {
@@ -22,6 +23,7 @@ import {
   getUygunsuzBakiye,
   isKontrolAny,
   kontrolKarar,
+  periodQuery,
   safe,
   TIP_LABELS,
   type KaliteRow,
@@ -89,14 +91,17 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const g = resolveGranularity(sp.g, from, to);
 
-  const [kal, bakiye] = await Promise.all([
-    safe(getKaliteRows(from, to), { available: false, rows: [] as KaliteRow[] }),
+  const colFilters = parseColumnFilters(sp, COLS);
+  const filtActive = hasActiveFilters(colFilters);
+  const needPrev = !!period.prevFrom && !!period.prevTo && metric === CHIPS[0].key && !filtActive;
+  const EMPTY_KAL = { available: false, rows: [] as KaliteRow[] };
+  const [kal, bakiye, kalPrev] = await Promise.all([
+    safe(getKaliteRows(from, to), EMPTY_KAL),
     safe(getUygunsuzBakiye(), 0),
+    needPrev ? safe(getKaliteRows(period.prevFrom, period.prevTo), EMPTY_KAL) : Promise.resolve(null),
   ]);
 
   const kontrolAll = kal.rows.filter(isKontrolAny);
-  const colFilters = parseColumnFilters(sp, COLS);
-  const filtActive = hasActiveFilters(colFilters);
   const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   // kart + grafik + liste filtrelenmiş kontrol kayıtlarından türer
   const kontrol = pickByFilters(kontrolAll, toRow, colFilters);
@@ -146,6 +151,15 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
   const qU = qtyOf("uygun");
   const qS = qtyOf("sokum");
   const qF = qtyOf("fire");
+  const prevQty = (k: string) =>
+    kalPrev ? kalPrev.rows.filter(isKontrolAny).filter((r) => kontrolKarar(r.islem) === k).reduce((a, r) => a + Math.abs(r.qty), 0) : null;
+  const mk = (k: string) => !focus.showCard(k) || (filtActive && (k === "uygun" ? qU : k === "sokum" ? qS : qF) === 0);
+  const summaryItems: SummaryItem[] = [
+    { key: "uygun", label: "Uygun'a Dönen", short: "Uygun", unit: "adet", cur: qU, prev: prevQty("uygun"), muted: mk("uygun") },
+    { key: "sokum", label: "Söküme Giden", short: "Söküm", unit: "adet", cur: qS, prev: prevQty("sokum"), muted: mk("sokum") },
+    { key: "fire", label: "Fire'ye Ayrılan", short: "Fire", unit: "adet", lowerBetter: true, cur: qF, prev: prevQty("fire"), muted: mk("fire") },
+    { key: "bakiye", label: "Bekleyen Bakiye", short: "Bakiye", unit: "adet", lowerBetter: true, cur: bakiye, prev: null, muted: !focus.all },
+  ];
   const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
@@ -172,14 +186,23 @@ export default async function KontrolPage({ searchParams }: { searchParams: Prom
       activeMetric={metric}
       chart={
         <>
-          <AnalizChart
-            title="Kontrol kararları (adet)"
-            type="bar"
-            stacked
-            xKey="label"
-            data={buildSeries(from, to, g, sub)}
-            series={active}
-          />
+          {focus.chartMetric === CHIPS[0].key ? (
+            <SummaryChart
+              title={`Kontrol Özeti — ${period.label}`}
+              items={summaryItems}
+              hasPrev={needPrev}
+              query={periodQuery(sp)}
+            />
+          ) : (
+            <AnalizChart
+              title="Kontrol kararları (adet)"
+              type="bar"
+              stacked
+              xKey="label"
+              data={buildSeries(from, to, g, sub)}
+              series={active}
+            />
+          )}
           {!kal.available && <p className="text-xs text-muted-foreground">Kalite verisi henüz yok</p>}
         </>
       }

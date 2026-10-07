@@ -17,10 +17,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { satirGuncelle, topluMiktarYukle, sayimUygula, sayimIptal } from "../../actions";
+import {
+  satirGuncelle, satirKaliteGuncelle, sayimPencereGetir, topluMiktarYukle, sayimUygula, sayimIptal,
+} from "../../actions";
 import { cn } from "@/lib/utils";
 import {
-  CheckCheck, Download, Loader2, Search, TriangleAlert, Upload, XCircle,
+  CheckCheck, Download, Loader2, RefreshCw, Search, TriangleAlert, Upload, XCircle,
 } from "lucide-react";
 
 interface Satir {
@@ -33,6 +35,19 @@ interface Satir {
   sayilan_miktar: number | null;
   fark: number | null;
   not_text: string | null;
+  uygunsuz_qty: number | null;
+  fire_qty: number | null;
+  // Tamamlanınca donan değerler
+  pencere_miktar: number | null;
+  nihai_miktar: number | null;
+  canli_sistem: number | null;
+  uygulanan_fark: number | null;
+}
+interface PencereKaydi {
+  satir_id: string;
+  kalem_id: string;
+  pencere_miktar: number;
+  canli_sistem: number;
 }
 interface Baslik {
   sayim_id: string;
@@ -42,6 +57,7 @@ interface Baslik {
   durum: string;
   notlar: string | null;
   tamamlanma_zamani: string | null;
+  baslangic_zamani: string | null;
 }
 
 const KATEGORI_ETIKET: Record<string, string> = {
@@ -49,18 +65,50 @@ const KATEGORI_ETIKET: Record<string, string> = {
   KUTU: "Kutu", KARTON: "Karton", MAMUL: "Mamül",
 };
 
+/** Uygunsuz/fire defteri yalnızca mamül ve yarı mamülde tutulur */
+const KALITE_KATEGORILERI = ["MAMUL", "YARIMAMUL"];
+
+const fmtSayi = (n: number) => Number(n).toLocaleString("tr-TR");
+
 export function SayimDetayClient({
-  baslik, satirlar: ilkSatirlar,
-}: { baslik: Baslik; satirlar: Satir[] }) {
+  baslik, satirlar: ilkSatirlar, pencere: ilkPencere,
+}: { baslik: Baslik; satirlar: Satir[]; pencere: PencereKaydi[] }) {
   const router = useRouter();
   const [satirlar, setSatirlar] = useState(ilkSatirlar);
   const [kategori, setKategori] = useState("hepsi");
   const [arama, setArama] = useState("");
   const [sadeceSayilmayan, setSadeceSayilmayan] = useState(false);
   const [isleniyor, basla] = useTransition();
+  const [pencereHarita, setPencereHarita] = useState(
+    () => new Map(ilkPencere.map((p) => [p.satir_id, p])),
+  );
+  const [yenileniyor, setYenileniyor] = useState(false);
   const dosyaRef = useRef<HTMLInputElement>(null);
 
   const kilitli = baslik.durum !== "taslak";
+
+  /**
+   * Sayım penceresi: sayım başladığından beri girenler (üretim, kalite, iade, satış...)
+   * sayılan rakamın ÜSTÜNE eklenir. Nihai = sayılan + pencere; fark = nihai - şu anki sistem.
+   * Tamamlanmış sayımda donmuş değerler kullanılır.
+   */
+  const hesap = (s: Satir) => {
+    const donmus = baslik.durum === "tamamlandi" && s.nihai_miktar !== null;
+    const p = pencereHarita.get(s.id);
+    const pencere = donmus ? Number(s.pencere_miktar ?? 0) : (p?.pencere_miktar ?? 0);
+    const sistem = donmus ? Number(s.canli_sistem ?? s.sistem_miktar) : (p?.canli_sistem ?? Number(s.sistem_miktar));
+    const nihai = s.sayilan_miktar === null ? null : Number(s.sayilan_miktar) + pencere;
+    const fark = nihai === null ? null : nihai - sistem;
+    return { pencere, sistem, nihai, fark };
+  };
+
+  const pencereYenile = async () => {
+    setYenileniyor(true);
+    const r = await sayimPencereGetir(baslik.sayim_id);
+    setYenileniyor(false);
+    if (!r.success) { toast.error(r.error); return; }
+    setPencereHarita(new Map(r.data.map((p) => [p.satir_id, p])));
+  };
 
   const kategoriler = useMemo(
     () => [...new Set(satirlar.map((s) => s.kategori))].sort(),
@@ -82,14 +130,15 @@ export function SayimDetayClient({
 
   const ozet = useMemo(() => {
     const sayilan = satirlar.filter((s) => s.sayilan_miktar !== null);
-    const farkli = sayilan.filter((s) => (s.fark ?? 0) !== 0);
+    const farkli = sayilan.filter((s) => (hesap(s).fark ?? 0) !== 0);
     return {
       toplam: satirlar.length,
       sayilan: sayilan.length,
       kalan: satirlar.length - sayilan.length,
       farkli: farkli.length,
     };
-  }, [satirlar]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [satirlar, pencereHarita]);
 
   /** Miktar girişi — odak çıkınca kaydeder */
   const miktarKaydet = (satir: Satir, ham: string) => {
@@ -105,7 +154,7 @@ export function SayimDetayClient({
     const onceki = satir.sayilan_miktar;
     setSatirlar((s) =>
       s.map((x) => (x.id === satir.id
-        ? { ...x, sayilan_miktar: yeni, fark: (yeni ?? 0) - x.sistem_miktar }
+        ? { ...x, sayilan_miktar: yeni }
         : x)),
     );
 
@@ -115,9 +164,29 @@ export function SayimDetayClient({
         toast.error(r.error);
         setSatirlar((s) =>
           s.map((x) => (x.id === satir.id
-            ? { ...x, sayilan_miktar: onceki, fark: (onceki ?? 0) - x.sistem_miktar }
+            ? { ...x, sayilan_miktar: onceki }
             : x)),
         );
+      }
+    });
+  };
+
+  /** Uygunsuz / fire miktarı — odak çıkınca kaydeder */
+  const kaliteKaydet = (satir: Satir, alan: "uygunsuz_qty" | "fire_qty", ham: string) => {
+    const temiz = ham.trim().replace(",", ".");
+    const yeni = temiz === "" ? 0 : Number(temiz);
+    if (!Number.isFinite(yeni) || yeni < 0) {
+      toast.error("Geçerli bir sayı girin");
+      return;
+    }
+    const onceki = Number(satir[alan] ?? 0);
+    if (yeni === onceki) return;
+    setSatirlar((s) => s.map((x) => (x.id === satir.id ? { ...x, [alan]: yeni } : x)));
+    basla(async () => {
+      const r = await satirKaliteGuncelle(satir.id, alan, yeni);
+      if (!r.success) {
+        toast.error(r.error);
+        setSatirlar((s) => s.map((x) => (x.id === satir.id ? { ...x, [alan]: onceki } : x)));
       }
     });
   };
@@ -129,9 +198,11 @@ export function SayimDetayClient({
       Kategori: KATEGORI_ETIKET[s.kategori] ?? s.kategori,
       "Sistem Miktar": s.sistem_miktar,
       "Sayılan Miktar": s.sayilan_miktar ?? "",
+      Uygunsuz: s.uygunsuz_qty ?? 0,
+      Fire: s.fire_qty ?? 0,
     }));
     const ws = XLSX.utils.json_to_sheet(veri);
-    ws["!cols"] = [{ wch: 24 }, { wch: 38 }, { wch: 14 }, { wch: 14 }, { wch: 16 }];
+    ws["!cols"] = [{ wch: 24 }, { wch: 38 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 10 }, { wch: 10 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sayım");
     XLSX.writeFile(wb, `${baslik.sayim_id}-sayim.xlsx`);
@@ -144,14 +215,22 @@ export function SayimDetayClient({
       const ws = wb.Sheets[wb.SheetNames[0]];
       const satirlarHam = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
 
-      const gonderilecek: { kalem_id: string; sayilan: number }[] = [];
+      const gonderilecek: { kalem_id: string; sayilan: number; uygunsuz?: number; fire?: number }[] = [];
+      const sayiOku = (v: unknown) => {
+        if (v === undefined || v === null || String(v).trim() === "") return undefined;
+        const n = Number(String(v).replace(",", "."));
+        return Number.isFinite(n) && n >= 0 ? n : undefined;
+      };
       for (const r of satirlarHam) {
         const kalem = String(r["Kalem"] ?? "").trim();
         const ham = r["Sayılan Miktar"];
         if (!kalem || ham === undefined || ham === null || String(ham).trim() === "") continue;
         const sayi = Number(String(ham).replace(",", "."));
         if (!Number.isFinite(sayi)) continue;
-        gonderilecek.push({ kalem_id: kalem, sayilan: sayi });
+        gonderilecek.push({
+          kalem_id: kalem, sayilan: sayi,
+          uygunsuz: sayiOku(r["Uygunsuz"]), fire: sayiOku(r["Fire"]),
+        });
       }
 
       if (gonderilecek.length === 0) {
@@ -183,7 +262,10 @@ export function SayimDetayClient({
         toast.error(r.error);
         return;
       }
-      toast.success(`${r.guncellenen} kalem sabitlendi, ${r.hareket} düzeltme hareketi yazıldı`);
+      toast.success(
+        `${r.guncellenen} kalem sabitlendi, ${r.hareket} düzeltme hareketi yazıldı` +
+        (r.uygunsuz || r.fire ? ` (${r.uygunsuz ?? 0} uygunsuz, ${r.fire ?? 0} fire kaydı)` : ""),
+      );
       router.refresh();
     });
   };
@@ -217,6 +299,7 @@ export function SayimDetayClient({
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {new Date(baslik.sayim_tarihi).toLocaleDateString("tr-TR")} · {baslik.sayim_id}
+            {baslik.baslangic_zamani && ` · Başlangıç ${new Date(baslik.baslangic_zamani).toLocaleString("tr-TR")}`}
             {baslik.notlar && ` · ${baslik.notlar}`}
           </p>
         </div>
@@ -288,6 +371,12 @@ export function SayimDetayClient({
                           dokunulmayacak, bakiyeleri olduğu gibi kalacak.
                         </p>
                       )}
+                      <p>
+                        Sayım başladığından beri kalemlere <b>giren/çıkan hareketler</b>
+                        (üretim, kalite, iade, satış) sayılan miktarın üstüne eklenir.
+                        Girdiğiniz <b>uygunsuz</b> ve <b>fire</b> miktarları kalite
+                        defterine stoktan düşmeden işlenir.
+                      </p>
                       <p className="text-muted-foreground">
                         Bu işlem geri alınamaz. Geçmiş hareketler silinmez.
                       </p>
@@ -349,6 +438,12 @@ export function SayimDetayClient({
           >
             Sayılmayanlar
           </Button>
+          {!kilitli && (
+            <Button variant="outline" onClick={pencereYenile} disabled={yenileniyor}>
+              <RefreshCw className={cn("mr-2 size-4", yenileniyor && "animate-spin")} />
+              Girenleri Yenile
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -360,21 +455,27 @@ export function SayimDetayClient({
                 <TableHead className="w-[180px]">Kalem</TableHead>
                 <TableHead>Ad</TableHead>
                 <TableHead className="w-[110px]">Kategori</TableHead>
-                <TableHead className="w-[110px] text-right">Sistem</TableHead>
+                <TableHead className="w-[110px] text-right">Sistem{!kilitli && " (şimdi)"}</TableHead>
                 <TableHead className="w-[130px] text-right">Sayılan</TableHead>
-                <TableHead className="w-[110px] text-right">Fark</TableHead>
+                <TableHead className="w-[130px] text-right">Sayım sırasında giren</TableHead>
+                <TableHead className="w-[110px] text-right">Nihai</TableHead>
+                <TableHead className="w-[100px] text-right">Fark</TableHead>
+                <TableHead className="w-[100px] text-right">Uygunsuz</TableHead>
+                <TableHead className="w-[100px] text-right">Fire</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {gorunen.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                     Kayıt bulunamadı
                   </TableCell>
                 </TableRow>
               ) : (
                 gorunen.slice(0, 400).map((s) => {
-                  const fark = s.sayilan_miktar === null ? null : (s.sayilan_miktar - s.sistem_miktar);
+                  const { pencere, sistem, nihai, fark } = hesap(s);
+                  const kaliteAcik = !kilitli && KALITE_KATEGORILERI.includes(s.kategori);
+                  const kaliteGoster = KALITE_KATEGORILERI.includes(s.kategori);
                   return (
                     <TableRow key={s.id} className={cn(s.sayilan_miktar === null && "opacity-70")}>
                       <TableCell className="font-mono text-xs">{s.kalem_id}</TableCell>
@@ -385,7 +486,7 @@ export function SayimDetayClient({
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {Number(s.sistem_miktar).toLocaleString("tr-TR")}
+                        {fmtSayi(sistem)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Input
@@ -399,6 +500,14 @@ export function SayimDetayClient({
                           placeholder="—"
                         />
                       </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {s.sayilan_miktar === null || pencere === 0
+                          ? "—"
+                          : (pencere > 0 ? "+" : "") + fmtSayi(pencere)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {nihai === null ? "—" : fmtSayi(nihai)}
+                      </TableCell>
                       <TableCell
                         className={cn(
                           "text-right tabular-nums",
@@ -409,6 +518,24 @@ export function SayimDetayClient({
                       >
                         {fark === null ? "—" : (fark > 0 ? "+" : "") + fark.toLocaleString("tr-TR")}
                       </TableCell>
+                      {(["uygunsuz_qty", "fire_qty"] as const).map((alan) => (
+                        <TableCell key={alan} className="text-right">
+                          {kaliteGoster ? (
+                            <Input
+                              type="text" inputMode="decimal" disabled={!kaliteAcik}
+                              defaultValue={Number(s[alan] ?? 0) === 0 ? "" : Number(s[alan])}
+                              onBlur={(e) => kaliteKaydet(s, alan, e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="h-8 text-right tabular-nums"
+                              placeholder="0"
+                            />
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   );
                 })

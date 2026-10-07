@@ -25,9 +25,7 @@ import {
   CreditCard,
   PieChart,
   Kanban,
-  Bot,
   FileOutput,
-  Activity,
   Container,
   AlertTriangle,
   type LucideIcon,
@@ -88,8 +86,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Görev Panosu", href: "/ops/board", icon: Kanban, roles: "all" },
       { title: "Raporlar", href: "/ops/raporlar", icon: FileOutput, roles: "all" },
-      { title: "Ajanlar", href: "/ops/ajanlar", icon: Bot, roles: APPROVAL_NAV_ROLES },
-      { title: "Kullanım", href: "/ops/kullanim", icon: Activity, roles: APPROVAL_NAV_ROLES },
     ],
   },
   {

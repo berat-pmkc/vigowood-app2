@@ -87,10 +87,71 @@ export async function satirGuncelle(
   }
 }
 
+/** Bir satırın uygunsuz / fire miktarını yazar (yalnızca mamül ve yarı mamülde anlamlı). */
+export async function satirKaliteGuncelle(
+  satirId: string,
+  alan: "uygunsuz_qty" | "fire_qty",
+  miktar: number,
+): Promise<Sonuc> {
+  try {
+    await yetkiKontrol();
+    if (!Number.isFinite(miktar) || miktar < 0) {
+      return { success: false, error: "Miktar 0 veya daha büyük olmalı" };
+    }
+    if (alan !== "uygunsuz_qty" && alan !== "fire_qty") {
+      return { success: false, error: "Geçersiz alan" };
+    }
+    const supabase = await createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from("stok_sayim_satirlari")
+      .update({ [alan]: miktar })
+      .eq("id", satirId)
+      .select("id");
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) {
+      return { success: false, error: "Satır güncellenemedi (yetki veya kayıt bulunamadı)" };
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+export interface PencereSatiri {
+  satir_id: string;
+  kalem_id: string;
+  pencere_miktar: number;
+  canli_sistem: number;
+}
+
+/** Sayım başladığından beri kalemlere giren/çıkan hareketler (canlı) */
+export async function sayimPencereGetir(
+  sayimId: string,
+): Promise<{ success: true; data: PencereSatiri[] } | { success: false; error: string }> {
+  try {
+    await yetkiKontrol();
+    const supabase = await createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc("stok_sayim_pencere", { p_sayim_id: sayimId });
+    if (error) return { success: false, error: error.message };
+    return {
+      success: true,
+      data: ((data ?? []) as PencereSatiri[]).map((r) => ({
+        ...r,
+        pencere_miktar: Number(r.pencere_miktar),
+        canli_sistem: Number(r.canli_sistem),
+      })),
+    };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
 /** Excel/CSV'den toplu miktar yükler. Eşleşmeyen kalemler rapor edilir. */
 export async function topluMiktarYukle(
   sayimId: string,
-  satirlar: { kalem_id: string; sayilan: number }[],
+  satirlar: { kalem_id: string; sayilan: number; uygunsuz?: number; fire?: number }[],
 ): Promise<Sonuc & { guncellenen?: number; eslesmeyen?: string[] }> {
   try {
     await yetkiKontrol();
@@ -113,9 +174,13 @@ export async function topluMiktarYukle(
         eslesmeyen.push(s.kalem_id);
         continue;
       }
-      const { data, error } = await supabase
+      const guncelle: Record<string, number> = { sayilan_miktar: s.sayilan };
+      if (s.uygunsuz !== undefined && s.uygunsuz >= 0) guncelle.uygunsuz_qty = s.uygunsuz;
+      if (s.fire !== undefined && s.fire >= 0) guncelle.fire_qty = s.fire;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("stok_sayim_satirlari")
-        .update({ sayilan_miktar: s.sayilan })
+        .update(guncelle)
         .eq("id", id)
         .select("id");
       if (error) return { success: false, error: error.message };
@@ -132,14 +197,17 @@ export async function topluMiktarYukle(
 /** Sayımı uygular: farkları hareket olarak yazar, bakiyeleri sabitler */
 export async function sayimUygula(
   sayimId: string,
-): Promise<Sonuc & { guncellenen?: number; hareket?: number }> {
+): Promise<Sonuc & { guncellenen?: number; hareket?: number; uygunsuz?: number; fire?: number }> {
   try {
     const user = await yetkiKontrol();
     const supabase = await createClient();
 
-    const { data, error } = await supabase.rpc("stok_sayimi_uygula", {
+    // Atomik tamamlama: sayım penceresi + düzeltme + uygunsuz/fire defteri tek işlemde
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc("stok_sayim_tamamla", {
       p_sayim_id: sayimId,
-      p_operator: user.email ?? user.user_id,
+      p_operator: user.user_id,
+      p_operator_name: user.full_name ?? user.email ?? null,
     });
     if (error) return { success: false, error: error.message };
 
@@ -153,6 +221,8 @@ export async function sayimUygula(
       success: true,
       guncellenen: (sonuc as { guncellenen?: number })?.guncellenen ?? 0,
       hareket: (sonuc as { hareket?: number })?.hareket ?? 0,
+      uygunsuz: (sonuc as { uygunsuz_kayit?: number })?.uygunsuz_kayit ?? 0,
+      fire: (sonuc as { fire_kayit?: number })?.fire_kayit ?? 0,
     };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };

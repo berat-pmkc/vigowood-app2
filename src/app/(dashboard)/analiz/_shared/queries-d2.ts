@@ -96,7 +96,7 @@ export async function getKaliteRows(from: string | null, to: string | null): Pro
     const [rows, hazir] = await Promise.all([
       fetchAll<any>((lo, hi) => {
         let q = s
-          .from("kalite_hareketleri")
+          .from("kalite_hareketleri_aktif")
           .select(
             "id, tarih, item_tipi, item_id, stok_turu, qty, islem, kaynak, source_id, parent_id, operator_id, operator_name",
           )

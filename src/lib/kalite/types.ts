@@ -59,3 +59,21 @@ export interface DepoOption {
 export type KaliteActionResult<T = undefined> =
   | ({ success: true } & (T extends undefined ? object : { data: T }))
   | { success: false; error: string };
+
+/** "Son Kayıtlar" listesi satırı (iptal edilebilirlik sunucuda hesaplanır) */
+export type KaliteKayitTipi = "uygunsuz" | "kontrol" | "fire";
+
+export interface KaliteKayit {
+  id: string;
+  created_at: string;
+  item_tipi: KaliteItemTipi;
+  item_id: string;
+  item_adi: string | null;
+  stok_turu: "UYGUNSUZ" | "FIRE" | "SAGLAM";
+  qty: number;
+  islem: string;
+  kaynak: KaliteKaynak | null;
+  operator_name: string | null;
+  not_text: string | null;
+  canCancel: boolean;
+}

@@ -6,6 +6,7 @@ import { resolvePeriod } from "@/lib/periods";
 import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { StatCard } from "../_shared/stat-card";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
@@ -26,6 +27,7 @@ import {
   type StandardTimes,
 } from "../_shared/performance";
 import { getPersonStepStats, safe, type PersonStepStat } from "../_shared/queries-d2";
+import { periodQuery } from "../_shared/queries-d1";
 import { PersonSelect } from "./person-select";
 
 export const metadata: Metadata = { title: "Personel Verimliliği | Analiz" };
@@ -91,11 +93,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const kisiRaw = Array.isArray(sp.kisi) ? sp.kisi[0] : sp.kisi;
 
-  const [perf, std, birim, stepStats] = await Promise.all([
+  const needPrev =
+    !!period.prevFrom && !!period.prevTo && metric === CHIPS[0].key && !hasActiveFilters(parseColumnFilters(sp, COLS));
+  const [perf, std, birim, stepStats, perfPrev, birimPrev] = await Promise.all([
     safe(computePerformance(from, to), EMPTY_PERF),
     safe(getStandardTimes(), EMPTY_STD),
     safe(getBirimSure(from, to), EMPTY_BIRIM),
     safe(getPersonStepStats(from, to), new Map<string, PersonStepStat[]>()),
+    needPrev ? safe(computePerformance(period.prevFrom, period.prevTo), EMPTY_PERF) : Promise.resolve(null),
+    needPrev ? safe(getBirimSure(period.prevFrom, period.prevTo), EMPTY_BIRIM) : Promise.resolve(null),
   ]);
 
   // Kolon filtreleri: kart + grafikler + liste eşleşen personelden türer
@@ -195,14 +201,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   if (focus.chartMetric === "performans") chart = perfChart;
   else if (focus.chartMetric === "adam-saat") chart = hoursChart;
   else if (focus.chartMetric === "birim-sure") chart = unitChart;
-  else
+  else {
+    const mk = (k: string) => !focus.showCard(k) || (filtActive && (k === "saat" ? people.length === 0 : k === "birim" ? montajAvg === null : overallPct === null));
+    const summaryItems: SummaryItem[] = [
+      { key: "saat", label: "Adam Saat", short: "Adam sa", unit: "sa", cur: round(totalHours, 1), prev: perfPrev ? round(perfPrev.people.reduce((a, p) => a + p.actual, 0) / 60, 1) : null, muted: mk("saat") },
+      { key: "birim", label: "Birim Süre", short: "B.Süre", unit: "dk", lowerBetter: true, cur: montajAvg, prev: birimPrev?.montajAvg ?? null, muted: mk("birim") },
+      { key: "perf", label: "Genel Performans", short: "Perf.", unit: "%", cur: overallPct, prev: perfPrev?.overallPct ?? null, muted: mk("perf") },
+    ];
     chart = (
-      <div className="space-y-4">
-        {perfChart}
-        {hoursChart}
-        {unitChart}
-      </div>
+      <SummaryChart
+        title={`Personel Özeti — ${period.label}`}
+        items={summaryItems}
+        hasPrev={!!perfPrev && !filtActive}
+        query={periodQuery(sp)}
+      />
     );
+  }
 
   // Odak dışı / filtre altında verisi olmayan kartlar boş görünür
   const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);

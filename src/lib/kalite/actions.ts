@@ -4,13 +4,15 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readOperatorId, readOperatorName } from "@/lib/supabase/schema";
-import { PRODUCTION_ACCESS_ROLES, STOCK_ACCESS_ROLES } from "@/lib/constants";
+import { ADMIN_ROLES, PRODUCTION_ACCESS_ROLES, STOCK_ACCESS_ROLES } from "@/lib/constants";
 import type {
   KaliteItemTipi,
   KaliteKaynak,
   KaliteItemOption,
   UrunParcasi,
   DepoOption,
+  KaliteKayit,
+  KaliteKayitTipi,
 } from "./types";
 
 type Res<T = undefined> = T extends undefined
@@ -394,6 +396,99 @@ export async function montajFire(input: {
       p_session_id: input.sessionId,
       p_step_id: input.stepId,
       p_parts: parts,
+      p_operator_id: operatorId,
+      p_operator_name: operatorName,
+    });
+    if (r.success) revalidateAll();
+    return r;
+  } catch (e) {
+    return { success: false, error: errMsg(e) };
+  }
+}
+
+// ─── KAYITLAR / İPTAL ───────────────────────────────────────────
+
+const IPTAL_SURESI_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * İstasyonun (oturum hesabının) son 7 gündeki kalite kayıtları.
+ * tumu=true yalnızca yönetici/stok rolleri için tüm kullanıcıların kayıtlarını getirir.
+ * canCancel: yönetici/mühendis her kaydı, diğerleri yalnızca kendi kaydını 24 saat içinde iptal eder
+ * (sunucudaki kalite_iptal() aynı kuralı uygular; burası yalnızca buton gösterimi içindir).
+ */
+export async function listKaliteKayitlari(input: {
+  tip: KaliteKayitTipi;
+  tumu?: boolean;
+}): Promise<Res<KaliteKayit[]>> {
+  try {
+    const user = await requireAccess();
+    const supabase = await createClient();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    const uid = authUser?.id ?? null;
+    const isAdmin = (ADMIN_ROLES as readonly string[]).includes(user.role);
+    const canSeeAll = isAdmin || (STOCK_ACCESS_ROLES as readonly string[]).includes(user.role);
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let qb = (supabase as any)
+      .from("kalite_hareketleri")
+      .select(
+        "id, created_at, item_tipi, item_id, item_adi, stok_turu, qty, islem, kaynak, parent_id, operator_name, not_text, created_by"
+      )
+      .eq("iptal_edildi", false)
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (input.tip === "uygunsuz") qb = qb.eq("islem", "giris");
+    else if (input.tip === "fire") qb = qb.eq("islem", "fire_giris").eq("stok_turu", "FIRE");
+    else
+      qb = qb.or(
+        "islem.in.(kontrol_uygun,sokum,donusum_kaynak),and(islem.eq.fire_giris,stok_turu.eq.UYGUNSUZ)"
+      );
+
+    if (!(input.tumu && canSeeAll) && uid) qb = qb.eq("created_by", uid);
+
+    const { data, error } = await qb;
+    if (error) return { success: false, error: error.message };
+
+    type Row = Omit<KaliteKayit, "canCancel"> & { parent_id: string | null; created_by: string | null };
+    const now = Date.now();
+    const rows: KaliteKayit[] = ((data ?? []) as Row[])
+      // Söküm kalanı gibi sistem tarafından üretilen çocuk satırlar ayrı kayıt değildir
+      .filter((r) => !(r.parent_id && r.parent_id.startsWith("KLT-")))
+      .map((r) => ({
+        id: r.id,
+        created_at: r.created_at,
+        item_tipi: r.item_tipi,
+        item_id: r.item_id,
+        item_adi: r.item_adi,
+        stok_turu: r.stok_turu,
+        qty: Number(r.qty),
+        islem: r.islem,
+        kaynak: r.kaynak,
+        operator_name: r.operator_name,
+        not_text: r.not_text,
+        canCancel:
+          isAdmin ||
+          (!!uid && r.created_by === uid && now - new Date(r.created_at).getTime() < IPTAL_SURESI_MS),
+      }));
+    return { success: true, data: rows };
+  } catch (e) {
+    return { success: false, error: errMsg(e) };
+  }
+}
+
+/** Kalite kaydını iptal eder; tüm stok etkilerini ters hareketle geri alır (kalite_iptal RPC) */
+export async function kaliteIptal(input: { id: string; neden: string }): Promise<Res> {
+  try {
+    const { supabase, operatorId, operatorName } = await getOperator();
+    if (!input.neden.trim()) return { success: false, error: "İptal nedenini yazınız" };
+    const r = await callRpc(supabase, "kalite_iptal", {
+      p_id: input.id,
+      p_neden: input.neden.trim(),
       p_operator_id: operatorId,
       p_operator_name: operatorName,
     });

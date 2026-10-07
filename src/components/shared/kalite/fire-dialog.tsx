@@ -19,6 +19,7 @@ import { fireGiris, getUrunYariMamulleri } from "@/lib/kalite/actions";
 import type { KaliteItemOption, KaliteItemTipi, KaliteKaynak, UrunParcasi } from "@/lib/kalite/types";
 import { KALITE_ITEM_TIPI_LABEL } from "@/lib/kalite/constants";
 import { ItemCombobox } from "./item-combobox";
+import { KayitlarSekme } from "./kayitlar-sekme";
 
 interface FireDialogProps {
   open: boolean;
@@ -131,6 +132,7 @@ export function FireDialog({
           <DialogDescription>Hurdaya çıkan ürün, parça veya plakayı kaydedin.</DialogDescription>
         </DialogHeader>
 
+        <KayitlarSekme tip="fire" open={open}>
         <div className="space-y-4">
           {tipler.length > 1 && (
             <div className={cn("grid gap-2", tipler.length === 3 ? "grid-cols-3" : "grid-cols-2")}>
@@ -262,6 +264,7 @@ export function FireDialog({
             </Button>
           </div>
         </div>
+        </KayitlarSekme>
       </DialogContent>
     </Dialog>
   );

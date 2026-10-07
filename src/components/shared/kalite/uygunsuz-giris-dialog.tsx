@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { uygunsuzGiris, listDepolar } from "@/lib/kalite/actions";
 import type { DepoOption, KaliteItemOption, KaliteKaynak } from "@/lib/kalite/types";
 import { ItemCombobox } from "./item-combobox";
+import { KayitlarSekme } from "./kayitlar-sekme";
 
 interface UygunsuzGirisDialogProps {
   open: boolean;
@@ -101,6 +102,7 @@ export function UygunsuzGirisDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <KayitlarSekme tip="uygunsuz" open={open}>
         <div className="space-y-4">
           {!lockTipi && (
             <div className="grid grid-cols-2 gap-2">
@@ -193,6 +195,7 @@ export function UygunsuzGirisDialog({
             </Button>
           </div>
         </div>
+        </KayitlarSekme>
       </DialogContent>
     </Dialog>
   );

@@ -31,6 +31,7 @@ import {
 } from "@/lib/kalite/actions";
 import type { DepoOption, KaliteItemOption, UrunParcasi } from "@/lib/kalite/types";
 import { ItemCombobox } from "./item-combobox";
+import { KayitlarSekme } from "./kayitlar-sekme";
 
 type Sonuc = "uygun" | "sokum" | "fire";
 
@@ -186,6 +187,7 @@ export function KontrolDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <KayitlarSekme tip="kontrol" open={open}>
         <div className="space-y-4">
           {tipler.length > 1 && (
             <div className="grid grid-cols-2 gap-2">
@@ -353,6 +355,7 @@ export function KontrolDialog({
             </Button>
           </div>
         </div>
+        </KayitlarSekme>
       </DialogContent>
     </Dialog>
   );

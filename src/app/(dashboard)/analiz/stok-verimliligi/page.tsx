@@ -5,6 +5,7 @@ import { resolvePeriod } from "@/lib/periods";
 import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { StatCard } from "../_shared/stat-card";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
@@ -17,6 +18,7 @@ import {
 import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { round } from "../_shared/utils";
+import { periodQuery } from "../_shared/queries-d1";
 import {
   getStokVerimlilikDetay,
   safe,
@@ -106,11 +108,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const g = resolveGranularity(sp.g, from, to);
 
-  const d = await safe(getStokVerimlilikDetay(from, to), EMPTY);
-
-  // Kolon filtreleri: kart + grafik + liste eşleşen ürünlerden türer
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
+  const needPrev = !!period.prevFrom && !!period.prevTo && metric === CHIPS[0].key && !filtActive;
+  const [d, dPrev] = await Promise.all([
+    safe(getStokVerimlilikDetay(from, to), EMPTY),
+    needPrev ? safe(getStokVerimlilikDetay(period.prevFrom, period.prevTo), EMPTY) : Promise.resolve(null),
+  ]);
+
+  // Kolon filtreleri: kart + grafik + liste eşleşen ürünlerden türer
   const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
   const sortedAll = [...d.products].sort((a, b) => a.score - b.score);
   const matched = pickByFilters(sortedAll, toRow, colFilters);
@@ -215,6 +221,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const rows: CompactRow[] = matched.map(toRow);
 
+  const mk = (k: string) => !focus.showCard(k) || (filtActive && matched.length === 0);
+  const summaryItems: SummaryItem[] = [
+    { key: "genel", label: "Genel Verim", short: "Verim", unit: "%", cur: overallPct, prev: dPrev?.overallPct ?? null, muted: mk("genel") },
+    { key: "altgun", label: "Kritik Altı Gün", short: "Kr. Altı", unit: "%", lowerBetter: true, cur: belowDayPct, prev: dPrev?.belowDayPct ?? null, muted: mk("altgun") },
+    { key: "ustgun", label: "Aşırı Stok Gün", short: "Aşırı", unit: "%", lowerBetter: true, cur: aboveDayPct, prev: dPrev?.aboveDayPct ?? null, muted: mk("ustgun") },
+    { key: "simdi", label: "Şu An Kritik Altı", short: "Şu an", unit: "adet", lowerBetter: true, cur: currentBelow, prev: null, muted: mk("simdi") },
+  ];
+  const chartNode =
+    focus.chartMetric === CHIPS[0].key ? (
+      <SummaryChart title={`Stok Verimliliği Özeti — ${period.label}`} items={summaryItems} hasPrev={!!dPrev} query={periodQuery(sp)} />
+    ) : (
+      <AnalizChart {...chartProps} title={title} />
+    );
+
   // Odak dışı / eşleşen ürün yoksa kartlar boş görünür
   const noMatch = filtActive && matched.length === 0;
   const mut = (k: string) => noMatch || !focus.showCard(k);
@@ -274,7 +294,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
-      chart={<AnalizChart {...chartProps} title={title} />}
+      chart={chartNode}
       cards={cards}
       cardsClassName="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       list={

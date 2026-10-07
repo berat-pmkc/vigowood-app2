@@ -6,6 +6,7 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { StatCard } from "../_shared/stat-card";
+import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
   distinctOptions,
@@ -17,6 +18,7 @@ import {
 import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
+import { periodQuery } from "../_shared/queries-d1";
 import {
   addTo,
   aggregateKalite,
@@ -327,6 +329,22 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const firePlaka = cur.k.fireByTip.PLAKA;
   const hours = cur.plannedMin / 60;
 
+  const mk = (k: string) => !focus.showCard(k);
+  const summaryItems: SummaryItem[] = [
+    { key: "plaka", label: "Kesilen Plaka", short: "Plaka", unit: "adet", cur: cur.plates, prev: prev?.plates ?? null, muted: mk("plaka") },
+    { key: "parca", label: "Kesilen Parça", short: "Parça", unit: "adet", cur: cur.parts, prev: prev?.parts ?? null, muted: mk("parca") },
+    { key: "sure", label: "Planlanan Süre", short: "Süre", unit: "sa", cur: round(hours, 1), prev: prev ? round(prev.plannedMin / 60, 1) : null, muted: mk("sure") },
+    { key: "uygunsuz", label: "Uygunsuz YM", short: "Uygunsuz", unit: "adet", lowerBetter: true, cur: uyg, prev: uygPrev, muted: mk("uygunsuz") },
+    { key: "donusum", label: "Dönüştürülen YM", short: "Dönüşüm", unit: "adet", cur: donusum, prev: donusumPrev, muted: mk("donusum") },
+    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: cur.k.fire, prev: prev?.k.fire ?? null, muted: mk("fire") },
+  ];
+  const chartNode =
+    focus.chartMetric === CHIPS[0].key ? (
+      <SummaryChart title={`Kesim Özeti — ${period.label}`} items={summaryItems} hasPrev={!!prev} query={periodQuery(sp)} />
+    ) : (
+      <AnalizChart {...chartProps} title={title} />
+    );
+
   const mut = (k: string, empty = false) => !focus.showCard(k) || (filtActive && empty);
   const cards = (
     <>
@@ -404,7 +422,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
-      chart={<AnalizChart {...chartProps} title={title} />}
+      chart={chartNode}
       cards={cards}
       list={list}
     />

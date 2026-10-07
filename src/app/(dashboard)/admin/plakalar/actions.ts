@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { getCurrentUser, ADMIN_ROLES } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { plakaUpdateSchema, plakaCreateSchema, plakaPartSchema } from "@/lib/validations";
@@ -8,6 +8,15 @@ import type { Database } from "@/lib/supabase/types";
 
 type ActionResult = { success: true } | { success: false; error: string };
 type Plaka = Database["public"]["Tables"]["plakalar"]["Row"];
+
+/** Admin ağacı + tablet kesim ekranı (parça/plaka değişiklikleri orada da görünsün) */
+function revalidateAll() {
+  revalidatePath("/admin/plakalar");
+  revalidatePath("/admin/parcalar");
+  revalidatePath("/uretim/kesim");
+  revalidatePath("/uretim/kesim/ihtiyac");
+  revalidateTag("parts", "default");
+}
 
 async function requireAdmin() {
   const user = await getCurrentUser();
@@ -120,7 +129,7 @@ export async function createPlaka(
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true };
   } catch (e) {
     return {
@@ -165,7 +174,7 @@ export async function updatePlaka(
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true };
   } catch (e) {
     return {
@@ -253,7 +262,7 @@ export async function updatePlakaPart(
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true };
   } catch (e) {
     return {
@@ -300,7 +309,7 @@ export async function addPlakaPart(
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true };
   } catch (e) {
     return {
@@ -326,7 +335,7 @@ export async function deletePlakaPart(
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true };
   } catch (e) {
     return {
@@ -382,7 +391,7 @@ export async function deletePlaka(plakalarId: string): Promise<ActionResult> {
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true };
   } catch (e) {
     return {
@@ -521,7 +530,7 @@ export async function importPlakalar(
       count++;
     }
 
-    revalidatePath("/admin/plakalar");
+    revalidateAll();
     return { success: true, count };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
@@ -565,6 +574,147 @@ export async function getAllPlakalar(): Promise<
 
     if (error) return { success: false, error: error.message };
     return { success: true, data: (data ?? []) as { plaka_id: string; plaka_adi: string; sku: string[] | null }[] };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+// ─── Ağaç görünümü: yeni / düzenle / sil ──────────────────────
+
+type PartTypeValue = "YARIMAMUL" | "HAZIR" | "KUTU" | "KARTON";
+
+/** Otomatik parça kodu önizlemesi (kaydetmeden önce dialogda gösterilir). */
+export async function previewPartCode(
+  prefix: string
+): Promise<{ success: true; code: string } | { success: false; error: string }> {
+  try {
+    await requireAdmin();
+    const p = prefix.trim();
+    if (!p) return { success: false, error: "Önek boş" };
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("next_part_code" as never, { p_prefix: p } as never);
+    if (error || !data) return { success: false, error: error?.message ?? "Kod üretilemedi" };
+    return { success: true, code: data as unknown as string };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Yeni parça: kod SQL tarafında (advisory lock altında) üretilir; plaka verilirse plakaya bağlanır. */
+export async function addNewPart(input: {
+  sku: string | null;
+  plaka_id: string | null;
+  part_adi: string;
+  part_type: PartTypeValue;
+  default_qty: number | null;
+  prefix: string | null;
+  tur: string | null;
+  mdf_tipi: string | null;
+  mdf_renk: string | null;
+  kritik: number;
+}): Promise<{ success: true; part_id: string } | { success: false; error: string }> {
+  try {
+    await requireAdmin();
+    if (!input.part_adi.trim()) return { success: false, error: "Parça adı gereklidir" };
+    if (!input.sku && !input.prefix?.trim()) {
+      return { success: false, error: "Ürün (SKU) veya kod öneki gereklidir" };
+    }
+    if (input.default_qty != null && input.default_qty < 0) {
+      return { success: false, error: "Miktar 0 veya üzeri olmalıdır" };
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc(
+      "admin_parca_ekle" as never,
+      {
+        p_sku: input.sku,
+        p_plaka_id: input.plaka_id,
+        p_part_adi: input.part_adi.trim(),
+        p_part_type: input.part_type,
+        p_default_qty: input.default_qty,
+        p_prefix: input.prefix?.trim() || null,
+        p_tur: input.tur,
+        p_mdf_tipi: input.mdf_tipi,
+        p_mdf_renk: input.mdf_renk,
+        p_kritik: Math.max(0, Math.round(input.kritik || 0)),
+      } as never
+    );
+    if (error || !data) return { success: false, error: error?.message ?? "Parça eklenemedi" };
+    revalidateAll();
+    return { success: true, part_id: data as unknown as string };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Parça bilgilerini düzenle (kod değişmez). */
+export async function updatePartInfo(
+  partId: string,
+  input: {
+    part_adi: string;
+    part_type: PartTypeValue;
+    tur: string | null;
+    mdf_tipi: string | null;
+    mdf_renk: string | null;
+    kritik: number;
+  }
+): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    if (!input.part_adi.trim()) return { success: false, error: "Parça adı gereklidir" };
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("all_parts")
+      .update({
+        part_adi: input.part_adi.trim(),
+        part_type: input.part_type,
+        tur: input.tur,
+        mdf_tipi: input.mdf_tipi,
+        mdf_renk: input.mdf_renk,
+        hazir_eleman_kritik_stok: Math.max(0, Math.round(input.kritik || 0)),
+      })
+      .eq("part_id", partId)
+      .select("part_id");
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) return { success: false, error: "Güncellenemedi (yetki veya kayıt yok)" };
+    revalidateAll();
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
+  }
+}
+
+/** Parçayı tamamen sil: plaka bağlantıları dahil. Reçete/kesim/stok hareketi varsa reddeder. */
+export async function deletePartEverywhere(partId: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const supabase = await createClient();
+
+    const [bom, cut, stok] = await Promise.all([
+      supabase.from("step_bom").select("step_bom_id").eq("part_id", partId).limit(1),
+      supabase.from("cut_lines").select("cut_line_id").eq("part_id", partId).limit(1),
+      supabase.from("yari_mamul_stok").select("part_id").eq("part_id", partId).limit(1),
+    ]);
+    if (bom.data && bom.data.length > 0) {
+      return { success: false, error: "Bu parça bir montaj reçetesinde (BOM) kullanılıyor, silinemez" };
+    }
+    if (cut.data && cut.data.length > 0) {
+      return { success: false, error: "Bu parça kesim kayıtlarında kullanılmış, silinemez" };
+    }
+    if (stok.data && stok.data.length > 0) {
+      return { success: false, error: "Bu parçanın stok hareketi var, silinemez" };
+    }
+
+    await supabase.from("plaka_parts").delete().eq("part_id", partId);
+    const { data, error } = await supabase
+      .from("all_parts")
+      .delete()
+      .eq("part_id", partId)
+      .select("part_id");
+    if (error) return { success: false, error: error.message };
+    if (!data || data.length === 0) return { success: false, error: "Silinemedi (yetki veya kayıt yok)" };
+
+    revalidateAll();
+    return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Bir hata oluştu" };
   }
