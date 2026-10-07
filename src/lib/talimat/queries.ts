@@ -9,6 +9,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { talimatDb } from "./db";
 import { TALIMAT_AYAR_VARSAYILAN, TALIMAT_BILDIRIM_KIND, TALIMAT_PERSONEL_ROLES } from "./constants";
+import { isStationEmail } from "@/lib/constants";
 import { haftaBaslangici } from "./helpers";
 import type {
   Depo,
@@ -165,12 +166,15 @@ export async function getTalimatPersoneller(): Promise<TalimatPersonel[]> {
   const sb = await talimatDb();
   const { data, error } = await sb
     .from("users")
-    .select("user_id, full_name, role, station")
+    .select("user_id, full_name, role, station, email")
     .in("role", TALIMAT_PERSONEL_ROLES)
     .eq("is_active", true)
     .order("full_name");
   hataFirlat(error);
-  return (data ?? []) as TalimatPersonel[];
+  // Ortak istasyon tablet hesapları (kesim@, montaj@...) personel değildir
+  return (data ?? [])
+    .filter((u) => !isStationEmail(u.email ?? undefined))
+    .map(({ email: _email, ...u }) => u) as TalimatPersonel[];
 }
 
 // ─── Yayınlar ───────────────────────────────────────────────────
@@ -471,12 +475,12 @@ export async function getIstasyonPersonelIdleri(station: string): Promise<string
   const sb = await talimatDb();
   const { data, error } = await sb
     .from("users")
-    .select("user_id")
+    .select("user_id, email")
     .eq("station", station)
     .in("role", TALIMAT_PERSONEL_ROLES)
     .eq("is_active", true);
   hataFirlat(error);
-  return (data ?? []).map((u) => u.user_id as string);
+  return (data ?? []).filter((u) => !isStationEmail(u.email ?? undefined)).map((u) => u.user_id as string);
 }
 
 /** "Seans Başlat": satırdan montaj/paketleme formunu ön doldurma verisi */

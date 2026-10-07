@@ -7,6 +7,7 @@
 import { getCurrentUserWithAuth } from "@/lib/auth";
 import { STATION_EMAILS } from "@/lib/constants";
 import { TALIMAT_PERSONEL_ROLES, TALIMAT_VIEW_ROLES } from "./constants";
+import { isStationEmail } from "@/lib/constants";
 import { sonucaCevir, talimatDb } from "./db";
 import { getKesimOnDoldurma } from "./queries";
 import type { ActionResult, KesimOnDoldurma } from "./types";
@@ -49,7 +50,7 @@ export async function tabletKontekstGetir(): Promise<ActionResult<TabletKontekst
     const sb = await talimatDb();
     let q = sb
       .from("users")
-      .select("user_id, full_name, station")
+      .select("user_id, full_name, station, email")
       .in("role", TALIMAT_PERSONEL_ROLES)
       .eq("is_active", true)
       .order("full_name");
@@ -58,7 +59,7 @@ export async function tabletKontekstGetir(): Promise<ActionResult<TabletKontekst
     }
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    const personeller = (data ?? []).map((u) => ({ user_id: u.user_id as string, full_name: (u.full_name as string) ?? (u.user_id as string) }));
+    const personeller = (data ?? []).filter((u) => !isStationEmail((u.email as string | null) ?? undefined)).map((u) => ({ user_id: u.user_id as string, full_name: (u.full_name as string) ?? (u.user_id as string) }));
 
     const kendisiPersonel = (TALIMAT_PERSONEL_ROLES as readonly string[]).includes(profile.role);
     return {
