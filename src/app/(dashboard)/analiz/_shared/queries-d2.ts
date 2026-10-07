@@ -8,10 +8,9 @@ import {
   bucketLabel,
   trBugun,
   trDay,
-  tsBounds,
   type Granularity,
 } from "@/lib/periods";
-import { fetchAll, parseWorkers, round } from "./utils";
+import { closeRange, fetchAll, parseWorkers, round, tsRange } from "./utils";
 import type { ChartRow } from "./series";
 import { excludeHazir, getHazirPartIds } from "./queries";
 
@@ -207,22 +206,20 @@ export interface MontajSessionRow {
 
 export async function getMontajSessions(from: string | null, to: string | null): Promise<MontajSessionRow[]> {
   const s = await sb();
-  const b = tsBounds(from, to);
   const rows = await fetchAll<any>((lo, hi) => {
     let q = s
       .from("montaj_sessions")
       .select(
-        "session_id, sku, step_id, step_name, qty, net_sure_dk, worker_count, workers, operator_id, operator_name, birim_montaj_dk, created_at",
+        "session_id, sku, step_id, step_name, qty, net_sure_dk, worker_count, workers, operator_id, operator_name, birim_montaj_dk, created_at, start_time, end_time",
       )
       .eq("durum", "tamamlandi")
       .order("session_id");
-    if (b.gte) q = q.gte("created_at", b.gte);
-    if (b.lte) q = q.lte("created_at", b.lte);
+    q = closeRange(q, "end_time", "start_time", from, to);
     return q.range(lo, hi);
   });
   const out: MontajSessionRow[] = [];
   for (const r of rows) {
-    const day = trDay(r.created_at);
+    const day = trDay(r.end_time ?? r.start_time ?? r.created_at);
     if (!day) continue;
     let ws = parseWorkers(r.workers);
     if (ws.length === 0 && (r.operator_id || r.operator_name)) {
@@ -272,14 +269,12 @@ export async function getKesimDetay(from: string | null, to: string | null): Pro
         .select("cut_id, tarih, plaka_id, makine_id, adet, operator_id")
         .eq("durum", "tamamlandi")
         .order("cut_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = tsRange(q, "tarih", from, to);
       return q.range(lo, hi);
     }),
     fetchAll<any>((lo, hi) => {
       let q = s.from("cut_lines").select("cut_id, adet").order("cut_line_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = tsRange(q, "tarih", from, to);
       return q.range(lo, hi);
     }),
     fetchAll<any>((lo, hi) => s.from("plakalar").select("plaka_id, kesim_sureleri").order("plakalar_id").range(lo, hi)),
@@ -323,12 +318,11 @@ export async function getPaketlemeBySku(
   const rows = await fetchAll<any>((lo, hi) => {
     let q = s
       .from("pack_events")
-      .select("sku, qty, birim_paketleme_dk")
+      .select("sku, qty, birim_paketleme_dk, end_time, tarih")
       .eq("durum", "tamamlandi")
       .not("birim_paketleme_dk", "is", null)
       .order("session_id");
-    if (from) q = q.gte("tarih", from);
-    if (to) q = q.lte("tarih", to);
+    q = closeRange(q, "end_time", "tarih", from, to);
     return q.range(lo, hi);
   });
   const acc = new Map<string, { w: number; s: number }>();
@@ -476,7 +470,7 @@ export async function getStokVerimlilikDetay(from: string | null, to: string | n
   const current = new Map(bal);
 
   const moves = await fetchAll<any>((lo, hi) =>
-    s.from("stock_movements").select("sku, qty, tarih").gte("tarih", dayFrom).order("id").range(lo, hi),
+    s.from("stock_movements").select("sku, qty, tarih").gte("tarih", `${dayFrom}T00:00:00+03:00`).order("id").range(lo, hi),
   );
   const net = new Map<string, Map<string, number>>();
   for (const m of moves) {

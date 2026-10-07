@@ -1,8 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { addDays, trBugun, trDay, tsBounds } from "@/lib/periods";
-import { fetchAll, parseWorkers, round } from "./utils";
+import { addDays, trBugun, trDay } from "@/lib/periods";
+import { closeRange, fetchAll, parseWorkers, round, tsRange } from "./utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -55,10 +55,9 @@ export interface UretimData {
 
 export async function getUretim(from: string | null, to: string | null): Promise<UretimData> {
   const s = await sb();
-  const rows = await fetchAll<{ tarih: string | null; qty: number | null; sku: string | null }>((lo, hi) => {
-    let q = s.from("pack_events").select("tarih, qty, sku").eq("durum", "tamamlandi").order("session_id");
-    if (from) q = q.gte("tarih", from);
-    if (to) q = q.lte("tarih", to);
+  const rows = await fetchAll<{ tarih: string | null; end_time: string | null; qty: number | null; sku: string | null }>((lo, hi) => {
+    let q = s.from("pack_events").select("tarih, end_time, qty, sku").eq("durum", "tamamlandi").order("session_id");
+    q = closeRange(q, "end_time", "tarih", from, to);
     return q.range(lo, hi);
   });
   const byDay: DayMap = {};
@@ -67,7 +66,7 @@ export async function getUretim(from: string | null, to: string | null): Promise
   for (const r of rows) {
     const qty = Number(r.qty ?? 0);
     total += qty;
-    add(byDay, trDay(r.tarih), qty);
+    add(byDay, trDay(r.end_time ?? r.tarih), qty);
     if (r.sku) bySku[r.sku] = (bySku[r.sku] ?? 0) + qty;
   }
   return { total, byDay, bySku };
@@ -87,20 +86,20 @@ export interface MontajData {
 
 export async function getMontaj(from: string | null, to: string | null): Promise<MontajData> {
   const s = await sb();
-  const b = tsBounds(from, to);
   const rows = await fetchAll<{
     qty: number | null;
+    end_time: string | null;
+    start_time: string | null;
     created_at: string | null;
     step_id: string;
     is_final_step: boolean | null;
   }>((lo, hi) => {
     let q = s
       .from("montaj_sessions")
-      .select("qty, created_at, step_id, is_final_step")
+      .select("qty, end_time, start_time, created_at, step_id, is_final_step")
       .eq("durum", "tamamlandi")
       .order("session_id");
-    if (b.gte) q = q.gte("created_at", b.gte);
-    if (b.lte) q = q.lte("created_at", b.lte);
+    q = closeRange(q, "end_time", "start_time", from, to);
     return q.range(lo, hi);
   });
   const byDay: DayMap = {};
@@ -111,7 +110,7 @@ export async function getMontaj(from: string | null, to: string | null): Promise
     const qty = Number(r.qty ?? 0);
     total += qty;
     if (r.is_final_step) finalTotal += qty;
-    add(byDay, trDay(r.created_at), qty);
+    add(byDay, trDay(r.end_time ?? r.start_time ?? r.created_at), qty);
     byStep[r.step_id] = (byStep[r.step_id] ?? 0) + qty;
   }
   return { total, finalTotal, sessions: rows.length, byDay, byStep };
@@ -131,14 +130,12 @@ export async function getKesim(from: string | null, to: string | null): Promise<
   const [batches, lines] = await Promise.all([
     fetchAll<{ tarih: string | null; adet: number | null }>((lo, hi) => {
       let q = s.from("cut_batches").select("tarih, adet").eq("durum", "tamamlandi").order("cut_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = tsRange(q, "tarih", from, to);
       return q.range(lo, hi);
     }),
     fetchAll<{ tarih: string | null; adet: number | null }>((lo, hi) => {
       let q = s.from("cut_lines").select("tarih, adet").order("cut_line_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = tsRange(q, "tarih", from, to);
       return q.range(lo, hi);
     }),
   ]);
@@ -181,34 +178,33 @@ function weighted(acc: Record<string, { w: number; s: number }>, key: string | n
 
 export async function getBirimSure(from: string | null, to: string | null): Promise<BirimSureData> {
   const s = await sb();
-  const b = tsBounds(from, to);
   const [mRows, pRows] = await Promise.all([
     fetchAll<{
       birim_montaj_dk: number | null;
       qty: number | null;
+      end_time: string | null;
+      start_time: string | null;
       created_at: string | null;
       step_id: string;
       step_name: string | null;
     }>((lo, hi) => {
       let q = s
         .from("montaj_sessions")
-        .select("birim_montaj_dk, qty, created_at, step_id, step_name")
+        .select("birim_montaj_dk, qty, end_time, start_time, created_at, step_id, step_name")
         .eq("durum", "tamamlandi")
         .not("birim_montaj_dk", "is", null)
         .order("session_id");
-      if (b.gte) q = q.gte("created_at", b.gte);
-      if (b.lte) q = q.lte("created_at", b.lte);
+      q = closeRange(q, "end_time", "start_time", from, to);
       return q.range(lo, hi);
     }),
-    fetchAll<{ birim_paketleme_dk: number | null; qty: number | null; tarih: string | null }>((lo, hi) => {
+    fetchAll<{ birim_paketleme_dk: number | null; qty: number | null; tarih: string | null; end_time: string | null }>((lo, hi) => {
       let q = s
         .from("pack_events")
-        .select("birim_paketleme_dk, qty, tarih")
+        .select("birim_paketleme_dk, qty, tarih, end_time")
         .eq("durum", "tamamlandi")
         .not("birim_paketleme_dk", "is", null)
         .order("session_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = closeRange(q, "end_time", "tarih", from, to);
       return q.range(lo, hi);
     }),
   ]);
@@ -227,7 +223,7 @@ export async function getBirimSure(from: string | null, to: string | null): Prom
     if (v < MIN_UNIT || w <= 0) continue;
     mW += w;
     mS += v * w;
-    weighted(mDay, trDay(r.created_at), v, w);
+    weighted(mDay, trDay(r.end_time ?? r.start_time ?? r.created_at), v, w);
     const a = (stepAcc[r.step_id] ??= { w: 0, s: 0, name: r.step_name });
     a.w += w;
     a.s += v * w;
@@ -238,7 +234,7 @@ export async function getBirimSure(from: string | null, to: string | null): Prom
     if (v < MIN_UNIT || w <= 0) continue;
     pW += w;
     pS += v * w;
-    weighted(pDay, trDay(r.tarih), v, w);
+    weighted(pDay, trDay(r.end_time ?? r.tarih), v, w);
   }
 
   const fin = (acc: Record<string, { w: number; s: number }>) =>
@@ -278,8 +274,7 @@ export async function getStokCikis(from: string | null, to: string | null): Prom
   const rows = await fetchAll<{ sku: string | null; qty: number | null; source: string | null; tarih: string | null }>(
     (lo, hi) => {
       let q = s.from("stock_movements").select("sku, qty, source, tarih").lt("qty", 0).order("id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = tsRange(q, "tarih", from, to);
       return q.range(lo, hi);
     },
   );
@@ -339,7 +334,7 @@ export async function getStokVerimlilik(from: string | null, to: string | null):
   }
 
   const moves = await fetchAll<{ sku: string | null; qty: number | null; tarih: string | null }>((lo, hi) =>
-    s.from("stock_movements").select("sku, qty, tarih").gte("tarih", dayFrom).order("id").range(lo, hi),
+    s.from("stock_movements").select("sku, qty, tarih").gte("tarih", `${dayFrom}T00:00:00+03:00`).order("id").range(lo, hi),
   );
   const net = new Map<string, Map<string, number>>(); // gün → sku → net
   for (const m of moves) {

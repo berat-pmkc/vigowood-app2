@@ -65,3 +65,39 @@ export async function fetchAll<T>(
   }
   return out;
 }
+
+// ─── Zaman damgası filtreleri (Europe/Istanbul gün sınırları) ─────────────
+
+function trStart(day: string): string {
+  return `${day}T00:00:00+03:00`;
+}
+function trNextStart(day: string): string {
+  const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) + 1));
+  return `${d.toISOString().slice(0, 10)}T00:00:00+03:00`;
+}
+
+/** timestamptz sütunu için [from, to] (TR günü, dahil) filtresi. `.lte(col,'YYYY-MM-DD')` son günü kaçırır. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function tsRange(q: any, col: string, from: string | null, to: string | null): any {
+  if (from) q = q.gte(col, trStart(from));
+  if (to) q = q.lt(col, trNextStart(to));
+  return q;
+}
+
+/**
+ * Seans üretimi KAPANIŞ zamanına yazılır: closeCol (end_time) aralıkta ya da
+ * closeCol boşsa fallbackCol aralıkta.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function closeRange(q: any, closeCol: string, fallbackCol: string, from: string | null, to: string | null): any {
+  if (!from && !to) return q;
+  const cond = (c: string) => {
+    const p: string[] = [];
+    if (from) p.push(`${c}.gte.${trStart(from)}`);
+    if (to) p.push(`${c}.lt.${trNextStart(to)}`);
+    return p;
+  };
+  const a = cond(closeCol);
+  const b = [`${closeCol}.is.null`, ...cond(fallbackCol)];
+  return q.or(`and(${a.join(",")}),and(${b.join(",")})`);
+}

@@ -1,8 +1,8 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { trDay, tsBounds } from "@/lib/periods";
-import { fetchAll } from "./utils";
+import { trDay } from "@/lib/periods";
+import { closeRange, fetchAll, tsRange } from "./utils";
 import { excludeHazir, getHazirPartIds, isSalesSource } from "./queries";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -153,7 +153,6 @@ export interface ProdRows {
 
 export async function getProdRows(from: string | null, to: string | null): Promise<ProdRows> {
   const s = await sb();
-  const b = tsBounds(from, to);
   const [p, m] = await Promise.all([
     fetchAll<any>((lo, hi) => {
       let q = s
@@ -161,25 +160,23 @@ export async function getProdRows(from: string | null, to: string | null): Promi
         .select("tarih, sku, qty, start_time, end_time, duraklama_dk, worker_count")
         .eq("durum", "tamamlandi")
         .order("session_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = closeRange(q, "end_time", "tarih", from, to);
       return q.range(lo, hi);
     }),
     fetchAll<any>((lo, hi) => {
       let q = s
         .from("montaj_sessions")
-        .select("created_at, sku, step_id, qty, net_sure_dk, worker_count")
+        .select("created_at, start_time, end_time, sku, step_id, qty, net_sure_dk, worker_count")
         .eq("durum", "tamamlandi")
         .order("session_id");
-      if (b.gte) q = q.gte("created_at", b.gte);
-      if (b.lte) q = q.lte("created_at", b.lte);
+      q = closeRange(q, "end_time", "start_time", from, to);
       return q.range(lo, hi);
     }),
   ]);
 
   const pack: PackRow[] = [];
   for (const r of p) {
-    const day = trDay(r.tarih);
+    const day = trDay(r.end_time ?? r.tarih);
     if (!day || !r.sku) continue;
     let man = 0;
     if (r.start_time && r.end_time) {
@@ -191,7 +188,7 @@ export async function getProdRows(from: string | null, to: string | null): Promi
   }
   const montaj: MontajRow[] = [];
   for (const r of m) {
-    const day = trDay(r.created_at);
+    const day = trDay(r.end_time ?? r.start_time ?? r.created_at);
     if (!day) continue;
     const net = Number(r.net_sure_dk ?? 0);
     montaj.push({
@@ -214,8 +211,7 @@ export async function getStokCikisRows(
   const rows = await fetchAll<{ sku: string | null; qty: number | null; source: string | null; tarih: string | null }>(
     (lo, hi) => {
       let q = s.from("stock_movements").select("sku, qty, source, tarih").lt("qty", 0).order("id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = tsRange(q, "tarih", from, to);
       return q.range(lo, hi);
     },
   );

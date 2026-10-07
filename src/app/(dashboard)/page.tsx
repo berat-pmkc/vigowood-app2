@@ -28,34 +28,26 @@ import { ADMIN_ROLES, type UserRole } from "@/lib/constants";
 import { DashboardRealtimeWrapper } from "./components/dashboard-realtime-wrapper";
 import { PeriodFilter } from "./components/period-filter";
 import { UretimUyariKarti, type UretimUyari } from "./components/uretim-uyari-karti";
+import { addDays, monthEnd, monthStart, trBugun, weekStart } from "@/lib/periods";
+import { closeRange, tsRange } from "./analiz/_shared/utils";
 
 export const metadata: Metadata = { title: "Ana Sayfa" };
 
 type PeriodType = "today" | "week" | "month" | "last_month";
 
+// Türkiye günü (Europe/Istanbul) ile dönem sınırları — UTC tarihi gece yarısı kayıyordu.
 function getPeriodDates(period: PeriodType): { start: string; end: string } {
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
+  const todayStr = trBugun();
   switch (period) {
     case "today":
       return { start: todayStr, end: todayStr };
-    case "week": {
-      const startOfWeek = new Date(now);
-      const day = now.getDay();
-      startOfWeek.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
-      return { start: startOfWeek.toISOString().split("T")[0], end: todayStr };
-    }
-    case "month": {
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start: startOfMonth.toISOString().split("T")[0], end: todayStr };
-    }
+    case "week":
+      return { start: weekStart(todayStr), end: todayStr };
+    case "month":
+      return { start: monthStart(todayStr), end: todayStr };
     case "last_month": {
-      const firstLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-      return {
-        start: firstLastMonth.toISOString().split("T")[0],
-        end: lastLastMonth.toISOString().split("T")[0],
-      };
+      const prev = addDays(monthStart(todayStr), -1);
+      return { start: monthStart(prev), end: monthEnd(prev) };
     }
   }
 }
@@ -80,40 +72,39 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     : "today") as PeriodType;
   const { start, end } = getPeriodDates(period);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = trBugun();
 
   // Build period-filtered queries for production KPIs
   function cutBatchPeriodQuery() {
-    let q = supabase
+    const q = supabase
       .from("cut_batches")
       .select("cut_id", { count: "exact", head: true });
-    q = q.gte("tarih", start).lte("tarih", end);
-    return q;
+    return tsRange(q, "tarih", start, end);
   }
 
   function montajPeriodQuery() {
-    let q = supabase
+    const q = supabase
       .from("montaj_sessions")
       .select("session_id", { count: "exact", head: true })
       .eq("durum", "tamamlandi");
-    q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
-    return q;
+    // Üretim seansın kapandığı güne yazılır
+    return closeRange(q, "end_time", "start_time", start, end);
   }
 
   function packPeriodQuery() {
-    let q = supabase
+    const q = supabase
       .from("pack_events")
-      .select("session_id", { count: "exact", head: true });
-    q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
-    return q;
+      .select("session_id", { count: "exact", head: true })
+      .eq("durum", "tamamlandi");
+    // Üretim seansın kapandığı güne yazılır
+    return closeRange(q, "end_time", "tarih", start, end);
   }
 
   function kutuPeriodQuery() {
-    let q = supabase
+    const q = supabase
       .from("kutu_uretim")
       .select("session_id", { count: "exact", head: true });
-    q = q.gte("created_at", start + "T00:00:00").lte("created_at", end + "T23:59:59");
-    return q;
+    return tsRange(q, "created_at", start, end);
   }
 
   // Fetch dashboard data in parallel
@@ -135,7 +126,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       .select("cut_id", { count: "exact", head: true })
       .eq("durum", "tamamlandi")
       .gte("tarih", today)
-      .lte("tarih", today),
+      .lt("tarih", addDays(today, 1)),
     supabase
       .from("cut_batches")
       .select(

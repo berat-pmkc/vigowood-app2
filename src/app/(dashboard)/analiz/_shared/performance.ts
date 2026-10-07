@@ -2,7 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { addDays, trBugun, tsBounds } from "@/lib/periods";
-import { fetchAll, median, parseWorkers, percentile, round } from "./utils";
+import { closeRange, fetchAll, median, parseWorkers, percentile, round } from "./utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -49,7 +49,7 @@ export async function getStandardTimes(): Promise<StandardTimes> {
         .select("step_id, birim_montaj_dk")
         .eq("durum", "tamamlandi")
         .not("birim_montaj_dk", "is", null)
-        .gte("created_at", b.gte)
+        .or(`end_time.gte.${b.gte},and(end_time.is.null,start_time.gte.${b.gte})`)
         .order("session_id")
         .range(lo, hi),
     ),
@@ -59,7 +59,7 @@ export async function getStandardTimes(): Promise<StandardTimes> {
         .select("sku, birim_paketleme_dk")
         .eq("durum", "tamamlandi")
         .not("birim_paketleme_dk", "is", null)
-        .gte("tarih", since)
+        .or(`end_time.gte.${b.gte},and(end_time.is.null,tarih.gte.${b.gte})`)
         .order("session_id")
         .range(lo, hi),
     ),
@@ -116,7 +116,6 @@ export interface PerformanceData {
 export async function computePerformance(from: string | null, to: string | null): Promise<PerformanceData> {
   const s: any = await createClient();
   const std = await getStandardTimes();
-  const b = tsBounds(from, to);
 
   const [mRows, pRows] = await Promise.all([
     fetchAll<{
@@ -134,8 +133,7 @@ export async function computePerformance(from: string | null, to: string | null)
         .select("step_id, step_name, qty, net_sure_dk, worker_count, workers, operator_id, operator_name")
         .eq("durum", "tamamlandi")
         .order("session_id");
-      if (b.gte) q = q.gte("created_at", b.gte);
-      if (b.lte) q = q.lte("created_at", b.lte);
+      q = closeRange(q, "end_time", "start_time", from, to);
       return q.range(lo, hi);
     }),
     fetchAll<{
@@ -154,8 +152,7 @@ export async function computePerformance(from: string | null, to: string | null)
         .select("sku, qty, start_time, end_time, duraklama_dk, worker_count, workers, operator_id, operator_name")
         .eq("durum", "tamamlandi")
         .order("session_id");
-      if (from) q = q.gte("tarih", from);
-      if (to) q = q.lte("tarih", to);
+      q = closeRange(q, "end_time", "tarih", from, to);
       return q.range(lo, hi);
     }),
   ]);

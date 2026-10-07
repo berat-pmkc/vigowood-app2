@@ -152,14 +152,14 @@ export function CompactList({
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="max-h-[70vh] overflow-auto overscroll-x-contain">
         <table className="w-full min-w-[320px] text-sm">
           <thead>
-            <tr className="border-b border-[#a99c7d]/20 text-xs text-muted-foreground">
+            <tr className="text-xs text-muted-foreground">
               {columns.map((c) => (
                 <th
                   key={c.key}
-                  className={`whitespace-nowrap px-4 py-1 font-medium ${
+                  className={`sticky top-0 z-10 whitespace-nowrap bg-[#f7f5ee] px-4 py-1.5 font-medium shadow-[0_1px_0_0_rgba(169,156,125,0.35),0_2px_4px_-2px_rgba(71,66,55,0.15)] ${
                     c.align === "right" ? "text-right" : "text-left"
                   } ${isMuted(c.key) ? "opacity-40" : ""}`}
                 >
