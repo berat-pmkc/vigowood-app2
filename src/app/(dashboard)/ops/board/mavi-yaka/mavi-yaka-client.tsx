@@ -66,6 +66,7 @@ import {
   talimatYayinla,
 } from "@/lib/talimat/actions";
 import { satirlariTopluSil } from "@/lib/talimat/toplu-actions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { PLAN_DURUM_LABEL, TALIMAT_ISTASYONLAR } from "@/lib/talimat/constants";
 import { gunEkle, istasyonEsle, personeleGoreGrupla, satirBos, satirFiltrele } from "@/lib/talimat/helpers";
 import type {
@@ -262,9 +263,39 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     yenile();
   };
 
+  // ── çoklu personel seçimi ──
+  const [secili, setSecili] = useState<Set<string>>(new Set());
+  useEffect(() => setSecili(new Set()), [hafta]);
+  // listeden kalkan personeli seçimden düşür
+  useEffect(() => {
+    setSecili((p) => {
+      const n = new Set([...p].filter((id) => tumGrup.has(id)));
+      return n.size === p.size ? p : n;
+    });
+  }, [tumGrup]);
+  const seciliToggle = (pid: string) =>
+    setSecili((p) => {
+      const n = new Set(p);
+      if (n.has(pid)) n.delete(pid);
+      else n.add(pid);
+      return n;
+    });
+  const gorunenPidler = useMemo(() => gruplar.map((g) => g.pid), [gruplar]);
+  const hepsiSecili = gorunenPidler.length > 0 && gorunenPidler.every((id) => secili.has(id));
+  const bazilariSecili = !hepsiSecili && gorunenPidler.some((id) => secili.has(id));
+  const tumunuSec = () => setSecili(hepsiSecili ? new Set() : new Set(gorunenPidler));
+  const seciliBilgi = useMemo(() => {
+    const liste = [...secili].filter((id) => tumGrup.has(id)).map((id) => ({
+      pid: id,
+      ad: personelAdlari.get(id) ?? id,
+      ids: (tumGrup.get(id) ?? []).map((s) => s.satir_id),
+    }));
+    return { liste, satirSayisi: liste.reduce((t, x) => t + x.ids.length, 0) };
+  }, [secili, tumGrup, personelAdlari]);
+
   const [pasifHedef, setPasifHedef] = useState<PasifHedef | null>(null);
   const [silHedef, setSilHedef] = useState<TalimatSatir | null>(null);
-  const [topluSilHedef, setTopluSilHedef] = useState<{ baslik: string; personelAdi?: string; personelSayisi: number; ids: string[] } | null>(null);
+  const [topluSilHedef, setTopluSilHedef] = useState<{ baslik: string; personelAdi?: string; personelSayisi: number; ids: string[]; secimler?: { ad: string; satir: number }[] } | null>(null);
   const [topluIlerleme, setTopluIlerleme] = useState<{ yapilan: number; toplam: number } | null>(null);
   const topluSilBaslat = async () => {
     if (!topluSilHedef || !plan || topluIlerleme) return;
@@ -285,6 +316,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     }
     setTopluIlerleme(null);
     setTopluSilHedef(null);
+    setSecili(new Set());
     if (hatalar.length) toast.error(`${silinen} satır silindi, ${hatalar.length} hata: ${hatalar[0]}`);
     else toast.success(`${silinen} satır silindi`);
     yenile();
@@ -748,6 +780,18 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
               </SheetContent>
             </Sheet>
 
+            {editable && gruplar.length > 0 && (
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-vw-dark">
+                <Checkbox
+                  checked={hepsiSecili ? true : bazilariSecili ? "indeterminate" : false}
+                  onCheckedChange={tumunuSec}
+                  aria-label="Tümünü seç"
+                  className="h-5 w-5 bg-white"
+                />
+                Tümünü seç{filtreAktif ? ` (görünen ${gorunenPidler.length})` : ""}
+              </label>
+            )}
+
             {/* Tablo */}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <div className="max-h-[calc(100dvh-14rem)] min-h-[320px] overflow-auto rounded-lg border bg-card">
@@ -790,6 +834,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                                 >
                                   <ChevronDown className={cn("h-4 w-4 transition-transform", kapaliGruplar.has(g.pid) && "-rotate-90")} />
                                 </button>
+                                {editable && (
+                                  <Checkbox
+                                    checked={secili.has(g.pid)}
+                                    onCheckedChange={() => seciliToggle(g.pid)}
+                                    aria-label={`${g.ad} seç`}
+                                    className="h-5 w-5 bg-white"
+                                  />
+                                )}
                                 <span className="text-sm font-bold text-vw-dark">{g.ad}</span>
                                 {g.istasyon && (
                                   <Badge variant="outline" className="border-vw-side/60 text-[11px] text-vw-deep">
@@ -883,6 +935,33 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
               </div>
             </DndContext>
 
+            {editable && seciliBilgi.liste.length > 0 && (
+              <div className="sticky bottom-3 z-30 flex flex-wrap items-center gap-2 rounded-lg border border-vw-side bg-vw-light px-3 py-2 shadow-lg">
+                <span className="text-sm font-medium text-vw-dark">
+                  {seciliBilgi.liste.length} personel seçildi · {seciliBilgi.satirSayisi} satır
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="h-9" onClick={() => setSecili(new Set())}>
+                    Seçimi temizle
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-9 bg-[#c0424f] text-white hover:bg-[#a63744]"
+                    onClick={() =>
+                      setTopluSilHedef({
+                        baslik: `${seciliBilgi.liste.length} personel listeden çıkarılsın mı?`,
+                        personelSayisi: seciliBilgi.liste.length,
+                        ids: seciliBilgi.liste.flatMap((x) => x.ids),
+                        secimler: seciliBilgi.liste.map((x) => ({ ad: x.ad, satir: x.ids.length })),
+                      })
+                    }
+                  >
+                    <Trash2 className="mr-1.5 h-4 w-4" /> Seçilenleri listeden çıkar
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <YayinGecmisi yayinlar={yayinlar} editable={editable} onChanged={yenile} />
           </>
         )}
@@ -939,6 +1018,15 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                 {topluSilHedef?.personelAdi
                   ? `${topluSilHedef.personelAdi} personelinin bu haftaki iş talimatı listesindeki ${topluSilHedef.ids.length} satır silinecek. `
                   : `Bu haftanın iş talimatı listesindeki ${topluSilHedef?.personelSayisi ?? 0} personel / ${topluSilHedef?.ids.length ?? 0} satır silinecek. `}
+                {topluSilHedef?.secimler && (
+                  <span className="mt-2 block max-h-40 overflow-y-auto rounded border bg-muted/40 p-2 text-xs text-vw-dark">
+                    {topluSilHedef.secimler.map((x) => (
+                      <span key={x.ad} className="block">
+                        {x.ad} — {x.satir} satır
+                      </span>
+                    ))}
+                  </span>
+                )}
                 Seanslar, üretim adetleri, stoklar, talepler ve personel kayıtları SİLİNMEZ. Talebe bağlı satırlar silinince ilgili talepler tekrar &apos;Açık&apos; olur.
                 Plan yayındaysa değişiklik bir sonraki Yayınla ile tabletlere gider.
                 {topluIlerleme && (
