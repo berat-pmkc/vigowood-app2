@@ -69,9 +69,12 @@ steps.push(step('1.2 uc satir ekle (LS031,LS051,MKOS41)', 'planner', `
   s3 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w1,'sku','MKOS41','istenen_miktar',30)`)};
   ${assert(`${sat('s1')}=1 and ${sat('s2')}=2 and ${sat('s3')}=3`, 'sira 1,2,3 degil')}
 `));
-steps.push(expectErr('1.3 ardisik ayni sku (MKOS41 ardindan MKOS41)', 'planner',
-  `perform ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w1,'sku','MKOS41')`)};`, 'ARDISIK_SKU'));
-steps.push(step('1.4 ardisik olmayan tekrar (LS031 sona) serbest', 'planner', `
+steps.push(step('1.3 ardisik ayni sku artik serbest (MKOS41 ardindan MKOS41, sonra sil)', 'planner', `
+  s4 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w1,'sku','MKOS41')`)};
+  ${assert(`${sat('s4')}=4`, 'ardisik ayni sku eklenemedi')}
+  perform ${S}.talimat_satir_sil(s4);
+`));
+steps.push(step('1.4 LS031 sona (4. sira)', 'planner', `
   s4 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w1,'sku','LS031')`)};
   ${assert(`${sat('s4')}=4`, 's4 sira 4 degil')}
 `));
@@ -87,8 +90,10 @@ steps.push(step('1.7 satir_sirala ters sirala', 'planner', `
   perform ${S}.talimat_satir_sirala(v_plan, w1, array[s4,s3,s2,s5,s1]);
   ${assert(`${sat('s4')}=1 and ${sat('s3')}=2 and ${sat('s2')}=3 and ${sat('s5')}=4 and ${sat('s1')}=5`, 'siralama hatali')}
 `));
-steps.push(expectErr('1.8 satir_sirala ardisik ihlali', 'planner',
-  `perform ${S}.talimat_satir_sirala(v_plan, w1, array[s1,s4,s3,s2,s5]);`, 'ARDISIK_SKU'));
+steps.push(step('1.8 satir_sirala ardisik ayni sku artik serbest', 'planner', `
+  perform ${S}.talimat_satir_sirala(v_plan, w1, array[s1,s4,s3,s2,s5]);
+  perform ${S}.talimat_satir_sirala(v_plan, w1, array[s4,s3,s2,s5,s1]);
+`));
 steps.push(expectErr('1.8b satir_sirala eksik liste', 'planner',
   `perform ${S}.talimat_satir_sirala(v_plan, w1, array[s1,s4]);`, 'Sıralama listesi'));
 steps.push(step('1.9 satir_sil + sira sikistirma', 'planner', `
@@ -110,14 +115,11 @@ steps.push(step('1.11 plaka satiri: sku otomatik + etkin_istasyon=kesim', 'plann
     out := out || '      plaka=' || plk || ' sku=' || tmp || E'\\n';
   end if;
 `));
-steps.push(step('1.12 dogrudan yazma ardisik tetikleyici (deferred)', 'planner', `
+steps.push(step('1.12 dogrudan yazma ardisik ayni sku artik serbest', 'planner', `
   insert into ${S}.talimat_satirlar (plan_id, personel_id, sira, sku) values (v_plan, w3, 1, 'LS031'), (v_plan, w3, 2, 'LS031');
   execute 'set constraints all immediate';
+  delete from ${S}.talimat_satirlar where plan_id=v_plan and personel_id=w3;
 `));
-// 1.12 must fail: invert result
-steps[steps.length - 1] = expectErr('1.12 dogrudan yazma ardisik tetikleyici (deferred)', 'planner', `
-  insert into ${S}.talimat_satirlar (plan_id, personel_id, sira, sku) values (v_plan, w3, 1, 'LS031'), (v_plan, w3, 2, 'LS031');
-  execute 'set constraints all immediate';`, 'ARDISIK_SKU');
 steps.push(expectErr('1.13 gecersiz personel (Yonetici)', 'planner',
   `perform ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id','VW001','sku','LS031')`)};`, 'Geçersiz personel'));
 
@@ -134,15 +136,9 @@ steps.push(step('1.14 bos satir (ürünsüz personel): ekle, doldur, tablette yo
   perform ${kaydet(`jsonb_build_object('satir_id',s9,'sku','LS031','istenen_miktar',4)`)};
   ${assert(`(select sku='LS031' from ${S}.talimat_satirlar where satir_id=s9)`, 'sku doldurulamadi')}
   ${assert(`(select satir_sayisi=m+1 and personel_sayisi=k+1 from ${S}.talimat_plan_ozet where plan_id=v_plan)`, 'dolu satir ozete girmedi')}
-  -- ardisik kural bos satiri yok sayar: LS031, bos, LS031 hatali olmali
-  perform ${kaydet(`jsonb_build_object('satir_id',s10,'sku','LS051')`)};
-  perform ${kaydet(`jsonb_build_object('satir_id',s10,'sku',null)`)};
-  begin
-    perform ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5,'sku','LS031')`)};
-    raise exception 'NO_ERROR_RAISED';
-  exception when others then
-    if sqlerrm not like 'ARDISIK_SKU%' then raise; end if;
-  end;
+  -- ardisik kural kaldirildi: LS031 (s9) ardindan LS031 serbest
+  perform ${S}.talimat_satir_sil(s10);
+  s10 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'personel_id',w5,'sku','LS031')`)};
   perform ${S}.talimat_satir_sil(s10);
   perform ${S}.talimat_satir_sil(s9);
   ${assert(`not exists (select 1 from ${S}.talimat_satirlar where plan_id=v_plan and personel_id=w5)`, 'w5 satirlari silinmedi')}

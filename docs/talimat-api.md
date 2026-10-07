@@ -15,7 +15,7 @@ Kod: `src/lib/talimat/{constants,types,helpers,db,queries,actions}.ts`, `src/lib
 - **Satır** (`talimat_satirlar`): personel (users.role `Üretim`/`Hat`), `sira` (1=en öncelikli, personel içinde 1..n sıkışık), `istasyon` (kesim/montaj/paketleme, opsiyonel), `sku`, kesimde `plaka_id`, `istenen_miktar`, `not_text`, `talep_id`, `durum` (`aktif|pasif|tamamlandi`), `pasif_*`, bayraklar `degisti` ve `onay_bekliyor`.
   - Plaka verilip sku verilmezse, plakanın tek SKU'su varsa sku otomatik doldurulur.
   - İstasyon boşsa türetilir: plaka varsa `kesim`, yoksa `montaj` (`etkin_istasyon`).
-  - **Ardışık SKU kuralı**: aynı personelde art arda iki öncelikte aynı sku olamaz (araya başka ürün girerse olur; aynı sku farklı personellere verilebilir). RPC içinde `ARDISIK_SKU` hatası; ayrıca deferred constraint trigger doğrudan yazmaları da engeller.
+  - **Ardışık SKU kuralı KALDIRILDI (SQL 155)**: aynı personelde art arda aynı ürün serbest. `talimat_ardisik_dogrula()` no-op, `trg_talimat_ardisik` düşürüldü; `ARDISIK_SKU` artık üretilmez. Aynı personel plana iki kez eklenemez (istemci personel seçicisi eklenmişleri dışlar).
 - **Yayın** (`talimat_yayinlar` + `talimat_yayin_hedefler`): "Değişiklikleri yayınla" kaydı; snapshot (değişen satırlar), hedef personeller (+ onların satır id'leri), seçenekler.
 - **Onay** (`talimat_onaylar`): personelin "Görüldü, anlaşıldı" kaydı (`yayin_id`, `personel_id`, `onay_zamani`).
 - **Güncellik** (`talimat_guncellik`): "Liste güncel" işaretleri (bitiş tarihi dahil).
@@ -125,9 +125,9 @@ Planlayıcı raporu: `kind='talimat_rapor'`, `target_user = yayını yapan`.
 |---|---|---|
 | `talimat_plan_getir_veya_olustur(date)` | planlayıcı | hafta planı / taslak oluştur |
 | `talimat_kopyala_hafta(uuid, date)` | planlayıcı | haftayı kopyala (hedef boş olmalı) |
-| `talimat_satir_kaydet(jsonb)` | planlayıcı | ekle/güncelle; `SIRA_DOLU`, `ARDISIK_SKU`, `PLAN_PASIF` |
+| `talimat_satir_kaydet(jsonb)` | planlayıcı | ekle/güncelle; `SIRA_DOLU`, `PLAN_PASIF` |
 | `talimat_satir_sil(uuid)` | planlayıcı | sil + sıra sıkıştır |
-| `talimat_satir_sirala(uuid, text, uuid[])` | planlayıcı | personel satırlarını yeniden sırala (kural doğrulanır) |
+| `talimat_satir_sirala(uuid, text, uuid[])` | planlayıcı | personel satırlarını yeniden sırala |
 | `talimat_yayinla(uuid, bool, timestamptz, bool, text)` | planlayıcı | yayınla (`bildirim, gonderim, sesli, hedef`) |
 | `talimat_bildirim_durdur(uuid, bool)` | planlayıcı | durdur / geri çek |
 | `talimat_onayla(uuid, text, bool)` | üretim/ofis | personel onayı (action ek kontrol yapar) |
@@ -171,3 +171,10 @@ Okuma: `has_production_access() OR is_office_user()`. Doğrudan yazma: planlayı
 
 - `talimat_satirlar.sayac_baslangic` (NULL = hafta başı). `talimat_satir_etkin.sayac_bas_ts` = greatest(hafta başı, sayac_baslangic); `talimat_satir_ilerleme` (uretilen, son_seans_at) ve `talimat_satir_katki` yalnız bu andan sonra kapanan seansları sayar. `paketlemeye_hazir` ve `talep_durum` (talep kümülatif üretilen) değişmedi.
 - RPC `talimat_satir_yeniden_aktif(p_satir, p_istenen>0)`: planlayıcı, PLAN_PASIF korumalı; sayac=now(), istenen=p_istenen, tamamlandi->aktif, yayında ise degisti + degisen_personeller. Action: `satirYenidenAktifEt(satirId, istenen)`.
+
+## 11. Görünen sıra (tamamlananlar çıkınca) + Tamamlananlar filtreleri
+
+- Planlayıcı tablosunda tamamlanan (`etkin_durum='tamamlandi'`) satırlar gizlenir ve **Sıra sütunu görünen aktif satırlara göre 1..n** gösterilir (personel başına, tablet gibi). DB `sira` tamamlananları da içerir (değişmedi).
+- Sürükle-bırak: tam liste `satirSirala`'ya gönderilir, **tamamlananlar listenin sonuna** alınır; böylece aktif satırlar DB'de de 1..k olur.
+- Talep -> "İş talimatına ata" diyaloğunda sıra N = aktif satırlar arasındaki görünen konum; istemci gerçek `sira`'ya çevirip RPC'ye gönderir (N > aktif sayısı = listenin sonu). `SIRA_DOLU`/kaydır mantığı aynen geçerli.
+- Tamamlananlar diyaloğu: arama (kod/ad/personel, Türkçe harf duyarsız), Personel, İstasyon (chip) ve Ürün (aranabilir) filtreleri, "N / M kalem", Temizle; tek tablo + sabit başlık, boş gruplar gizlenir.

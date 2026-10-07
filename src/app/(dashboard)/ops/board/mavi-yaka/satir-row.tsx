@@ -26,7 +26,7 @@ interface Props {
   s: TalimatSatir;
   editable: boolean;
   /** Seçilemeyen SKU'lar (komşu satırlarda kullanılan) */
-  engelli: Record<string, string>;
+  siraNo: number;
   depoStoklari: UrunStokSecenek["depo_stoklari"] | undefined;
   islem: SatirIslemleri;
   sirali: boolean;
@@ -34,7 +34,7 @@ interface Props {
   parlak?: boolean;
 }
 
-export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali, parlak }: Props) {
+export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: s.satir_id,
     disabled: !editable || !sirali,
@@ -74,7 +74,7 @@ export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali, pa
           >
             <GripVertical className="h-4 w-4" />
           </button>
-          <span className="w-5 text-center font-semibold tabular-nums">{s.sira}</span>
+          <span className="w-5 text-center font-semibold tabular-nums">{siraNo}</span>
         </div>
       </td>
 
@@ -101,7 +101,6 @@ export function SatirRow({ s, editable, engelli, depoStoklari, islem, sirali, pa
           compact
           value={s.sku}
           disabled={!editable}
-          engelli={engelli}
           onChange={(u) => islem.kaydet(s.satir_id, { sku: u.sku, ...(s.plaka_id ? { plaka_id: null } : {}) })}
           placeholder="Ürün seç..."
         />

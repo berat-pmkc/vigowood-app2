@@ -123,7 +123,6 @@ const TOGGLES: Array<{ key: Toggle; label: string }> = [
 ];
 
 function hataMesaji(r: { error: string; code?: string }): string {
-  if (r.code === "ARDISIK_SKU") return "Aynı personelde art arda aynı ürün olamaz. Araya başka bir ürün ekleyin.";
   if (r.code === "PLAN_PASIF") return "Pasif plan düzenlenemez.";
   return r.error;
 }
@@ -222,6 +221,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
       })
       .sort((a, b) => b.ilk.localeCompare(a.ilk) || a.ad.localeCompare(b.ad, "tr"));
   }, [gorunenSatirlar, yerelSira, eklenme, tumGrup, arama, istasyon, toggles, personelKumesi, personelFiltre]);
+
+  // Personel başına görünen sıra numarası (tamamlananlar hariç, 1..n; yerel sürükleme sırası dikkate alınır)
+  const siraHaritasi = useMemo(() => {
+    const m = new Map<string, Map<string, number>>();
+    for (const [pid, liste] of tumGrup) {
+      const yerel = yerelSira[pid];
+      const aktif = liste
+        .filter((x) => x.etkin_durum !== "tamamlandi")
+        .sort((a, b) => (yerel ? yerel.indexOf(a.satir_id) - yerel.indexOf(b.satir_id) : a.sira - b.sira));
+      m.set(pid, new Map(aktif.map((x, i) => [x.satir_id, i + 1])));
+    }
+    return m;
+  }, [tumGrup, yerelSira]);
 
   const eklenmisPersonel = useMemo(() => new Set(satirlar.map((s) => s.personel_id)), [satirlar]);
   const personelAdlari = useMemo(() => {
@@ -485,7 +497,10 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
     }
     const pid = aktif.personel_id;
     const tam = yerelSira[pid] ?? (tumGrup.get(pid) ?? []).map((s) => s.satir_id);
-    const yeni = arrayMove(tam, tam.indexOf(aktif.satir_id), tam.indexOf(hedef.satir_id));
+    const hamYeni = arrayMove(tam, tam.indexOf(aktif.satir_id), tam.indexOf(hedef.satir_id));
+    // Tamamlananlar listenin sonuna alınır: aktif satırlar DB'de 1..k sırasını alır
+    const tamamlandiSet = new Set((tumGrup.get(pid) ?? []).filter((x) => x.etkin_durum === "tamamlandi").map((x) => x.satir_id));
+    const yeni = [...hamYeni.filter((id) => !tamamlandiSet.has(id)), ...hamYeni.filter((id) => tamamlandiSet.has(id))];
     setYerelSira((p) => ({ ...p, [pid]: yeni }));
     const r = await satirSirala(plan.plan_id, pid, yeni);
     if (!r.success) {
@@ -964,18 +979,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, perso
                           </tr>
                           <SortableContext items={g.satirlar.map((s) => s.satir_id)} strategy={verticalListSortingStrategy}>
                             {!kapaliGruplar.has(g.pid) && g.satirlar.map((s) => {
-                              // Ürünsüz (boş) satırlar atlanır: en yakın dolu önceki/sonraki satır
-                              const onceki = [...tamListe].reverse().find((x) => x.sira < s.sira && x.sku);
-                              const sonraki = tamListe.find((x) => x.sira > s.sira && x.sku);
-                              const engelli: Record<string, string> = {};
-                              if (onceki?.sku) engelli[onceki.sku] = "Önceki satırda aynı ürün var";
-                              if (sonraki?.sku) engelli[sonraki.sku] = "Sonraki satırda aynı ürün var";
+                              // Görünen sıra: tamamlananlar çıkarıldıktan sonra 1..n
+                              const gosterSira = siraHaritasi.get(g.pid)?.get(s.satir_id) ?? s.sira;
                               return (
                                 <SatirRow
                                   key={s.satir_id}
                                   s={s}
                                   editable={editable}
-                                  engelli={engelli}
+                                  siraNo={gosterSira}
                                   depoStoklari={s.sku ? stoklar[s.sku] : undefined}
                                   islem={islem}
                                   sirali

@@ -69,7 +69,9 @@ export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props
   if (!talep) return null;
 
   const siraSayi = sira.trim() === "" ? null : Math.floor(Number(sira));
-  const dolu = siraSayi != null ? liste.find((l) => l.sira === siraSayi) : undefined;
+  // Tamamlananlar listeden düşer: sıra numarası görünen (aktif) satırlar arasındaki konumdur
+  const aktifListe = liste.filter((l) => l.etkin_durum !== "tamamlandi");
+  const dolu = siraSayi != null ? aktifListe[siraSayi - 1] : undefined;
   const personel = personeller.find((p) => p.user_id === personelId);
 
   const ata = async () => {
@@ -81,7 +83,8 @@ export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props
     const r = await talepTalimataAta({
       talepId: talep.talep_id,
       personelId,
-      sira: bosaEkle ? null : siraSayi,
+      // görünen konum -> gerçek sıra (aktif satırın gerçek sırası; listeden büyükse sona)
+      sira: bosaEkle || siraSayi == null ? null : (aktifListe[siraSayi - 1]?.sira ?? null),
       miktar,
       istasyon: istasyon || null,
       plakaId: istasyon === "kesim" ? plakaId : null,
@@ -165,16 +168,16 @@ export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props
                   min={1}
                   value={sira}
                   onChange={(e) => setSira(e.target.value)}
-                  placeholder={`${liste.length + 1}`}
+                  placeholder={`${aktifListe.length + 1}`}
                   className="w-24"
                 />
-                <span className="text-xs text-muted-foreground">Mevcut: {liste.length} satır</span>
+                <span className="text-xs text-muted-foreground">Mevcut: {aktifListe.length} satır</span>
               </div>
-              {liste.length > 0 && (
+              {aktifListe.length > 0 && (
                 <ol className="mt-2 max-h-28 space-y-0.5 overflow-y-auto rounded border bg-muted/30 p-2 text-xs">
-                  {liste.map((l) => (
-                    <li key={l.satir_id} className={cn("flex gap-2", l.sira === siraSayi && "font-semibold text-[#b8650c]")}>
-                      <span className="w-5 tabular-nums">{l.sira}.</span>
+                  {aktifListe.map((l, i) => (
+                    <li key={l.satir_id} className={cn("flex gap-2", i + 1 === siraSayi && "font-semibold text-[#b8650c]")}>
+                      <span className="w-5 tabular-nums">{i + 1}.</span>
                       <span className="truncate">
                         {l.sku ?? "(boş)"} {l.urun_adi ? `· ${l.urun_adi}` : ""}
                       </span>

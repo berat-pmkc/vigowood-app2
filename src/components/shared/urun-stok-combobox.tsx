@@ -15,8 +15,6 @@ interface Props {
   /** Seçili ürünün etiketi (liste dışında kalsa bile gösterilir) */
   label?: string | null;
   onChange: (urun: UrunStokSecenek) => void;
-  /** Seçilemeyecek SKU'lar (ör. ardışık kuralı) -> neden metniyle */
-  engelli?: Record<string, string>;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -24,7 +22,7 @@ interface Props {
 }
 
 /** Ürün kodu / adı ile sunucuda arama yapan, stok gösteren combobox */
-export function UrunStokCombobox({ value, label, onChange, engelli, placeholder = "Ürün seç...", disabled, className, compact }: Props) {
+export function UrunStokCombobox({ value, label, onChange, placeholder = "Ürün seç...", disabled, className, compact }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<UrunStokSecenek[]>([]);
@@ -75,12 +73,10 @@ export function UrunStokCombobox({ value, label, onChange, engelli, placeholder 
             {!loading && items.length === 0 && <CommandEmpty>Ürün bulunamadı</CommandEmpty>}
             <CommandGroup>
               {items.map((u) => {
-                const neden = engelli?.[u.sku];
                 return (
                   <CommandItem
                     key={u.sku}
                     value={u.sku}
-                    disabled={!!neden}
                     onSelect={() => {
                       onChange(u);
                       setOpen(false);
@@ -93,7 +89,6 @@ export function UrunStokCombobox({ value, label, onChange, engelli, placeholder 
                         <span className="font-medium">{u.sku}</span>
                         {u.urun_adi && <span className="text-muted-foreground"> · {u.urun_adi}</span>}
                       </div>
-                      {neden && <div className="text-[11px] text-[#c0424f]">{neden}</div>}
                     </div>
                     <span className="shrink-0 rounded bg-vw-light px-1.5 py-0.5 text-[11px] font-medium text-vw-deep">
                       Stok {u.toplam_stok}

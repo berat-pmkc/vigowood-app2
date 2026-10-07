@@ -12,40 +12,6 @@ export function parseRpcHata(message: string): { kod?: TalimatHataKodu; mesaj: s
   return { mesaj: message };
 }
 
-/**
- * Aynı personelde art arda aynı SKU var mı? (sunucu kuralının istemci ön kontrolü)
- * Satırlar tek personele ait olmalı; sıraya göre dizilir. İhlal eden ardışık sku'ları döner.
- */
-export function ardisikSkuIhlalleri(
-  satirlar: Array<Pick<TalimatSatir, "sira" | "sku">>,
-): Array<{ sira: number; sku: string }> {
-  // Ürünsüz (boş) satırlar atlanır: sunucu kuralıyla aynı
-  const sirali = satirlar.filter((s) => s.sku).sort((a, b) => a.sira - b.sira);
-  const ihlaller: Array<{ sira: number; sku: string }> = [];
-  for (let i = 1; i < sirali.length; i++) {
-    const onceki = sirali[i - 1].sku;
-    if (onceki && onceki === sirali[i].sku) ihlaller.push({ sira: sirali[i].sira, sku: onceki });
-  }
-  return ihlaller;
-}
-
-/**
- * Bir SKU'yu personelin listesine `sira` konumuna (araya girerek) eklemek ardışık kuralı bozar mı?
- * `mevcut`: personelin mevcut satırları. `hedefSira`: 1 tabanlı konum (null = sona).
- */
-export function ekleyinceArdisikOlur(
-  mevcut: Array<Pick<TalimatSatir, "sira" | "sku">>,
-  sku: string,
-  hedefSira: number | null,
-): boolean {
-  const tum = [...mevcut].sort((a, b) => a.sira - b.sira);
-  const idx = hedefSira == null ? tum.length : Math.min(Math.max(hedefSira - 1, 0), tum.length);
-  // Ürünsüz (boş) satırlar atlanır: en yakın dolu komşulara bakılır
-  const onceki = tum.slice(0, idx).reverse().find((x) => x.sku)?.sku ?? null;
-  const sonraki = tum.slice(idx).find((x) => x.sku)?.sku ?? null;
-  return onceki === sku || sonraki === sku;
-}
-
 /** Hızlı miktar sayfaları: 0 -> [50..250], 1 -> [300..500] ("daha fazla") */
 export function hizliMiktarlar(sayfa = 0): readonly number[] {
   return HIZLI_MIKTAR_SAYFALARI[Math.min(Math.max(sayfa, 0), HIZLI_MIKTAR_SAYFALARI.length - 1)];

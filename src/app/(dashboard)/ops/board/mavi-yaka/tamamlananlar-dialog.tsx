@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { RotateCcw } from "lucide-react";
+import { Check, ChevronsUpDown, RotateCcw, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
 import { personeleGoreGrupla } from "@/lib/talimat/helpers";
 import type { TalimatSatir } from "@/lib/talimat/types";
@@ -16,6 +19,23 @@ function zamanTr(iso: string | null): string {
     timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
+
+/** Türkçe karakterlerden bağımsız karşılaştırma (İ/ı/ş/ğ/ü/ö/ç) */
+const trNorm = (t: string | null | undefined) =>
+  (t ?? "")
+    .replace(/İ/g, "i")
+    .replace(/I/g, "i")
+    .toLocaleLowerCase("tr")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/ı/g, "i");
+
+const ISTASYON_CHIPS = [
+  { value: "", label: "Tümü" },
+  { value: "kesim", label: "Kesim" },
+  { value: "montaj", label: "Montaj" },
+  { value: "paketleme", label: "Paketleme" },
+];
 
 interface Props {
   open: boolean;
@@ -28,15 +48,54 @@ interface Props {
   yenidenAktifEt: (satirId: string, istenen: number) => Promise<void>;
 }
 
-/** Tamamlanan iş talimatı satırları (salt okunur) + "Tekrar aktif et" */
+/** Tamamlanan iş talimatı satırları (salt okunur) + filtreler + "Tekrar aktif et" */
 export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, yenidenAktifEt }: Props) {
+  const [arama, setArama] = useState("");
+  const [personelF, setPersonelF] = useState("");
+  const [istasyonF, setIstasyonF] = useState("");
+  const [urunF, setUrunF] = useState("");
+  const [urunAcik, setUrunAcik] = useState(false);
+
+  const personelSecenek = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of satirlar) m.set(s.personel_id, s.personel_adi ?? s.personel_id);
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "tr"));
+  }, [satirlar]);
+
+  const urunSecenek = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of satirlar) if (s.sku) m.set(s.sku, s.urun_adi ?? "");
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "tr"));
+  }, [satirlar]);
+
+  const filtreli = useMemo(() => {
+    const q = trNorm(arama.trim());
+    return satirlar.filter((s) => {
+      if (personelF && s.personel_id !== personelF) return false;
+      if (istasyonF && s.etkin_istasyon !== istasyonF) return false;
+      if (urunF && s.sku !== urunF) return false;
+      if (q && !trNorm(`${s.sku ?? ""} ${s.plaka_id ?? ""} ${s.urun_adi ?? ""} ${s.personel_adi ?? ""}`).includes(q)) return false;
+      return true;
+    });
+  }, [satirlar, arama, personelF, istasyonF, urunF]);
+
+  const filtreVar = !!(arama || personelF || istasyonF || urunF);
+  const temizle = () => {
+    setArama("");
+    setPersonelF("");
+    setIstasyonF("");
+    setUrunF("");
+  };
+
+  // Gruplar filtreli satırlardan türetilir: boş gruplar kendiliğinden gizlenir
   const gruplar = useMemo(
     () =>
-      [...personeleGoreGrupla(satirlar).entries()]
+      [...personeleGoreGrupla(filtreli).entries()]
         .map(([pid, liste]) => ({ pid, ad: liste[0]?.personel_adi ?? pid, liste }))
         .sort((a, b) => a.ad.localeCompare(b.ad, "tr")),
-    [satirlar],
+    [filtreli],
   );
+
   const [acik, setAcik] = useState<TalimatSatir | null>(null);
   const [deger, setDeger] = useState("");
   const [hata, setHata] = useState<string | null>(null);
@@ -58,9 +117,11 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
     setAcik(null);
   };
 
+  const kolonSayisi = editable ? 8 : 7;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-5xl">
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Tamamlananlar ({satirlar.length})</DialogTitle>
           <DialogDescription>
@@ -68,58 +129,155 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
           </DialogDescription>
         </DialogHeader>
 
-        {gruplar.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Bu hafta tamamlanan satır yok.</p>
-        ) : (
-          <div className="space-y-4">
-            {gruplar.map((g) => (
-              <div key={g.pid} className="overflow-x-auto rounded-md border">
-                <div className="bg-[#e6dfc9] px-3 py-1.5 text-sm font-bold text-vw-dark">{g.ad}</div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-xs text-muted-foreground">
-                      <th className="px-3 py-1.5">Sıra</th>
-                      <th className="px-3 py-1.5">İstasyon</th>
-                      <th className="px-3 py-1.5">Ürün</th>
-                      <th className="px-3 py-1.5 text-right">İstenen</th>
-                      <th className="px-3 py-1.5 text-right">Üretilen</th>
-                      <th className="px-3 py-1.5">Son üretim</th>
-                      <th className="px-3 py-1.5">Talep</th>
-                      {editable && <th className="px-3 py-1.5" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.liste.map((s) => (
-                      <tr key={s.satir_id} className="border-b last:border-0">
-                        <td className="px-3 py-1.5 tabular-nums">{s.sira}</td>
-                        <td className="px-3 py-1.5">{TALIMAT_ISTASYON_LABEL[s.etkin_istasyon]}</td>
-                        <td className="px-3 py-1.5">
-                          <span className="font-medium">{s.sku ?? s.plaka_id ?? "—"}</span>
-                          <span className="ml-2 text-muted-foreground">{s.urun_adi ?? ""}</span>
-                        </td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">{s.istenen_miktar ?? "—"}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">{s.uretilen}</td>
-                        <td className="whitespace-nowrap px-3 py-1.5">{zamanTr(s.son_seans_at)}</td>
-                        <td className="px-3 py-1.5">
-                          {s.talep_id ? (
-                            <Link href={`/talepler?talep=${s.talep_id}`} className="text-[#3368b1] underline">Talep</Link>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        {editable && (
-                          <td className="px-3 py-1.5 text-right">
-                            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => ac(s)}>
-                              <RotateCcw className="mr-1 h-3.5 w-3.5" /> Tekrar aktif et
-                            </Button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {satirlar.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={arama}
+                  onChange={(e) => setArama(e.target.value)}
+                  placeholder="Ürün kodu, ürün adı veya personel ara..."
+                  className="h-9 pl-8"
+                />
               </div>
-            ))}
+              <select
+                value={personelF}
+                onChange={(e) => setPersonelF(e.target.value)}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                aria-label="Personel"
+              >
+                <option value="">Tüm personel</option>
+                {personelSecenek.map(([id, ad]) => (
+                  <option key={id} value={id}>{ad}</option>
+                ))}
+              </select>
+              <Popover open={urunAcik} onOpenChange={setUrunAcik}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 max-w-[220px] justify-between font-normal">
+                    <span className="truncate">{urunF || "Tüm ürünler"}</span>
+                    <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[min(92vw,380px)] p-0" align="start">
+                  <Command filter={(value, search) => (trNorm(value).includes(trNorm(search)) ? 1 : 0)}>
+                    <CommandInput placeholder="Kod veya ad ara..." />
+                    <CommandList>
+                      <CommandEmpty>Ürün bulunamadı</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="tum urunler"
+                          onSelect={() => {
+                            setUrunF("");
+                            setUrunAcik(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", !urunF ? "opacity-100" : "opacity-0")} /> Tüm ürünler
+                        </CommandItem>
+                        {urunSecenek.map(([sku, ad]) => (
+                          <CommandItem
+                            key={sku}
+                            value={`${sku} ${ad}`}
+                            onSelect={() => {
+                              setUrunF(sku);
+                              setUrunAcik(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4 shrink-0", urunF === sku ? "opacity-100" : "opacity-0")} />
+                            <span className="truncate">
+                              <b>{sku}</b>
+                              {ad ? ` · ${ad}` : ""}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {ISTASYON_CHIPS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setIstasyonF(c.value)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                    istasyonF === c.value ? "border-vw-deep bg-vw-deep text-white" : "bg-background hover:bg-vw-light",
+                  )}
+                >
+                  {c.label}
+                </button>
+              ))}
+              <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                {filtreli.length} / {satirlar.length} kalem
+              </span>
+              {filtreVar && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={temizle}>
+                  <X className="mr-1 h-3.5 w-3.5" /> Temizle
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {satirlar.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Bu hafta tamamlanan satır yok.</p>
+        ) : gruplar.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Filtreye uyan kalem yok.</p>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-[#f0ede1] shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">
+                <tr className="text-left text-xs text-muted-foreground">
+                  <th className="px-3 py-1.5">Sıra</th>
+                  <th className="px-3 py-1.5">İstasyon</th>
+                  <th className="px-3 py-1.5">Ürün</th>
+                  <th className="px-3 py-1.5 text-right">İstenen</th>
+                  <th className="px-3 py-1.5 text-right">Üretilen</th>
+                  <th className="px-3 py-1.5">Son üretim</th>
+                  <th className="px-3 py-1.5">Talep</th>
+                  {editable && <th className="px-3 py-1.5" />}
+                </tr>
+              </thead>
+              {gruplar.map((g) => (
+                <tbody key={g.pid}>
+                  <tr>
+                    <td colSpan={kolonSayisi} className="bg-[#e6dfc9] px-3 py-1.5 text-sm font-bold text-vw-dark">
+                      {g.ad}
+                    </td>
+                  </tr>
+                  {g.liste.map((s) => (
+                    <tr key={s.satir_id} className="border-b last:border-0">
+                      <td className="px-3 py-1.5 tabular-nums">{s.sira}</td>
+                      <td className="px-3 py-1.5">{TALIMAT_ISTASYON_LABEL[s.etkin_istasyon]}</td>
+                      <td className="px-3 py-1.5">
+                        <span className="font-medium">{s.sku ?? s.plaka_id ?? "—"}</span>
+                        <span className="ml-2 text-muted-foreground">{s.urun_adi ?? ""}</span>
+                      </td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{s.istenen_miktar ?? "—"}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums">{s.uretilen}</td>
+                      <td className="whitespace-nowrap px-3 py-1.5">{zamanTr(s.son_seans_at)}</td>
+                      <td className="px-3 py-1.5">
+                        {s.talep_id ? (
+                          <Link href={`/talepler?talep=${s.talep_id}`} className="text-[#3368b1] underline">Talep</Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      {editable && (
+                        <td className="px-3 py-1.5 text-right">
+                          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => ac(s)}>
+                            <RotateCcw className="mr-1 h-3.5 w-3.5" /> Tekrar aktif et
+                          </Button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
+            </table>
           </div>
         )}
 
