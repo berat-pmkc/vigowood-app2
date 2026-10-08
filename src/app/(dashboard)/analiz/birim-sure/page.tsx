@@ -19,6 +19,8 @@ import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { resolveGranularity, buildSeries } from "../_shared/series";
 import { fmtNum, round } from "../_shared/utils";
 import { getBirimSure, getProductNames, type BirimSureData } from "../_shared/queries";
+import { asamaRengi } from "@/lib/talimat/hat-renk";
+import { getAnalizHatlar } from "../_shared/hat-data";
 import { getStandardTimes, type StandardTimes } from "../_shared/performance";
 import { getPaketlemeBySku, safe } from "../_shared/queries-d2";
 import { periodQuery } from "../_shared/queries-d1";
@@ -71,13 +73,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const hasPrev = !!period.prevFrom && !!period.prevTo;
   const needPrev = hasPrev && metric === CHIPS[0].key && !hasActiveFilters(parseColumnFilters(sp, COLS));
-  const [birim, std, pack, names, birimPrev] = await Promise.all([
+  const [hatlar, birim, std, pack, names, birimPrev] = await Promise.all([
+    getAnalizHatlar(),
     safe(getBirimSure(from, to), EMPTY_BIRIM),
     safe(getStandardTimes(), EMPTY_STD),
     safe(getPaketlemeBySku(from, to), [] as { sku: string; qty: number; avgDk: number }[]),
     safe(getProductNames(), new Map<string, string>()),
     needPrev ? safe(getBirimSure(period.prevFrom, period.prevTo), EMPTY_BIRIM) : Promise.resolve(null),
   ]);
+
+  const montajColor = asamaRengi("montaj", hatlar);
+  const paketColor = asamaRengi("paketleme", hatlar);
 
   // Adım ve ürün satırları (standart + fark)
   const stepRows = birim.byStep.map((s) => {
@@ -185,7 +191,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         .slice(0, 10)
         .map((r) => ({ label: trunc(r.label), avg: r.avg, std: r.std })),
       series: [
-        { key: "avg", label: "Ortalama", color: isP ? "#3368b1" : "#8d9d70" },
+        { key: "avg", label: "Ortalama", color: isP ? paketColor : montajColor },
         { key: "std", label: "Standart", color: "#adb5be" },
       ],
     };
@@ -196,7 +202,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       xKey: "label",
       unit: " dk",
       data: buildSeries(from, to, g, { v: birim.paketlemeByDay }, "avg"),
-      series: [{ key: "v", label: "Paketleme", color: "#3368b1" }],
+      series: [{ key: "v", label: "Paketleme", color: paketColor }],
     };
   } else if (focus.chartMetric === "adim") {
     chart = {
@@ -210,7 +216,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         .slice(0, 10)
         .map((r) => ({ label: trunc(r.label), avg: r.avg, std: r.std })),
       series: [
-        { key: "avg", label: "Ortalama", color: "#8d9d70" },
+        { key: "avg", label: "Ortalama", color: montajColor },
         { key: "std", label: "Standart", color: "#adb5be" },
       ],
     };
@@ -226,7 +232,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         .slice(0, 10)
         .map((r) => ({ label: trunc(r.label), avg: r.avg, std: r.std })),
       series: [
-        { key: "avg", label: "Ortalama", color: "#3368b1" },
+        { key: "avg", label: "Ortalama", color: paketColor },
         { key: "std", label: "Standart", color: "#adb5be" },
       ],
     };
@@ -237,15 +243,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       xKey: "label",
       unit: " dk",
       data: buildSeries(from, to, g, { v: birim.montajByDay }, "avg"),
-      series: [{ key: "v", label: "Montaj", color: "#8d9d70" }],
+      series: [{ key: "v", label: "Montaj", color: montajColor }],
     };
   }
   const { title, ...chartProps } = chart;
 
   const mk = (k: string) => !focus.showCard(k);
   const summaryItems: SummaryItem[] = [
-    { key: "montaj", label: "Montaj", short: "Montaj", unit: "dk", lowerBetter: true, cur: montajAvg, prev: birimPrev?.montajAvg ?? null, muted: mk("montaj") },
-    { key: "paketleme", label: "Paketleme", short: "Paketl.", unit: "dk", lowerBetter: true, cur: paketlemeAvg, prev: birimPrev?.paketlemeAvg ?? null, muted: mk("paketleme") },
+    { key: "montaj", label: "Montaj", short: "Montaj", unit: "dk", lowerBetter: true, cur: montajAvg, prev: birimPrev?.montajAvg ?? null, muted: mk("montaj"), color: montajColor },
+    { key: "paketleme", label: "Paketleme", short: "Paketl.", unit: "dk", lowerBetter: true, cur: paketlemeAvg, prev: birimPrev?.paketlemeAvg ?? null, muted: mk("paketleme"), color: paketColor },
     { key: "yavas", label: "En Yavaş Adım", short: "Yavaş", unit: "dk", lowerBetter: true, cur: listIsUrun ? null : (slowest?.avg ?? null), prev: prevSlowest?.avg ?? null, muted: mk("yavas") || listIsUrun },
     { key: "hizli", label: "En Hızlı Adım", short: "Hızlı", unit: "dk", lowerBetter: true, cur: listIsUrun ? null : (fastest?.avg ?? null), prev: prevFastest?.avg ?? null, muted: mk("hizli") || listIsUrun },
   ];
@@ -264,18 +270,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
     <>
       <StatCard
         title="Montaj Birim Süre"
+        accent={montajColor}
         empty={mut("montaj", montajAvg === null)}
         value={dk(montajAvg)}
         subtitle="dk / adet, adet ağırlıklı"
       />
       <StatCard
         title="Paketleme Birim Süre"
+        accent={paketColor}
         empty={mut("paketleme", paketlemeAvg === null)}
         value={dk(paketlemeAvg)}
         subtitle="dk / adet, adet ağırlıklı"
       />
-      <StatCard title="En Yavaş Adım" empty={mut("yavas", listIsUrun || !slowest)} value={slowCard.value} subtitle={slowCard.subtitle} />
-      <StatCard title="En Hızlı Adım" empty={mut("hizli", listIsUrun || !fastest)} value={fastCard.value} subtitle={fastCard.subtitle} />
+      <StatCard title="En Yavaş Adım" accent={montajColor} empty={mut("yavas", listIsUrun || !slowest)} value={slowCard.value} subtitle={slowCard.subtitle} />
+      <StatCard title="En Hızlı Adım" accent={montajColor} empty={mut("hizli", listIsUrun || !fastest)} value={fastCard.value} subtitle={fastCard.subtitle} />
     </>
   );
 

@@ -202,6 +202,7 @@ export interface MontajSessionRow {
   workers: { id: string; name: string }[];
   birim: number | null;
   day: string;
+  hatId: string | null;
 }
 
 export async function getMontajSessions(from: string | null, to: string | null): Promise<MontajSessionRow[]> {
@@ -210,7 +211,7 @@ export async function getMontajSessions(from: string | null, to: string | null):
     let q = s
       .from("montaj_sessions")
       .select(
-        "session_id, sku, step_id, step_name, qty, net_sure_dk, worker_count, workers, operator_id, operator_name, birim_montaj_dk, created_at, start_time, end_time",
+        "session_id, sku, step_id, step_name, qty, net_sure_dk, worker_count, workers, operator_id, operator_name, birim_montaj_dk, created_at, start_time, end_time, hat_id",
       )
       .eq("durum", "tamamlandi")
       .order("session_id");
@@ -236,6 +237,7 @@ export async function getMontajSessions(from: string | null, to: string | null):
       workers: ws,
       birim: r.birim_montaj_dk === null || r.birim_montaj_dk === undefined ? null : Number(r.birim_montaj_dk),
       day,
+      hatId: r.hat_id ?? null,
     });
   }
   return out;

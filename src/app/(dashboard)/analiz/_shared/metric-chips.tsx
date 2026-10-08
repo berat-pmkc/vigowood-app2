@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 export interface MetricChip {
   key: string;
   label: string;
+  /** Aşama / hat rengi: etiketin önünde küçük nokta */
+  color?: string;
 }
 
 interface MetricChipsProps {
@@ -42,6 +44,13 @@ export function MetricChips({ chips, param = "m", active }: MetricChipsProps) {
                 : "bg-[#f0ede1] text-[#5e5747] hover:bg-[#cdbd9d]/50"
             }`}
           >
+            {c.color && (
+              <span
+                aria-hidden
+                className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle ring-1 ring-white/70"
+                style={{ backgroundColor: c.color }}
+              />
+            )}
             {c.label}
           </button>
         );

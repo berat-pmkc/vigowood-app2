@@ -33,6 +33,8 @@ interface CompactListProps {
   filterOptions?: Record<string, string[]>;
   /** Odak modu: listelenen kolonlar odakta; diğerlerinin başlığı soluk, hücreleri boş görünür (kolon ve filtre chip'leri yerinde kalır). */
   visibleColumns?: string[];
+  /** `dot` kolonları için değer → renk (ör. hat adı → hat rengi) */
+  dotColors?: Record<string, string>;
 }
 
 const FIRST = 5;
@@ -66,6 +68,7 @@ export function CompactList({
   emptyText = "Bu dönemde kayıt yok",
   filterOptions,
   visibleColumns,
+  dotColors,
 }: CompactListProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -195,7 +198,20 @@ export function CompactList({
                       c.align === "right" ? "text-right tabular-nums" : "text-left"
                     }`}
                   >
-                    {isMuted(c.key) ? "" : fmt(r[c.key] ?? null, c.format)}
+                    {isMuted(c.key) ? (
+                      ""
+                    ) : c.dot && r[c.key] ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          aria-hidden
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10"
+                          style={{ backgroundColor: dotColors?.[String(r[c.key])] ?? "#5e5747" }}
+                        />
+                        {fmt(r[c.key] ?? null, c.format)}
+                      </span>
+                    ) : (
+                      fmt(r[c.key] ?? null, c.format)
+                    )}
                   </td>
                 ))}
               </tr>

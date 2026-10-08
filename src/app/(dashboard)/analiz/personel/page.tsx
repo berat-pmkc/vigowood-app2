@@ -7,6 +7,7 @@ import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
 import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
+import { asamaRengi } from "@/lib/talimat/hat-renk";
 import { StatCard } from "../_shared/stat-card";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
 import {
@@ -147,7 +148,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       xKey="label"
       unit="%"
       data={people.slice(0, 20).map((p) => ({ label: trunc(p.name), v: p.pct }))}
-      series={[{ key: "v", label: "Performans", color: "#70c1aa" }]}
+      series={[{ key: "v", label: "Performans", color: asamaRengi("personel") }]}
     />
   );
 
@@ -160,7 +161,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       xKey="label"
       unit=" sa"
       data={byHours.slice(0, 20).map((p) => ({ label: trunc(p.name), v: round(p.actual / 60, 1) }))}
-      series={[{ key: "v", label: "Adam saat", color: "#3368b1" }]}
+      series={[{ key: "v", label: "Adam saat", color: "#5e5747" }]}
     />
   );
 
@@ -190,7 +191,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
             std: std.montaj.get(s.stepId) ?? null,
           }))}
         series={[
-          { key: "kisi", label: "Kişi", color: "#8d9d70" },
+          { key: "kisi", label: "Kişi", color: asamaRengi("personel") },
           { key: "std", label: "Standart", color: "#adb5be" },
         ]}
       />
@@ -223,18 +224,21 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const cards = (
     <>
       <StatCard
+        accent={asamaRengi("personel")}
         title="Personel Adam Saat Çalışma Süresi"
         empty={mut("saat", people.length === 0)}
         value={`${fmtNum(totalHours, 1)} sa`}
         subtitle={`${people.length} kişi, net seans süresi (mola düşülmüş)`}
       />
       <StatCard
+        accent={asamaRengi("personel")}
         title="Ortalama Birim Süre"
         empty={mut("birim", montajAvg === null)}
         value={montajAvg === null ? "—" : `${montajAvg.toLocaleString("tr-TR")} dk`}
         subtitle="Montaj, dk / adet (adet ağırlıklı)"
       />
       <StatCard
+        accent={asamaRengi("personel")}
         title="Genel Performans"
         empty={mut("perf", overallPct === null)}
         value={overallPct === null ? "—" : `%${overallPct.toLocaleString("tr-TR")}`}

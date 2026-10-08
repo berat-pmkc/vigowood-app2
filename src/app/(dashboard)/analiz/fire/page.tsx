@@ -100,7 +100,7 @@ export default async function FirePage({ searchParams }: { searchParams: Promise
   const filtersOn = hasActiveFilters(parseColumnFilters(sp, FIRE_COLS));
   const needPrev = metric === CHIPS[0].key && hasPrev && !filtersOn;
   const EMPTY_KAL = { available: false, rows: [] as KaliteRow[] };
-  const EMPTY_URETIM: UretimData = { total: 0, byDay: {}, bySku: {} };
+  const EMPTY_URETIM: UretimData = { total: 0, byDay: {}, bySku: {}, byHatDay: {} };
   const [kal, uretim, aktif, kalPrev, uretimPrev] = await Promise.all([
     safe(getKaliteRows(from, to, "FIRE"), EMPTY_KAL),
     safe(getUretim(from, to), EMPTY_URETIM),

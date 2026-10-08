@@ -5,6 +5,7 @@ import { bucketKey, bucketLabel, resolvePeriod, trDay, type ResolvedPeriod } fro
 import { AnalizLayout } from "../_shared/analiz-layout";
 import { AnalizChart, type AnalizChartProps } from "../_shared/analiz-chart";
 import type { MetricChip } from "../_shared/metric-chips";
+import { asamaRengi } from "@/lib/talimat/hat-renk";
 import { StatCard } from "../_shared/stat-card";
 import { SummaryChart, type SummaryItem } from "../_shared/summary-chart";
 import { CompactList, type CompactColumn, type CompactRow } from "../_shared/compact-list";
@@ -91,9 +92,9 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
   });
   switch (metric) {
     case "parca":
-      return one("Kesilen parça adedi", d.partByDay, "#f28a19", "Parça");
+      return one("Kesilen parça adedi", d.partByDay, "#5e5747", "Parça");
     case "sure":
-      return one("Planlanan kesim süresi (saat)", d.minByDay, "#6f4c37", "Süre", " sa");
+      return one("Planlanan kesim süresi (saat)", d.minByDay, "#474237", "Süre", " sa");
     case "uygunsuz":
       return one("Uygunsuz yarı mamul (kesim)", d.k.byDay.uygunsuz, "#f28a19", "Uygunsuz");
     case "fire":
@@ -102,7 +103,7 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
       return one("Dönüştürülen yarı mamul", d.k.byDay.donusum, "#70c1aa", "Dönüşüm");
     case "plaka":
     default:
-      return one("Kesilen plaka adedi", d.plateByDay, "#3368b1", "Plaka");
+      return one("Kesilen plaka adedi", d.plateByDay, asamaRengi("kesim"), "Plaka");
   }
 }
 
@@ -331,12 +332,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
   const mk = (k: string) => !focus.showCard(k);
   const summaryItems: SummaryItem[] = [
-    { key: "plaka", label: "Kesilen Plaka", short: "Plaka", unit: "adet", cur: cur.plates, prev: prev?.plates ?? null, muted: mk("plaka") },
-    { key: "parca", label: "Kesilen Parça", short: "Parça", unit: "adet", cur: cur.parts, prev: prev?.parts ?? null, muted: mk("parca") },
-    { key: "sure", label: "Planlanan Süre", short: "Süre", unit: "sa", cur: round(hours, 1), prev: prev ? round(prev.plannedMin / 60, 1) : null, muted: mk("sure") },
-    { key: "uygunsuz", label: "Uygunsuz YM", short: "Uygunsuz", unit: "adet", lowerBetter: true, cur: uyg, prev: uygPrev, muted: mk("uygunsuz") },
-    { key: "donusum", label: "Dönüştürülen YM", short: "Dönüşüm", unit: "adet", cur: donusum, prev: donusumPrev, muted: mk("donusum") },
-    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: cur.k.fire, prev: prev?.k.fire ?? null, muted: mk("fire") },
+    { key: "plaka", label: "Kesilen Plaka", short: "Plaka", unit: "adet", cur: cur.plates, prev: prev?.plates ?? null, muted: mk("plaka"), color: asamaRengi("kesim") },
+    { key: "parca", label: "Kesilen Parça", short: "Parça", unit: "adet", cur: cur.parts, prev: prev?.parts ?? null, muted: mk("parca"), color: asamaRengi("kesim") },
+    { key: "sure", label: "Planlanan Süre", short: "Süre", unit: "sa", cur: round(hours, 1), prev: prev ? round(prev.plannedMin / 60, 1) : null, muted: mk("sure"), color: asamaRengi("kesim") },
+    { key: "uygunsuz", label: "Uygunsuz YM", short: "Uygunsuz", unit: "adet", lowerBetter: true, cur: uyg, prev: uygPrev, muted: mk("uygunsuz"), color: asamaRengi("kesim") },
+    { key: "donusum", label: "Dönüştürülen YM", short: "Dönüşüm", unit: "adet", cur: donusum, prev: donusumPrev, muted: mk("donusum"), color: asamaRengi("kesim") },
+    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: cur.k.fire, prev: prev?.k.fire ?? null, muted: mk("fire"), color: asamaRengi("fire") },
   ];
   const chartNode =
     focus.chartMetric === CHIPS[0].key ? (
@@ -349,6 +350,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const cards = (
     <>
       <StatCard
+        accent={asamaRengi("kesim")}
         title="Kesilen Plaka"
         empty={mut("plaka", cur.plates === 0)}
         value={fmtNum(cur.plates)}
@@ -356,6 +358,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         delta={prev ? deltaPct(cur.plates, prev.plates) : null}
       />
       <StatCard
+        accent={asamaRengi("kesim")}
         title="Kesilen Parça"
         empty={mut("parca", cur.parts === 0)}
         value={fmtNum(cur.parts)}
@@ -363,6 +366,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         delta={prev ? deltaPct(cur.parts, prev.parts) : null}
       />
       <StatCard
+        accent={asamaRengi("kesim")}
         title="Planlanan Kesim Süresi"
         empty={mut("sure", cur.plannedMin === 0)}
         value={`${fmtNum(hours, 1)} saat`}
@@ -370,6 +374,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         delta={prev ? deltaPct(cur.plannedMin, prev.plannedMin) : null}
       />
       <StatCard
+        accent={asamaRengi("kesim")}
         title="Uygunsuz YM"
         empty={mut("uygunsuz", uyg === 0)}
         value={fmtNum(uyg)}
@@ -378,6 +383,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         inverseDelta
       />
       <StatCard
+        accent={asamaRengi("kesim")}
         title="Dönüştürülen YM"
         empty={mut("donusum", donusum === 0)}
         value={fmtNum(donusum)}
@@ -385,6 +391,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         delta={donusumPrev !== null ? deltaPct(donusum, donusumPrev) : null}
       />
       <StatCard
+        accent={asamaRengi("kesim")}
         title="Fire"
         empty={mut("fire", cur.k.fire === 0)}
         value={fmtNum(cur.k.fire)}

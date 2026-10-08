@@ -51,25 +51,30 @@ export interface UretimData {
   total: number;
   byDay: DayMap;
   bySku: Record<string, number>;
+  /** Paketleme hattı (hat_id, atanmamış = "_yok") → gün → adet */
+  byHatDay: Record<string, DayMap>;
 }
 
 export async function getUretim(from: string | null, to: string | null): Promise<UretimData> {
   const s = await sb();
-  const rows = await fetchAll<{ tarih: string | null; end_time: string | null; qty: number | null; sku: string | null }>((lo, hi) => {
-    let q = s.from("pack_events").select("tarih, end_time, qty, sku").eq("durum", "tamamlandi").order("session_id");
+  const rows = await fetchAll<{ tarih: string | null; end_time: string | null; qty: number | null; sku: string | null; hat_id: string | null }>((lo, hi) => {
+    let q = s.from("pack_events").select("tarih, end_time, qty, sku, hat_id").eq("durum", "tamamlandi").order("session_id");
     q = closeRange(q, "end_time", "tarih", from, to);
     return q.range(lo, hi);
   });
   const byDay: DayMap = {};
   const bySku: Record<string, number> = {};
+  const byHatDay: Record<string, DayMap> = {};
   let total = 0;
   for (const r of rows) {
     const qty = Number(r.qty ?? 0);
     total += qty;
-    add(byDay, trDay(r.end_time ?? r.tarih), qty);
+    const day = trDay(r.end_time ?? r.tarih);
+    add(byDay, day, qty);
+    add((byHatDay[r.hat_id ?? "_yok"] ??= {}), day, qty);
     if (r.sku) bySku[r.sku] = (bySku[r.sku] ?? 0) + qty;
   }
-  return { total, byDay, bySku };
+  return { total, byDay, bySku, byHatDay };
 }
 
 // ─── Montaj ─────────────────────────────────────────────────────
@@ -82,6 +87,8 @@ export interface MontajData {
   sessions: number;
   byDay: DayMap;
   byStep: Record<string, number>;
+  /** Montaj hattı (hat_id, atanmamış = "_yok") → gün → adet */
+  byHatDay: Record<string, DayMap>;
 }
 
 export async function getMontaj(from: string | null, to: string | null): Promise<MontajData> {
@@ -93,10 +100,11 @@ export async function getMontaj(from: string | null, to: string | null): Promise
     created_at: string | null;
     step_id: string;
     is_final_step: boolean | null;
+    hat_id: string | null;
   }>((lo, hi) => {
     let q = s
       .from("montaj_sessions")
-      .select("qty, end_time, start_time, created_at, step_id, is_final_step")
+      .select("qty, end_time, start_time, created_at, step_id, is_final_step, hat_id")
       .eq("durum", "tamamlandi")
       .order("session_id");
     q = closeRange(q, "end_time", "start_time", from, to);
@@ -104,16 +112,19 @@ export async function getMontaj(from: string | null, to: string | null): Promise
   });
   const byDay: DayMap = {};
   const byStep: Record<string, number> = {};
+  const byHatDay: Record<string, DayMap> = {};
   let total = 0;
   let finalTotal = 0;
   for (const r of rows) {
     const qty = Number(r.qty ?? 0);
     total += qty;
     if (r.is_final_step) finalTotal += qty;
-    add(byDay, trDay(r.end_time ?? r.start_time ?? r.created_at), qty);
+    const day = trDay(r.end_time ?? r.start_time ?? r.created_at);
+    add(byDay, day, qty);
+    add((byHatDay[r.hat_id ?? "_yok"] ??= {}), day, qty);
     byStep[r.step_id] = (byStep[r.step_id] ?? 0) + qty;
   }
-  return { total, finalTotal, sessions: rows.length, byDay, byStep };
+  return { total, finalTotal, sessions: rows.length, byDay, byStep, byHatDay };
 }
 
 // ─── Kesim ──────────────────────────────────────────────────────

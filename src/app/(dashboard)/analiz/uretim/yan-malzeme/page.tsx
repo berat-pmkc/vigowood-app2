@@ -178,7 +178,7 @@ export default async function YanMalzemePage({ searchParams }: { searchParams: P
       layout: "vertical",
       xKey: "label",
       data: byStep.slice(0, 10).map(([step, qty]) => ({ label: trunc(step), qty: round(qty, 2) })),
-      series: [{ key: "qty", label: "Kullanım", color: "#3368b1" }],
+      series: [{ key: "qty", label: "Kullanım", color: "#0c1c2d" }],
     };
   } else {
     chart = {

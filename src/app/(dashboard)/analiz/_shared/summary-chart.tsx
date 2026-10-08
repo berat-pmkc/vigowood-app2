@@ -19,6 +19,8 @@ export interface SummaryItem {
   prev: number | null;
   /** true: odak dışı; kategori eksende kalır ama çubuk/etiket gösterilmez */
   muted?: boolean;
+  /** Çubuk rengi (aşama rengi); yoksa varsayılan koyu ton */
+  color?: string;
 }
 
 export interface SummaryChartProps {

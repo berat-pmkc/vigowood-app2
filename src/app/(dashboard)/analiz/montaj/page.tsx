@@ -18,6 +18,10 @@ import {
 import { resolveFocus, type FocusMap } from "../_shared/focus";
 import { buildSeries, resolveGranularity } from "../_shared/series";
 import { deltaPct, fmtNum, round } from "../_shared/utils";
+import { asamaRengi, hatHaritasi, HAT_ATANMAMIS_AD, HAT_ATANMAMIS_RENK } from "@/lib/talimat/hat-renk";
+import type { TalimatHat } from "@/lib/talimat/types";
+import { getAnalizHatlar, hatSerileri, hatToplamlari } from "../_shared/hat-data";
+import { HatLegend } from "../_shared/hat-legend";
 import { periodQuery } from "../_shared/queries-d1";
 import {
   addTo,
@@ -40,6 +44,7 @@ export const revalidate = 30;
 const CHIPS: MetricChip[] = [
   { key: "tumu", label: "Tümü" },
   { key: "adet", label: "İş Adımı Adedi" },
+  { key: "hat", label: "Hatlara Göre" },
   { key: "birim-sure", label: "Birim Süre" },
   { key: "calisan", label: "Çalışan Sayısı" },
   { key: "uygunsuz", label: "Uygunsuz" },
@@ -124,10 +129,29 @@ const EMPTY: Summary = {
   fireByDay: {},
 };
 
-function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary): AnalizChartProps & { title: string } {
+function buildChart(
+  metric: string,
+  period: ResolvedPeriod,
+  sp: SP,
+  d: Summary,
+  hatlar: TalimatHat[],
+  byHatDay: Record<string, DayMap>,
+): AnalizChartProps & { title: string } {
   const { from, to } = period;
   const g = resolveGranularity(sp.g, from, to);
+  const montajColor = asamaRengi("montaj", hatlar);
   switch (metric) {
+    case "hat": {
+      const hs = hatSerileri(hatlar, byHatDay);
+      return {
+        title: "Hatlara göre iş adımı adedi",
+        type: "bar",
+        xKey: "label",
+        stacked: true,
+        data: hs.series.length ? buildSeries(from, to, g, hs.maps) : [],
+        series: hs.series,
+      };
+    }
     case "birim-sure":
       return {
         title: "Birim süre (dk / adet, adet ağırlıklı)",
@@ -135,7 +159,7 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
         xKey: "label",
         unit: " dk",
         data: ratioSeries(from, to, g, { v: { num: d.birimNum, den: d.birimDen } }),
-        series: [{ key: "v", label: "Birim süre", color: "#8d9d70" }],
+        series: [{ key: "v", label: "Birim süre", color: asamaRengi("birimSure") }],
       };
     case "calisan":
       return {
@@ -143,7 +167,7 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
         type: "line",
         xKey: "label",
         data: buildSeries(from, to, g, { v: d.workersByDay }, "avg"),
-        series: [{ key: "v", label: "Çalışan", color: "#3368b1" }],
+        series: [{ key: "v", label: "Çalışan", color: asamaRengi("personel") }],
       };
     case "uygunsuz":
       return {
@@ -168,7 +192,7 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
         type: "bar",
         xKey: "label",
         data: buildSeries(from, to, g, { v: d.qtyByDay }),
-        series: [{ key: "v", label: "Adet", color: "#8d9d70" }],
+        series: [{ key: "v", label: "Adet", color: montajColor }],
       };
   }
 }
@@ -176,6 +200,7 @@ function buildChart(metric: string, period: ResolvedPeriod, sp: SP, d: Summary):
 const COLS: CompactColumn[] = [
   { key: "donem", label: "Dönem" },
   { key: "sku", label: "Ürün Kodu" },
+  { key: "hat", label: "Hat", dot: true },
   { key: "adim", label: "İş Adımı Kodu" },
   { key: "kisi", label: "Personel Adı Soyadı" },
   { key: "part", label: "Parça/Ürün" },
@@ -190,6 +215,7 @@ const FOCUS: FocusMap = {
   defaultChip: "tumu",
   chips: {
     adet: { cards: ["adet"], cols: ["adet"] },
+    hat: { cards: ["adet"], cols: ["adet"] },
     "birim-sure": { cards: ["birim"], cols: ["birim"] },
     calisan: { cards: ["calisan"], cols: [] },
     uygunsuz: { cards: ["uygunsuz", "kontrol"], cols: ["uygunsuz", "kontrol"] },
@@ -215,6 +241,8 @@ interface Acc {
   person: string;
   /** Seansa bağlı olmayan kalite kayıtlarında parça/ürün kodu; seans satırlarında "—" */
   part: string;
+  /** Montaj hattı (atanmamış = null) */
+  hatId: string | null;
   qty: number;
   num: number;
   den: number;
@@ -238,8 +266,9 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
     pid: string,
     pname: string,
     part: string,
+    hatId: string | null,
   ) => {
-    const key = `${bk}|${sku}|${stepId}|${pid}|${part}`;
+    const key = `${bk}|${sku}|${stepId}|${pid}|${part}|${hatId ?? ""}`;
     let a = acc.get(key);
     if (!a) {
       a = {
@@ -250,6 +279,7 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
         personId: pid,
         person: pname,
         part,
+        hatId,
         qty: 0,
         num: 0,
         den: 0,
@@ -265,7 +295,7 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
     return a;
   };
   const getAcc = (s: MontajSessionRow, pid: string, pname: string) =>
-    getAccRaw(bucketKey(s.day, g), s.sku, s.step_id, s.step_name, pid, pname, "—");
+    getAccRaw(bucketKey(s.day, g), s.sku, s.step_id, s.step_name, pid, pname, "—", s.hatId);
 
   for (const s of sessions) {
     bySession.set(s.session_id, s);
@@ -304,6 +334,7 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
         r.operator_id ?? pname,
         pname,
         r.item_id ?? "—",
+        null,
       );
       for (const c of kaliteContribution(r)) {
         a.m[c.metric] += c.value;
@@ -337,9 +368,10 @@ function buildAccs(sessions: MontajSessionRow[], kalite: KaliteRow[], g: Gran): 
   );
 }
 
-const toRow = (a: Acc, g: Gran): CompactRow => ({
+const toRow = (a: Acc, g: Gran, hatAd: (id: string | null) => string): CompactRow => ({
   donem: bucketLabel(a.bucket, g),
   sku: a.sku,
+  hat: hatAd(a.hatId),
   adim: a.stepName ? `${a.stepId} · ${a.stepName}` : a.stepId,
   kisi: a.person,
   part: a.part,
@@ -417,7 +449,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const g = resolveGranularity(sp.g, from, to);
 
   const hasPrev = !!(period.prevFrom && period.prevTo);
-  const [sessions, kalite, prevSessions, prevKalite] = await Promise.all([
+  const [hatlar, sessions, kalite, prevSessions, prevKalite] = await Promise.all([
+    getAnalizHatlar(),
     safe(getMontajSessions(from, to), [] as MontajSessionRow[]),
     safe(getKaliteRows(from, to), [] as KaliteRow[]),
     hasPrev ? safe(getMontajSessions(period.prevFrom, period.prevTo), [] as MontajSessionRow[]) : Promise.resolve(null),
@@ -425,29 +458,40 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   ]);
 
   // Kolon filtreleri: kart + grafik + liste eşleşen satırlardan türer
+  const hatMap = hatHaritasi(hatlar);
+  const hatAd = (id: string | null) => (id ? hatMap.get(id)?.ad : undefined) ?? HAT_ATANMAMIS_AD;
+  const dotColors: Record<string, string> = { [HAT_ATANMAMIS_AD]: HAT_ATANMAMIS_RENK };
+  for (const v of hatMap.values()) dotColors[v.ad] = v.renk;
   const accs = buildAccs(sessions, kalite, g);
   const colFilters = parseColumnFilters(sp, COLS);
   const filtActive = hasActiveFilters(colFilters);
   const focus = resolveFocus(FOCUS, metric, colFilters, COLS, CHIPS);
-  const matched = pickByFilters(accs, (a) => toRow(a, g), colFilters);
-  const options = distinctOptions(accs.map((a) => toRow(a, g)), COLS);
-  const rows = matched.map((a) => toRow(a, g));
+  const matched = pickByFilters(accs, (a) => toRow(a, g, hatAd), colFilters);
+  const options = distinctOptions(accs.map((a) => toRow(a, g, hatAd)), COLS);
+  const rows = matched.map((a) => toRow(a, g, hatAd));
+  const byHatDay: Record<string, DayMap> = {};
+  for (const a of matched) {
+    const m = (byHatDay[a.hatId ?? "_yok"] ??= {});
+    for (const [d, v] of Object.entries(a.qtyByDay)) m[d] = (m[d] ?? 0) + v;
+  }
+  const hatToplam = hatToplamlari(hatlar, byHatDay);
+  const montajColor = asamaRengi("montaj", hatlar);
 
   const cur = filtActive ? summarizeAccs(matched) : summarize(sessions, kalite);
   // Önceki dönem kıyası filtreye uygulanamaz; filtre aktifken gizlenir
   const prev = !filtActive && prevSessions && prevKalite ? summarize(prevSessions, prevKalite) : null;
   void EMPTY;
 
-  const { title, ...chartProps } = buildChart(focus.chartMetric, period, sp, cur);
+  const { title, ...chartProps } = buildChart(focus.chartMetric, period, sp, cur, hatlar, byHatDay);
 
   const mk = (k: string) => !focus.showCard(k);
   const summaryItems: SummaryItem[] = [
-    { key: "adet", label: "İş Adımı Adedi", short: "Adet", unit: "adet", cur: cur.qty, prev: prev?.qty ?? null, muted: mk("adet") },
-    { key: "calisan", label: "Ort. Çalışan", short: "Çalışan", unit: "kişi", cur: cur.avgWorkers, prev: prev?.avgWorkers ?? null, muted: mk("calisan") },
-    { key: "birim", label: "Birim Süre", short: "B.Süre", unit: "dk", lowerBetter: true, cur: cur.birim, prev: prev?.birim ?? null, muted: mk("birim") },
+    { key: "adet", label: "İş Adımı Adedi", short: "Adet", unit: "adet", cur: cur.qty, prev: prev?.qty ?? null, muted: mk("adet"), color: montajColor },
+    { key: "calisan", label: "Ort. Çalışan", short: "Çalışan", unit: "kişi", cur: cur.avgWorkers, prev: prev?.avgWorkers ?? null, muted: mk("calisan"), color: asamaRengi("personel") },
+    { key: "birim", label: "Birim Süre", short: "B.Süre", unit: "dk", lowerBetter: true, cur: cur.birim, prev: prev?.birim ?? null, muted: mk("birim"), color: asamaRengi("birimSure") },
     { key: "uygunsuz", label: "Uygunsuz", short: "Uygunsuz", unit: "adet", lowerBetter: true, cur: cur.uygunsuz, prev: prev?.uygunsuz ?? null, muted: mk("uygunsuz") },
     { key: "kontrol", label: "Kontrol Edilen", short: "Kontrol", unit: "adet", cur: cur.kontrol, prev: prev?.kontrol ?? null, muted: mk("kontrol") },
-    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: cur.fire, prev: prev?.fire ?? null, muted: mk("fire") },
+    { key: "fire", label: "Fire", short: "Fire", unit: "adet", lowerBetter: true, cur: cur.fire, prev: prev?.fire ?? null, muted: mk("fire"), color: asamaRengi("fire") },
   ];
   const chartNode =
     focus.chartMetric === CHIPS[0].key ? (
@@ -462,8 +506,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       <StatCard
         title="Toplam İş Adımı Adedi"
         empty={mut("adet", cur.qty === 0)}
+        accent={montajColor}
         value={fmtNum(cur.qty)}
-        subtitle={`${fmtNum(cur.sessions)} seans`}
+        subtitle={
+          <>
+            {fmtNum(cur.sessions)} seans
+            <HatLegend compact items={hatToplam} />
+          </>
+        }
         delta={prev ? deltaPct(cur.qty, prev.qty) : null}
       />
       <StatCard
@@ -517,6 +567,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
         rows={rows}
         filterOptions={options}
         visibleColumns={focus.visibleColumns}
+        dotColors={dotColors}
       />
       <p className="px-1 text-[11px] text-muted-foreground">
         Ekip seanslarında adet, çalışan sayısına eşit bölünerek her kişiye yazılır. Uygunsuz/fire kayıtları seans
@@ -534,7 +585,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
       focus={focus.all ? null : { labels: focus.labels, clearKeys: focus.clearKeys }}
       chips={CHIPS}
       activeMetric={metric}
-      chart={chartNode}
+      chart={
+        <>
+          {chartNode}
+          {focus.chartMetric === "hat" && <HatLegend title="Hatlar" items={hatToplam} />}
+        </>
+      }
       cards={cards}
       list={list}
     />

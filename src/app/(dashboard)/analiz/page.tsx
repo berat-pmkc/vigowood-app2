@@ -26,21 +26,26 @@ import {
   type UretimData,
 } from "./_shared/queries";
 import { resolveFocus, type FocusMap } from "./_shared/focus";
+import { asamaRengi } from "@/lib/talimat/hat-renk";
+import type { TalimatHat } from "@/lib/talimat/types";
+import { getAnalizHatlar, hatToplamlari } from "./_shared/hat-data";
+import { HatLegend } from "./_shared/hat-legend";
 import { computePerformance, type PerformanceData } from "./_shared/performance";
 
 export const metadata: Metadata = { title: "Analiz" };
 export const revalidate = 30;
 
-const CHIPS: MetricChip[] = [
+/** Chip noktaları aşama renkleriyle (hat paletinden) gelir */
+const chipsFor = (hatlar: TalimatHat[]): MetricChip[] => [
   { key: "ozet", label: "Özet" },
-  { key: "uretim", label: "Üretim" },
-  { key: "montaj", label: "Montaj" },
-  { key: "kesim", label: "Kesim" },
+  { key: "uretim", label: "Üretim", color: asamaRengi("paketleme", hatlar) },
+  { key: "montaj", label: "Montaj", color: asamaRengi("montaj", hatlar) },
+  { key: "kesim", label: "Kesim", color: asamaRengi("kesim") },
   { key: "en-cok-satan", label: "En Çok Satan Ürünler" },
   { key: "satisi-dusen", label: "Satışı Düşen Ürünler" },
-  { key: "stok-verimliligi", label: "Stok Verimliliği" },
-  { key: "birim-sure", label: "Çalışma Birim Süresi" },
-  { key: "personel", label: "Personel Verimliliği" },
+  { key: "stok-verimliligi", label: "Stok Verimliliği", color: asamaRengi("stok") },
+  { key: "birim-sure", label: "Çalışma Birim Süresi", color: asamaRengi("birimSure") },
+  { key: "personel", label: "Personel Verimliliği", color: asamaRengi("personel") },
 ];
 
 const FOCUS: FocusMap = {
@@ -69,8 +74,8 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
   }
 }
 
-const EMPTY_URETIM: UretimData = { total: 0, byDay: {}, bySku: {} };
-const EMPTY_MONTAJ: MontajData = { total: 0, finalTotal: 0, sessions: 0, byDay: {}, byStep: {} };
+const EMPTY_URETIM: UretimData = { total: 0, byDay: {}, bySku: {}, byHatDay: {} };
+const EMPTY_MONTAJ: MontajData = { total: 0, finalTotal: 0, sessions: 0, byDay: {}, byStep: {}, byHatDay: {} };
 const EMPTY_KESIM: KesimData = { plates: 0, parts: 0, platesByDay: {}, partsByDay: {} };
 const EMPTY_BIRIM: BirimSureData = {
   montajAvg: null,
@@ -102,6 +107,7 @@ async function buildChart(
     birim: BirimSureData;
     stok: StokVerimlilikData;
     perf: PerformanceData;
+    hatlar: TalimatHat[];
   },
 ): Promise<AnalizChartProps & { title: string }> {
   const { from, to } = period;
@@ -114,7 +120,7 @@ async function buildChart(
         type: "bar",
         xKey: "label",
         data: buildSeries(from, to, g, { v: d.montaj.byDay }),
-        series: [{ key: "v", label: "Montaj", color: "#8d9d70" }],
+        series: [{ key: "v", label: "Montaj", color: asamaRengi("montaj", d.hatlar) }],
       };
     case "kesim":
       return {
@@ -123,8 +129,8 @@ async function buildChart(
         xKey: "label",
         data: buildSeries(from, to, g, { plates: d.kesim.platesByDay, parts: d.kesim.partsByDay }),
         series: [
-          { key: "plates", label: "Plaka", color: "#3368b1", type: "bar", yAxisId: "left" },
-          { key: "parts", label: "Parça", color: "#f28a19", type: "line", yAxisId: "right" },
+          { key: "plates", label: "Plaka", color: asamaRengi("kesim"), type: "bar", yAxisId: "left" },
+          { key: "parts", label: "Parça", color: "#5e5747", type: "line", yAxisId: "right" },
         ],
       };
     case "en-cok-satan": {
@@ -142,7 +148,7 @@ async function buildChart(
         layout: "vertical",
         xKey: "label",
         data: top,
-        series: [{ key: "qty", label: "Adet", color: "#3368b1" }],
+        series: [{ key: "qty", label: "Adet", color: "#0c1c2d" }],
       };
     }
     case "satisi-dusen": {
@@ -181,7 +187,7 @@ async function buildChart(
         xKey: "label",
         unit: "%",
         data: buildSeries(from, to, g, { pct: d.stok.byDay }, "avg"),
-        series: [{ key: "pct", label: "Verimlilik", color: "#70c1aa" }],
+        series: [{ key: "pct", label: "Verimlilik", color: asamaRengi("stok") }],
       };
     case "birim-sure":
       return {
@@ -191,8 +197,8 @@ async function buildChart(
         unit: " dk",
         data: buildSeries(from, to, g, { montaj: d.birim.montajByDay, paketleme: d.birim.paketlemeByDay }, "avg"),
         series: [
-          { key: "montaj", label: "Montaj", color: "#8d9d70" },
-          { key: "paketleme", label: "Paketleme", color: "#3368b1" },
+          { key: "montaj", label: "Montaj", color: asamaRengi("montaj", d.hatlar) },
+          { key: "paketleme", label: "Paketleme", color: asamaRengi("paketleme", d.hatlar) },
         ],
       };
     case "personel":
@@ -203,7 +209,7 @@ async function buildChart(
         xKey: "label",
         unit: "%",
         data: d.perf.people.slice(0, 10).map((p) => ({ label: trunc(p.name), pct: p.pct })),
-        series: [{ key: "pct", label: "Performans", color: "#70c1aa" }],
+        series: [{ key: "pct", label: "Performans", color: asamaRengi("personel") }],
       };
     case "uretim":
     default:
@@ -212,7 +218,7 @@ async function buildChart(
         type: "bar",
         xKey: "label",
         data: buildSeries(from, to, g, { v: d.uretim.byDay }),
-        series: [{ key: "v", label: "Paketleme", color: "#cdbd9d" }],
+        series: [{ key: "v", label: "Paketleme", color: asamaRengi("paketleme", d.hatlar) }],
       };
   }
 }
@@ -226,8 +232,10 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
   const period = resolvePeriod(sp);
   const { from, to } = period;
   const metricRaw = Array.isArray(sp.m) ? sp.m[0] : sp.m;
-  const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
 
+  const hatlar = await getAnalizHatlar();
+  const CHIPS = chipsFor(hatlar);
+  const metric = CHIPS.some((c) => c.key === metricRaw) ? (metricRaw as string) : CHIPS[0].key;
   const isOzet = metric === "ozet";
   const focus = resolveFocus(FOCUS, metric, {}, [], CHIPS);
   const mut = (k: string) => !focus.showCard(k);
@@ -253,13 +261,13 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
   if (isOzet) {
     const hasPrev = !!period.prevFrom && !!period.prevTo;
     const items: SummaryItem[] = [
-      { key: "uretim", label: "Üretim", short: "Üretim", href: "/analiz/uretim", unit: "adet", cur: uretim.total, prev: uretimPrev?.total ?? null },
-      { key: "montaj", label: "Montaj", short: "Montaj", href: "/analiz/montaj", unit: "adet", cur: montaj.total, prev: montajPrev?.total ?? null },
-      { key: "kesim", label: "Kesim", short: "Kesim", href: "/analiz/kesim", unit: "plaka", cur: kesim.plates, prev: kesimPrev?.plates ?? null },
-      { key: "birim-sure", label: "Birim Süre", short: "B.Süre", href: "/analiz/birim-sure", unit: "dk", lowerBetter: true, cur: birim.montajAvg, prev: birimPrev?.montajAvg ?? null },
-      { key: "stok", label: "Stok Verimliliği", short: "Stok V.", href: "/analiz/stok-verimliligi", unit: "%", cur: stok.overallPct, prev: stokPrev?.overallPct ?? null },
-      { key: "personel", label: "Personel Performans", short: "Perf.", href: "/analiz/personel", unit: "%", cur: perf.overallPct, prev: perfPrev?.overallPct ?? null },
-      { key: "fire", label: "Fire", short: "Fire", href: "/analiz/fire", unit: "adet", lowerBetter: true, cur: kalite.fire.total, prev: kalitePrev?.fire.total ?? null },
+      { key: "uretim", label: "Üretim", short: "Üretim", href: "/analiz/uretim", unit: "adet", cur: uretim.total, prev: uretimPrev?.total ?? null, color: asamaRengi("paketleme", hatlar) },
+      { key: "montaj", label: "Montaj", short: "Montaj", href: "/analiz/montaj", unit: "adet", cur: montaj.total, prev: montajPrev?.total ?? null, color: asamaRengi("montaj", hatlar) },
+      { key: "kesim", label: "Kesim", short: "Kesim", href: "/analiz/kesim", unit: "plaka", cur: kesim.plates, prev: kesimPrev?.plates ?? null, color: asamaRengi("kesim") },
+      { key: "birim-sure", label: "Birim Süre", short: "B.Süre", href: "/analiz/birim-sure", unit: "dk", lowerBetter: true, cur: birim.montajAvg, prev: birimPrev?.montajAvg ?? null, color: asamaRengi("birimSure") },
+      { key: "stok", label: "Stok Verimliliği", short: "Stok V.", href: "/analiz/stok-verimliligi", unit: "%", cur: stok.overallPct, prev: stokPrev?.overallPct ?? null, color: asamaRengi("stok") },
+      { key: "personel", label: "Personel Performans", short: "Perf.", href: "/analiz/personel", unit: "%", cur: perf.overallPct, prev: perfPrev?.overallPct ?? null, color: asamaRengi("personel") },
+      { key: "fire", label: "Fire", short: "Fire", href: "/analiz/fire", unit: "adet", lowerBetter: true, cur: kalite.fire.total, prev: kalitePrev?.fire.total ?? null, color: asamaRengi("fire") },
     ];
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(sp)) {
@@ -275,6 +283,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
       birim,
       stok,
       perf,
+      hatlar,
     });
     chartNode = <AnalizChart {...chartProps} title={chartTitle} />;
   }
@@ -287,22 +296,35 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
         title="Üretim"
         empty={mut("uretim")}
         href="/analiz/uretim"
+        accent={asamaRengi("paketleme", hatlar)}
         value={fmtNum(uretim.total)}
-        subtitle="Paketlenen ürün (adet)"
+        subtitle={
+          <>
+            Paketlenen ürün (adet)
+            <HatLegend compact items={hatToplamlari(hatlar, uretim.byHatDay)} />
+          </>
+        }
         delta={uretimPrev ? deltaPct(uretim.total, uretimPrev.total) : null}
       />
       <StatCard
         title="Montaj"
         empty={mut("montaj")}
         href="/analiz/montaj"
+        accent={asamaRengi("montaj", hatlar)}
         value={fmtNum(montaj.total)}
-        subtitle={`${fmtNum(montaj.sessions)} seans · son adım ${fmtNum(montaj.finalTotal)} adet`}
+        subtitle={
+          <>
+            {fmtNum(montaj.sessions)} seans · son adım {fmtNum(montaj.finalTotal)} adet
+            <HatLegend compact items={hatToplamlari(hatlar, montaj.byHatDay)} />
+          </>
+        }
         delta={montajPrev ? deltaPct(montaj.total, montajPrev.total) : null}
       />
       <StatCard
         title="Kesim"
         empty={mut("kesim")}
         href="/analiz/kesim"
+        accent={asamaRengi("kesim")}
         value={`${fmtNum(kesim.plates)} plaka`}
         subtitle={`${fmtNum(kesim.parts)} parça`}
         delta={kesimPrev ? deltaPct(kesim.plates, kesimPrev.plates) : null}
@@ -311,14 +333,16 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
         title="Birim Süre"
         empty={mut("birim-sure")}
         href="/analiz/birim-sure"
-        topLeft={<StatSlot label="Montaj" value={dk(birim.montajAvg)} small />}
-        topRight={<StatSlot label="Paketleme" value={dk(birim.paketlemeAvg)} small />}
+        accent={asamaRengi("birimSure")}
+        topLeft={<StatSlot label="Montaj" value={dk(birim.montajAvg)} small color={asamaRengi("montaj", hatlar)} />}
+        topRight={<StatSlot label="Paketleme" value={dk(birim.paketlemeAvg)} small color={asamaRengi("paketleme", hatlar)} />}
         subtitle="Kişi-dk / adet (adet ağırlıklı ortalama)"
       />
       <StatCard
         title="Stok Verimliliği"
         empty={mut("stok")}
         href="/analiz/stok-verimliligi"
+        accent={asamaRengi("stok")}
         value={stok.overallPct === null ? "—" : `%${stok.overallPct.toLocaleString("tr-TR")}`}
         subtitle={
           stok.activeCount
@@ -330,6 +354,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
         title="Personel Performans"
         empty={mut("personel")}
         href="/analiz/personel"
+        accent={asamaRengi("personel")}
         topLeft={
           <StatSlot label="Genel" value={perf.overallPct === null ? "—" : `%${perf.overallPct.toLocaleString("tr-TR")}`} />
         }
@@ -349,6 +374,7 @@ export default async function AnalizPage({ searchParams }: { searchParams: Promi
         title="Fire"
         empty={mut("fire")}
         href="/analiz/fire"
+        accent={asamaRengi("fire")}
         topLeft={<StatSlot label="Ürün" value={fmtNum(kalite.fire.urun)} />}
         topCenter={<StatSlot label="Yarı Mamul" value={fmtNum(kalite.fire.yariMamul)} />}
         topRight={<StatSlot label="Plaka" value={fmtNum(kalite.fire.plaka)} />}

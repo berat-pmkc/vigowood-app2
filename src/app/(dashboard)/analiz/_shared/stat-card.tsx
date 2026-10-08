@@ -16,6 +16,8 @@ interface StatCardProps {
   inverseDelta?: boolean;
   /** Odak dışı / verisiz: çerçeve + başlık kalır, değer "—" (soluk), sayı/alt başlık/delta yok, tıklanmaz */
   empty?: boolean;
+  /** Üst kenar vurgu rengi (aşama / hat rengi); ince bir şerit olarak gösterilir */
+  accent?: string;
 }
 
 export function StatCard({
@@ -29,6 +31,7 @@ export function StatCard({
   delta,
   inverseDelta,
   empty,
+  accent,
 }: StatCardProps) {
   if (empty) {
     return (
@@ -47,8 +50,14 @@ export function StatCard({
       className={`flex h-full min-h-[120px] flex-col rounded-xl border border-[#a99c7d]/30 bg-white p-4 shadow-sm transition-all ${
         href ? "hover:border-[#cdbd9d] hover:shadow-md active:scale-[0.99]" : ""
       }`}
+      style={accent ? { borderTopColor: accent, borderTopWidth: 3 } : undefined}
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#a99c7d]">{title}</p>
+      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#a99c7d]">
+        {accent && (
+          <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+        )}
+        {title}
+      </p>
 
       {hasSlots && (
         <div className="mt-2 grid grid-cols-3 items-start gap-2">
@@ -83,14 +92,20 @@ export function StatSlot({
   label,
   value,
   small,
+  color,
 }: {
   label: string;
   value: ReactNode;
   small?: boolean;
+  /** Etiketin yanında renk noktası (aşama / hat rengi) */
+  color?: string;
 }) {
   return (
     <div className="leading-tight">
-      <div className="text-[10px] font-medium uppercase text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-1 text-[10px] font-medium uppercase text-muted-foreground">
+        {color && <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />}
+        {label}
+      </div>
       <div className={`font-bold text-[#474237] ${small ? "text-sm" : "text-lg sm:text-xl"}`}>{value}</div>
     </div>
   );

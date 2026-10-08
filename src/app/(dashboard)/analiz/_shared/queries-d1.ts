@@ -135,6 +135,8 @@ export interface PackRow {
   day: string;
   sku: string;
   qty: number;
+  /** Paketleme hattı (atanmamış = null) */
+  hatId: string | null;
   /** kişi-dk (paketleme: (bitiş−başlangıç−duraklama)×işçi) */
   manMin: number;
   /** paketleme standart süre kullanılabilirse (qty×T) kazanılan dk için SKU anahtarı */
@@ -145,6 +147,8 @@ export interface MontajRow {
   stepId: string;
   qty: number;
   manMin: number;
+  /** Montaj hattı (atanmamış = null) */
+  hatId: string | null;
 }
 export interface ProdRows {
   pack: PackRow[];
@@ -157,7 +161,7 @@ export async function getProdRows(from: string | null, to: string | null): Promi
     fetchAll<any>((lo, hi) => {
       let q = s
         .from("pack_events")
-        .select("tarih, sku, qty, start_time, end_time, duraklama_dk, worker_count")
+        .select("tarih, sku, qty, start_time, end_time, duraklama_dk, worker_count, hat_id")
         .eq("durum", "tamamlandi")
         .order("session_id");
       q = closeRange(q, "end_time", "tarih", from, to);
@@ -166,7 +170,7 @@ export async function getProdRows(from: string | null, to: string | null): Promi
     fetchAll<any>((lo, hi) => {
       let q = s
         .from("montaj_sessions")
-        .select("created_at, start_time, end_time, sku, step_id, qty, net_sure_dk, worker_count")
+        .select("created_at, start_time, end_time, sku, step_id, qty, net_sure_dk, worker_count, hat_id")
         .eq("durum", "tamamlandi")
         .order("session_id");
       q = closeRange(q, "end_time", "start_time", from, to);
@@ -184,7 +188,7 @@ export async function getProdRows(from: string | null, to: string | null): Promi
         (new Date(r.end_time).getTime() - new Date(r.start_time).getTime()) / 60000 - Number(r.duraklama_dk ?? 0);
       if (mins > 0) man = mins * Math.max(Number(r.worker_count ?? 1), 1);
     }
-    pack.push({ day, sku: r.sku, qty: Number(r.qty ?? 0), manMin: man });
+    pack.push({ day, sku: r.sku, qty: Number(r.qty ?? 0), manMin: man, hatId: r.hat_id ?? null });
   }
   const montaj: MontajRow[] = [];
   for (const r of m) {
@@ -197,6 +201,7 @@ export async function getProdRows(from: string | null, to: string | null): Promi
       stepId: r.step_id,
       qty: Number(r.qty ?? 0),
       manMin: net > 0 ? net * Math.max(Number(r.worker_count ?? 1), 1) : 0,
+      hatId: r.hat_id ?? null,
     });
   }
   return { pack, montaj };

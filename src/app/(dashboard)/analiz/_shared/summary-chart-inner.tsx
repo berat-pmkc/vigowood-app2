@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { SummaryChartProps, SummaryItem, SummaryUnit } from "./summary-chart";
 
 const CUR = "#5e5747";
@@ -109,6 +109,9 @@ export default function SummaryChartInner({ items, hasPrev, query }: Omit<Summar
           cursor="pointer"
           onClick={(d) => go(d as unknown as Row)}
         >
+          {data.map((r) => (
+            <Cell key={r.key} fill={r.color ?? CUR} />
+          ))}
           <LabelList
             dataKey="curH"
             position="top"

@@ -20,6 +20,8 @@ export interface FilterableColumn {
   format?: "text" | "number" | "dk" | "percent";
   /** Varsayılan: sayı biçimleri → "number", diğerleri → "text". false = filtre yok */
   filter?: FilterKind | false;
+  /** true: hücre değeri renkli nokta ile gösterilir (renk: CompactList `dotColors[değer]`) */
+  dot?: boolean;
 }
 
 export type CellValue = string | number | null | undefined;
