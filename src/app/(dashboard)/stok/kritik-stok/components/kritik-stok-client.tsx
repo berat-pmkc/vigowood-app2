@@ -189,13 +189,13 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
         <div>
           <span className="font-mono text-sm">{row.original.sku}</span>
           {row.original.urun_adi && (
-            <div className="max-w-[180px] truncate text-xs text-muted-foreground">
+            <div className="max-w-[260px] truncate text-xs text-muted-foreground">
               {row.original.urun_adi}
             </div>
           )}
         </div>
       ),
-      size: 200,
+      size: 150, // otomatik: kalan genişliği SKU/ürün adı alır
     },
     {
       accessorKey: "stok_toplam",
@@ -203,13 +203,13 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
       cell: ({ row }) => (
         <span className="font-mono tabular-nums text-sm">{formatNumber(row.original.stok_toplam)}</span>
       ),
-      size: 110,
+      size: 96,
     },
     {
       accessorKey: "mamul_stok_kritik",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Mevcut Kritik Stok" />,
       cell: ({ row }) => <KritikStokEditCell row={row.original} canEdit={canEdit} />,
-      size: 160,
+      size: 120,
     },
     {
       accessorKey: "onerilen_kritik_stok",
@@ -240,7 +240,7 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
           </div>
         );
       },
-      size: 150,
+      size: 128,
     },
     {
       accessorKey: "satis_90gun",
@@ -251,7 +251,7 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
         </span>
       ),
       meta: { className: "hidden md:table-cell" },
-      size: 100,
+      size: 92,
     },
     {
       accessorKey: "paketlenen_90gun",
@@ -262,7 +262,7 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
         </span>
       ),
       meta: { className: "hidden lg:table-cell" },
-      size: 120,
+      size: 104,
     },
     {
       accessorKey: "gunluk_satis_hizi",
@@ -273,7 +273,7 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
         </span>
       ),
       meta: { className: "hidden md:table-cell" },
-      size: 130,
+      size: 104,
     },
     {
       accessorKey: "tedarik_suresi_gun",
@@ -287,13 +287,13 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
         </div>
       ),
       meta: { className: "hidden xl:table-cell" },
-      size: 160,
+      size: 136,
     },
     {
       accessorKey: "durum",
       header: "Durum",
       cell: ({ row }) => <DurumBadge durum={row.original.durum} />,
-      size: 100,
+      size: 96,
     },
   ];
 }
