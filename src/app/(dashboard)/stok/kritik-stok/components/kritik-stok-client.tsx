@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import {
   useReactTable,
@@ -22,15 +23,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Check, X, Pencil, Info, AlertTriangle } from "lucide-react";
+import { Search, Check, X, Pencil, Info, AlertTriangle, Plus, Minus } from "lucide-react";
 import { formatNumber, cn } from "@/lib/utils";
 import { updateKritikStok } from "../../mamul/actions";
+import { saveKritikStokUyari } from "../actions";
 import type { KritikStokOneri } from "@/lib/kritikStok";
 
 interface KritikStokClientProps {
   data: KritikStokOneri[];
   canEdit: boolean;
+  initialSariEsik: number;
 }
+
+type Seviye = "kirmizi" | "sari" | "normal";
+
+/** Kritik stok tanımlı değilse (<=0) uyarı verilmez. */
+function seviyeOf(row: KritikStokOneri, sariEsik: number): Seviye {
+  const kritik = row.mamul_stok_kritik;
+  if (!(kritik > 0)) return "normal";
+  if (row.stok_toplam <= kritik) return "kirmizi";
+  if (row.stok_toplam <= kritik + sariEsik) return "sari";
+  return "normal";
+}
+
+/** Kritik seviyeye mesafe: negatif = kritik altında */
+const marj = (r: KritikStokOneri) => r.stok_toplam - r.mamul_stok_kritik;
+
+const trNorm = (s: string | null | undefined) =>
+  (s ?? "")
+    .toLocaleLowerCase("tr")
+    .replace(/ı/g, "i")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+
+type SiraKey = "kritige_yakin" | "en_cok_stok" | "en_az_stok" | "sku";
+const SIRA_LABEL: Record<SiraKey, string> = {
+  kritige_yakin: "Kritik seviyeye en yakın",
+  en_cok_stok: "En çok stoğu olan",
+  en_az_stok: "En az stoğu olan",
+  sku: "SKU (A-Z)",
+};
+
+const ROW_CLASS: Record<Seviye, string> = {
+  kirmizi: "bg-[#ee7683]/20 hover:bg-[#ee7683]/30 shadow-[inset_4px_0_0_#ee7683]",
+  sari: "bg-[#f28a19]/15 hover:bg-[#f28a19]/25 shadow-[inset_4px_0_0_#f28a19]",
+  normal: "",
+};
 
 const DURUM_LABEL: Record<KritikStokOneri["durum"], string> = {
   kritik: "Kritik",
@@ -175,12 +213,17 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
     },
     {
       accessorKey: "onerilen_kritik_stok",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Önerilen Değer" />,
+      header: ({ column }) => (
+        <span title="Sistemin Hesapladığı Kritik Stok">
+          <DataTableColumnHeader column={column} title="Sistemin Hesapladığı" />
+        </span>
+      ),
+      meta: { className: "bg-vw-info/10 text-vw-info" },
       cell: ({ row }) => {
         const fark = row.original.onerilen_kritik_stok - row.original.mamul_stok_kritik;
         return (
           <div className="flex items-center gap-1.5">
-            <span className="font-mono tabular-nums text-sm font-semibold text-vw-info">
+            <span className="rounded bg-vw-info/10 px-1.5 py-0.5 font-mono tabular-nums text-sm font-semibold text-vw-info">
               {formatNumber(row.original.onerilen_kritik_stok)}
             </span>
             {Math.abs(fark) > 0 && (
@@ -255,23 +298,52 @@ function getColumns(canEdit: boolean): ColumnDef<KritikStokOneri>[] {
   ];
 }
 
-export function KritikStokClient({ data, canEdit }: KritikStokClientProps) {
+export function KritikStokClient({ data, canEdit, initialSariEsik }: KritikStokClientProps) {
   const [search, setSearch] = useState("");
   const [durumFilter, setDurumFilter] = useState<string>("all");
-  const [sorting, setSorting] = useState<SortingState>([{ id: "durum", desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sira, setSira] = useState<SiraKey>("kritige_yakin");
+  const [renk, setRenk] = useState<"all" | Seviye>("all");
+  const [sariEsik, setSariEsik] = useState(initialSariEsik);
+  const [esikInput, setEsikInput] = useState(String(initialSariEsik));
+  const [, startSave] = useTransition();
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyEsik = (raw: number) => {
+    const n = Number.isFinite(raw) ? Math.max(0, Math.min(100000, Math.round(raw))) : 0;
+    setSariEsik(n);
+    setEsikInput(String(n));
+    if (!canEdit) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      startSave(async () => {
+        const r = await saveKritikStokUyari(n);
+        if (!r.success) toast.error(r.error);
+      });
+    }, 600);
+  };
 
   const filtered = useMemo(() => {
-    return data.filter((row) => {
+    const q = trNorm(search.trim());
+    const list = data.filter((row) => {
       if (durumFilter !== "all" && row.durum !== durumFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const matches =
-          row.sku.toLowerCase().includes(q) || (row.urun_adi ?? "").toLowerCase().includes(q);
-        if (!matches) return false;
-      }
+      if (renk !== "all" && seviyeOf(row, sariEsik) !== renk) return false;
+      if (q && !trNorm(row.sku).includes(q) && !trNorm(row.urun_adi).includes(q)) return false;
       return true;
     });
-  }, [data, search, durumFilter]);
+    const cmpSku = (a: KritikStokOneri, b: KritikStokOneri) => a.sku.localeCompare(b.sku);
+    if (sira === "kritige_yakin") list.sort((a, b) => marj(a) - marj(b) || cmpSku(a, b));
+    else if (sira === "en_cok_stok") list.sort((a, b) => b.stok_toplam - a.stok_toplam || cmpSku(a, b));
+    else if (sira === "en_az_stok") list.sort((a, b) => a.stok_toplam - b.stok_toplam || cmpSku(a, b));
+    else list.sort(cmpSku);
+    return list;
+  }, [data, search, durumFilter, renk, sariEsik, sira]);
+
+  const renkSayilari = useMemo(() => {
+    const c = { all: data.length, kirmizi: 0, sari: 0, normal: 0 };
+    for (const r of data) c[seviyeOf(r, sariEsik)]++;
+    return c;
+  }, [data, sariEsik]);
 
   const kritikSayisi = useMemo(() => data.filter((r) => r.durum === "kritik").length, [data]);
   const dusukSayisi = useMemo(() => data.filter((r) => r.durum === "dusuk").length, [data]);
@@ -395,9 +467,97 @@ export function KritikStokClient({ data, canEdit }: KritikStokClientProps) {
             <SelectItem value="saglikli">Sağlıklı</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+          value={sira}
+          onValueChange={(v) => {
+            setSira(v as SiraKey);
+            setSorting([]);
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-[220px]">
+            <SelectValue placeholder="Sıralama" />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(SIRA_LABEL) as SiraKey[]).map((k) => (
+              <SelectItem key={k} value={k}>
+                {SIRA_LABEL[k]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <DataTable table={table} emptyMessage="Ürün bulunamadı." />
+      {/* Renk uyarısı: hızlı filtreler + sarı eşik */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["all", "Tümü", "border-border bg-background"],
+              ["kirmizi", "Kırmızı (kritik altı)", "border-[#ee7683] bg-[#ee7683]/15"],
+              ["sari", "Sarı (yaklaşan)", "border-[#f28a19] bg-[#f28a19]/15"],
+              ["normal", "Normal", "border-border bg-background"],
+            ] as const
+          ).map(([k, label, cls]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setRenk(k)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition",
+                cls,
+                renk === k ? "ring-2 ring-vw-deep" : "opacity-80 hover:opacity-100"
+              )}
+            >
+              {label} ({formatNumber(renkSayilari[k])})
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="sari-esik" className="text-xs font-medium text-muted-foreground">
+            Sarı uyarı eşiği (adet)
+          </label>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => applyEsik(sariEsik - 10)}
+              disabled={!canEdit || sariEsik <= 0}
+            >
+              <Minus className="h-3.5 w-3.5" />
+            </Button>
+            <Input
+              id="sari-esik"
+              type="number"
+              min={0}
+              step={1}
+              value={esikInput}
+              disabled={!canEdit}
+              onChange={(e) => setEsikInput(e.target.value)}
+              onBlur={() => applyEsik(Number(esikInput))}
+              onKeyDown={(e) => e.key === "Enter" && applyEsik(Number(esikInput))}
+              className="h-8 w-20 px-2 text-center font-mono text-sm"
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              onClick={() => applyEsik(sariEsik + 10)}
+              disabled={!canEdit}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <DataTable
+        table={table}
+        emptyMessage="Ürün bulunamadı."
+        rowClassName={(r) => ROW_CLASS[seviyeOf(r, sariEsik)]}
+      />
     </div>
   );
 }

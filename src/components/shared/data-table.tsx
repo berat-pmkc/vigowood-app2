@@ -14,12 +14,14 @@ interface DataTableProps<TData> {
   table: TanstackTable<TData>;
   onRowClick?: (row: TData) => void;
   emptyMessage?: string;
+  rowClassName?: (row: TData) => string | undefined;
 }
 
 export function DataTable<TData>({
   table,
   onRowClick,
   emptyMessage = "Kayıt bulunamadı.",
+  rowClassName,
 }: DataTableProps<TData>) {
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 shadow-[var(--shadow-card)]">
@@ -50,7 +52,7 @@ export function DataTable<TData>({
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
-                className={onRowClick ? "cursor-pointer" : undefined}
+                className={[onRowClick ? "cursor-pointer" : "", rowClassName?.(row.original) ?? ""].filter(Boolean).join(" ") || undefined}
                 onClick={() => onRowClick?.(row.original)}
               >
                 {row.getVisibleCells().map((cell) => (
