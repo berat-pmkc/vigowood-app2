@@ -764,6 +764,30 @@ steps.push(step('11.16 talimat_tablet_plan_hat() = yayindaki plan', 'station', `
   ${assert(`(select count(*) from ${S}.talimat_hatlar where aktif) >= 6`, 'istasyon hesabi hatlari okuyabilmeli')}
 `));
 
+steps.push(step('11.17 pasif satir hattin sonuna, aktif olunca aktiflerin sonuna (163)', 'planner', `
+  q1 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h4,'sku','LS031')`)};
+  q2 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h4,'sku','LS051')`)};
+  q3 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h4,'sku','MKOS41')`)};
+  q4 := ${kaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h4,'sku',other)`)};
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q1) < (select sira from ${S}.talimat_satirlar where satir_id=q2)`, 'baslangic sirasi')}
+  n := ${S}.talimat_pasif('satir', v_plan, array[q2::text], null, null, 'sira testi');
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q2) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'pasif satir en alta gitmeli')}
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q3) < (select sira from ${S}.talimat_satirlar where satir_id=q2) and (select sira from ${S}.talimat_satirlar where satir_id=q4) < (select sira from ${S}.talimat_satirlar where satir_id=q2)`, 'aktifler pasifin ustunde')}
+  -- kaydet ile ikinci pasif: ilkinin altinda
+  perform ${kaydet(`jsonb_build_object('satir_id',q1,'durum','pasif')`)};
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q1) > (select sira from ${S}.talimat_satirlar where satir_id=q2)`, 'ikinci pasif ilkinin altinda')}
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q1) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'ikinci pasif en altta')}
+  ${assert(`(select count(distinct sira) = count(*) and min(sira)=1 and max(sira)=count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'sira 1..n tekil')}
+  -- en alttaki pasifi aktif et: aktiflerin sonuna, kalan pasifin ustune
+  n := ${S}.talimat_pasif_kaldir('satir', v_plan, array[q1::text]);
+  ${assert('n=1', 'kaldir sayisi')}
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q1) > (select sira from ${S}.talimat_satirlar where satir_id=q4) and (select sira from ${S}.talimat_satirlar where satir_id=q1) < (select sira from ${S}.talimat_satirlar where satir_id=q2)`, 'aktif olan aktiflerin sonuna, pasifin ustune')}
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q2) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'kalan pasif en altta')}
+  -- kaydet ile aktif et
+  perform ${kaydet(`jsonb_build_object('satir_id',q2,'durum','aktif')`)};
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q2) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif')`, 'kaydet ile aktif: aktiflerin sonu')}
+`));
+
 // Hat testlerinin ürettiği seansları sonraki (eski personel bazlı) adımları kirletmesin diye 90 gün geriye al / kapat
 steps.push(step('11.99 hat test seanslari temizlik (kapat + zamani geriye al)', null, `
   update ${S}.montaj_sessions set durum='tamamlandi', end_time = coalesce(end_time, start_time) where session_id like 'H-%' and durum='montajda';
@@ -916,7 +940,7 @@ const body = `
 declare
   v_plan uuid; v_plan2 uuid; s1 uuid; s2 uuid; s3 uuid; s4 uuid; s5 uuid; s6 uuid; s7 uuid; s8 uuid; s9 uuid; s10 uuid;
   y1 uuid; y2 uuid; y3 uuid; y4 uuid; y5 uuid; y6 uuid; t1 uuid; t2 uuid; t3 uuid; tid uuid;
-  h1 uuid; h2 uuid; h3 uuid; h4 uuid; h5 uuid; hx uuid; r1 uuid; r2 uuid; r3 uuid; r4 uuid; r5 uuid; r6 uuid; r7 uuid; r8 uuid;
+  h1 uuid; h2 uuid; h3 uuid; h4 uuid; h5 uuid; hx uuid; r1 uuid; r2 uuid; r3 uuid; r4 uuid; r5 uuid; r6 uuid; r7 uuid; r8 uuid; q1 uuid; q2 uuid; q3 uuid; q4 uuid;
   ids uuid[]; ya uuid; yb uuid; t4 uuid; v_plan3 uuid; v_plan4 uuid; rec record;
   n int; m int; k int; tmpn numeric; flag boolean; d date; j jsonb; plk text; tmp text; tmp2 text;
   w1 text := 'VW016'; w2 text := 'VW018'; w3 text := 'VW020'; w4 text := 'VW022'; w5 text := 'VW021';
