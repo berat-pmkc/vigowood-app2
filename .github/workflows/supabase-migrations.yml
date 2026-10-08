@@ -10,12 +10,10 @@ name: Supabase Migrations
 #
 # Elle çalıştırmak için: Actions sekmesi > Supabase Migrations > Run workflow
 
+# DEVRE DIŞI (2026-10-08): Veritabanı yeni Supabase projesindeki `vigowood` schema'sına taşındı.
+# Bu iş eski projeyi (mdxaktebpuhlwacqcven) hedefliyordu; otomatik tetikleme kapatıldı.
+# Yeni şema değişiklikleri: supabase/pending_migrations + scripts/migrate/build-schema.mjs.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "supabase/migrations/**"
-      - ".github/workflows/supabase-migrations.yml"
   workflow_dispatch:
 
 # Aynı anda birden fazla migration job'u çalışmasın — yarış durumu
