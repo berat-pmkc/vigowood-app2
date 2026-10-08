@@ -129,13 +129,19 @@ export async function satirSil(satirId: string): Promise<ActionResult> {
  * Tamamlanan satırı "tekrar aktif et": sayaç sıfırlanır (üretilen bu andan itibaren sayılır),
  * istenen miktar herhangi bir pozitif sayı olabilir. Dönen: satir_id.
  */
-export async function satirYenidenAktifEt(satirId: string, istenen: number): Promise<ActionResult<string>> {
+export async function satirYenidenAktifEt(satirId: string, istenen: number, sira?: number | null): Promise<ActionResult<string>> {
   return sonucaCevir(async () => {
     await rolGerekli(TALIMAT_PLANNER_ROLES);
-    const id = await rpcCagir<string>("talimat_satir_yeniden_aktif", {
-      p_satir: uuid.parse(satirId),
-      p_istenen: z.number().positive("Miktar sıfırdan büyük olmalı").parse(istenen),
-    });
+    const miktar = z.number().positive("Miktar sıfırdan büyük olmalı").parse(istenen);
+    // sira: hattın aktif satırları arasındaki görünen konum (boş = aktiflerin sonu) — SQL 166
+    const id =
+      sira != null
+        ? await rpcCagir<string>("talimat_satir_yeniden_aktif_sirali", {
+            p_satir: uuid.parse(satirId),
+            p_istenen: miktar,
+            p_sira: z.number().int().positive().parse(sira),
+          })
+        : await rpcCagir<string>("talimat_satir_yeniden_aktif", { p_satir: uuid.parse(satirId), p_istenen: miktar });
     talimatYenile();
     return id;
   });

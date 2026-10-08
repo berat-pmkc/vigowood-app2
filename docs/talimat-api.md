@@ -293,3 +293,9 @@ Server action'lar:
 - `talimat_satirlari_hatta_kopyala`: komşusu aynı ürün olacak satır atlanır (NOTICE); hepsi atlanırsa `ARDISIK_SKU: Seçilen ürünler ...`. İstemci atlanan sayısını (dolu kaynak - dönen id) uyarı toast'ı olarak gösterir.
 - `talimat_zamanli_islem_calistir`: ihlalde işlem `hata` olur (değişiklik geri alınır), cron çökmez; "hemen" işlemde hata fırlatılır.
 - İstemci: Mavi Yaka ürün combobox'ı en yakın görünen önceki/sonraki satırın sku'sunu devre dışı bırakır (tooltip nedeni); sürükle-sırala hatası toast + geri alma; `hataMesaji` ARDISIK_SKU mesajı; Talepler "İş talimatına ata" hat başına hatayı gösterir.
+
+## 14. Planlayıcıda tamamlananlar satır içinde (SQL 166)
+
+- Mavi Yaka tablosu hattın TÜM satırlarını 3 blokta gösterir: aktifler (boş dahil, `sira` sırasıyla, görünen numara 1..n) -> "Tamamlananlar" (yeşil rozet, soluk, üretilen / istenen + fazla, "Tekrar aktif et") -> "Pasif". Blok istemcide türetilir (`blokTuru`: etkin_pasif/durum=pasif, etkin_durum=tamamlandi). Sürükle-bırak yalnız aktif blokta; `satirSiralaHat` aktifler, tamamlananlar, pasifler sırasıyla tam liste gönderir. Ayrı "Tamamlananlar" butonu/diyaloğu kaldırıldı.
+- `talimat_satir_yeniden_aktif(satir, istenen)` artık hat satırını aktiflerin sonuna (pasiflerin üstüne) yerleştirir (`talimat_hat_yeniden_sirala(..., p_son_aktif)`). Yeni `talimat_satir_yeniden_aktif_sirali(satir, istenen, sira)`: sira = aktif satırlar arasındaki görünen konum (`talimat_satir_gorunen_sira_ic`, pasif ve tamamlananları saymaz). Action: `satirYenidenAktifEt(id, istenen, sira?)`. Ardışık-SKU (165) ihlali COMMIT'te `ARDISIK_SKU` olarak döner, diyalogda gösterilir.
+- Çoklu seçim: tamamlanan satırlar seçilebilir -> "Seçilenleri tekrar aktif et" (her satır önceki istenen miktarıyla, aktiflerin sonuna). Kopyala/pasif et/sil seçimden tamamlananları dışlar; "Satırları temizle" tamamlananları korur. Tablet değişmedi.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-ki
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
+  RotateCcw,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -95,7 +95,7 @@ import { PasifDialog, PasifKaldirDialog, type PasifHedef, type PasifKaldirHedef 
 import { SatirRow, type SatirIslemleri } from "./satir-row";
 import { YayinDialog } from "./yayin-dialog";
 import { ZamanliListeDialog, zamanliOzet } from "./zamanli-liste";
-import { TamamlananlarDialog } from "./tamamlananlar-dialog";
+import { YenidenAktifDialog } from "./yeniden-aktif-dialog";
 import { YayinGecmisi } from "./yayin-gecmisi";
 
 interface Props {
@@ -132,6 +132,13 @@ const TOGGLES: Array<{ key: Toggle; label: string }> = [
   { key: "onaysiz", label: "Onay bekleyenler" },
   { key: "pasif", label: "Pasifler" },
 ];
+
+/** Satırın tablo bloğu: aktif (boş dahil) | tamamlanmış | pasif */
+function blokTuru(s: TalimatSatir): "aktif" | "tamam" | "pasif" {
+  if (s.etkin_pasif || s.durum === "pasif") return "pasif";
+  if (s.etkin_durum === "tamamlandi") return "tamam";
+  return "aktif";
+}
 
 function hataMesaji(r: { error: string; code?: string }): string {
   if (r.code === "PLAN_PASIF") return "Pasif plan düzenlenemez.";
@@ -243,8 +250,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
       sadeceOnaylamayan: toggles.has("onaysiz"),
       sadecePasif: toggles.has("pasif"),
     };
-    // Tamamlanan satırlar ana listeden çıkar ("Tamamlananlar" görünümünde listelenir)
-    let liste = satirFiltrele(satirlar, f).filter((s) => s.etkin_durum !== "tamamlandi" && !!s.hat_id);
+    // Tamamlananlar da listede kalır (aktiflerin altında "Tamamlandı" bloğu)
+    let liste = satirFiltrele(satirlar, f).filter((s) => !!s.hat_id);
     if (hatFiltre) liste = liste.filter((s) => s.hat_id === hatFiltre);
     if (hatKumesi) liste = liste.filter((s) => s.hat_id && hatKumesi.includes(s.hat_id));
     const q = arama.trim().toLocaleLowerCase("tr");
@@ -263,8 +270,12 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
       .map((hat) => {
         const liste = harita.get(hat.hat_id) ?? [];
         const sira = yerelSira[hat.hat_id];
-        const sirali = sira ? [...liste].sort((a, b) => sira.indexOf(a.satir_id) - sira.indexOf(b.satir_id)) : liste;
-        return { hat, satirlar: sirali };
+        const sirali = sira ? [...liste].sort((a, b) => sira.indexOf(a.satir_id) - sira.indexOf(b.satir_id)) : [...liste].sort((a, b) => a.sira - b.sira);
+        // Blok sırası: aktifler (sira) -> tamamlananlar -> pasifler
+        const aktifler = sirali.filter((x) => blokTuru(x) === "aktif");
+        const tamamlananlar = sirali.filter((x) => blokTuru(x) === "tamam");
+        const pasifler = sirali.filter((x) => blokTuru(x) === "pasif");
+        return { hat, satirlar: [...aktifler, ...tamamlananlar, ...pasifler], aktifler, tamamlananlar, pasifler };
       })
       .filter((g) => !daraltan || g.satirlar.length > 0);
   }, [gorunenSatirlar, hatlar, yerelSira, arama, istasyon, toggles, hatFiltre, hatKumesi]);
@@ -275,7 +286,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
     for (const [hid, liste] of tumGrup) {
       const yerel = yerelSira[hid];
       const aktif = liste
-        .filter((x) => x.etkin_durum !== "tamamlandi")
+        .filter((x) => blokTuru(x) === "aktif")
         .sort((a, b) => (yerel ? yerel.indexOf(a.satir_id) - yerel.indexOf(b.satir_id) : a.sira - b.sira));
       m.set(hid, new Map(aktif.map((x, i) => [x.satir_id, i + 1])));
     }
@@ -292,8 +303,6 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
   }, [yayinlar]);
 
   const degisenSayisi = satirlar.filter((s) => s.degisti).length;
-  const tamamlananlar = useMemo(() => satirlar.filter((s) => s.etkin_durum === "tamamlandi"), [satirlar]);
-  const [tamamlananAcik, setTamamlananAcik] = useState(false);
 
   // ── işlemler ──
   const [busy, setBusy] = useState(false);
@@ -307,11 +316,23 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
     [yenile],
   );
 
-  const yenidenAktifEt = useCallback(
-    async (satirId: string, istenen: number) => {
-      const r = await satirYenidenAktifEt(satirId, istenen);
-      if (!r.success) toast.error(hataMesaji(r));
+  // Tamamlanan satır(lar)ı tekrar aktif et (diyalog; tek: istenen + iş sırası, toplu: önceki istenenle sona)
+  const [yenidenHedef, setYenidenHedef] = useState<TalimatSatir[]>([]);
+  const yenidenOnayla = useCallback(
+    async (items: { satirId: string; istenen: number }[], sira: number | null): Promise<string | null> => {
+      let yapilan = 0;
+      for (const it of items) {
+        const r = await satirYenidenAktifEt(it.satirId, it.istenen, sira);
+        if (!r.success) {
+          yenile();
+          return (yapilan > 0 ? `${yapilan} satır aktif edildi, sonrası başarısız: ` : "") + hataMesaji(r);
+        }
+        yapilan++;
+      }
+      toast.success(yapilan === 1 ? "Talimat tekrar aktif edildi" : `${yapilan} talimat tekrar aktif edildi`);
+      setSecili(new Set());
       yenile();
+      return null;
     },
     [yenile],
   );
@@ -327,10 +348,10 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
   // ── çoklu satır seçimi (başka hatta kopyalama, toplu işlemler) ──
   const [secili, setSecili] = useState<Set<string>>(new Set());
   useEffect(() => setSecili(new Set()), [hafta]);
-  // listeden kalkan / tamamlanan satırları seçimden düşür
+  // listeden kalkan satırları seçimden düşür (tamamlananlar seçilebilir: toplu tekrar aktif)
   useEffect(() => {
     setSecili((p) => {
-      const gecerli = new Set(satirlar.filter((s) => s.etkin_durum !== "tamamlandi").map((s) => s.satir_id));
+      const gecerli = new Set(satirlar.map((s) => s.satir_id));
       const n = new Set([...p].filter((id) => gecerli.has(id)));
       return n.size === p.size ? p : n;
     });
@@ -344,7 +365,12 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
     });
   /** Görünen sırayla seçili satır id'leri */
   const seciliSirali = useMemo(
-    () => gruplar.flatMap((g) => g.satirlar).filter((s) => secili.has(s.satir_id)).map((s) => s.satir_id),
+    () => gruplar.flatMap((g) => g.satirlar).filter((s) => secili.has(s.satir_id) && blokTuru(s) !== "tamam").map((s) => s.satir_id),
+    [gruplar, secili],
+  );
+  /** Seçili tamamlanan satırlar (toplu "Tekrar aktif et") */
+  const seciliTamam = useMemo(
+    () => gruplar.flatMap((g) => g.tamamlananlar).filter((s) => secili.has(s.satir_id)),
     [gruplar, secili],
   );
   const seciliKaynakHatlar = useMemo(
@@ -352,13 +378,13 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
     [satirlar, secili],
   );
   const hatSecimDurumu = (g: { satirlar: TalimatSatir[] }): boolean | "indeterminate" => {
-    const dolu = g.satirlar.filter((s) => !satirBosMu(s));
+    const dolu = g.satirlar.filter((s) => !satirBosMu(s) && blokTuru(s) !== "tamam");
     if (dolu.length === 0) return false;
     const n = dolu.filter((s) => secili.has(s.satir_id)).length;
     return n === 0 ? false : n === dolu.length ? true : "indeterminate";
   };
   const hatSecToggle = (g: { satirlar: TalimatSatir[] }) => {
-    const dolu = g.satirlar.filter((s) => !satirBosMu(s)).map((s) => s.satir_id);
+    const dolu = g.satirlar.filter((s) => !satirBosMu(s) && blokTuru(s) !== "tamam").map((s) => s.satir_id);
     setSecili((p) => {
       const n = new Set(p);
       const hepsi = dolu.length > 0 && dolu.every((id) => n.has(id));
@@ -369,7 +395,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
       return n;
     });
   };
-  const gorunenDolu = useMemo(() => gruplar.flatMap((g) => g.satirlar).filter((s) => !satirBosMu(s)), [gruplar]);
+  const gorunenDolu = useMemo(() => gruplar.flatMap((g) => g.satirlar).filter((s) => !satirBosMu(s) && blokTuru(s) !== "tamam"), [gruplar]);
   const tumunuSec = () => {
     const dolu = gorunenDolu.map((s) => s.satir_id);
     setSecili((p) => (dolu.length > 0 && dolu.every((id) => p.has(id)) ? new Set() : new Set(dolu)));
@@ -548,6 +574,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
   const islem: SatirIslemleri = useMemo(
     () => ({
       kaydet,
+      yenidenAktif: (s) => setYenidenHedef([s]),
       pasifEt: (s) =>
         setPasifHedef({
           kapsam: "satir",
@@ -602,12 +629,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
 
     // Aynı hat: sıralama
     if (hedefBaslik || e.active.id === e.over.id || !hedefSatir) return;
+    // Yalnız aktif blok içinde sıralanır; tamamlanan/pasif satırlara bırakmak geçersiz
+    if (blokTuru(aktif) !== "aktif" || blokTuru(hedefSatir) !== "aktif") return;
     const hid = aktif.hat_id;
-    const tam = yerelSira[hid] ?? (tumGrup.get(hid) ?? []).map((s) => s.satir_id);
+    const tumHat = tumGrup.get(hid) ?? [];
+    const tam = yerelSira[hid] ?? [...tumHat].sort((a, b) => a.sira - b.sira).map((s) => s.satir_id);
     const hamYeni = arrayMove(tam, tam.indexOf(aktif.satir_id), tam.indexOf(hedefSatir.satir_id));
-    // Tamamlananlar listenin sonuna alınır: aktif satırlar DB'de 1..k sırasını alır
-    const tamamlandiSet = new Set((tumGrup.get(hid) ?? []).filter((x) => x.etkin_durum === "tamamlandi").map((x) => x.satir_id));
-    const yeni = [...hamYeni.filter((id) => !tamamlandiSet.has(id)), ...hamYeni.filter((id) => tamamlandiSet.has(id))];
+    // Aktifler yeni sırayla başa, sonra tamamlananlar, sonra pasifler (DB'de aktifler 1..k)
+    const tur = new Map(tumHat.map((x) => [x.satir_id, blokTuru(x)]));
+    const yeni = [
+      ...hamYeni.filter((id) => tur.get(id) === "aktif"),
+      ...hamYeni.filter((id) => tur.get(id) === "tamam"),
+      ...hamYeni.filter((id) => tur.get(id) === "pasif"),
+    ];
     setYerelSira((p) => ({ ...p, [hid]: yeni }));
     const r = await satirSiralaHat(plan.plan_id, hid, yeni);
     if (!r.success) {
@@ -686,14 +720,6 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                 <Sigma className="mr-1.5 h-4 w-4" /> Toplam Ek Seanslar
               </Link>
             </Button>
-            {plan && (
-              <Button variant="outline" size="sm" onClick={() => setTamamlananAcik(true)}>
-                <CheckCircle2 className="mr-1.5 h-4 w-4" /> Tamamlananlar
-                {tamamlananlar.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-[#3caa35] px-1.5 text-[11px] text-white">{tamamlananlar.length}</span>
-                )}
-              </Button>
-            )}
             <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
               <Link href="/talepler">
                 <ClipboardList className="mr-1.5 h-4 w-4" /> Talepler
@@ -848,15 +874,6 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                   {degisenSayisi} yayınlanmamış değişiklik
                 </button>
               )}
-              {tamamlananlar.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setTamamlananAcik(true)}
-                  className="rounded-full border border-[#3caa35]/40 bg-[#e3ecd2] px-3 py-1 font-medium text-[#2f8a2a] hover:bg-[#d3e3b8]"
-                >
-                  {tamamlananlar.length} tamamlanan
-                </button>
-              )}
               <span className="text-muted-foreground">
                 {hatlar.filter((h) => h.aktif).length} hat · {satirlar.filter((s) => !satirBosMu(s)).length} dolu satır
               </span>
@@ -1009,7 +1026,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                       const hat = g.hat;
                       const tamListe = tumGrup.get(hat.hat_id) ?? [];
                       const dolu = tamListe.filter((s) => !satirBosMu(s));
-                      const aktifSayisi = tamListe.filter((s) => s.etkin_durum !== "tamamlandi").length;
+                      const aktifSayisi = g.aktifler.length;
+                      const tamamSayisi = g.tamamlananlar.length;
                       const hatPasif = dolu.length > 0 && dolu.every((s) => s.etkin_pasif);
                       const pasifSayisi = dolu.filter((x) => x.etkin_pasif).length;
                       const pasifKaydi = hatPasifKaydi.get(hat.hat_id);
@@ -1071,7 +1089,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                       </Badge>
                                     );
                                   })()}
-                                  <span className={cn("text-xs", isOver ? "text-muted-foreground" : "font-medium text-white/90")}>{aktifSayisi} satır</span>
+                                  <span className={cn("text-xs", isOver ? "text-muted-foreground" : "font-medium text-white/90")}>{aktifSayisi} satır{tamamSayisi > 0 ? ` · ${tamamSayisi} tamamlandı` : ""}</span>
                                   {isOver && <span className="text-xs font-semibold text-[#2f7d66]">Buraya bırak: kopyala</span>}
                                   {hatDuzenlenebilir && (
                                     <div className="ml-auto flex items-center gap-1">
@@ -1136,30 +1154,48 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                               </td>
                             )}
                           </HatDropRow>
-                          <SortableContext items={g.satirlar.map((s) => s.satir_id)} strategy={verticalListSortingStrategy}>
+                          <SortableContext items={g.aktifler.map((s) => s.satir_id)} strategy={verticalListSortingStrategy}>
                             {!kapaliGruplar.has(hat.hat_id) &&
-                              g.satirlar.map((s) => {
-                                // Görünen sıra: tamamlananlar çıkarıldıktan sonra 1..n
-                                const gosterSira = siraHaritasi.get(hat.hat_id)?.get(s.satir_id) ?? s.sira;
-                                return (
-                                  <SatirRow
-                                    key={s.satir_id}
-                                    s={s}
-                                    editable={hatDuzenlenebilir}
-                                    siraNo={gosterSira}
-                                    depoStoklari={s.sku ? stoklar[s.sku] : undefined}
-                                    islem={islem}
-                                    sirali
-                                    parlak={parlayanSatir === s.satir_id}
-                                    secili={secili.has(s.satir_id)}
-                                    hatRenk={hatRengi(hat)}
-                                    hatRenkAcik={hatRengiAcik(hat, 0.07)}
-                                    zamanli={satirZamanli.get(s.satir_id)}
-                                    engelliSkular={engelliSkular.get(s.satir_id)}
-                                    onSecToggle={satirBosMu(s) ? undefined : () => seciliToggle(s.satir_id)}
-                                  />
-                                );
-                              })}
+                              [
+                                { tur: "aktif" as const, liste: g.aktifler, baslik: null },
+                                { tur: "tamam" as const, liste: g.tamamlananlar, baslik: "Tamamlananlar" },
+                                { tur: "pasif" as const, liste: g.pasifler, baslik: "Pasif" },
+                              ].map((blok) => (
+                                <Fragment key={blok.tur}>
+                                  {blok.baslik && blok.liste.length > 0 && (
+                                    <tr>
+                                      <td
+                                        colSpan={11}
+                                        className={cn(
+                                          "border-y px-3 py-1 text-[11px] font-semibold uppercase tracking-wide",
+                                          blok.tur === "tamam" ? "bg-[#e3ecd2] text-[#2f8a2a]" : "bg-[#eceff1] text-[#546e7a]",
+                                        )}
+                                      >
+                                        {blok.baslik} ({blok.liste.length})
+                                      </td>
+                                    </tr>
+                                  )}
+                                  {blok.liste.map((s) => (
+                                    <SatirRow
+                                      key={s.satir_id}
+                                      s={s}
+                                      editable={hatDuzenlenebilir}
+                                      // Sıra numarası yalnız aktiflerde (1..n)
+                                      siraNo={blok.tur === "aktif" ? (siraHaritasi.get(hat.hat_id)?.get(s.satir_id) ?? s.sira) : null}
+                                      depoStoklari={s.sku ? stoklar[s.sku] : undefined}
+                                      islem={islem}
+                                      sirali={blok.tur === "aktif"}
+                                      parlak={parlayanSatir === s.satir_id}
+                                      secili={secili.has(s.satir_id)}
+                                      hatRenk={hatRengi(hat)}
+                                      hatRenkAcik={hatRengiAcik(hat, 0.07)}
+                                      zamanli={satirZamanli.get(s.satir_id)}
+                                      engelliSkular={engelliSkular.get(s.satir_id)}
+                                      onSecToggle={satirBosMu(s) ? undefined : () => seciliToggle(s.satir_id)}
+                                    />
+                                  ))}
+                                </Fragment>
+                              ))}
                           </SortableContext>
                         </tbody>
                       );
@@ -1175,13 +1211,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
               </div>
             )}
 
-            {editable && seciliSirali.length > 0 && (
+            {editable && (seciliSirali.length > 0 || seciliTamam.length > 0) && (
               <div className="sticky bottom-3 z-30 flex flex-wrap items-center gap-2 rounded-lg border border-vw-side bg-vw-light px-3 py-2 shadow-lg">
-                <span className="text-sm font-medium text-vw-dark">{seciliSirali.length} satır seçildi</span>
+                <span className="text-sm font-medium text-vw-dark">{seciliSirali.length + seciliTamam.length} satır seçildi</span>
                 <div className="ml-auto flex flex-wrap items-center gap-2">
                   <Button variant="outline" size="sm" className="h-9" onClick={() => setSecili(new Set())}>
                     Seçimi temizle
                   </Button>
+                  {seciliTamam.length > 0 && (
+                    <Button size="sm" className="h-9 bg-[#3caa35] text-white hover:bg-[#2f8a2a]" onClick={() => setYenidenHedef(seciliTamam)}>
+                      <RotateCcw className="mr-1.5 h-4 w-4" /> Seçilenleri tekrar aktif et ({seciliTamam.length})
+                    </Button>
+                  )}
+                  {seciliSirali.length > 0 && (<>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button size="sm" className="h-9 bg-vw-deep text-white hover:bg-vw-dark">
@@ -1245,16 +1287,16 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                   >
                     <Trash2 className="mr-1.5 h-4 w-4" /> Seçilenleri sil
                   </Button>
+                  </>)}
                 </div>
               </div>
             )}
 
-            <TamamlananlarDialog
-              open={tamamlananAcik}
-              onOpenChange={setTamamlananAcik}
-              satirlar={tamamlananlar}
-              editable={editable}
-              yenidenAktifEt={yenidenAktifEt}
+            <YenidenAktifDialog
+              hedefler={yenidenHedef}
+              aktifSayisi={yenidenHedef.length === 1 ? (gruplar.find((g) => g.hat.hat_id === yenidenHedef[0].hat_id)?.aktifler.length ?? 0) : 0}
+              onClose={() => setYenidenHedef([])}
+              onayla={yenidenOnayla}
             />
 
             <YayinGecmisi yayinlar={yayinlar} editable={editable} onChanged={yenile} hatlar={hatlar} />

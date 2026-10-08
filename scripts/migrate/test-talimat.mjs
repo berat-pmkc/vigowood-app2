@@ -791,6 +791,17 @@ steps.push(step('11.17 pasif satir hattin sonuna, aktif olunca aktiflerin sonuna
   ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q2) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif')`, 'kaydet ile aktif: aktiflerin sonu')}
 `));
 
+steps.push(step('11.17b yeniden_aktif_sirali: sona / konuma yerlesir (166)', 'planner', `
+  -- varsayilan: aktiflerin sonuna, pasifin ustune
+  perform ${S}.talimat_satir_yeniden_aktif(q3, 7);
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q3) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif')`, 'yeniden aktif: aktiflerin sonu')}
+  -- konum 1: en uste
+  perform ${S}.talimat_satir_yeniden_aktif_sirali(q3, 4, 1);
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q3) = (select min(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif')`, 'konum 1: en ustte')}
+  ${assert(`(select istenen_miktar from ${S}.talimat_satirlar where satir_id=q3)=4`, 'istenen yazildi')}
+  ${assert(`(select count(distinct sira) = count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'sira tekil')}
+`));
+
 steps.push(step('11.18 zamanli pasif/aktif islemleri (164)', 'planner', `
   -- gelecek zamanli pasif: hemen uygulanmaz
   j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif', now() + interval '1 hour', null, 'zamanli test', null, 'yok', false);
@@ -916,8 +927,10 @@ steps.push(okRb('11.23i ardisik: uretimle olusan eski komsuluk, ilgisiz satir du
 `));
 steps.push(expectErr('11.24 ardisik: kopyala — komsusu ayni urun olan satir atlanir, digerleri kopyalanir', 'planner', `
   perform ${aK('LS031')};
-  r1 := ${hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',h3,'sku','LS031')`)};
-  r2 := ${hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',h3,'sku','LS051')`)};
+  -- Kaynak satırlar önceki adımların verisinden bağımsız, boş bir test hattında
+  q4 := ${S}.hat_ekle('TEST KAYNAK HATTI', 'montaj');
+  r1 := ${hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',q4,'sku','LS031')`)};
+  r2 := ${hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',q4,'sku','LS051')`)};
   ids := ${S}.talimat_satirlari_hatta_kopyala(array[r1, r2], h2);
   ${assert('cardinality(ids)=1', 'yalniz LS051 kopyalanmali (LS031 atlanmali)')}
   ${assert(`(select sku from ${S}.talimat_satirlar where satir_id=ids[1])='LS051'`, 'kopyalanan LS051 olmali')}

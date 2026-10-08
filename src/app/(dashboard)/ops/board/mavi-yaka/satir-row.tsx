@@ -3,7 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { Clock, GripVertical, History, Link2, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
+import { Clock, GripVertical, History, Link2, PauseCircle, PlayCircle, RotateCcw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,8 @@ export interface SatirIslemleri {
   kaydet: (satirId: string, alanlar: Partial<SatirKaydetGirdi>) => void;
   pasifEt: (s: TalimatSatir) => void;
   pasifKaldir: (s: TalimatSatir) => void;
+  /** Tamamlanan satırı tekrar aktif et (diyalog açar) */
+  yenidenAktif: (s: TalimatSatir) => void;
   sil: (s: TalimatSatir) => void;
 }
 
@@ -28,7 +30,8 @@ interface Props {
   s: TalimatSatir;
   editable: boolean;
   /** Seçilemeyen SKU'lar (komşu satırlarda kullanılan) */
-  siraNo: number;
+  /** Görünen sıra (yalnız aktif bloktaki satırlarda; diğerlerinde null) */
+  siraNo: number | null;
   depoStoklari: UrunStokSecenek["depo_stoklari"] | undefined;
   islem: SatirIslemleri;
   sirali: boolean;
@@ -72,7 +75,7 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
         "border-b align-top text-sm",
         pasif && "bg-[#eceff1]/70 text-[#78909c]",
         secili && "bg-[#cdbd9d]/25",
-        tamam && "opacity-50",
+        tamam && "bg-[#e3ecd2]/40 text-vw-dark/80",
         s.kirmizi && !pasif && "text-[#c0424f]",
         isDragging && "relative z-10 bg-vw-light shadow-lg",
         parlak && "animate-pulse bg-[#fff59d] opacity-100",
@@ -95,12 +98,12 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
             {...listeners}
             disabled={!editable || !sirali}
             aria-label="Sırayı değiştir"
-            title={sirali ? "Sürükle: sırayı değiştir / başka hattın başlığına bırak: kopyala" : "Sıralama için filtreleri temizleyin"}
+            title={sirali ? "Sürükle: sırayı değiştir / başka hattın başlığına bırak: kopyala" : "Yalnız aktif satırlar sıralanır"}
             className="flex h-8 w-6 cursor-grab touch-none items-center justify-center rounded text-vw-side hover:bg-muted active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
           >
             <GripVertical className="h-4 w-4" />
           </button>
-          <span className="w-5 text-center font-semibold tabular-nums">{siraNo}</span>
+          <span className="w-5 text-center font-semibold tabular-nums">{siraNo ?? "–"}</span>
         </div>
       </td>
 
@@ -180,11 +183,20 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
 
       {/* İstenen miktar */}
       <td className="w-36 px-1 py-2">
-        <MiktarHizliInput
-          value={s.istenen_miktar}
-          disabled={!editable}
-          onCommit={(v) => islem.kaydet(s.satir_id, { istenen_miktar: v })}
-        />
+        {tamam ? (
+          <div className="px-1 text-sm tabular-nums">
+            <span className="font-semibold">{formatNumber(s.uretilen)}</span> / {formatNumber(s.istenen_miktar)}
+            {s.istenen_miktar != null && s.uretilen > s.istenen_miktar && (
+              <span className="ml-1 text-xs font-semibold text-[#b8650c]">(+{formatNumber(s.uretilen - s.istenen_miktar)} fazla)</span>
+            )}
+          </div>
+        ) : (
+          <MiktarHizliInput
+            value={s.istenen_miktar}
+            disabled={!editable}
+            onCommit={(v) => islem.kaydet(s.satir_id, { istenen_miktar: v })}
+          />
+        )}
       </td>
 
       {/* Fark */}
@@ -235,7 +247,7 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
               </TooltipContent>
             </Tooltip>
           ) : s.etkin_durum === "tamamlandi" ? (
-            <Badge className="border-0 bg-[#e3ecd2] text-[#3caa35]">Tamamlandı</Badge>
+            <Badge className="border-0 bg-[#3caa35] text-white">Tamamlandı</Badge>
           ) : (
             <Badge className="border-0 bg-[#f0ede1] text-vw-deep">Aktif</Badge>
           )}
@@ -255,8 +267,17 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
       </td>
 
       {/* İşlemler */}
-      <td className="w-24 px-1 py-2">
-        {editable && (
+      <td className={cn("px-1 py-2", tamam ? "w-36" : "w-24")}>
+        {editable && tamam && (
+          <button
+            type="button"
+            onClick={() => islem.yenidenAktif(s)}
+            className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-md bg-[#3caa35] px-2.5 text-xs font-semibold text-white hover:bg-[#2f8a2a]"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Tekrar aktif et
+          </button>
+        )}
+        {editable && !tamam && (
           <div className="flex items-center gap-0.5">
             {s.durum === "pasif" ? (
               <button
