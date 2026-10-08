@@ -561,7 +561,7 @@ export function TaleplerClient({
                 </td>
               </tr>
             )}
-            {gorunen.map((t) => {
+            {gorunen.map((t, satirNo) => {
               const renk = TALEP_DURUM_COLOR[t.durum] ?? TALEP_DURUM_COLOR.acik;
               const bag = baglantiMap.get(t.talep_id);
               const kapali = !!t.kapanis;
@@ -587,6 +587,9 @@ export function TaleplerClient({
                     data-talep-id={t.talep_id}
                     className={cn(
                       "border-b align-top transition-colors",
+                      // Atlamalı satır rengi: beyaz / açık mavi
+                      satirNo % 2 === 0 ? "bg-white" : "bg-[#e8f0fb]",
+                      "hover:bg-[#d6e4f7]",
                       t.durum === "pasif" && "text-[#78909c]",
                       solukSatir && "bg-muted/30 opacity-55",
                       vurgulu && "animate-pulse bg-[#fff59d] opacity-100",
