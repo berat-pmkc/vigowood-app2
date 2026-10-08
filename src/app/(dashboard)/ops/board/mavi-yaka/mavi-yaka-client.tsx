@@ -954,7 +954,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                 colSpan={11}
                                 style={isOver ? undefined : { backgroundColor: hatRengi(hat), color: HAT_YAZI_RENGI }}
                                 className={cn(
-                                  "sticky top-9 z-10 px-3 py-2 transition-colors",
+                                  // Hat başlığı listeyle birlikte kayar; yalnız sütun başlıkları sabit kalır
+                                  "px-3 py-2 transition-colors",
                                   isOver ? "bg-[#b1d286] text-vw-dark ring-2 ring-inset ring-[#3caa35]" : "text-white",
                                 )}
                               >
