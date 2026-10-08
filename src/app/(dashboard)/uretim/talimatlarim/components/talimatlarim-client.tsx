@@ -505,59 +505,63 @@ function SatirKarti({
   return (
     <li
       className={cn(
-        "rounded-2xl border-2 bg-card p-4 shadow-sm",
+        "rounded-xl border-2 bg-card px-3 py-2.5 shadow-sm",
         s.kirmizi ? "border-[#ee7683] bg-[#ee7683]/10" : "border-border",
       )}
+      style={s.kirmizi ? undefined : { borderLeftColor: renk, borderLeftWidth: 5 }}
     >
-      <div className="flex items-start gap-3">
+      {/* Üst satır: sıra · ürün adı / kod */}
+      <div className="flex items-center gap-2.5">
         <span
-          className="flex size-12 shrink-0 items-center justify-center rounded-full text-2xl font-extrabold text-white"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-lg font-extrabold text-white"
           style={{ backgroundColor: renk }}
         >
           {no}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={cn("text-xl font-extrabold leading-tight", s.kirmizi && "text-[#b3202f]")}>
+          <p className={cn("line-clamp-2 text-base font-bold leading-snug", s.kirmizi && "text-[#b3202f]")}>
             {s.urun_adi ?? s.sku ?? "—"}
           </p>
-          <p className="text-sm text-muted-foreground">{s.sku}</p>
-          {s.kirmizi && <p className="text-sm font-bold text-[#b3202f]">Değişti</p>}
+          <p className="text-xs text-muted-foreground">
+            {s.sku}
+            {s.kirmizi && <span className="ml-2 font-bold text-[#b3202f]">Değişti</span>}
+          </p>
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-        <Rakam etiket="İstenen" deger={istenen != null ? istenen : "—"} />
-        <Rakam etiket="Üretilen" deger={s.uretilen} vurgu />
-      </div>
-
       {s.not_text?.trim() && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-base text-amber-900">
-          <StickyNote className="mt-0.5 size-5 shrink-0" />
+        <div className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-sm text-amber-900">
+          <StickyNote className="mt-0.5 size-4 shrink-0" />
           <span className="whitespace-pre-wrap">{s.not_text}</span>
         </div>
       )}
 
-      <Button
-        className="mt-3 h-16 w-full text-xl font-bold text-white hover:opacity-90"
-        style={{ backgroundColor: renk }}
-        onClick={onSeansIslemi}
-      >
-        Seans işlemi
-        {acik > 0 && (
-          <span className="ml-3 rounded-full bg-white px-2.5 py-0.5 text-base font-bold" style={{ color: renk }}>
-            {acik} açık
-          </span>
-        )}
-      </Button>
+      {/* Alt satır: istenen / üretilen + seans işlemi */}
+      <div className="mt-2 flex items-stretch gap-2">
+        <Rakam etiket="İstenen" deger={istenen != null ? istenen : "—"} />
+        <Rakam etiket="Üretilen" deger={s.uretilen} vurgu />
+        <Button
+          className="h-auto min-h-12 flex-1 flex-col gap-0 px-2 py-1.5 text-base font-bold text-white hover:opacity-90"
+          style={{ backgroundColor: renk }}
+          onClick={onSeansIslemi}
+        >
+          Seans işlemi
+          {acik > 0 && (
+            <span className="mt-0.5 rounded-full bg-white px-2 text-xs font-bold leading-5" style={{ color: renk }}>
+              {acik} açık
+            </span>
+          )}
+        </Button>
+      </div>
     </li>
   );
 }
 
 function Rakam({ etiket, deger, vurgu }: { etiket: string; deger: number | string; vurgu?: boolean }) {
   return (
-    <div className="rounded-xl bg-muted/60 py-2">
-      <p className="text-sm text-muted-foreground">{etiket}</p>
-      <p className={cn("text-3xl font-extrabold tabular-nums", vurgu && "text-vw-deep")}>{deger}</p>
+    <div className="flex w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-lg bg-muted/60 py-1">
+      <p className="text-[11px] leading-tight text-muted-foreground">{etiket}</p>
+      <p className={cn("text-xl font-extrabold leading-tight tabular-nums", vurgu && "text-vw-deep")}>{deger}</p>
     </div>
   );
 }
