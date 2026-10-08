@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { talimatPasifKayitlari } from "@/lib/talimat/actions";
 import { TALIMAT_PLANNER_ROLES, TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
+import { rpcCagir } from "@/lib/talimat/db";
 import { haftaBaslangici } from "@/lib/talimat/helpers";
 import { getPlanByHafta, getHatlar, getPlanSatirlari, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
 import type { UrunStokSecenek } from "@/lib/talimat/types";
@@ -23,6 +24,16 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
   const hafta = params.hafta && /^\d{4}-\d{2}-\d{2}$/.test(params.hafta) ? haftaBaslangici(params.hafta) : buHafta;
 
   const [plan, hatlar] = await Promise.all([getPlanByHafta(hafta), getHatlar({ sadeceAktif: false })]);
+
+  // Hat sistemi öncesi oluşturulmuş ya da sonradan hat eklenmiş planlarda her aktif hatta
+  // en az bir boş satır olsun (yalnızca planlayıcı, pasif olmayan planda; satır ekler, silmez).
+  if (plan && planner && plan.durum !== "pasif") {
+    try {
+      await rpcCagir<number>("talimat_plan_hat_satirlari_hazirla", { p_plan: plan.plan_id });
+    } catch (e) {
+      console.error("[mavi-yaka] hat satırları hazırlanamadı", e);
+    }
+  }
 
   const [satirlar, yayinlar, pasifKayitlari] = plan
     ? await Promise.all([
