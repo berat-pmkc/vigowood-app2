@@ -788,6 +788,52 @@ steps.push(step('11.17 pasif satir hattin sonuna, aktif olunca aktiflerin sonuna
   ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q2) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif')`, 'kaydet ile aktif: aktiflerin sonu')}
 `));
 
+steps.push(step('11.18 zamanli pasif/aktif islemleri (164)', 'planner', `
+  -- gelecek zamanli pasif: hemen uygulanmaz
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif', now() + interval '1 hour', null, 'zamanli test', null, 'yok', false);
+  ${assert(`j->>'durum'='bekliyor' and (select durum from ${S}.talimat_satirlar where satir_id=q4)='aktif'`, 'gelecek islem hemen uygulandi')}
+  tid := (j->>'islem_id')::uuid;
+  -- zamani gelince zamanlayici (cron baglami: auth yok) uygular
+  ${su}
+  update ${S}.talimat_zamanli_islemler set calisma_zamani = now() - interval '1 minute' where islem_id = tid;
+  j := ${S}.talimat_zamanlayici();
+  ${assert(`(j->>'zamanli_islem')::int >= 1`, 'zamanlayici islem calistirmadi')}
+  ${assert(`(select durum from ${S}.talimat_satirlar where satir_id=q4)='pasif' and (select pasif_neden from ${S}.talimat_satirlar where satir_id=q4)='zamanli test'`, 'zamanli pasif uygulanmadi')}
+  ${assert(`(select durum from ${S}.talimat_zamanli_islemler where islem_id=tid)='yapildi'`, 'islem yapildi degil')}
+  ${assert(`(select sira from ${S}.talimat_satirlar where satir_id=q4) = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'pasif en alta gitmeli')}
+  ${as('planner')}
+  -- hemen aktif + 1. siraya + bildirimsiz yayin
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'aktif', null, 1, null, null, 'bildirimsiz', false);
+  ${assert(`j->>'durum'='yapildi' and (select durum from ${S}.talimat_satirlar where satir_id=q4)='aktif'`, 'hemen aktif olmadi')}
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif' and sira < ${sat('q4')}) = 0`, '1. siraya gitmedi')}
+  -- 2. siraya
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'aktif', null, 2, null, null, 'yok', false);
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif' and sira < ${sat('q4')}) = 1`, '2. siraya gitmedi')}
+  ${assert(`(select count(distinct sira) = count(*) and min(sira)=1 and max(sira)=count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'sira 1..n tekil degil')}
+  -- sona (hedef sira buyuk)
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'aktif', null, 99, null, null, 'yok', false);
+  ${assert(`${sat('q4')} = (select max(sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 and durum<>'pasif')`, 'buyuk sira sona gitmedi')}
+  -- iptal: zamanlayici calistirmaz
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif', now() + interval '2 hours', null, null, null, 'yok', false);
+  tid := (j->>'islem_id')::uuid;
+  ${assert(`${S}.talimat_zamanli_islem_iptal(tid)`, 'iptal edilemedi')}
+  ${assert(`not ${S}.talimat_zamanli_islem_iptal(tid)`, 'ikinci iptal true dondu')}
+  ${su}
+  update ${S}.talimat_zamanli_islemler set calisma_zamani = now() - interval '1 minute' where islem_id = tid;
+  j := ${S}.talimat_zamanlayici();
+  ${assert(`(select durum from ${S}.talimat_satirlar where satir_id=q4)='aktif' and (select durum from ${S}.talimat_zamanli_islemler where islem_id=tid)='iptal'`, 'iptal edilen calisti')}
+  ${as('planner')}
+  -- hat kapsami: hemen pasif sonra aktif
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'hat', array[h4::text], 'pasif', null, null, 'hat testi', null, 'yok', false);
+  ${assert(`exists (select 1 from ${S}.talimat_pasifler where plan_id=v_plan and kapsam='hat' and hat_id=h4 and iptal_at is null)`, 'hat pasif kaydi yok')}
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan, 'hat', array[h4::text], 'aktif', null, null, null, null, 'yok', false);
+  ${assert(`not exists (select 1 from ${S}.talimat_pasifler where plan_id=v_plan and kapsam='hat' and hat_id=h4 and iptal_at is null)`, 'hat pasifi kalkmadi')}
+`));
+steps.push(expectErr('11.19 zamanli islem: planlayici degil', 'station', `perform ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif');`, ''));
+steps.push(expectErr('11.20 zamanli islem: dogrudan INSERT yok', 'planner', `insert into ${S}.talimat_zamanli_islemler (plan_id, kapsam, ids, islem) values (v_plan, 'satir', array[q4::text], 'pasif');`, 'permission denied'));
+steps.push(expectErr('11.21 zamanli islem: zamanlayici-calistir istemciden cagrilamaz', 'planner', `perform ${S}.talimat_zamanli_islem_calistir(gen_random_uuid());`, 'permission denied'));
+steps.push(expectErr('11.22 zamanli islem: gecersiz yayin', 'planner', `perform ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif', null, null, null, null, 'xyz', false);`, 'Geçersiz yayın'));
+
 // Hat testlerinin ürettiği seansları sonraki (eski personel bazlı) adımları kirletmesin diye 90 gün geriye al / kapat
 steps.push(step('11.99 hat test seanslari temizlik (kapat + zamani geriye al)', null, `
   update ${S}.montaj_sessions set durum='tamamlandi', end_time = coalesce(end_time, start_time) where session_id like 'H-%' and durum='montajda';

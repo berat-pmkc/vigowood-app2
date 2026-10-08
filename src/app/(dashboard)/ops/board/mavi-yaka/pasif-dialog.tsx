@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { talimatPasifYap, talimatPasifKaldir } from "@/lib/talimat/actions";
+import { talimatZamanliIslemEkle } from "@/lib/talimat/zamanli-actions";
 import type { TalimatPasifKapsam } from "@/lib/talimat/types";
+import { ZamanliSecenekler, duzIslemMi, istanbulBugun, varsayilanZamanli, zamanGecerliMi, type ZamanliDurum } from "./zamanli-secenek";
 
 export interface PasifHedef {
   kapsam: TalimatPasifKapsam;
@@ -37,9 +39,11 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
   const [bitis, setBitis] = useState(bugun());
   const [neden, setNeden] = useState("");
   const [busy, setBusy] = useState(false);
+  const [z, setZ] = useState<ZamanliDurum>(varsayilanZamanli());
 
   useEffect(() => {
     if (hedef) {
+      setZ(varsayilanZamanli());
       setSure("bugun");
       setBaslangic(bugun());
       setBitis(bugun());
@@ -51,6 +55,42 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
     if (!hedef) return;
     if (sure === "aralik" && bitis < baslangic) {
       toast.error("Bitiş tarihi başlangıçtan önce olamaz");
+      return;
+    }
+    const zamanli = hedef.kapsam !== "personel" && !duzIslemMi(z);
+    if (zamanli && !zamanGecerliMi(z)) {
+      toast.error("Geçerli bir tarih ve saat seçin");
+      return;
+    }
+    if (zamanli) {
+      // Zamanlı / yayınlı yol: pasif, seçilen günden itibaren uygulanır
+      const gun = z.zaman === "sec" ? z.tarih : istanbulBugun();
+      if (sure === "aralik" && bitis < gun) {
+        toast.error("Bitiş tarihi başlangıçtan önce olamaz");
+        return;
+      }
+      setBusy(true);
+      const zr = await talimatZamanliIslemEkle({
+        planId,
+        kapsam: hedef.kapsam as "satir" | "hat" | "liste",
+        ids: hedef.ids,
+        islem: "pasif",
+        tarih: z.zaman === "sec" ? z.tarih : null,
+        saat: z.zaman === "sec" ? z.saat : null,
+        neden: neden.trim() || null,
+        bitis: sure === "bugun" ? gun : sure === "aralik" ? bitis || gun : null,
+        yayin: z.yayin,
+        sesli: z.yayin === "bildirimli" && z.sesli,
+      });
+      setBusy(false);
+      if (!zr.success) {
+        toast.error(zr.error);
+        return;
+      }
+      if (zr.data.durum === "bekliyor") toast.success("Pasif işlemi zamanlandı");
+      else toast.success(zr.data.uyari ? `Pasif edildi (${zr.data.uyari})` : "Pasif edildi");
+      onDone();
+      onClose();
       return;
     }
     const bas = sure === "aralik" ? baslangic : bugun();
@@ -82,7 +122,7 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
 
   return (
     <Dialog open={!!hedef} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Pasif et</DialogTitle>
           <DialogDescription>{hedef?.baslik}</DialogDescription>
@@ -107,7 +147,11 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Başlangıç</Label>
-                <Input type="date" value={baslangic} onChange={(e) => setBaslangic(e.target.value)} />
+                {hedef?.kapsam === "personel" || duzIslemMi(z) ? (
+                  <Input type="date" value={baslangic} onChange={(e) => setBaslangic(e.target.value)} />
+                ) : (
+                  <Input type="date" value={z.zaman === "sec" ? z.tarih : istanbulBugun()} disabled />
+                )}
               </div>
               <div>
                 <Label>Bitiş</Label>
@@ -122,13 +166,14 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
             <Label>Neden (isteğe bağlı)</Label>
             <Input value={neden} onChange={(e) => setNeden(e.target.value)} placeholder="Örn. izinli, makine arızası" maxLength={300} />
           </div>
+          {hedef?.kapsam !== "personel" && <ZamanliSecenekler durum={z} onChange={setZ} />}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Vazgeç
           </Button>
           <Button onClick={kaydet} disabled={busy} className="bg-vw-deep text-white hover:bg-vw-dark">
-            Pasif et
+            {z.zaman === "sec" && hedef?.kapsam !== "personel" ? "Zamanla" : "Pasif et"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -137,8 +182,10 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
 }
 
 export interface PasifKaldirHedef {
-  /** 'liste' = tüm liste; 'hat' = seçili hatlar */
-  kapsam: "liste" | "hat";
+  /** 'liste' = tüm liste; 'hat' = seçili hatlar; 'satir' = seçili satırlar (aktif et + iş sırası) */
+  kapsam: "liste" | "hat" | "satir";
+  /** kapsam='satir' ise aktif edilecek satırlar */
+  satirIds?: string[];
   baslik: string;
   /** hat kapsamında seçili hatlar; liste kapsamında tüm hatlar */
   hatlar: string[];
@@ -165,23 +212,83 @@ export function PasifKaldirDialog({
   const [alt, setAlt] = useState(true);
   const [liste, setListe] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [z, setZ] = useState<ZamanliDurum>(varsayilanZamanli());
 
   useEffect(() => {
     if (hedef) {
       setAlt(true);
       setListe(true);
+      setZ(varsayilanZamanli());
     }
   }, [hedef]);
 
+  /** Zamanlı / yayınlı / özel sıralı yol: işlemler sırayla eklenir, yayın yalnız sonuncuya bağlanır */
+  const zamanliUygula = async () => {
+    if (!hedef) return;
+    if (!zamanGecerliMi(z)) {
+      toast.error("Geçerli bir tarih ve saat seçin");
+      return;
+    }
+    const isler: { kapsam: "liste" | "hat" | "satir"; ids: string[] }[] = [];
+    if (hedef.kapsam === "satir") {
+      isler.push({ kapsam: "satir", ids: hedef.satirIds ?? [] });
+    } else if (hedef.kapsam === "liste") {
+      isler.push({ kapsam: "liste", ids: [] });
+      if (alt) {
+        if (hedef.hatlar.length) isler.push({ kapsam: "hat", ids: hedef.hatlar });
+        if (hedef.pasifSatirlar.length) isler.push({ kapsam: "satir", ids: hedef.pasifSatirlar });
+      }
+    } else {
+      isler.push({ kapsam: "hat", ids: hedef.hatlar });
+      if (alt && hedef.pasifSatirlar.length) isler.push({ kapsam: "satir", ids: hedef.pasifSatirlar });
+      if (hedef.listePasifVar && liste) isler.push({ kapsam: "liste", ids: [] });
+    }
+    setBusy(true);
+    let bekleyen = 0;
+    let uyari: string | null = null;
+    for (let i = 0; i < isler.length; i++) {
+      const son = i === isler.length - 1;
+      const is = isler[i];
+      const r = await talimatZamanliIslemEkle({
+        planId,
+        kapsam: is.kapsam,
+        ids: is.ids,
+        islem: "aktif",
+        tarih: z.zaman === "sec" ? z.tarih : null,
+        saat: z.zaman === "sec" ? z.saat : null,
+        hedefSira: is.kapsam === "satir" && hedef.kapsam === "satir" && z.sira === "sec" ? z.siraNo : null,
+        yayin: son ? z.yayin : "yok",
+        sesli: son && z.yayin === "bildirimli" && z.sesli,
+      });
+      if (!r.success) {
+        toast.error(r.error);
+        break;
+      }
+      if (r.data.durum === "bekliyor") bekleyen++;
+      if (r.data.uyari) uyari = r.data.uyari;
+    }
+    setBusy(false);
+    if (bekleyen > 0) toast.success("Aktif etme işlemi zamanlandı");
+    else toast.success(uyari ? `Aktif edildi (${uyari})` : "Aktif edildi");
+    onDone();
+    onClose();
+  };
+
   const uygula = async () => {
     if (!hedef) return;
+    if (!duzIslemMi(z)) {
+      await zamanliUygula();
+      return;
+    }
     setBusy(true);
     const hatalar: string[] = [];
     const calis = async (p: ReturnType<typeof talimatPasifKaldir>) => {
       const r = await p;
       if (!r.success) hatalar.push(r.error);
     };
-    if (hedef.kapsam === "liste") {
+    if (hedef.kapsam === "satir") {
+      await calis(talimatPasifKaldir({ kapsam: "satir", planId, ids: hedef.satirIds ?? [] }));
+    } else if (hedef.kapsam === "liste") {
       await calis(talimatPasifKaldir({ kapsam: "liste", planId }));
       if (alt) {
         if (hedef.hatlar.length) await calis(talimatPasifKaldir({ kapsam: "hat", planId, ids: hedef.hatlar }));
@@ -201,13 +308,13 @@ export function PasifKaldirDialog({
 
   return (
     <Dialog open={!!hedef} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Pasifi kaldır</DialogTitle>
+          <DialogTitle>{hedef?.kapsam === "satir" ? "Aktif et" : "Pasifi kaldır"}</DialogTitle>
           <DialogDescription>{hedef?.baslik}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 text-sm">
-          {hedef?.kapsam === "liste" ? (
+          {hedef?.kapsam === "satir" ? null : hedef?.kapsam === "liste" ? (
             <label className="flex items-start gap-2">
               <Checkbox checked={alt} onCheckedChange={(v) => setAlt(!!v)} className="mt-0.5" />
               <span>
@@ -239,13 +346,14 @@ export function PasifKaldirDialog({
               )}
             </>
           )}
+          <ZamanliSecenekler durum={z} onChange={setZ} siraGoster={hedef?.kapsam === "satir"} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Vazgeç
           </Button>
           <Button onClick={uygula} disabled={busy} className="bg-vw-deep text-white hover:bg-vw-dark">
-            Pasifi kaldır
+            {z.zaman === "sec" ? "Zamanla" : hedef?.kapsam === "satir" ? "Aktif et" : "Pasifi kaldır"}
           </Button>
         </DialogFooter>
       </DialogContent>

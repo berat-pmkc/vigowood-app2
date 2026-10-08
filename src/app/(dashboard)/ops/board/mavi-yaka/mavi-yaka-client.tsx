@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Clock,
   Copy,
   CopyPlus,
   EyeOff,
@@ -69,7 +70,6 @@ import {
   satirKaydet,
   satirYenidenAktifEt,
   satirSil,
-  talimatPasifKaldir,
   talimatYayinla,
   type TalimatPasifKayit,
 } from "@/lib/talimat/actions";
@@ -85,6 +85,7 @@ import type {
   TalimatSatirFiltre,
   TalimatYayin,
   UrunStokSecenek,
+  ZamanliIslem,
 } from "@/lib/talimat/types";
 import { cn, formatDate } from "@/lib/utils";
 import { HatNokta } from "@/components/shared/hat-nokta";
@@ -93,6 +94,7 @@ import { HAT_TUR_LABEL, HatDuzenleDialog, HatEkle } from "./hat-ekle";
 import { PasifDialog, PasifKaldirDialog, type PasifHedef, type PasifKaldirHedef } from "./pasif-dialog";
 import { SatirRow, type SatirIslemleri } from "./satir-row";
 import { YayinDialog } from "./yayin-dialog";
+import { ZamanliListeDialog, zamanliOzet } from "./zamanli-liste";
 import { TamamlananlarDialog } from "./tamamlananlar-dialog";
 import { YayinGecmisi } from "./yayin-gecmisi";
 
@@ -109,6 +111,8 @@ interface Props {
   planner: boolean;
   /** Aktif hat/liste pasif kayıtları (rozetler + kaldırma) */
   pasifKayitlari: TalimatPasifKayit[];
+  /** Bekleyen zamanlı pasif/aktif işlemleri (SQL 164; yalnız planlayıcı) */
+  zamanliIslemler: ZamanliIslem[];
   /** Derin bağlantı (?satir=<id>): grubu aç, satıra kaydır, 3 sn vurgula */
   vurguSatir: string | null;
 }
@@ -155,7 +159,7 @@ function HatDropRow({ hatId, disabled, children }: { hatId: string; disabled: bo
   );
 }
 
-export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatlar, stoklar, planner, pasifKayitlari, vurguSatir }: Props) {
+export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatlar, stoklar, planner, pasifKayitlari, zamanliIslemler, vurguSatir }: Props) {
   const router = useRouter();
   const yenile = useCallback(() => router.refresh(), [router]);
 
@@ -368,6 +372,37 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
   // ── pasif ──
   const [pasifHedef, setPasifHedef] = useState<PasifHedef | null>(null);
   const [kaldirHedef, setKaldirHedef] = useState<PasifKaldirHedef | null>(null);
+  const [zamanliAcik, setZamanliAcik] = useState(false);
+  /** Satır başına: yalnız satır kapsamlı bekleyen işlemler */
+  const satirZamanli = useMemo(() => {
+    const m = new Map<string, ZamanliIslem[]>();
+    for (const i of zamanliIslemler) {
+      if (i.kapsam !== "satir") continue;
+      for (const id of i.ids) m.set(id, [...(m.get(id) ?? []), i]);
+    }
+    return m;
+  }, [zamanliIslemler]);
+  /** Hat başına: hat, liste ve o hattın satırlarını ilgilendiren bekleyen işlemler */
+  const hatZamanli = useMemo(() => {
+    const m = new Map<string, ZamanliIslem[]>();
+    const hatSatirlari = new Map<string, Set<string>>();
+    for (const x of satirlar) {
+      if (!x.hat_id) continue;
+      (hatSatirlari.get(x.hat_id) ?? hatSatirlari.set(x.hat_id, new Set()).get(x.hat_id)!).add(x.satir_id);
+    }
+    for (const h of hatlar) {
+      m.set(
+        h.hat_id,
+        zamanliIslemler.filter(
+          (i) =>
+            i.kapsam === "liste" ||
+            (i.kapsam === "hat" && i.ids.includes(h.hat_id)) ||
+            (i.kapsam === "satir" && i.ids.some((id) => hatSatirlari.get(h.hat_id)?.has(id))),
+        ),
+      );
+    }
+    return m;
+  }, [zamanliIslemler, satirlar, hatlar]);
   const listePasifKaydi = useMemo(() => pasifKayitlari.find((k) => k.kapsam === "liste") ?? null, [pasifKayitlari]);
   const hatPasifKaydi = useMemo(() => {
     const m = new Map<string, TalimatPasifKayit>();
@@ -493,16 +528,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
           ids: [s.satir_id],
           baslik: `${s.hat_adi ?? ""} · ${s.sira}. sıra ${s.sku ? `(${s.sku})` : ""}`,
         }),
-      pasifKaldir: async (s) => {
-        if (!plan) return;
-        const r = await talimatPasifKaldir({ kapsam: "satir", planId: plan.plan_id, ids: [s.satir_id] });
-        if (!r.success) toast.error(hataMesaji(r));
-        else toast.success("Pasif kaldırıldı");
-        yenile();
-      },
+      pasifKaldir: (s) =>
+        setKaldirHedef({
+          kapsam: "satir",
+          satirIds: [s.satir_id],
+          baslik: `${s.hat_adi ?? ""} · ${s.sira}. sıra ${s.sku ? `(${s.sku})` : ""} aktif edilecek`,
+          hatlar: [],
+          pasifSatirlar: [],
+          listePasifVar: false,
+          hatPasifVar: false,
+        }),
       sil: (s) => setSilHedef(s),
     }),
-    [kaydet, plan, yenile],
+    [kaydet],
   );
 
   // ── sürükle-bırak: aynı hatta sıralama, başka hatta kopyalama ──
@@ -668,6 +706,12 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                       <Copy className="mr-2 h-4 w-4" /> Bu haftayı kopyala → yeni hafta
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setZamanliAcik(true)}>
+                      <Clock className="mr-2 h-4 w-4" /> Zamanlanmış işlemler
+                      {zamanliIslemler.length > 0 && (
+                        <span className="ml-auto rounded-full bg-vw-deep px-1.5 text-[11px] text-white">{zamanliIslemler.length}</span>
+                      )}
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() => setPasifHedef({ kapsam: "liste", ids: [], baslik: "Tüm liste (bütün hatlar) pasif edilecek" })}
                     >
@@ -988,6 +1032,19 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                     if (pasifSayisi > 0) return <Badge className="border-0 bg-[#eceff1] text-[#546e7a]">{pasifSayisi} satır pasif</Badge>;
                                     return null;
                                   })()}
+                                  {(() => {
+                                    const hz = hatZamanli.get(hat.hat_id) ?? [];
+                                    if (hz.length === 0) return null;
+                                    return (
+                                      <Badge
+                                        title={hz.map((z) => zamanliOzet(z)).join(" | ")}
+                                        className="cursor-pointer border-0 bg-[#e8eaf6] text-[#283593]"
+                                        onClick={() => setZamanliAcik(true)}
+                                      >
+                                        <Clock className="mr-1 h-3 w-3" /> {hz.length} zamanlı
+                                      </Badge>
+                                    );
+                                  })()}
                                   <span className={cn("text-xs", isOver ? "text-muted-foreground" : "font-medium text-white/90")}>{aktifSayisi} satır</span>
                                   {isOver && <span className="text-xs font-semibold text-[#2f7d66]">Buraya bırak: kopyala</span>}
                                   {hatDuzenlenebilir && (
@@ -1071,6 +1128,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                     secili={secili.has(s.satir_id)}
                                     hatRenk={hatRengi(hat)}
                                     hatRenkAcik={hatRengiAcik(hat, 0.07)}
+                                    zamanli={satirZamanli.get(s.satir_id)}
                                     onSecToggle={satirBosMu(s) ? undefined : () => seciliToggle(s.satir_id)}
                                   />
                                 );
@@ -1127,6 +1185,26 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                   >
                     <EyeOff className="mr-1.5 h-4 w-4" /> Seçilenleri pasif et
                   </Button>
+                  {satirlar.some((x) => secili.has(x.satir_id) && x.durum === "pasif") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9"
+                      onClick={() =>
+                        setKaldirHedef({
+                          kapsam: "satir",
+                          satirIds: satirlar.filter((x) => secili.has(x.satir_id) && x.durum === "pasif").map((x) => x.satir_id),
+                          baslik: `${satirlar.filter((x) => secili.has(x.satir_id) && x.durum === "pasif").length} pasif satır aktif edilecek`,
+                          hatlar: [],
+                          pasifSatirlar: [],
+                          listePasifVar: false,
+                          hatPasifVar: false,
+                        })
+                      }
+                    >
+                      <PlayCircle className="mr-1.5 h-4 w-4" /> Seçilenleri aktif et
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     className="h-9 bg-[#c0424f] text-white hover:bg-[#a63744]"
@@ -1162,6 +1240,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
             <YayinDialog open={yayinAcik} plan={plan} gelecekHafta={gelecekHafta} onClose={() => setYayinAcik(false)} onDone={yenile} />
             <PasifDialog planId={plan.plan_id} hedef={pasifHedef} onClose={() => setPasifHedef(null)} onDone={yenile} />
             <PasifKaldirDialog planId={plan.plan_id} hedef={kaldirHedef} onClose={() => setKaldirHedef(null)} onDone={yenile} />
+            <ZamanliListeDialog
+              open={zamanliAcik}
+              onOpenChange={setZamanliAcik}
+              islemler={zamanliIslemler}
+              hatlar={hatlar}
+              satirlar={satirlar}
+              onDone={yenile}
+            />
           </>
         )}
         <HatDuzenleDialog hat={duzenleHat} onClose={() => setDuzenleHat(null)} onDone={yenile} />

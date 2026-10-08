@@ -276,3 +276,11 @@ Server action'lar:
 - Aynı hatta aynı sku iki satırda varsa üretilen her iki satıra yansır (hat+sku bazlı sayım).
 - `talimat_satir_kapat` / `talimat_satir_yeniden_aktif` (başka çalışmadan gelen, canlı şemada) hat satırında `talimat_degisen_isaretle(plan, NULL)` çağırır; 160 bunu NULL-güvenli yapar (satırın `degisti` bayrağı hattı yayına zaten dahil eder).
 - Test: `node scripts/migrate/test-talimat.mjs --schema vigowood_prova` (hat adımları 11.x; tek transaction, her zaman rollback).
+
+## 12. Zamanlı pasif / aktif işlemleri (SQL 164)
+
+- Tablo `talimat_zamanli_islemler` (kapsam `satir|hat|liste`, `islem` pasif|aktif, `calisma_zamani`, `hedef_sira`, `pasif_neden/bitis`, `yayin` yok|bildirimsiz|bildirimli, `sesli`, `durum` bekliyor|yapildi|iptal|hata). RLS: yalnız planlayıcı SELECT; yazma yalnız RPC.
+- RPC: `talimat_zamanli_islem_ekle(plan, kapsam, ids, islem, zaman, hedef_sira, neden, bitis, yayin, sesli)` (zaman NULL/geçmiş = hemen uygular, hata fırlatır), `talimat_zamanli_islem_iptal(id)`. İç: `talimat_zamanli_islem_calistir(id)`, `talimat_pasif_ic`, `talimat_pasif_kaldir_ic` (dış `talimat_pasif`/`talimat_pasif_kaldir` artık yetki + iç çağrı), `talimat_satir_gorunen_sira_ic`.
+- `hedef_sira` = hattın aktif (pasif/tamamlanmamış olmayan) satırları arasındaki görünen konum; NULL = aktiflerin sonu. Yayın, değişiklik uygulandıktan sonra `talimat_yayinla_ic(..., 'degisenler')`; yayın başarısızsa pasif/aktif korunur, `hata` alanına uyarı yazılır.
+- `talimat_zamanlayici()` her dakika zamanı gelen `bekliyor` işlemleri çalıştırır (sonuç JSON'unda `zamanli_islem`).
+- UI: `mavi-yaka/pasif-dialog.tsx` (Ne zaman / İş sırası / Yayın, `zamanli-secenek.tsx`), `zamanli-liste.tsx` (İşlemler > Zamanlanmış işlemler, iptal), satır/hat rozetleri. Action'lar: `src/lib/talimat/zamanli-actions.ts`.

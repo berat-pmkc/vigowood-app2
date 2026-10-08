@@ -3,7 +3,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
-import { GripVertical, History, Link2, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
+import { Clock, GripVertical, History, Link2, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,10 @@ import { MiktarHizliInput } from "@/components/shared/miktar-hizli-input";
 import { UrunStokCombobox } from "@/components/shared/urun-stok-combobox";
 import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
 import { ilerlemeYuzdesi } from "@/lib/talimat/helpers";
-import type { SatirKaydetGirdi, TalimatSatir, UrunStokSecenek } from "@/lib/talimat/types";
+import type { SatirKaydetGirdi, TalimatSatir, UrunStokSecenek, ZamanliIslem } from "@/lib/talimat/types";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { PlakaSecici } from "./plaka-secici";
+import { zamanliOzet } from "./zamanli-liste";
 
 export interface SatirIslemleri {
   kaydet: (satirId: string, alanlar: Partial<SatirKaydetGirdi>) => void;
@@ -39,9 +40,11 @@ interface Props {
   /** Hat rengi (tabletle aynı): sol kalın şerit + çok açık zemin */
   hatRenk?: string;
   hatRenkAcik?: string;
+  /** Bu satırı etkileyecek bekleyen zamanlı işlemler (satır / hat / liste kapsamlı) */
+  zamanli?: ZamanliIslem[];
 }
 
-export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle, hatRenk, hatRenkAcik }: Props) {
+export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle, hatRenk, hatRenkAcik, zamanli }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: s.satir_id,
     disabled: !editable || !sirali,
@@ -232,6 +235,16 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
             <Badge className="border-0 bg-[#e3ecd2] text-[#3caa35]">Tamamlandı</Badge>
           ) : (
             <Badge className="border-0 bg-[#f0ede1] text-vw-deep">Aktif</Badge>
+          )}
+          {zamanli && zamanli.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex cursor-help items-center gap-1 rounded bg-[#e8eaf6] px-1.5 py-0.5 text-[11px] font-medium text-[#283593]">
+                  <Clock className="h-3 w-3" /> {zamanli.length > 1 ? `${zamanli.length} zamanlı` : zamanliOzet(zamanli[0])}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{zamanli.map((z) => zamanliOzet(z)).join(" | ")}</TooltipContent>
+            </Tooltip>
           )}
           {s.degisti && <span className="text-[11px] font-semibold text-[#c0424f]">Değişti</span>}
           {s.onay_bekliyor && <span className="text-[11px] font-semibold text-[#c0424f]">Onay bekliyor</span>}

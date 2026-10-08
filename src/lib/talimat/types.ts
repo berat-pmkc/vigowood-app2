@@ -475,3 +475,42 @@ export interface TalimatPlanHatGrubu {
   /** Hat bugün için plan düzeyinde pasif mi (talimat_pasifler kapsam='hat') */
   pasif: boolean;
 }
+
+// ─── Zamanlı pasif / aktif işlemleri (SQL 164) ──────────────────
+
+export type ZamanliYayin = "yok" | "bildirimsiz" | "bildirimli";
+
+export interface ZamanliIslem {
+  islem_id: string;
+  plan_id: string;
+  kapsam: "satir" | "hat" | "liste";
+  ids: string[];
+  islem: "pasif" | "aktif";
+  /** ISO zaman damgası */
+  calisma_zamani: string;
+  hedef_sira: number | null;
+  pasif_neden: string | null;
+  pasif_bitis: string | null;
+  yayin: ZamanliYayin;
+  sesli: boolean;
+  durum: "bekliyor" | "yapildi" | "iptal" | "hata";
+  hata: string | null;
+  created_at: string;
+}
+
+export interface ZamanliIslemGirdi {
+  planId: string;
+  kapsam: "satir" | "hat" | "liste";
+  ids?: string[];
+  islem: "pasif" | "aktif";
+  /** YYYY-MM-DD (İstanbul); boş = hemen */
+  tarih?: string | null;
+  /** HH:MM (İstanbul) */
+  saat?: string | null;
+  /** aktif satır: hattın aktif satırları arasındaki görünen konum; boş = aktiflerin sonu */
+  hedefSira?: number | null;
+  neden?: string | null;
+  bitis?: string | null;
+  yayin?: ZamanliYayin;
+  sesli?: boolean;
+}
