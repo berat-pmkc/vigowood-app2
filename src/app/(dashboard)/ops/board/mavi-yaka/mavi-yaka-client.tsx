@@ -87,6 +87,8 @@ import type {
   UrunStokSecenek,
 } from "@/lib/talimat/types";
 import { cn, formatDate } from "@/lib/utils";
+import { HatNokta } from "@/components/shared/hat-nokta";
+import { HAT_YAZI_RENGI, hatRengi, hatRengiAcik } from "@/lib/talimat/hat-renk";
 import { HAT_TUR_LABEL, HatDuzenleDialog, HatEkle } from "./hat-ekle";
 import { PasifDialog, PasifKaldirDialog, type PasifHedef, type PasifKaldirHedef } from "./pasif-dialog";
 import { SatirRow, type SatirIslemleri } from "./satir-row";
@@ -836,7 +838,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                       <option value="">Tüm hatlar</option>
                       {hatlar.map((h) => (
                         <option key={h.hat_id} value={h.hat_id}>
-                          {h.ad}
+                          ● {h.ad}
                         </option>
                       ))}
                     </select>
@@ -950,9 +952,10 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                             {(isOver) => (
                               <td
                                 colSpan={11}
+                                style={isOver ? undefined : { backgroundColor: hatRengi(hat), color: HAT_YAZI_RENGI }}
                                 className={cn(
                                   "sticky top-9 z-10 px-3 py-2 transition-colors",
-                                  isOver ? "bg-[#b1d286] ring-2 ring-inset ring-[#3caa35]" : "bg-[#e6dfc9]",
+                                  isOver ? "bg-[#b1d286] text-vw-dark ring-2 ring-inset ring-[#3caa35]" : "text-white",
                                 )}
                               >
                                 <div className="flex flex-wrap items-center gap-2">
@@ -960,7 +963,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                     type="button"
                                     onClick={() => grupToggle(hat.hat_id)}
                                     aria-label={kapaliGruplar.has(hat.hat_id) ? "Hattı aç" : "Hattı kapat"}
-                                    className="rounded p-0.5 hover:bg-black/10"
+                                    className="rounded p-0.5 hover:bg-black/20"
                                   >
                                     <ChevronDown className={cn("h-4 w-4 transition-transform", kapaliGruplar.has(hat.hat_id) && "-rotate-90")} />
                                   </button>
@@ -972,8 +975,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                       className="h-5 w-5 bg-white"
                                     />
                                   )}
-                                  <span className="text-sm font-bold text-vw-dark">{hat.ad}</span>
-                                  <Badge variant="outline" className="border-vw-side/60 text-[11px] text-vw-deep">
+                                  <span className="text-sm font-bold">{hat.ad}</span>
+                                  <Badge variant="outline" className={cn("text-[11px]", isOver ? "border-vw-side/60 text-vw-deep" : "border-white/70 bg-white/15 text-white")}>
                                     {HAT_TUR_LABEL[hat.tur]}
                                   </Badge>
                                   {!hat.aktif && <Badge className="border-0 bg-[#cfd8dc] text-[#546e7a]">Hat kapalı</Badge>}
@@ -984,7 +987,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                     if (pasifSayisi > 0) return <Badge className="border-0 bg-[#eceff1] text-[#546e7a]">{pasifSayisi} satır pasif</Badge>;
                                     return null;
                                   })()}
-                                  <span className="text-xs text-muted-foreground">{aktifSayisi} satır</span>
+                                  <span className={cn("text-xs", isOver ? "text-muted-foreground" : "font-medium text-white/90")}>{aktifSayisi} satır</span>
                                   {isOver && <span className="text-xs font-semibold text-[#2f7d66]">Buraya bırak: kopyala</span>}
                                   {hatDuzenlenebilir && (
                                     <div className="ml-auto flex items-center gap-1">
@@ -993,7 +996,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                       </Button>
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`${hat.ad} işlemleri`}>
+                                          <Button variant="ghost" size="icon" className={cn("h-7 w-7", !isOver && "text-white hover:bg-white/20 hover:text-white")} aria-label={`${hat.ad} işlemleri`}>
                                             <MoreHorizontal className="h-4 w-4" />
                                           </Button>
                                         </DropdownMenuTrigger>
@@ -1059,6 +1062,8 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                     sirali
                                     parlak={parlayanSatir === s.satir_id}
                                     secili={secili.has(s.satir_id)}
+                                    hatRenk={hatRengi(hat)}
+                                    hatRenkAcik={hatRengiAcik(hat, 0.07)}
                                     onSecToggle={satirBosMu(s) ? undefined : () => seciliToggle(s.satir_id)}
                                   />
                                 );
@@ -1097,6 +1102,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                       ) : (
                         kopyaHedefHatlari.map((h) => (
                           <DropdownMenuItem key={h.hat_id} onSelect={() => void kopyalaHatta(seciliSirali, h.hat_id)}>
+                            <HatNokta hat={h} className="mr-2" />
                             {h.ad}
                             <span className="ml-auto text-[11px] text-muted-foreground">{HAT_TUR_LABEL[h.tur]}</span>
                           </DropdownMenuItem>
@@ -1139,7 +1145,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
               yenidenAktifEt={yenidenAktifEt}
             />
 
-            <YayinGecmisi yayinlar={yayinlar} editable={editable} onChanged={yenile} />
+            <YayinGecmisi yayinlar={yayinlar} editable={editable} onChanged={yenile} hatlar={hatlar} />
           </>
         )}
 

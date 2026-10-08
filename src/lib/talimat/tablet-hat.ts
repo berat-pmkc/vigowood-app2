@@ -33,12 +33,7 @@ export function hataGoreSeansGrupla<T extends { hat_id?: string | null }>(items:
   return sonuc;
 }
 
-/** Hat sırasına göre vurgu rengi (başlık şeridi) */
-const HAT_RENKLERI = ["#3368b1", "#2f8a6f", "#8a5a9e", "#c26a0c", "#6f4c37", "#0c1c2d"];
-export function hatRengi(hat: Pick<TalimatHat, "sira"> | null | undefined): string {
-  if (!hat) return "#5e5747";
-  return HAT_RENKLERI[Math.max(0, hat.sira - 1) % HAT_RENKLERI.length];
-}
+export { HAT_RENKLERI, hatRengi, hatRengiAcik, HAT_YAZI_RENGI } from "./hat-renk";
 
 /** DOM id: hat bölümüne kaydırma */
 export function hatDomId(hatId: string): string {

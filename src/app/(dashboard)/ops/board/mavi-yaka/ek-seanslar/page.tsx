@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
+import { getHatlar } from "@/lib/talimat/queries";
 import { getEkSeanslarAralikHat } from "@/lib/talimat/planlayici-hat";
 import { trBugun } from "@/lib/periods";
 import { EkSeanslarClient } from "./ek-seanslar-client";
@@ -28,6 +29,7 @@ export default async function EkSeanslarPage({
   const personel = sp.personel && /^[A-Za-z0-9_-]{1,32}$/.test(sp.personel) ? sp.personel : null;
 
   let hata: string | null = null;
+  const hatlar = await getHatlar().catch(() => []);
   let satirlar: Awaited<ReturnType<typeof getEkSeanslarAralikHat>> = [];
   try {
     satirlar = await getEkSeanslarAralikHat(from, to, personel);
@@ -38,6 +40,7 @@ export default async function EkSeanslarPage({
   return (
     <EkSeanslarClient
       satirlar={satirlar}
+      hatlar={hatlar}
       hata={hata}
       gun={gun}
       bugun={bugun}

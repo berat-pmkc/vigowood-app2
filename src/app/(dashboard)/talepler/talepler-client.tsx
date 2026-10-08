@@ -64,6 +64,8 @@ import { TALEP_DURUM_COLOR, TALEP_DURUM_LABEL } from "@/lib/talimat/constants";
 import { talepSerbestMi } from "@/lib/talimat/helpers";
 import type { TalepBaglanti } from "@/lib/talimat/admin-actions";
 import type { Depo } from "@/lib/talimat/types";
+import { hatRengi } from "@/lib/talimat/hat-renk";
+import type { TalimatHat } from "@/lib/talimat/types";
 import type { Talep, TalepAsama, TalepDurum, TalepRevizyon } from "@/lib/talep/types";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { TalepFormDialog } from "./talep-form-dialog";
@@ -77,6 +79,8 @@ interface Props {
   toplam: number;
   baglantilar: TalepBaglanti[];
   depolar: Depo[];
+  /** Hat renkleri için (tablet/planlayıcı ile aynı renk) */
+  hatlar?: TalimatHat[];
   userId: string;
   planner: boolean;
   baslangic: string;
@@ -176,6 +180,7 @@ export function TaleplerClient({
   toplam,
   baglantilar,
   depolar,
+  hatlar = [],
   userId,
   planner,
   baslangic,
@@ -636,6 +641,7 @@ export function TaleplerClient({
                           <div className="flex flex-col items-start gap-0.5">
                             {(t.asamalar ?? []).map((a) => {
                               const r = ASAMA_RENK[a.durum] ?? ASAMA_RENK.atandi;
+                              const hatRenk = hatRengi(hatlar.find((h) => h.hat_id === a.hat_id));
                               return (
                                 <span key={a.satir_id} className="inline-flex items-center gap-1">
                                   <span
@@ -644,8 +650,13 @@ export function TaleplerClient({
                                       "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium",
                                       a.pasif && "line-through opacity-50",
                                     )}
-                                    style={{ background: r.bg, color: r.fg }}
+                                    style={{ background: r.bg, color: r.fg, borderLeft: "5px solid " + hatRenk }}
                                   >
+                                    <span
+                                      aria-hidden
+                                      className="mr-1 inline-block h-2 w-2 rounded-full align-middle ring-1 ring-black/10"
+                                      style={{ backgroundColor: hatRenk }}
+                                    />
                                     {asamaMetni(a)}
                                   </span>
                                   {bag && (

@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { bildirimDurdur, yayinDetayGetir } from "@/lib/talimat/actions";
 import { YAYIN_DURUM_LABEL } from "@/lib/talimat/constants";
-import type { TalimatYayin, TalimatYayinHedefDetay } from "@/lib/talimat/types";
+import { HatNokta } from "@/components/shared/hat-nokta";
+import type { TalimatHat, TalimatYayin, TalimatYayinHedefDetay } from "@/lib/talimat/types";
 import { formatDate, formatTime } from "@/lib/utils";
 
 interface Props {
   yayinlar: TalimatYayin[];
   editable: boolean;
   onChanged: () => void;
+  hatlar?: TalimatHat[];
 }
 
 const DURUM_RENK: Record<string, string> = {
@@ -26,7 +28,7 @@ const DURUM_RENK: Record<string, string> = {
   geri_cekildi: "bg-[#fbdde1] text-[#c0424f]",
 };
 
-function YayinSatiri({ y, editable, onChanged }: { y: TalimatYayin; editable: boolean; onChanged: () => void }) {
+function YayinSatiri({ y, editable, onChanged, hatlar }: { y: TalimatYayin; editable: boolean; onChanged: () => void; hatlar: TalimatHat[] }) {
   const [acik, setAcik] = useState(false);
   const [hedefler, setHedefler] = useState<TalimatYayinHedefDetay[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,7 +103,10 @@ function YayinSatiri({ y, editable, onChanged }: { y: TalimatYayin; editable: bo
             <ul className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2 lg:grid-cols-3">
               {hedefler.map((h) => (
                 <li key={h.hat_id ?? h.personel_id} className="flex justify-between gap-2">
-                  <span>{h.hat_adi ?? h.personel_adi ?? h.personel_id}</span>
+                  <span className="flex items-center gap-1.5">
+                    {h.hat_id && <HatNokta hat={hatlar.find((x) => x.hat_id === h.hat_id)} />}
+                    {h.hat_adi ?? h.personel_adi ?? h.personel_id}
+                  </span>
                   <span className={h.onay_zamani ? "text-[#2f7d66]" : "text-[#c0424f]"}>
                     {h.onay_zamani ? `Görüldü ${formatTime(h.onay_zamani)}` : "Görmedi"}
                   </span>
@@ -115,7 +120,7 @@ function YayinSatiri({ y, editable, onChanged }: { y: TalimatYayin; editable: bo
   );
 }
 
-export function YayinGecmisi({ yayinlar, editable, onChanged }: Props) {
+export function YayinGecmisi({ yayinlar, editable, onChanged, hatlar = [] }: Props) {
   const [acik, setAcik] = useState(false);
   return (
     <Card className="gap-0 overflow-hidden p-0">
@@ -134,7 +139,7 @@ export function YayinGecmisi({ yayinlar, editable, onChanged }: Props) {
           {yayinlar.length === 0 ? (
             <div className="px-3 py-4 text-sm text-muted-foreground">Henüz yayın yapılmadı.</div>
           ) : (
-            yayinlar.map((y) => <YayinSatiri key={y.yayin_id} y={y} editable={editable} onChanged={onChanged} />)
+            yayinlar.map((y) => <YayinSatiri key={y.yayin_id} y={y} editable={editable} onChanged={onChanged} hatlar={hatlar} />)
           )}
         </div>
       )}

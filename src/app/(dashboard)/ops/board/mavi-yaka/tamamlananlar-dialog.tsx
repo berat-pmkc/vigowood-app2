@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from "@/lib/utils";
 import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
 import { hataGoreGrupla } from "@/lib/talimat/helpers";
+import { HAT_YAZI_RENGI, hatRengi, hatRengiAcik } from "@/lib/talimat/hat-renk";
 import type { TalimatSatir } from "@/lib/talimat/types";
 
 function zamanTr(iso: string | null): string {
@@ -57,8 +58,15 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
 
   const hatSecenek = useMemo(() => {
     const m = new Map<string, string>();
-    for (const s of satirlar) if (s.hat_id) m.set(s.hat_id, s.hat_adi ?? s.hat_id);
-    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "tr"));
+    const siralar = new Map<string, number>();
+    for (const s of satirlar)
+      if (s.hat_id) {
+        m.set(s.hat_id, s.hat_adi ?? s.hat_id);
+        siralar.set(s.hat_id, s.hat_sira ?? 0);
+      }
+    return [...m.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1], "tr"))
+      .map(([id, ad]) => [id, ad, siralar.get(id) ?? 0] as [string, string, number]);
   }, [satirlar]);
 
   const urunSecenek = useMemo(() => {
@@ -147,8 +155,8 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
                 aria-label="Hat"
               >
                 <option value="">Tüm hatlar</option>
-                {hatSecenek.map(([id, ad]) => (
-                  <option key={id} value={id}>{ad}</option>
+                {hatSecenek.map(([id, ad, sira]) => (
+                  <option key={id} value={id} style={{ color: hatRengi({ sira }) }}>● {ad}</option>
                 ))}
               </select>
               <Popover open={urunAcik} onOpenChange={setUrunAcik}>
@@ -243,13 +251,17 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
               {gruplar.map((g) => (
                 <tbody key={g.pid}>
                   <tr>
-                    <td colSpan={kolonSayisi} className="bg-[#e6dfc9] px-3 py-1.5 text-sm font-bold text-vw-dark">
+                    <td
+                      colSpan={kolonSayisi}
+                      className="px-3 py-1.5 text-sm font-bold text-white"
+                      style={{ backgroundColor: hatRengi({ sira: g.sira }), color: HAT_YAZI_RENGI }}
+                    >
                       {g.ad}
                     </td>
                   </tr>
                   {g.liste.map((s) => (
-                    <tr key={s.satir_id} className="border-b last:border-0">
-                      <td className="px-3 py-1.5 tabular-nums">{s.sira}</td>
+                    <tr key={s.satir_id} className="border-b last:border-0" style={{ backgroundColor: hatRengiAcik({ sira: g.sira }, 0.07) }}>
+                      <td className="px-3 py-1.5 tabular-nums" style={{ boxShadow: "inset 5px 0 0 " + hatRengi({ sira: g.sira }) }}>{s.sira}</td>
                       <td className="px-3 py-1.5">{TALIMAT_ISTASYON_LABEL[s.etkin_istasyon]}</td>
                       <td className="px-3 py-1.5">
                         <span className="font-medium">{s.sku ?? s.plaka_id ?? "—"}</span>

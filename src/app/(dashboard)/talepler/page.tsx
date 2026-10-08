@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { talepBaglantilariGetir } from "@/lib/talimat/admin-actions";
 import { TALEP_CREATOR_ROLES, TALEP_KAPALI_TAMAMLANAN, TALEP_KAPALI_TAMAMLANMAYAN, TALIMAT_PLANNER_ROLES } from "@/lib/talimat/constants";
-import { getDepolar } from "@/lib/talimat/queries";
+import { getDepolar, getHatlar } from "@/lib/talimat/queries";
 import { getTalep, getTalepler } from "@/lib/talep/queries";
 import type { TalepFiltre } from "@/lib/talep/types";
 import { TaleplerClient, type TalepSekme } from "./talepler-client";
@@ -51,9 +51,10 @@ export default async function TaleplerPage({
     if (bitis) filtre.bitis = bitis;
   }
 
-  const [{ talepler, toplam }, depolar] = await Promise.all([
+  const [{ talepler, toplam }, depolar, hatlar] = await Promise.all([
     getTalepler(filtre),
     getDepolar(),
+    getHatlar().catch(() => []),
   ]);
 
   const bag = await talepBaglantilariGetir(talepler.filter((t) => t.bagli_satir_sayisi > 0).map((t) => t.talep_id));
@@ -65,6 +66,7 @@ export default async function TaleplerPage({
       toplam={toplam}
       baglantilar={bag.success ? bag.data : []}
       depolar={depolar}
+      hatlar={hatlar}
       userId={user.user_id}
       planner={planner}
       baslangic={baslangic}

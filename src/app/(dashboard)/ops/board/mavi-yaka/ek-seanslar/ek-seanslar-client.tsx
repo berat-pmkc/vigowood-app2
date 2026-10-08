@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { addDays, formatRangeText, formatTrDate } from "@/lib/periods";
 import type { EkSeansSatirHat as EkSeansSatir } from "@/lib/talimat/planlayici-hat";
+import { HAT_YAZI_RENGI, hatRengi, hatRengiAcik } from "@/lib/talimat/hat-renk";
+import type { TalimatHat } from "@/lib/talimat/types";
 import { DURUM_ETIKET, DURUM_STIL, saDk, saatTr } from "./ortak";
 
 function normalize(s: string): string {
@@ -26,16 +28,17 @@ interface Props {
   bugun: string;
   aralik: { from: string; to: string } | null;
   personelFiltre: string | null;
+  hatlar?: TalimatHat[];
 }
 
-export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelFiltre }: Props) {
+export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelFiltre, hatlar = [] }: Props) {
   const router = useRouter();
   const [arama, setArama] = useState("");
   const [istasyon, setIstasyon] = useState<"tumu" | "montaj" | "paketleme">("tumu");
 
   const gruplar = useMemo(() => {
     const q = normalize(arama);
-    const m = new Map<string, { id: string; ad: string; satirlar: EkSeansSatir[] }>();
+    const m = new Map<string, { id: string; ad: string; hat: TalimatHat | undefined; satirlar: EkSeansSatir[] }>();
     for (const s of satirlar) {
       if (istasyon !== "tumu" && s.kaynak !== istasyon) continue;
       const hatAd = s.hat_adi ?? "Hatsız";
@@ -43,13 +46,13 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
       const id = s.hat_id ?? s.hat_adi ?? "-";
       let g = m.get(id);
       if (!g) {
-        g = { id, ad: hatAd, satirlar: [] };
+        g = { id, ad: hatAd, hat: hatlar.find((h) => h.hat_id === s.hat_id), satirlar: [] };
         m.set(id, g);
       }
       g.satirlar.push(s);
     }
     return [...m.values()].sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
-  }, [satirlar, arama, istasyon]);
+  }, [satirlar, arama, istasyon, hatlar]);
 
   const toplam = gruplar.reduce((n, g) => n + g.satirlar.length, 0);
   const gunGit = (g: string) =>
@@ -163,7 +166,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
             <section key={g.id}>
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
-                  <tr className="sticky top-0 z-20 bg-vw-dark text-white">
+                  <tr className="sticky top-0 z-20 bg-vw-dark text-white" style={g.hat ? { backgroundColor: hatRengi(g.hat), color: HAT_YAZI_RENGI } : undefined}>
                     <th colSpan={kolonSayisi} className="rounded-t-md px-3 py-2 text-left text-base font-bold">
                       {g.ad}
                       <span className="ml-2 rounded-full bg-white/25 px-2 py-0.5 text-xs font-semibold">
@@ -185,7 +188,11 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
                 </thead>
                 <tbody>
                   {g.satirlar.map((s) => (
-                    <tr key={s.session_id} className="border-b last:border-0">
+                    <tr
+                      key={s.session_id}
+                      className="border-b last:border-0"
+                      style={g.hat ? { backgroundColor: hatRengiAcik(g.hat, 0.07), boxShadow: "inset 5px 0 0 " + hatRengi(g.hat) } : undefined}
+                    >
                       {aralik && <td className="px-3 py-2 tabular-nums">{formatTrDate(s.gun)}</td>}
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                         {saatTr(s.start_time)}–{s.end_time ? saatTr(s.end_time) : "…"}

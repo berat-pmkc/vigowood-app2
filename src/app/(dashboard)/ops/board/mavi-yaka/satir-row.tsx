@@ -36,9 +36,12 @@ interface Props {
   /** Satır seçili mi (çoklu seçim; başka hatta kopyalama) */
   secili?: boolean;
   onSecToggle?: () => void;
+  /** Hat rengi (tabletle aynı): sol kalın şerit + çok açık zemin */
+  hatRenk?: string;
+  hatRenkAcik?: string;
 }
 
-export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle }: Props) {
+export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle, hatRenk, hatRenkAcik }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: s.satir_id,
     disabled: !editable || !sirali,
@@ -54,7 +57,12 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
       ref={setNodeRef}
       id={`satir-${s.satir_id}`}
       data-satir-id={s.satir_id}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        // Zemin tonu yalnız normal satırda (pasif/seçili/parlak/sürükleme durumları kendi rengini korur)
+        ...(hatRenkAcik && !pasif && !secili && !parlak && !isDragging ? { backgroundColor: hatRenkAcik } : {}),
+      }}
       className={cn(
         "border-b align-top text-sm",
         pasif && "bg-[#eceff1]/70 text-[#78909c]",
@@ -66,7 +74,7 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
       )}
     >
       {/* Sıra + tutamaç */}
-      <td className="w-24 px-1 py-2">
+      <td className="w-24 px-1 py-2" style={hatRenk ? { boxShadow: `inset 5px 0 0 ${hatRenk}` } : undefined}>
         <div className="flex items-center gap-0.5">
           {editable && onSecToggle && (
             <Checkbox
