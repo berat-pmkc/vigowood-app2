@@ -34,6 +34,7 @@ export interface Talep {
   kapatan: string | null;
   durum: TalepDurum;
   bagli_satir_sayisi: number;
+  /** Eski personel bazlı satırlar; hat satırlarında boş */
   atanan_personeller: string[];
   uretilen: number;
   kalan: number | null;
@@ -45,6 +46,23 @@ export interface Talep {
   depo_stok: number | null;
   /** Kapalı talep kullanıcı tarafından "Kaldır"ıldığında dolar (geçmiş sekmelerine geçer) */
   kaldirildi_at: string | null;
+  /** Hat bazlı aşama durumları (talep_durum.asamalar): hat sırasıyla */
+  asamalar: TalepAsama[];
+}
+
+export type TalepAsamaDurum = "atandi" | "basladi" | "tamamlandi" | "tamamlanmadi";
+
+/** Bir talebin bir hattaki aşaması (montaj/döşeme/paketleme ... başladı, tamamlandı) */
+export interface TalepAsama {
+  satir_id: string;
+  hat_id: string;
+  hat_adi: string;
+  tur: "montaj" | "paketleme";
+  /** atandi: hatta atandı, seans yok | basladi: seans açıldı/üretim var | tamamlandi | tamamlanmadi (satır elle kapatıldı) */
+  durum: TalepAsamaDurum;
+  uretilen: number;
+  istenen: number | null;
+  pasif: boolean;
 }
 
 export interface TalepRevizyon {
@@ -94,6 +112,19 @@ export interface TalepTalimataAtaGirdi {
   miktar?: number | null;
   istasyon?: "kesim" | "montaj" | "paketleme" | null;
   plakaId?: string | null;
+  /** dolu sıraya araya girerek ekle */
+  kaydir?: boolean;
+  planId?: string | null;
+}
+
+/** Talebi bir veya birden fazla hatta ata (talep_talimata_ata hat sürümü) */
+export interface TalepTalimataAtaHatlarGirdi {
+  talepId: string;
+  hatIds: string[];
+  /** boş = talebin istenen miktarı (her hatta aynı) */
+  miktar?: number | null;
+  /** boş = hattın ilk boş satırı, yoksa hattın sonu */
+  sira?: number | null;
   /** dolu sıraya araya girerek ekle */
   kaydir?: boolean;
   planId?: string | null;

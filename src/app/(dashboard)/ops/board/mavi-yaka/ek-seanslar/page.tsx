@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
-import { getEkSeanslarAralik } from "@/lib/talimat/ek-seans";
+import { getEkSeanslarAralikHat } from "@/lib/talimat/planlayici-hat";
 import { trBugun } from "@/lib/periods";
 import { EkSeanslarClient } from "./ek-seanslar-client";
 
@@ -28,9 +28,9 @@ export default async function EkSeanslarPage({
   const personel = sp.personel && /^[A-Za-z0-9_-]{1,32}$/.test(sp.personel) ? sp.personel : null;
 
   let hata: string | null = null;
-  let satirlar: Awaited<ReturnType<typeof getEkSeanslarAralik>> = [];
+  let satirlar: Awaited<ReturnType<typeof getEkSeanslarAralikHat>> = [];
   try {
-    satirlar = await getEkSeanslarAralik(from, to, personel);
+    satirlar = await getEkSeanslarAralikHat(from, to, personel);
   } catch (e) {
     hata = e instanceof Error ? e.message : "Veri alınamadı";
   }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { addDays, formatRangeText, formatTrDate } from "@/lib/periods";
-import type { EkSeansSatir } from "@/lib/talimat/ek-seans";
+import type { EkSeansSatirHat as EkSeansSatir } from "@/lib/talimat/planlayici-hat";
 import { DURUM_ETIKET, DURUM_STIL, saDk, saatTr } from "./ortak";
 
 function normalize(s: string): string {
@@ -38,12 +38,12 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
     const m = new Map<string, { id: string; ad: string; satirlar: EkSeansSatir[] }>();
     for (const s of satirlar) {
       if (istasyon !== "tumu" && s.kaynak !== istasyon) continue;
-      const ad = s.personel_adi ?? s.personel_id ?? "—";
-      if (q && !normalize(ad).includes(q) && !normalize(s.personel_id ?? "").includes(q)) continue;
-      const id = s.personel_id ?? "-";
+      const hatAd = s.hat_adi ?? "Hatsız";
+      if (q && !normalize(hatAd).includes(q) && !normalize(s.personel_adi ?? "").includes(q) && !normalize(s.personel_id ?? "").includes(q)) continue;
+      const id = s.hat_id ?? s.hat_adi ?? "-";
       let g = m.get(id);
       if (!g) {
-        g = { id, ad, satirlar: [] };
+        g = { id, ad: hatAd, satirlar: [] };
         m.set(id, g);
       }
       g.satirlar.push(s);
@@ -55,7 +55,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
   const gunGit = (g: string) =>
     router.push(`/ops/board/mavi-yaka/ek-seanslar?gun=${g}${personelFiltre ? `&personel=${personelFiltre}` : ""}`);
   const baslikTarih = aralik ? formatRangeText(aralik.from, aralik.to) : formatTrDate(gun);
-  const kolonSayisi = aralik ? 8 : 7;
+  const kolonSayisi = aralik ? 9 : 8;
 
   return (
     <div className="space-y-4">
@@ -67,7 +67,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-vw-dark">Açılan Ek Seanslar</h1>
-          <p className="text-sm text-muted-foreground">Personelin “Ek Seans Aç” ile başlattığı plan dışı seanslar</p>
+          <p className="text-sm text-muted-foreground">Hatlarda “Ek Seans Aç” ile başlatılan plan dışı seanslar (hat bazlı)</p>
         </div>
         <Button asChild variant="outline" size="sm" className="ml-auto">
           <Link href="/ops/board/mavi-yaka/ek-seanslar/toplam">
@@ -117,7 +117,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
 
         <div className="relative ml-auto w-full sm:w-56">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Personel ara" className="h-9 pl-8" />
+          <Input value={arama} onChange={(e) => setArama(e.target.value)} placeholder="Hat veya personel ara" className="h-9 pl-8" />
         </div>
         <div className="flex gap-1">
           {(["tumu", "montaj", "paketleme"] as const).map((k) => (
@@ -137,7 +137,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
       {personelFiltre && (
         <div className="flex items-center gap-2 text-sm">
           <span className="rounded-full bg-vw-primary/20 px-3 py-1 font-medium">
-            Personel: {gruplar[0]?.ad ?? personelFiltre}
+            Personel: {personelFiltre}
           </span>
           <Button asChild variant="ghost" size="sm" className="h-7">
             <Link
@@ -174,6 +174,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
                   <tr className="sticky top-[2.4rem] z-10 bg-muted text-left text-xs uppercase text-muted-foreground">
                     {aralik && <th className="px-3 py-1.5">Gün</th>}
                     <th className="px-3 py-1.5">Saat</th>
+                    <th className="px-3 py-1.5">Personel</th>
                     <th className="px-3 py-1.5">İstasyon</th>
                     <th className="px-3 py-1.5">Ürün</th>
                     <th className="px-3 py-1.5">Adım</th>
@@ -189,6 +190,7 @@ export function EkSeanslarClient({ satirlar, hata, gun, bugun, aralik, personelF
                       <td className="whitespace-nowrap px-3 py-2 tabular-nums">
                         {saatTr(s.start_time)}–{s.end_time ? saatTr(s.end_time) : "…"}
                       </td>
+                      <td className="px-3 py-2">{s.personel_adi ?? s.personel_id ?? "—"}</td>
                       <td className="px-3 py-2">{s.kaynak === "montaj" ? "Montaj" : "Paketleme"}</td>
                       <td className="px-3 py-2">
                         <span className="font-semibold">{s.sku ?? "—"}</span>

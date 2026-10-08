@@ -5,11 +5,12 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { GripVertical, History, Link2, PauseCircle, PlayCircle, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MiktarHizliInput } from "@/components/shared/miktar-hizli-input";
 import { UrunStokCombobox } from "@/components/shared/urun-stok-combobox";
-import { TALIMAT_ISTASYON_LABEL, TALIMAT_ISTASYONLAR } from "@/lib/talimat/constants";
+import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
 import { ilerlemeYuzdesi } from "@/lib/talimat/helpers";
 import type { SatirKaydetGirdi, TalimatSatir, UrunStokSecenek } from "@/lib/talimat/types";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
@@ -32,9 +33,12 @@ interface Props {
   sirali: boolean;
   /** Derin bağlantıyla gelinen satır: sarı vurgu (3 sn) */
   parlak?: boolean;
+  /** Satır seçili mi (çoklu seçim; başka hatta kopyalama) */
+  secili?: boolean;
+  onSecToggle?: () => void;
 }
 
-export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak }: Props) {
+export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: s.satir_id,
     disabled: !editable || !sirali,
@@ -54,6 +58,7 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
       className={cn(
         "border-b align-top text-sm",
         pasif && "bg-[#eceff1]/70 text-[#78909c]",
+        secili && "bg-[#cdbd9d]/25",
         tamam && "opacity-50",
         s.kirmizi && !pasif && "text-[#c0424f]",
         isDragging && "relative z-10 bg-vw-light shadow-lg",
@@ -61,15 +66,23 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
       )}
     >
       {/* Sıra + tutamaç */}
-      <td className="w-14 px-1 py-2">
+      <td className="w-24 px-1 py-2">
         <div className="flex items-center gap-0.5">
+          {editable && onSecToggle && (
+            <Checkbox
+              checked={!!secili}
+              onCheckedChange={onSecToggle}
+              aria-label="Satırı seç"
+              className="mr-1 h-5 w-5 bg-white"
+            />
+          )}
           <button
             type="button"
             {...attributes}
             {...listeners}
             disabled={!editable || !sirali}
             aria-label="Sırayı değiştir"
-            title={sirali ? "Sürükleyip sırayı değiştir" : "Sıralama için filtreleri temizleyin"}
+            title={sirali ? "Sürükle: sırayı değiştir / başka hattın başlığına bırak: kopyala" : "Sıralama için filtreleri temizleyin"}
             className="flex h-8 w-6 cursor-grab touch-none items-center justify-center rounded text-vw-side hover:bg-muted active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
           >
             <GripVertical className="h-4 w-4" />
@@ -79,20 +92,8 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
       </td>
 
       {/* İstasyon */}
-      <td className="w-28 px-1 py-2">
-        <select
-          value={s.istasyon ?? ""}
-          disabled={!editable}
-          onChange={(e) => islem.kaydet(s.satir_id, { istasyon: (e.target.value || null) as SatirKaydetGirdi["istasyon"] })}
-          className="h-8 w-full rounded-md border border-input bg-transparent px-1 text-xs disabled:opacity-60"
-        >
-          <option value="">{TALIMAT_ISTASYON_LABEL[s.etkin_istasyon]} (oto)</option>
-          {TALIMAT_ISTASYONLAR.map((i) => (
-            <option key={i.value} value={i.value}>
-              {i.label}
-            </option>
-          ))}
-        </select>
+      <td className="w-24 px-2 py-2.5">
+        <span className="text-xs text-muted-foreground">{TALIMAT_ISTASYON_LABEL[s.etkin_istasyon]}</span>
       </td>
 
       {/* Ürün kodu (+ kesimde plaka) */}

@@ -21,6 +21,7 @@ export interface ActiveSession {
   yardimci_sayisi?: number | null;
   /** Talimattan başlatıldıysa talep açıklaması */
   not_text?: string | null;
+  hat_id?: string | null;
 }
 
 interface SessionCardProps {

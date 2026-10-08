@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { TALIMAT_ISTASYON_LABEL } from "@/lib/talimat/constants";
-import { personeleGoreGrupla } from "@/lib/talimat/helpers";
+import { hataGoreGrupla } from "@/lib/talimat/helpers";
 import type { TalimatSatir } from "@/lib/talimat/types";
 
 function zamanTr(iso: string | null): string {
@@ -32,7 +32,6 @@ const trNorm = (t: string | null | undefined) =>
 
 const ISTASYON_CHIPS = [
   { value: "", label: "Tümü" },
-  { value: "kesim", label: "Kesim" },
   { value: "montaj", label: "Montaj" },
   { value: "paketleme", label: "Paketleme" },
 ];
@@ -51,14 +50,14 @@ interface Props {
 /** Tamamlanan iş talimatı satırları (salt okunur) + filtreler + "Tekrar aktif et" */
 export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, yenidenAktifEt }: Props) {
   const [arama, setArama] = useState("");
-  const [personelF, setPersonelF] = useState("");
+  const [hatF, setHatF] = useState("");
   const [istasyonF, setIstasyonF] = useState("");
   const [urunF, setUrunF] = useState("");
   const [urunAcik, setUrunAcik] = useState(false);
 
-  const personelSecenek = useMemo(() => {
+  const hatSecenek = useMemo(() => {
     const m = new Map<string, string>();
-    for (const s of satirlar) m.set(s.personel_id, s.personel_adi ?? s.personel_id);
+    for (const s of satirlar) if (s.hat_id) m.set(s.hat_id, s.hat_adi ?? s.hat_id);
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "tr"));
   }, [satirlar]);
 
@@ -71,18 +70,18 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
   const filtreli = useMemo(() => {
     const q = trNorm(arama.trim());
     return satirlar.filter((s) => {
-      if (personelF && s.personel_id !== personelF) return false;
+      if (hatF && s.hat_id !== hatF) return false;
       if (istasyonF && s.etkin_istasyon !== istasyonF) return false;
       if (urunF && s.sku !== urunF) return false;
-      if (q && !trNorm(`${s.sku ?? ""} ${s.plaka_id ?? ""} ${s.urun_adi ?? ""} ${s.personel_adi ?? ""}`).includes(q)) return false;
+      if (q && !trNorm(`${s.sku ?? ""} ${s.plaka_id ?? ""} ${s.urun_adi ?? ""} ${s.hat_adi ?? ""}`).includes(q)) return false;
       return true;
     });
-  }, [satirlar, arama, personelF, istasyonF, urunF]);
+  }, [satirlar, arama, hatF, istasyonF, urunF]);
 
-  const filtreVar = !!(arama || personelF || istasyonF || urunF);
+  const filtreVar = !!(arama || hatF || istasyonF || urunF);
   const temizle = () => {
     setArama("");
-    setPersonelF("");
+    setHatF("");
     setIstasyonF("");
     setUrunF("");
   };
@@ -90,9 +89,9 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
   // Gruplar filtreli satırlardan türetilir: boş gruplar kendiliğinden gizlenir
   const gruplar = useMemo(
     () =>
-      [...personeleGoreGrupla(filtreli).entries()]
-        .map(([pid, liste]) => ({ pid, ad: liste[0]?.personel_adi ?? pid, liste }))
-        .sort((a, b) => a.ad.localeCompare(b.ad, "tr")),
+      [...hataGoreGrupla(filtreli).entries()]
+        .map(([pid, liste]) => ({ pid, ad: liste[0]?.hat_adi ?? pid, sira: liste[0]?.hat_sira ?? 0, liste }))
+        .sort((a, b) => a.sira - b.sira || a.ad.localeCompare(b.ad, "tr")),
     [filtreli],
   );
 
@@ -137,18 +136,18 @@ export function TamamlananlarDialog({ open, onOpenChange, satirlar, editable, ye
                 <Input
                   value={arama}
                   onChange={(e) => setArama(e.target.value)}
-                  placeholder="Ürün kodu, ürün adı veya personel ara..."
+                  placeholder="Ürün kodu, ürün adı veya hat ara..."
                   className="h-9 pl-8"
                 />
               </div>
               <select
-                value={personelF}
-                onChange={(e) => setPersonelF(e.target.value)}
+                value={hatF}
+                onChange={(e) => setHatF(e.target.value)}
                 className="h-9 rounded-md border bg-background px-2 text-sm"
-                aria-label="Personel"
+                aria-label="Hat"
               >
-                <option value="">Tüm personel</option>
-                {personelSecenek.map(([id, ad]) => (
+                <option value="">Tüm hatlar</option>
+                {hatSecenek.map(([id, ad]) => (
                   <option key={id} value={id}>{ad}</option>
                 ))}
               </select>

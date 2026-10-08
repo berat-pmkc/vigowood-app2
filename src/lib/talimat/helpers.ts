@@ -112,12 +112,31 @@ export function ilerlemeYuzdesi(s: Pick<TalimatSatir, "istenen_miktar" | "uretil
 export function personeleGoreGrupla(satirlar: TalimatSatir[]): Map<string, TalimatSatir[]> {
   const harita = new Map<string, TalimatSatir[]>();
   for (const s of satirlar) {
+    if (!s.personel_id) continue; // hat satırları personele ait değildir
     const liste = harita.get(s.personel_id) ?? [];
     liste.push(s);
     harita.set(s.personel_id, liste);
   }
   for (const liste of harita.values()) liste.sort((a, b) => a.sira - b.sira);
   return harita;
+}
+
+/** Satırları hatta göre grupla (hat_id -> sıralı satırlar); hat_id'siz (eski personel) satırlar atlanır */
+export function hataGoreGrupla(satirlar: TalimatSatir[]): Map<string, TalimatSatir[]> {
+  const harita = new Map<string, TalimatSatir[]>();
+  for (const s of satirlar) {
+    if (!s.hat_id) continue;
+    const liste = harita.get(s.hat_id) ?? [];
+    liste.push(s);
+    harita.set(s.hat_id, liste);
+  }
+  for (const liste of harita.values()) liste.sort((a, b) => a.sira - b.sira);
+  return harita;
+}
+
+/** Hat satırı boş mu (ürün seçilmemiş) */
+export function satirBosMu(s: Pick<TalimatSatir, "sku" | "plaka_id">): boolean {
+  return !s.sku && !s.plaka_id;
 }
 
 /**

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { talimatPasifKayitlari } from "@/lib/talimat/actions";
 import { TALIMAT_PLANNER_ROLES, TALIMAT_VIEW_ROLES } from "@/lib/talimat/constants";
 import { haftaBaslangici } from "@/lib/talimat/helpers";
-import { getPlanByHafta, getPlanSatirEklenme, getPlanSatirlari, getTalimatPersoneller, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
+import { getPlanByHafta, getHatlar, getPlanSatirlari, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
 import type { UrunStokSecenek } from "@/lib/talimat/types";
 import { MaviYakaClient } from "./mavi-yaka-client";
 
@@ -22,16 +22,15 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
   const buHafta = haftaBaslangici(new Date());
   const hafta = params.hafta && /^\d{4}-\d{2}-\d{2}$/.test(params.hafta) ? haftaBaslangici(params.hafta) : buHafta;
 
-  const [plan, personeller] = await Promise.all([getPlanByHafta(hafta), getTalimatPersoneller()]);
+  const [plan, hatlar] = await Promise.all([getPlanByHafta(hafta), getHatlar({ sadeceAktif: false })]);
 
-  const [satirlar, yayinlar, eklenme, pasifKayitlari] = plan
+  const [satirlar, yayinlar, pasifKayitlari] = plan
     ? await Promise.all([
-        getPlanSatirlari(plan.plan_id),
+        getPlanSatirlari(plan.plan_id, { sadeceHat: true }),
         getYayinlar(plan.plan_id, 20),
-        getPlanSatirEklenme(plan.plan_id),
         talimatPasifKayitlari(plan.plan_id),
       ])
-    : [[], [], {} as Record<string, string>, []];
+    : [[], [], []];
   const vurguSatir = params.satir && /^[0-9a-f-]{36}$/i.test(params.satir) ? params.satir : null;
 
   const skular = [...new Set(satirlar.map((s) => s.sku).filter((s): s is string => !!s))];
@@ -46,10 +45,9 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
       plan={plan}
       satirlar={satirlar}
       yayinlar={yayinlar}
-      personeller={personeller}
+      hatlar={hatlar}
       stoklar={stoklar}
       planner={planner}
-      eklenme={eklenme}
       pasifKayitlari={pasifKayitlari}
       vurguSatir={vurguSatir}
     />

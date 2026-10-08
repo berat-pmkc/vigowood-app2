@@ -1,101 +1,119 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MiktarHizliInput } from "@/components/shared/miktar-hizli-input";
-import { siraDurumuGetir } from "@/lib/talimat/actions";
 import { ataHedefPlanGetir } from "@/lib/talimat/admin-actions";
-import { TALIMAT_ISTASYONLAR } from "@/lib/talimat/constants";
-import { talepTalimataAta } from "@/lib/talep/actions";
-import type { TalimatIstasyon, TalimatPersonel, TalimatPlan } from "@/lib/talimat/types";
+import { hatSiraDurumuGetir, hatlariGetir } from "@/lib/talimat/hat-actions";
+import { talepTalimataAtaHatlar } from "@/lib/talep/actions";
+import type { TalimatHat, TalimatPlan } from "@/lib/talimat/types";
 import type { Talep } from "@/lib/talep/types";
 import { cn, formatDate } from "@/lib/utils";
-import { PlakaSecici } from "../ops/board/mavi-yaka/plaka-secici";
 
 interface Props {
   talep: Talep | null;
-  personeller: TalimatPersonel[];
   onClose: () => void;
   onDone: () => void;
 }
 
-type SiraSatiri = { satir_id: string; sira: number; sku: string | null; urun_adi: string | null; etkin_durum: string };
-type Mod = "kaydir" | "bos";
+type SiraSatiri = { satir_id: string; sira: number; sku: string | null; urun_adi: string | null; etkin_durum: string; bos: boolean };
 
-export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props) {
+export function TalimataAtaDialog({ talep, onClose, onDone }: Props) {
   const [plan, setPlan] = useState<TalimatPlan | null>(null);
-  const [planYukleniyor, setPlanYukleniyor] = useState(false);
-  const [personelId, setPersonelId] = useState("");
-  const [personelAcik, setPersonelAcik] = useState(false);
-  const [liste, setListe] = useState<SiraSatiri[]>([]);
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [hatlar, setHatlar] = useState<TalimatHat[]>([]);
+  const [secili, setSecili] = useState<Set<string>>(new Set());
+  const [siralar, setSiralar] = useState<Record<string, SiraSatiri[]>>({});
+  const [sonaEkle, setSonaEkle] = useState(true);
   const [sira, setSira] = useState("");
-  const [mod, setMod] = useState<Mod>("kaydir");
+  const [kaydir, setKaydir] = useState(true);
   const [miktar, setMiktar] = useState<number | null>(null);
-  const [istasyon, setIstasyon] = useState<"" | TalimatIstasyon>("");
-  const [plakaId, setPlakaId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const atanmisHatlar = useMemo(() => new Set((talep?.asamalar ?? []).map((a) => a.hat_id)), [talep]);
 
   useEffect(() => {
     if (!talep) return;
-    setPersonelId("");
-    setListe([]);
+    setSecili(new Set());
+    setSiralar({});
+    setSonaEkle(true);
     setSira("");
-    setMod("kaydir");
+    setKaydir(true);
     setMiktar(talep.istenen_miktar);
-    setIstasyon("");
-    setPlakaId(null);
-    setPlanYukleniyor(true);
-    void ataHedefPlanGetir().then((r) => {
-      setPlan(r.success ? r.data : null);
-      setPlanYukleniyor(false);
+    setYukleniyor(true);
+    void Promise.all([ataHedefPlanGetir(), hatlariGetir(true)]).then(([p, h]) => {
+      setPlan(p.success ? p.data : null);
+      setHatlar(h.success ? h.data : []);
+      setYukleniyor(false);
     });
   }, [talep]);
 
+  // Seçili hatların mevcut sıra durumunu çek (sıra numarası verildiğinde gösterilir)
+  const planId = plan?.plan_id;
   useEffect(() => {
-    if (!plan || !personelId) {
-      setListe([]);
-      return;
+    if (!planId || sonaEkle) return;
+    for (const id of secili) {
+      if (siralar[id]) continue;
+      void hatSiraDurumuGetir(planId, id).then((r) => {
+        if (r.success) setSiralar((p) => ({ ...p, [id]: r.data as SiraSatiri[] }));
+      });
     }
-    void siraDurumuGetir(plan.plan_id, personelId).then((r) => setListe(r.success ? (r.data as SiraSatiri[]) : []));
-  }, [plan, personelId]);
+  }, [planId, sonaEkle, secili, siralar]);
 
   if (!talep) return null;
 
-  const siraSayi = sira.trim() === "" ? null : Math.floor(Number(sira));
-  // Tamamlananlar listeden düşer: sıra numarası görünen (aktif) satırlar arasındaki konumdur
-  const aktifListe = liste.filter((l) => l.etkin_durum !== "tamamlandi");
-  const dolu = siraSayi != null ? aktifListe[siraSayi - 1] : undefined;
-  const personel = personeller.find((p) => p.user_id === personelId);
+  const secilebilir = hatlar.filter((h) => !atanmisHatlar.has(h.hat_id));
+  const hepsiSecili = secilebilir.length > 0 && secilebilir.every((h) => secili.has(h.hat_id));
+  const siraSayi = sonaEkle || sira.trim() === "" ? null : Math.floor(Number(sira));
+
+  const aktifSatirlar = (hatId: string) => (siralar[hatId] ?? []).filter((l) => l.etkin_durum !== "tamamlandi");
+  const doluSatir = (hatId: string) => (siraSayi != null ? aktifSatirlar(hatId)[siraSayi - 1] : undefined);
+
+  const toggle = (id: string, v: boolean) =>
+    setSecili((p) => {
+      const n = new Set(p);
+      if (v) n.add(id);
+      else n.delete(id);
+      return n;
+    });
 
   const ata = async () => {
     if (!plan) return void toast.error("Hedef plan bulunamadı");
-    if (!personelId) return void toast.error("Personel seçin");
-    if (siraSayi != null && (!Number.isFinite(siraSayi) || siraSayi < 1)) return void toast.error("Geçersiz sıra");
+    const idler = hatlar.filter((h) => secili.has(h.hat_id)).map((h) => h.hat_id);
+    if (idler.length === 0) return void toast.error("En az bir hat seçin");
+    if (!sonaEkle && (siraSayi == null || !Number.isFinite(siraSayi) || siraSayi < 1)) return void toast.error("Geçersiz sıra");
     setBusy(true);
-    const bosaEkle = !!dolu && mod === "bos";
-    const r = await talepTalimataAta({
-      talepId: talep.talep_id,
-      personelId,
-      // görünen konum -> gerçek sıra (aktif satırın gerçek sırası; listeden büyükse sona)
-      sira: bosaEkle || siraSayi == null ? null : (aktifListe[siraSayi - 1]?.sira ?? null),
-      miktar,
-      istasyon: istasyon || null,
-      plakaId: istasyon === "kesim" ? plakaId : null,
-      kaydir: !!dolu && mod === "kaydir",
-      planId: plan.plan_id,
-    });
+    let basarili = 0;
+    const hatalar: string[] = [];
+    // Görünen konum hat başına farklı gerçek sıraya denk gelir: her hat ayrı çağrılır
+    for (const hatId of idler) {
+      const ad = hatlar.find((h) => h.hat_id === hatId)?.ad ?? hatId;
+      const hedef = siraSayi != null ? aktifSatirlar(hatId)[siraSayi - 1] : undefined;
+      const r = await talepTalimataAtaHatlar({
+        talepId: talep.talep_id,
+        hatIds: [hatId],
+        miktar,
+        sira: siraSayi != null && hedef ? hedef.sira : null,
+        kaydir: !!hedef && kaydir,
+        planId: plan.plan_id,
+      });
+      if (r.success) basarili++;
+      else hatalar.push(`${ad}: ${r.error}`);
+    }
     setBusy(false);
-    if (!r.success) return void toast.error(r.error);
-    toast.success("İş talimatına atandı");
-    onDone();
-    onClose();
+    if (hatalar.length > 0) toast.error(hatalar.join(" · "));
+    if (basarili > 0) {
+      toast.success(`${basarili} hatta iş talimatına atandı`);
+      onDone();
+      if (hatalar.length === 0) onClose();
+    }
   };
 
   return (
@@ -110,7 +128,7 @@ export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props
 
         <div className="space-y-3">
           <div className="rounded-lg border bg-vw-light/60 px-3 py-2 text-xs">
-            {planYukleniyor ? (
+            {yukleniyor ? (
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" /> Hedef plan aranıyor...
               </span>
@@ -124,114 +142,93 @@ export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props
           </div>
 
           <div>
-            <Label>Personel</Label>
-            <Popover open={personelAcik} onOpenChange={setPersonelAcik}>
-              <PopoverTrigger asChild>
-                <Button type="button" variant="outline" role="combobox" className="w-full justify-between font-normal">
-                  {personel ? personel.full_name : <span className="text-muted-foreground">Personel seç...</span>}
-                  <ChevronsUpDown className="ml-1 h-3.5 w-3.5 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[min(92vw,340px)] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Personel ara..." />
-                  <CommandList>
-                    <CommandEmpty>Personel bulunamadı</CommandEmpty>
-                    <CommandGroup>
-                      {personeller.map((p) => (
-                        <CommandItem
-                          key={p.user_id}
-                          value={`${p.full_name} ${p.user_id}`}
-                          onSelect={() => {
-                            setPersonelId(p.user_id);
-                            setPersonelAcik(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", personelId === p.user_id ? "opacity-100" : "opacity-0")} />
-                          <span className="flex-1 truncate">{p.full_name}</span>
-                          <span className="text-[11px] text-muted-foreground">{p.station ?? p.role}</span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {personelId && (
-            <div>
-              <Label>Sıra (boş = listenin sonu)</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={sira}
-                  onChange={(e) => setSira(e.target.value)}
-                  placeholder={`${aktifListe.length + 1}`}
-                  className="w-24"
+            <div className="mb-1 flex items-center justify-between">
+              <Label>Hatlar</Label>
+              <label className="flex items-center gap-1.5 text-xs">
+                <Checkbox
+                  checked={hepsiSecili}
+                  disabled={secilebilir.length === 0}
+                  onCheckedChange={(v) => setSecili(v ? new Set(secilebilir.map((h) => h.hat_id)) : new Set())}
                 />
-                <span className="text-xs text-muted-foreground">Mevcut: {aktifListe.length} satır</span>
-              </div>
-              {aktifListe.length > 0 && (
-                <ol className="mt-2 max-h-28 space-y-0.5 overflow-y-auto rounded border bg-muted/30 p-2 text-xs">
-                  {aktifListe.map((l, i) => (
-                    <li key={l.satir_id} className={cn("flex gap-2", i + 1 === siraSayi && "font-semibold text-[#b8650c]")}>
-                      <span className="w-5 tabular-nums">{i + 1}.</span>
-                      <span className="truncate">
-                        {l.sku ?? "(boş)"} {l.urun_adi ? `· ${l.urun_adi}` : ""}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              {dolu && (
-                <div className="mt-2 rounded-lg border border-[#f28a19]/40 bg-[#fde8cf]/60 p-2.5 text-sm">
-                  <div className="mb-1.5 font-medium text-[#b8650c]">
-                    {siraSayi}. sırada <b>{dolu.sku ?? "boş satır"}</b>
-                    {dolu.urun_adi ? ` (${dolu.urun_adi})` : ""} var.
-                  </div>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={mod === "kaydir"} onChange={() => setMod("kaydir")} />
-                    Kaydır (araya gir, diğerleri aşağı iner)
-                  </label>
-                  <label className="mt-1 flex items-center gap-2">
-                    <input type="radio" checked={mod === "bos"} onChange={() => setMod("bos")} />
-                    İlk boş sıraya ekle (listenin sonuna)
-                  </label>
-                </div>
-              )}
+                Tümünü seç
+              </label>
             </div>
-          )}
+            <div className="space-y-1 rounded-md border p-2">
+              {hatlar.length === 0 && !yukleniyor && <p className="text-xs text-muted-foreground">Aktif hat yok.</p>}
+              {hatlar.map((h) => {
+                const atanmis = atanmisHatlar.has(h.hat_id);
+                return (
+                  <label
+                    key={h.hat_id}
+                    className={cn("flex items-center gap-2 rounded px-1.5 py-1 text-sm", atanmis ? "opacity-50" : "cursor-pointer hover:bg-muted/50")}
+                  >
+                    <Checkbox
+                      checked={!atanmis && secili.has(h.hat_id)}
+                      disabled={atanmis}
+                      onCheckedChange={(v) => toggle(h.hat_id, !!v)}
+                    />
+                    <span className="flex-1">{h.ad}</span>
+                    {atanmis && <Badge variant="secondary">atanmış</Badge>}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label>Miktar</Label>
+              <Label>Miktar (her hatta)</Label>
               <MiktarHizliInput value={miktar} onCommit={setMiktar} inputClassName="w-24" />
             </div>
             <div>
-              <Label>İstasyon</Label>
-              <select
-                value={istasyon}
-                onChange={(e) => setIstasyon(e.target.value as "" | TalimatIstasyon)}
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-              >
-                <option value="">Otomatik</option>
-                {TALIMAT_ISTASYONLAR.map((i) => (
-                  <option key={i.value} value={i.value}>
-                    {i.label}
-                  </option>
-                ))}
-              </select>
+              <Label>Sıra</Label>
+              <div className="space-y-1.5 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={sonaEkle} onChange={() => setSonaEkle(true)} /> Sona ekle
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={!sonaEkle} onChange={() => setSonaEkle(false)} /> Sıra no:
+                  <Input
+                    type="number"
+                    min={1}
+                    value={sira}
+                    disabled={sonaEkle}
+                    onChange={(e) => setSira(e.target.value)}
+                    className="h-8 w-20"
+                  />
+                </label>
+              </div>
             </div>
           </div>
 
-          {istasyon === "kesim" && (
-            <div>
-              <Label>Plaka</Label>
-              <div>
-                <PlakaSecici sku={talep.sku} plakaId={plakaId} plakaAdi={plakaId} onSelect={setPlakaId} />
-              </div>
+          {!sonaEkle && siraSayi != null && secili.size > 0 && (
+            <div className="space-y-1.5 rounded-lg border border-[#f28a19]/40 bg-[#fde8cf]/60 p-2.5 text-xs">
+              {hatlar
+                .filter((h) => secili.has(h.hat_id))
+                .map((h) => {
+                  const d = doluSatir(h.hat_id);
+                  return (
+                    <div key={h.hat_id}>
+                      <b>{h.ad}</b>: {siraSayi}. sırada{" "}
+                      {d ? (
+                        d.bos ? (
+                          "boş satır var (doldurulur)"
+                        ) : (
+                          <>
+                            <b>{d.sku}</b>
+                            {d.urun_adi ? ` (${d.urun_adi})` : ""} var
+                          </>
+                        )
+                      ) : (
+                        "satır yok (listenin sonuna eklenir)"
+                      )}
+                    </div>
+                  );
+                })}
+              <label className="mt-1 flex items-center gap-2 text-sm">
+                <Checkbox checked={kaydir} onCheckedChange={(v) => setKaydir(!!v)} />
+                Dolu sıraya araya gir (diğerleri aşağı kayar)
+              </label>
             </div>
           )}
         </div>
@@ -240,8 +237,9 @@ export function TalimataAtaDialog({ talep, personeller, onClose, onDone }: Props
           <Button variant="outline" onClick={onClose}>
             Vazgeç
           </Button>
-          <Button onClick={ata} disabled={busy || !plan} className="bg-vw-deep text-white hover:bg-vw-dark">
-            Ata
+          <Button onClick={ata} disabled={busy || !plan || secili.size === 0} className="bg-vw-deep text-white hover:bg-vw-dark">
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Ata{secili.size > 0 ? ` (${secili.size} hat)` : ""}
           </Button>
         </DialogFooter>
       </DialogContent>

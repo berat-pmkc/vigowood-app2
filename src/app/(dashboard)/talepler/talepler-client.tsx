@@ -63,8 +63,8 @@ import {
 import { TALEP_DURUM_COLOR, TALEP_DURUM_LABEL } from "@/lib/talimat/constants";
 import { talepSerbestMi } from "@/lib/talimat/helpers";
 import type { TalepBaglanti } from "@/lib/talimat/admin-actions";
-import type { Depo, TalimatPersonel } from "@/lib/talimat/types";
-import type { Talep, TalepDurum, TalepRevizyon } from "@/lib/talep/types";
+import type { Depo } from "@/lib/talimat/types";
+import type { Talep, TalepAsama, TalepDurum, TalepRevizyon } from "@/lib/talep/types";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { TalepFormDialog } from "./talep-form-dialog";
 import { TalimataAtaDialog } from "./talimata-ata-dialog";
@@ -77,7 +77,6 @@ interface Props {
   toplam: number;
   baglantilar: TalepBaglanti[];
   depolar: Depo[];
-  personeller: TalimatPersonel[];
   userId: string;
   planner: boolean;
   baslangic: string;
@@ -105,6 +104,46 @@ const CHIPS: Array<{ key: ChipKey; label: string }> = [
   { key: "pasif", label: "Pasif" },
   { key: "kapali", label: "Kapananlar" },
 ];
+
+type AsamaGrup = "montaj" | "doseme" | "paketleme";
+
+function asamaGrup(a: TalepAsama): AsamaGrup {
+  if (a.tur === "paketleme") return "paketleme";
+  return /d[öo]şeme|doseme/i.test(a.hat_adi) ? "doseme" : "montaj";
+}
+
+const ASAMA_GRUP_AD: Record<AsamaGrup, string> = { montaj: "Montaj", doseme: "Döşeme", paketleme: "Paketleme" };
+
+const ASAMA_DURUM_AD: Record<string, string> = {
+  atandi: "Atandı",
+  basladi: "Başladı",
+  tamamlandi: "Tamamlandı ✓",
+  tamamlanmadi: "Tamamlanmadı",
+};
+
+const ASAMA_RENK: Record<string, { bg: string; fg: string }> = {
+  atandi: { bg: "#eceff1", fg: "#546e7a" },
+  basladi: { bg: "#fde8cf", fg: "#b8650c" },
+  tamamlandi: { bg: "#d7efe6", fg: "#1f7a5c" },
+  tamamlanmadi: { bg: "#fce4ec", fg: "#b71c1c" },
+};
+
+const ASAMA_FILTRELER: Array<{ key: string; label: string }> = [
+  { key: "", label: "Aşama: tümü" },
+  { key: "montaj:basladi", label: "Montajı başlayanlar" },
+  { key: "montaj:tamamlandi", label: "Montajı tamamlananlar" },
+  { key: "doseme:basladi", label: "Döşemesi başlayanlar" },
+  { key: "doseme:tamamlandi", label: "Döşemesi tamamlananlar" },
+  { key: "paketleme:basladi", label: "Paketlemesi başlayanlar" },
+  { key: "paketleme:tamamlandi", label: "Paketlemesi tamamlananlar" },
+];
+
+function asamaMetni(a: TalepAsama): string {
+  const d = ASAMA_DURUM_AD[a.durum] ?? a.durum;
+  const ad = a.hat_adi.replace(/ HATTI$/i, "");
+  if (a.durum === "basladi") return `${ad} · ${d} ${formatNumber(a.uretilen)}${a.istenen != null ? `/${formatNumber(a.istenen)}` : ""}`;
+  return `${ad} · ${d}`;
+}
 
 type NedenIslem = { tip: "geri_cek" | "tamamlanmadi" | "stokta_mevcut"; talep: Talep };
 
@@ -137,7 +176,6 @@ export function TaleplerClient({
   toplam,
   baglantilar,
   depolar,
-  personeller,
   userId,
   planner,
   baslangic,
@@ -168,6 +206,7 @@ export function TaleplerClient({
   const [fUrun, setFUrun] = useState("");
   const [fDepo, setFDepo] = useState("");
   const [fAciklama, setFAciklama] = useState("");
+  const [fAsama, setFAsama] = useState("");
   const [tBas, setTBas] = useState(baslangic);
   const [tBit, setTBit] = useState(bitis);
   const [filtreAcik, setFiltreAcik] = useState(false);
@@ -198,6 +237,10 @@ export function TaleplerClient({
       if (sekme === "aktif" && chip !== "tumu") {
         if (chip === "kapali" ? !t.kapanis : t.durum !== chip) return false;
       }
+      if (fAsama) {
+        const [g, d] = fAsama.split(":");
+        if (!(t.asamalar ?? []).some((a) => asamaGrup(a) === g && a.durum === d)) return false;
+      }
       if (no && !String(t.talep_no).includes(no)) return false;
       if (fEden && (t.olusturan_adi ?? t.olusturan) !== fEden) return false;
       if (u && !`${t.sku} ${t.urun_adi ?? ""}`.toLocaleLowerCase("tr").includes(u)) return false;
@@ -209,7 +252,7 @@ export function TaleplerClient({
       }
       return true;
     },
-    [chip, fNo, fEden, fUrun, fDepo, fAciklama, arama, sekme],
+    [chip, fNo, fEden, fUrun, fDepo, fAciklama, fAsama, arama, sekme],
   );
 
   /** Açık/devam eden talepler yeni -> eski; kapalı ("Kaldır"a basılmamış) talepler soluk olarak EN ALTTA */
@@ -224,7 +267,7 @@ export function TaleplerClient({
   }, [talepler, gorunenMi, sekme]);
 
   const filtreSayisi =
-    [fNo, fEden, fUrun, fDepo, fAciklama].filter((x) => x.trim()).length + (sekme !== "aktif" && (baslangic || bitis) ? 1 : 0);
+    [fNo, fEden, fUrun, fDepo, fAciklama, fAsama].filter((x) => x.trim()).length + (sekme !== "aktif" && (baslangic || bitis) ? 1 : 0);
   const herhangiFiltre = filtreSayisi > 0 || !!arama.trim() || chip !== "tumu";
 
   const filtreleriTemizle = useCallback(() => {
@@ -235,6 +278,7 @@ export function TaleplerClient({
     setFUrun("");
     setFDepo("");
     setFAciklama("");
+    setFAsama("");
   }, []);
 
   // ── seçim (toplu kaldır) ──
@@ -446,6 +490,21 @@ export function TaleplerClient({
               {c.label} <span className="ml-0.5 tabular-nums opacity-80">{sayilar[c.key] ?? 0}</span>
             </button>
           ))}
+          <select
+            value={fAsama}
+            onChange={(e) => setFAsama(e.target.value)}
+            aria-label="Aşama durumu filtresi"
+            className={cn(
+              "rounded-full border bg-transparent px-2.5 py-0.5 text-[11px] font-medium",
+              fAsama ? "border-vw-deep bg-vw-deep text-white" : "border-border text-muted-foreground",
+            )}
+          >
+            {ASAMA_FILTRELER.map((f) => (
+              <option key={f.key} value={f.key} className="text-foreground">
+                {f.label}
+              </option>
+            ))}
+          </select>
         </div>
       ) : (
         <div className="mb-4 flex items-center gap-2 border-b pb-3 text-xs text-muted-foreground">
@@ -573,6 +632,37 @@ export function TaleplerClient({
                           {TALEP_DURUM_LABEL[t.durum] ?? t.durum}
                         </Badge>
                         {t.kapanis_neden && <span className="text-[11px] text-muted-foreground">{t.kapanis_neden}</span>}
+                        {(t.asamalar ?? []).length > 0 && (
+                          <div className="flex flex-col items-start gap-0.5">
+                            {(t.asamalar ?? []).map((a) => {
+                              const r = ASAMA_RENK[a.durum] ?? ASAMA_RENK.atandi;
+                              return (
+                                <span key={a.satir_id} className="inline-flex items-center gap-1">
+                                  <span
+                                    title={`${a.hat_adi} · ${ASAMA_GRUP_AD[asamaGrup(a)]}`}
+                                    className={cn(
+                                      "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium",
+                                      a.pasif && "line-through opacity-50",
+                                    )}
+                                    style={{ background: r.bg, color: r.fg }}
+                                  >
+                                    {asamaMetni(a)}
+                                  </span>
+                                  {bag && (
+                                    <Link
+                                      href={`/ops/board/mavi-yaka?hafta=${bag.hafta_baslangic}&satir=${a.satir_id}`}
+                                      aria-label={`${a.hat_adi} talimatını gör`}
+                                      title="Talimatı gör"
+                                      className="text-[#3368b1] hover:underline"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                    </Link>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
                         {bag?.kirmizi && (
                           <button
                             type="button"
@@ -582,7 +672,7 @@ export function TaleplerClient({
                             <History className="h-3 w-3" /> Değişikliği {diff ? "gizle" : "gör"}
                           </button>
                         )}
-                        {bag && (
+                        {bag && (t.asamalar ?? []).length === 0 && (
                           <Link
                             href={`/ops/board/mavi-yaka?hafta=${bag.hafta_baslangic}&satir=${bag.satir_id}`}
                             className="inline-flex items-center gap-1 text-[11px] text-[#3368b1] hover:underline"
@@ -758,6 +848,20 @@ export function TaleplerClient({
               </select>
             </div>
             <div>
+              <Label className="text-xs">Aşama durumu</Label>
+              <select
+                value={fAsama}
+                onChange={(e) => setFAsama(e.target.value)}
+                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+              >
+                {ASAMA_FILTRELER.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <Label className="text-xs">Açıklama</Label>
               <Input value={fAciklama} onChange={(e) => setFAciklama(e.target.value)} placeholder="Açıklamada ara" className="h-9" />
             </div>
@@ -814,7 +918,7 @@ export function TaleplerClient({
         onDone={yenile}
       />
 
-      <TalimataAtaDialog talep={ataTalep} personeller={personeller} onClose={() => setAtaTalep(null)} onDone={yenile} />
+      <TalimataAtaDialog talep={ataTalep} onClose={() => setAtaTalep(null)} onDone={yenile} />
 
       {/* Neden diyaloğu */}
       <Dialog open={!!nedenIslem} onOpenChange={(o) => !o && setNedenIslem(null)}>

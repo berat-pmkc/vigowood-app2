@@ -83,6 +83,7 @@ export async function planKopyala(kaynakPlanId: string, hedefHafta: string): Pro
 const satirSchema = z.object({
   satir_id: uuid.optional(),
   plan_id: uuid.optional(),
+  hat_id: uuid.nullable().optional(),
   personel_id: z.string().min(1).optional(),
   sira: z.number().int().min(1).nullable().optional(),
   kaydir: z.boolean().optional(),
@@ -99,14 +100,16 @@ const satirSchema = z.object({
 });
 
 /**
- * Satır ekle/güncelle. satir_id yoksa plan_id + personel_id zorunlu (yeni satır). Gönderilmeyen alan değişmez.
+ * Satır ekle/güncelle. satir_id yoksa plan_id + hat_id (hat satırı) ya da plan_id + personel_id (eski personel satırı)
+ * zorunlu. Gönderilmeyen alan değişmez. Hat satırında personel_id yok sayılır; istasyon hat türünden gelir.
+ * hat_id değiştirilirse satır yeni hattın sonuna (sira verilirse oraya) taşınır.
  * Yeni satırda sira doluysa SIRA_DOLU döner; kaydir:true ile araya girer. Dönen: satir_id.
  */
 export async function satirKaydet(girdi: SatirKaydetGirdi): Promise<ActionResult<string>> {
   return sonucaCevir(async () => {
     await rolGerekli(TALIMAT_PLANNER_ROLES);
     const p = satirSchema.parse(girdi);
-    if (!p.satir_id && (!p.plan_id || !p.personel_id)) throw new Error("Yeni satır için plan ve personel gerekli");
+    if (!p.satir_id && (!p.plan_id || (!p.hat_id && !p.personel_id))) throw new Error("Yeni satır için plan ve hat gerekli");
     const id = await rpcCagir<string>("talimat_satir_kaydet", { p });
     talimatYenile();
     return id;
@@ -244,7 +247,7 @@ export async function guncelIsaretle(planId: string, gun: number): Promise<Actio
 }
 
 const pasifSchema = z.object({
-  kapsam: z.enum(["satir", "personel", "liste"]),
+  kapsam: z.enum(["satir", "personel", "hat", "liste"]),
   planId: uuid,
   ids: z.array(z.string().min(1)).optional(),
   baslangic: tarih.nullish(),
@@ -258,6 +261,7 @@ export async function talimatPasifYap(girdi: PasifGirdi): Promise<ActionResult<n
     await rolGerekli(TALIMAT_PLANNER_ROLES);
     const p = pasifSchema.parse(girdi);
     if (p.kapsam !== "liste" && (!p.ids || p.ids.length === 0)) throw new Error("Pasif edilecek kayıt seçilmedi");
+    if (p.kapsam === "hat") p.ids?.forEach((id) => uuid.parse(id));
     const n = await rpcCagir<number>("talimat_pasif", {
       p_kapsam: p.kapsam,
       p_plan: p.planId,
@@ -283,8 +287,10 @@ export async function talimatPasifKaldir(girdi: Pick<PasifGirdi, "kapsam" | "pla
 
 export interface TalimatPasifKayit {
   pasif_id: string;
-  kapsam: "personel" | "liste";
+  kapsam: "personel" | "liste" | "hat";
   personel_id: string | null;
+  /** kapsam='hat' ise dolu */
+  hat_id?: string | null;
   baslangic: string;
   /** 'infinity' = süresiz */
   bitis: string;
@@ -298,7 +304,7 @@ export async function talimatPasifKayitlari(planId: string): Promise<TalimatPasi
     const sb = await talimatDb();
     const { data, error } = await sb
       .from("talimat_pasifler")
-      .select("pasif_id,kapsam,personel_id,baslangic,bitis,neden")
+      .select("pasif_id,kapsam,personel_id,hat_id,baslangic,bitis,neden")
       .eq("plan_id", planId)
       .is("iptal_at", null);
     if (error) return [];

@@ -28,6 +28,7 @@ import { cancelMontajSession, toggleMontajBeklet } from "../actions";
 import { TalimatButton } from "@/components/shared/talimat/talimat-button";
 import { toast } from "sonner";
 import { useMontajSessionRealtime } from "@/hooks/use-montaj-session-realtime";
+import type { TalimatHat } from "@/lib/talimat/types";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 interface ProductOption {
@@ -38,6 +39,7 @@ interface ProductOption {
 interface MontajDashboardProps {
   activeSessions: ActiveMontajSession[];
   productOptions: ProductOption[];
+  hatlar: TalimatHat[];
   /** Seans iptali yalnızca ofis rolleri için (PRODUCTION_CANCEL_ROLES). */
   canCancel: boolean;
   /** Saha hesapları analizleri görmez — kişi/adım karşılaştırması içeriyor */
@@ -49,6 +51,7 @@ export function MontajDashboard({
   analizGorebilir,
   activeSessions: serverActiveSessions,
   productOptions: serverProductOptions,
+  hatlar,
 }: MontajDashboardProps) {
   const activeSessions = useServerDataCache("montaj-sessions", serverActiveSessions);
   const productOptions = useServerDataCache("montaj-products", serverProductOptions);
@@ -139,6 +142,7 @@ export function MontajDashboard({
         </h2>
         <ActiveSessions
           sessions={activeSessions}
+          hatlar={hatlar}
           onClose={handleClose}
           onCancel={handleCancel}
           onToggleBeklet={handleToggleBeklet}

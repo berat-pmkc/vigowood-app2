@@ -137,17 +137,17 @@ export function PasifDialog({ planId, hedef, onClose, onDone }: Props) {
 }
 
 export interface PasifKaldirHedef {
-  /** 'liste' = tüm liste; 'personel' = seçili personeller */
-  kapsam: "liste" | "personel";
+  /** 'liste' = tüm liste; 'hat' = seçili hatlar */
+  kapsam: "liste" | "hat";
   baslik: string;
-  /** personel kapsamında seçili personeller; liste kapsamında tüm personeller */
-  personeller: string[];
-  /** Bu personellerde satır düzeyinde pasif olan satırlar */
+  /** hat kapsamında seçili hatlar; liste kapsamında tüm hatlar */
+  hatlar: string[];
+  /** Bu hatlarda satır düzeyinde pasif olan satırlar */
   pasifSatirlar: string[];
   /** Planda aktif liste düzeyi pasif kaydı var mı */
   listePasifVar: boolean;
-  /** Aktif personel düzeyi pasif kaydı var mı */
-  personelPasifVar: boolean;
+  /** Aktif hat düzeyi pasif kaydı var mı */
+  hatPasifVar: boolean;
 }
 
 /** Pasifi kaldırma: alt düzeydekileri de kaldırma seçenekleri */
@@ -184,11 +184,11 @@ export function PasifKaldirDialog({
     if (hedef.kapsam === "liste") {
       await calis(talimatPasifKaldir({ kapsam: "liste", planId }));
       if (alt) {
-        if (hedef.personeller.length) await calis(talimatPasifKaldir({ kapsam: "personel", planId, ids: hedef.personeller }));
+        if (hedef.hatlar.length) await calis(talimatPasifKaldir({ kapsam: "hat", planId, ids: hedef.hatlar }));
         if (hedef.pasifSatirlar.length) await calis(talimatPasifKaldir({ kapsam: "satir", planId, ids: hedef.pasifSatirlar }));
       }
     } else {
-      await calis(talimatPasifKaldir({ kapsam: "personel", planId, ids: hedef.personeller }));
+      await calis(talimatPasifKaldir({ kapsam: "hat", planId, ids: hedef.hatlar }));
       if (alt && hedef.pasifSatirlar.length) await calis(talimatPasifKaldir({ kapsam: "satir", planId, ids: hedef.pasifSatirlar }));
       if (hedef.listePasifVar && liste) await calis(talimatPasifKaldir({ kapsam: "liste", planId }));
     }
@@ -211,9 +211,9 @@ export function PasifKaldirDialog({
             <label className="flex items-start gap-2">
               <Checkbox checked={alt} onCheckedChange={(v) => setAlt(!!v)} className="mt-0.5" />
               <span>
-                Personel ve satır düzeyindeki pasifleri de kaldır
+                Hat ve satır düzeyindeki pasifleri de kaldır
                 <span className="block text-xs text-muted-foreground">
-                  {hedef.pasifSatirlar.length} pasif satır{hedef.personelPasifVar ? " + personel pasifleri" : ""}
+                  {hedef.pasifSatirlar.length} pasif satır{hedef.hatPasifVar ? " + hat pasifleri" : ""}
                 </span>
               </span>
             </label>
@@ -232,7 +232,7 @@ export function PasifKaldirDialog({
                   <span>
                     Tüm liste pasifini de kaldır
                     <span className="block text-xs text-muted-foreground">
-                      Liste düzeyinde pasif kayıt var; kalırsa personel pasif görünmeye devam eder.
+                      Liste düzeyinde pasif kayıt var; kalırsa hat pasif görünmeye devam eder.
                     </span>
                   </span>
                 </label>

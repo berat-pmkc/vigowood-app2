@@ -661,7 +661,7 @@ export async function createMontajSession(
    * İş talimatından başlatıldıysa: talimat satırı + isimsiz yardımcı sayısı.
    * worker_count = isimli çalışanlar + yardimci_sayisi (birim süre kişi başı kalır).
    */
-  talimat?: { talimatSatirId?: string | null; yardimciSayisi?: number; ekSeans?: boolean }
+  talimat?: { talimatSatirId?: string | null; yardimciSayisi?: number; ekSeans?: boolean; hatId?: string | null }
 ): Promise<ActionResult> {
   try {
     const user = await requireProductionAccess();
@@ -733,10 +733,18 @@ export async function createMontajSession(
       // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
       ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
       ...(talimat?.ekSeans ? { ek_seans: true } : {}),
+      ...(talimat?.hatId ? { hat_id: talimat.hatId } : {}),
       ...(yardimciSayisi > 0 ? { yardimci_sayisi: yardimciSayisi } : {}),
     } as never);
 
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      return {
+        success: false,
+        error: error.message.includes("açık seansı var")
+          ? "Bu personelin bu ürün/aşamada zaten açık seansı var. Önce o seansı kapatın ya da başka aşama/personel seçin."
+          : error.message,
+      };
+    }
 
     revalidatePath("/uretim/montaj");
     revalidatePath("/uretim/talimatlarim");

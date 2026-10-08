@@ -92,7 +92,7 @@ export function YayinDialog({ open, plan, gelecekHafta, onClose, onDone }: Props
     const d = r.data;
     toast.success(
       d.bildirim_gonder
-        ? `Yayınlandı: ${d.personel_sayisi} personele ${d.durum === "beklemede" ? "bildirim zamanlandı" : "bildirim gönderildi"}`
+        ? `Yayınlandı: ${d.personel_sayisi} hatta ${d.durum === "beklemede" ? "bildirim zamanlandı" : "bildirim gönderildi"}`
         : `Liste yenilendi (bildirimsiz): ${d.satir_sayisi} satır`,
     );
     onDone();
@@ -105,8 +105,8 @@ export function YayinDialog({ open, plan, gelecekHafta, onClose, onDone }: Props
         <DialogHeader>
           <DialogTitle>{ilkYayin ? "Planı yayınla" : "Değişiklikleri yayınla"}</DialogTitle>
           <DialogDescription>
-            {plan.degisen_satir_sayisi} değişen satır · {plan.personel_sayisi} personel
-            {ilkYayin && " · İlk yayın tüm personele gider"}
+            {plan.degisen_satir_sayisi} değişen satır · {plan.hat_sayisi ?? plan.personel_sayisi} hat
+            {ilkYayin && " · İlk yayın tüm hatlara gider"}
           </DialogDescription>
         </DialogHeader>
 
@@ -119,7 +119,7 @@ export function YayinDialog({ open, plan, gelecekHafta, onClose, onDone }: Props
                 <div className="text-xs text-muted-foreground">
                   {bildirimZorlaKapali
                     ? "Gelecek hafta planında bildirim gönderilmez; Pazartesi 07:55'te otomatik gider"
-                    : "Personel tabletine uyarı gider, onay beklenir"}
+                    : "Hat tabletine uyarı gider, onay beklenir"}
                 </div>
               </div>
             </div>

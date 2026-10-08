@@ -28,6 +28,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { getActiveProducts, getTopPackagedProducts, createPackSession, getPackOperators } from "../actions";
 import { toast } from "sonner";
+import { hatlariGetir } from "@/lib/talimat/hat-actions";
+import type { TalimatHat } from "@/lib/talimat/types";
 
 interface Product {
   sku: string;
@@ -50,6 +52,7 @@ export interface TalimatPaketOnDolu {
   personel_id: string;
   personel_adi: string;
   not_text: string | null;
+  hat_id?: string | null;
 }
 
 interface NewSessionDialogProps {
@@ -58,22 +61,41 @@ interface NewSessionDialogProps {
   talimat?: TalimatPaketOnDolu | null;
   /** "Ek Seans Aç": plan dışı seans — çalışan sabit, ürün serbest */
   ekSeans?: { personel_id: string; personel_adi: string } | null;
+  /** "Ek Seans Aç" (hat bazlı): hat sabit, ürün + çalışan serbest */
+  hat?: { hat_id: string; hat_adi: string } | null;
   /** Seans başarıyla başlayınca (dialog kapanmadan önce) */
   onSuccess?: () => void;
 }
 
-export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSuccess }: NewSessionDialogProps) {
+export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, hat, onSuccess }: NewSessionDialogProps) {
+  /** Talimat dışı ana ekran seansı: hat seçimi ZORUNLU */
+  const hatSecimiGerekli = !talimat && !ekSeans && !hat;
+  const [hatlar, setHatlar] = useState<TalimatHat[]>([]);
+  const [secilenHatId, setSecilenHatId] = useState("");
+  const [hatCalisanlar, setHatCalisanlar] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!open || !hatSecimiGerekli || hatlar.length > 0) return;
+    hatlariGetir(true).then((r) => {
+      if (r.success) setHatlar(r.data.filter((h) => h.tur === "paketleme"));
+    });
+  }, [open, hatSecimiGerekli, hatlar.length]);
+  useEffect(() => {
+    if (!open) {
+      setSecilenHatId("");
+      setHatCalisanlar(new Set());
+    }
+  }, [open]);
   // ── Talimat modu: ürün sabit, çalışan sabit; isteğe bağlı yardımcılar + isimsiz yardımcı sayısı ──
   const [operators, setOperators] = useState<Array<{ user_id: string; full_name: string }>>([]);
   const [yardimcilar, setYardimcilar] = useState<Set<string>>(new Set());
   const [yardimciSayisi, setYardimciSayisi] = useState(0);
   const [ekYardimci, setEkYardimci] = useState(0);
   useEffect(() => {
-    if (!open || !talimat || operators.length > 0) return;
+    if (!open || (!talimat && !hat) || operators.length > 0) return;
     getPackOperators().then((r) => {
       if (r.success) setOperators(r.data);
     });
-  }, [open, talimat, operators.length]);
+  }, [open, talimat, hat, operators.length]);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
@@ -126,6 +148,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
       talimatSatirId: talimat.satir_id,
       workers,
       yardimciSayisi,
+      hatId: talimat.hat_id ?? null,
     });
     if (result.success) {
       toast.success("Seans başlatıldı");
@@ -142,6 +165,14 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
       toast.error("Lütfen bir ürün seçin");
       return;
     }
+    if (hatSecimiGerekli && !secilenHatId) {
+      toast.error("Önce hat seçiniz");
+      return;
+    }
+    if (hat && hatCalisanlar.size === 0) {
+      toast.error("En az 1 çalışan seçiniz");
+      return;
+    }
     setSubmitting(true);
     const result = await createPackSession(
       selectedSku,
@@ -151,10 +182,20 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
             workers: [{ id: ekSeans.personel_id, name: ekSeans.personel_adi }],
             yardimciSayisi: ekYardimci,
           }
-        : undefined,
+        : hat
+          ? {
+              ekSeans: true,
+              hatId: hat.hat_id,
+              workers: Array.from(hatCalisanlar).map((id) => ({
+                id,
+                name: operators.find((o) => o.user_id === id)?.full_name ?? id,
+              })),
+              yardimciSayisi: ekYardimci,
+            }
+          : { workers: [], hatId: secilenHatId },
     );
     if (result.success) {
-      toast.success(ekSeans ? "Ek seans başlatıldı" : "Seans başlatıldı");
+      toast.success(ekSeans || hat ? "Ek seans başlatıldı" : "Seans başlatıldı");
       onSuccess?.();
       onOpenChange(false);
     } else {
@@ -250,10 +291,32 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md overflow-hidden">
         <DialogHeader>
-          <DialogTitle>{ekSeans ? `Ek Seans — ${ekSeans.personel_adi}` : "Yeni Paketleme Seansı"}</DialogTitle>
+          <DialogTitle>{hat ? `Ek Seans — ${hat.hat_adi}` : ekSeans ? `Ek Seans — ${ekSeans.personel_adi}` : "Yeni Paketleme Seansı"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 pt-2 overflow-hidden">
+          {hatSecimiGerekli && (
+            <div>
+              <p className="mb-2 text-sm font-semibold">Hangi hat? <span className="text-destructive">*</span></p>
+              <div className="flex flex-wrap gap-2">
+                {hatlar.map((h) => (
+                  <button
+                    key={h.hat_id}
+                    type="button"
+                    onClick={() => setSecilenHatId(h.hat_id)}
+                    className={cn(
+                      "min-h-11 rounded-lg border-2 px-3 text-sm font-semibold",
+                      secilenHatId === h.hat_id ? "border-vw-deep bg-vw-deep text-white" : "border-border bg-card",
+                    )}
+                  >
+                    {h.ad}
+                  </button>
+                ))}
+                {hatlar.length === 0 && <span className="text-sm text-muted-foreground">Hatlar yükleniyor...</span>}
+              </div>
+            </div>
+          )}
+
           {/* Ürün Arama */}
           <Popover open={comboOpen} onOpenChange={setComboOpen}>
             <PopoverTrigger asChild>
@@ -347,7 +410,35 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
             </div>
           ) : null}
 
-          {ekSeans && (
+          {hat && (
+            <div>
+              <p className="mb-1 flex items-center gap-2 text-sm font-medium">
+                <Users className="size-4" />
+                Çalışanlar ({hatCalisanlar.size} kişi)
+              </p>
+              <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-lg border p-1">
+                {operators.map((op) => (
+                  <label key={op.user_id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-md p-2.5 hover:bg-muted/50">
+                    <Checkbox
+                      checked={hatCalisanlar.has(op.user_id)}
+                      onCheckedChange={() =>
+                        setHatCalisanlar((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(op.user_id)) next.delete(op.user_id);
+                          else next.add(op.user_id);
+                          return next;
+                        })
+                      }
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm">{op.full_name}</span>
+                  </label>
+                ))}
+                {operators.length === 0 && <p className="py-2 text-center text-sm text-muted-foreground">Yükleniyor...</p>}
+              </div>
+            </div>
+          )}
+
+          {(ekSeans || hat) && (
             <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <Label htmlFor="pkt-ek-yardimci" className="text-sm">
                 Yardımcı sayısı
@@ -371,7 +462,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!selectedSku || submitting}
+              disabled={!selectedSku || submitting || (hatSecimiGerekli && !secilenHatId)}
               className="bg-vw-primary hover:bg-vw-deep text-white"
             >
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

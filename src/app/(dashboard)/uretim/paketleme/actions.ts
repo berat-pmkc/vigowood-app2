@@ -205,6 +205,8 @@ export async function createPackSession(
     yardimciSayisi?: number;
     /** "Ek Seans Aç": plan dışı seans (talimat satırı yok) */
     ekSeans?: boolean;
+    /** Seansın yapıldığı hat (talimat_hatlar.hat_id) */
+    hatId?: string | null;
   },
 ): Promise<ActionResult> {
   try {
@@ -261,10 +263,18 @@ export async function createPackSession(
       // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
       ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
       ...(talimat?.ekSeans ? { ek_seans: true } : {}),
+      ...(talimat?.hatId ? { hat_id: talimat.hatId } : {}),
       ...(yardimciSayisi > 0 ? { yardimci_sayisi: yardimciSayisi } : {}),
     } as never);
 
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      return {
+        success: false,
+        error: error.message.includes("açık seansı var")
+          ? "Bu personelin bu üründe zaten açık paketleme seansı var. Önce o seansı kapatın ya da başka personel seçin."
+          : error.message,
+      };
+    }
 
     revalidatePath("/uretim/paketleme");
     revalidatePath("/uretim/talimatlarim");

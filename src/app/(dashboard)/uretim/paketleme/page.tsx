@@ -7,6 +7,7 @@ import { PaketlemeDashboard } from "./components/paketleme-dashboard";
 import type { ActiveSession } from "./components/session-card";
 import type { CompletedSession } from "./components/completed-sessions";
 import { talimatDb } from "@/lib/talimat/db";
+import { getHatlar } from "@/lib/talimat/queries";
 
 export const metadata: Metadata = { title: "Paketleme" };
 
@@ -17,18 +18,19 @@ export default async function PaketlemePage() {
   }
 
   const supabase = await createClient();
+  const hatlar = await getHatlar().catch(() => []);
 
   // Devam eden seanslar
   const { data: activeRaw } = await supabase
     .from("pack_events")
-    .select("session_id, sku, start_time, durum, operator_name, duraklama_dk, duraklatma_baslangic, workers, yardimci_sayisi, talimat_satir_id")
+    .select("session_id, sku, start_time, durum, operator_name, duraklama_dk, duraklatma_baslangic, workers, yardimci_sayisi, talimat_satir_id, hat_id")
     .eq("durum", "paketlemede")
     .order("start_time", { ascending: true });
   // Yeni kolonlar (yardimci_sayisi, talimat_satir_id) henüz database types'ta yok
   const activeData = activeRaw as unknown as Array<{
     session_id: string; sku: string | null; start_time: string | null; durum: string;
     operator_name: string | null; duraklama_dk: number | null; duraklatma_baslangic: string | null;
-    workers: unknown; yardimci_sayisi: number | null; talimat_satir_id: string | null;
+    workers: unknown; yardimci_sayisi: number | null; talimat_satir_id: string | null; hat_id: string | null;
   }> | null;
 
   // Son 62 gün tamamlanan seanslar (geçen ay filtresi için yeterli)
@@ -104,6 +106,7 @@ export default async function PaketlemePage() {
         activeSessions={activeSessions}
         completedSessions={completedSessions}
         productOptions={productOptions}
+        hatlar={hatlar}
       />
     </div>
   );

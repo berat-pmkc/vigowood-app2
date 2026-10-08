@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/supabase/schema";
 
-export type TalepBildirimOlay = "yeni" | "degisti" | "geri_cekildi" | "kapandi" | "yeniden_acildi";
+export type TalepBildirimOlay = "yeni" | "degisti" | "geri_cekildi" | "kapandi" | "yeniden_acildi" | "asama";
 
 export type TalepBildirim = {
   id: string;
@@ -12,6 +12,8 @@ export type TalepBildirim = {
   olay: TalepBildirimOlay;
   ozet: string | null;
   olusturan: string | null;
+  hat_adi?: string | null;
+  asama?: "basladi" | "tamamlandi" | null;
   created_at: string;
   goruldu_at: string | null;
 };
@@ -22,7 +24,16 @@ export const TALEP_BILDIRIM_OLAY_LABEL: Record<TalepBildirimOlay, string> = {
   geri_cekildi: "Talep geri çekildi",
   kapandi: "Talep kapandı",
   yeniden_acildi: "Talep yeniden açıldı",
+  asama: "Aşama güncellendi",
 };
+
+/** Bildirim başlığı: aşama olaylarında hat türüne göre "Montaj tamamlandı" vb. */
+export function talepBildirimBaslik(b: Pick<TalepBildirim, "olay" | "hat_adi" | "asama">): string {
+  if (b.olay !== "asama") return TALEP_BILDIRIM_OLAY_LABEL[b.olay];
+  const ad = (b.hat_adi ?? "").toLocaleLowerCase("tr");
+  const grup = ad.includes("paket") ? "Paketleme" : ad.includes("döşeme") || ad.includes("doseme") ? "Döşeme" : "Montaj";
+  return `${grup} ${b.asama === "tamamlandi" ? "tamamlandı" : b.asama === "basladi" ? "başladı" : "güncellendi"}`;
+}
 
 /** Görüldükten 30 dk sonra silinir (cron 5 dk'da bir); bu süreyi aşanları istemci de gizler */
 const GORULDU_OMUR_MS = 30 * 60 * 1000;
@@ -56,7 +67,7 @@ export function useTalepBildirimleri(enabled = true) {
     // Tablo generated types içinde olmayabilir
     const { data, error } = await (supabase as unknown as SorguZinciri)
       .from("talep_bildirimleri")
-      .select("id, talep_id, olay, ozet, olusturan, created_at, goruldu_at")
+      .select("id, talep_id, olay, ozet, olusturan, hat_adi, asama, created_at, goruldu_at")
       .order("created_at", { ascending: false })
       .limit(100);
     if (error || !data) return;

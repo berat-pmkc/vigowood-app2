@@ -14,7 +14,19 @@ export type TalimatYayinDurum =
   | "durduruldu"
   | "geri_cekildi";
 export type TalimatYayinHedef = "degisenler" | "herkes";
-export type TalimatPasifKapsam = "satir" | "personel" | "liste";
+export type TalimatPasifKapsam = "satir" | "personel" | "liste" | "hat";
+/** Hat türü: montaj hatları (Montaj 1/2/3, Döşeme) son montaj aşamasını, paketleme hattı paketlemeyi sayar */
+export type HatTur = "montaj" | "paketleme";
+
+/** talimat_hatlar */
+export interface TalimatHat {
+  hat_id: string;
+  ad: string;
+  tur: HatTur;
+  sira: number;
+  aktif: boolean;
+  created_at: string;
+}
 
 /** Server action sonucu */
 export type ActionResult<T = undefined> =
@@ -33,6 +45,8 @@ export interface TalimatPlan {
   pasif_at: string | null;
   pazartesi_bildirim_at: string | null;
   degisen_personeller: string[];
+  /** Yayınlanmamış silme/sıra değişikliği olan hatlar (hat_id) */
+  degisen_hatlar?: string[];
   kaynak_plan_id: string | null;
   olusturan: string | null;
   created_at: string;
@@ -42,13 +56,16 @@ export interface TalimatPlan {
   satir_sayisi: number;
   degisen_satir_sayisi: number;
   personel_sayisi: number;
+  /** ürünlü satırı olan hat sayısı (boş hat satırları sayılmaz) */
+  hat_sayisi?: number;
 }
 
 /** talimat_satir_ilerleme (satır + üretim ilerlemesi) */
 export interface TalimatSatir {
   satir_id: string;
   plan_id: string;
-  personel_id: string;
+  /** Hat satırlarında NULL (eski personel bazlı satırlarda dolu) */
+  personel_id: string | null;
   personel_adi: string | null;
   personel_istasyon: string | null;
   sira: number;
@@ -87,6 +104,20 @@ export interface TalimatSatir {
   toplam_stok: number;
   /** Sayaç sıfırlama anı (null = plan haftası başı); üretilen bu andan itibaren sayılır */
   sayac_baslangic?: string | null;
+  /** Satır kapanışı (talimat_satir_kapat): 'tamamlandi' | 'tamamlanmadi' */
+  kapanis?: "tamamlandi" | "tamamlanmadi" | null;
+  kapanis_neden?: string | null;
+  kapanis_at?: string | null;
+  kapatan?: string | null;
+  // ── Hat bazlı model (SQL 160) ──
+  /** Hat satırı: hattın id'si (eski personel satırlarında null) */
+  hat_id?: string | null;
+  hat_adi?: string | null;
+  hat_tur?: HatTur | null;
+  hat_sira?: number | null;
+  hat_aktif?: boolean | null;
+  /** Şu an açık (montajda/paketlemede, bekletilenler dahil) seans sayısı — yalnız hat satırları */
+  acik_seans_sayisi?: number | null;
 }
 
 /** talimat_satir_katki */
@@ -102,6 +133,11 @@ export interface TalimatKatki {
 }
 
 /** talimat_yayin_ozet */
+export interface TalimatYayinOnaylamayanHat {
+  hat_id: string;
+  hat_adi: string;
+}
+
 export interface TalimatYayin {
   yayin_id: string;
   plan_id: string;
@@ -123,12 +159,20 @@ export interface TalimatYayin {
   hedef_sayisi: number;
   onay_sayisi: number;
   onaylamayan_sayisi: number;
+  /** Yalnız eski personel hedefleri (user_id) */
   onaylamayanlar: string[];
+  /** Hat hedefleri: hedef hat sayısı ve yayını henüz onaylamayan hatlar */
+  hat_sayisi?: number;
+  onaylamayan_hatlar?: TalimatYayinOnaylamayanHat[];
 }
 
 export interface TalimatYayinHedefDetay {
-  personel_id: string;
+  /** Hat hedefinde null */
+  personel_id: string | null;
   personel_adi: string | null;
+  /** Hat hedefinde dolu */
+  hat_id?: string | null;
+  hat_adi?: string | null;
   satir_ids: string[];
   son_bildirim_at: string | null;
   bildirim_sayisi: number;
@@ -165,13 +209,18 @@ export interface TalimatBildirim {
   payload: {
     yayin_id: string;
     plan_id: string;
-    personel_id: string;
+    /** Hat bildirimlerinde yok (target_user NULL, payload.hat_id dolu) */
+    personel_id?: string;
+    /** Hat bildirimi (kind='talimat_degisiklik', hat bazlı yayın) */
+    hat_id?: string;
+    hat_adi?: string;
+    hat_tur?: HatTur;
     personel_adi?: string;
     personel_istasyon?: string;
     satir_sayisi?: number;
     hatirlatma?: boolean;
     otomatik?: boolean;
-    onaylamayanlar?: Array<{ personel_id: string; ad: string }>;
+    onaylamayanlar?: Array<{ personel_id?: string; hat_id?: string; ad: string }>;
   } | null;
 }
 
@@ -243,6 +292,10 @@ export interface Depo {
 /** Planlayıcı satır filtreleri (sunucu tarafı) */
 export interface TalimatSatirFiltre {
   personelId?: string;
+  /** Yalnız bu hattın satırları (hat bazlı model) */
+  hatId?: string;
+  /** true: yalnız hat satırları (hat_id dolu) — eski personel satırlarını gizler */
+  sadeceHat?: boolean;
   /** sku veya ürün adı içinde arar */
   arama?: string;
   istasyon?: TalimatIstasyon;
@@ -265,6 +318,9 @@ export interface TalimatSatirFiltre {
 export interface SatirKaydetGirdi {
   satir_id?: string;
   plan_id?: string;
+  /** Hat satırı: hat_id (yeni satırda hat_id VEYA eski personel satırı için personel_id gerekli) */
+  hat_id?: string | null;
+  /** Eski personel satırları; hat satırında yok sayılır */
   personel_id?: string;
   sira?: number | null;
   /** yeni satırda dolu sıraya ekleme: true -> araya gir (diğerleri kayar) */
@@ -302,7 +358,7 @@ export interface YayinlaSonuc {
 export interface PasifGirdi {
   kapsam: TalimatPasifKapsam;
   planId: string;
-  /** satir: satir_id'ler; personel: user_id'ler; liste: boş */
+  /** satir: satir_id'ler; personel: user_id'ler; hat: hat_id'ler; liste: boş */
   ids?: string[];
   baslangic?: string | null;
   /** null = elle aktifleştirilene kadar */
@@ -313,8 +369,12 @@ export interface PasifGirdi {
 /** Montaj/paketleme "Seans Başlat" ön doldurma */
 export interface SeansOnDoldurma {
   satir_id: string;
-  personel_id: string;
+  /** Hat satırında null */
+  personel_id: string | null;
   personel_adi: string | null;
+  /** Hat satırı: seans bu hatta açılır (montaj_sessions/pack_events.hat_id) */
+  hat_id: string | null;
+  hat_adi: string | null;
   istasyon: TalimatIstasyon;
   sku: string | null;
   urun_adi: string | null;
@@ -328,10 +388,90 @@ export interface SeansOnDoldurma {
 /** Kesim satırı "Bitirdi" -> yeni kesim kaydı ön doldurma */
 export interface KesimOnDoldurma {
   talimat_satir_id: string;
-  personel_id: string;
+  personel_id: string | null;
   plaka_id: string | null;
   sku: string | null;
   /** Önerilen adet: kalan (yoksa istenen) */
   adet: number | null;
   not_text: string | null;
+}
+
+// ─── Hat bazlı model (H1) ───────────────────────────────────────
+
+/** Talimat satırına / hattına bağlı açık montaj-paketleme seansı (hat tableti) */
+export interface TabletHatSeans {
+  session_id: string;
+  tur: "montaj" | "paketleme";
+  /** Bağlandığı hat satırı (talimat_satir_id veya aynı hat+sku); bağlanmayan seanslarda null */
+  satir_id: string | null;
+  hat_id: string | null;
+  sku: string | null;
+  urun_adi: string | null;
+  step_id: string | null;
+  step_name: string | null;
+  seq_no: number | null;
+  is_final_step: boolean | null;
+  start_time: string | null;
+  /** 'montajda' | 'paketlemede' (bekletilen de açık sayılır; bekletme: duraklatma_baslangic dolu) */
+  durum: string;
+  operator_id: string | null;
+  operator_name: string | null;
+  workers: Array<{ id: string; name: string }> | null;
+  duraklama_dk: number | null;
+  duraklatma_baslangic: string | null;
+  yardimci_sayisi: number | null;
+  ek_seans: boolean;
+}
+
+/** Bugünün hat bazlı ek seansı (ek_seanslar görünümü) */
+export interface TabletHatEkSeans {
+  kaynak: "montaj" | "paketleme";
+  session_id: string;
+  personel_id: string | null;
+  personel_adi: string | null;
+  sku: string | null;
+  urun_adi: string | null;
+  step_name: string | null;
+  qty: number;
+  durum: "acik" | "beklemede" | "tamamlandi";
+  start_time: string;
+  end_time: string | null;
+  net_sure_dk: number | null;
+}
+
+export interface TabletHatSatir extends TalimatSatir {
+  /** Bu satıra bağlı AÇIK seanslar (talimat_satir_id veya aynı hat+sku) */
+  acik_seanslar: TabletHatSeans[];
+}
+
+/** Tablet: tek hat bölümü */
+export interface TalimatTabletHat {
+  hat: TalimatHat;
+  /** Hat bugün plan düzeyinde pasif (talimat_pasifler kapsam='hat'): satırlar gösterilmez */
+  pasif: boolean;
+  /** Ürünlü, pasif olmayan, tamamlanmamış satırlar (sıra) */
+  aktif: TabletHatSatir[];
+  /** Tamamlananlar (etkin_durum='tamamlandi'), sıra */
+  tamamlanan: TabletHatSatir[];
+  /** Hattın hiçbir satırına bağlanmayan açık seansları (talimat dışı / ek seans) */
+  diger_acik_seanslar: TabletHatSeans[];
+  /** Bugünün ek seansları (açık + tamamlanan) */
+  ek_seanslar: TabletHatEkSeans[];
+  /** Bu hat için henüz onaylanmamış bildirimli yayınlar (en yeni önce) -> talimatOnaylaHat(bekleyen[0], hat_id) */
+  bekleyen_yayin_idler: string[];
+}
+
+/** Tablet "İş Talimatları": hat bölümleri (aktif hatlar, hat sırasıyla) */
+export interface TalimatTabletHatListe {
+  plan: TalimatPlan | null;
+  guncel: { guncel_mi: boolean; bitis: string | null };
+  hatlar: TalimatTabletHat[];
+}
+
+/** Planlayıcı: hat grubu (Mavi Yaka) — satırlar hat içi sırayla */
+export interface TalimatPlanHatGrubu {
+  hat: TalimatHat;
+  satirlar: TalimatSatir[];
+  /** Hat bugün için plan düzeyinde pasif mi (talimat_pasifler kapsam='hat') */
+  pasif: boolean;
 }

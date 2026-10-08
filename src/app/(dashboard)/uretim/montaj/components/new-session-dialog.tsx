@@ -23,6 +23,8 @@ import {
 } from "../actions";
 import { toast } from "sonner";
 import { getSkuBadgeStyle } from "@/lib/sku-colors";
+import { hatlariGetir } from "@/lib/talimat/hat-actions";
+import type { TalimatHat } from "@/lib/talimat/types";
 
 interface Operator {
   user_id: string;
@@ -68,6 +70,8 @@ interface NewSessionDialogProps {
   talimat?: TalimatSeansOnDolu | null;
   /** "Ek Seans Aç": plan dışı seans — çalışan sabit, ürün serbest */
   ekSeans?: { personel_id: string; personel_adi: string } | null;
+  /** "Ek Seans Aç" (hat bazlı): hat sabit, ürün + çalışan serbest */
+  hat?: { hat_id: string; hat_adi: string } | null;
   /** Seans başarıyla başlayınca (dialog kapanmadan önce) */
   onSuccess?: () => void;
 }
@@ -87,7 +91,20 @@ function normalize(s: string): string {
     .trim();
 }
 
-export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSuccess }: NewSessionDialogProps) {
+export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, hat, onSuccess }: NewSessionDialogProps) {
+  /** Talimat dışı ana ekran seansı: hat seçimi ZORUNLU */
+  const hatSecimiGerekli = !talimat && !ekSeans && !hat;
+  const [hatlar, setHatlar] = useState<TalimatHat[]>([]);
+  const [secilenHatId, setSecilenHatId] = useState("");
+  useEffect(() => {
+    if (!open || !hatSecimiGerekli || hatlar.length > 0) return;
+    hatlariGetir(true).then((r) => {
+      if (r.success) setHatlar(r.data.filter((h) => h.tur === "montaj"));
+    });
+  }, [open, hatSecimiGerekli, hatlar.length]);
+  useEffect(() => {
+    if (!open) setSecilenHatId("");
+  }, [open]);
   /** Çıkarılamayan (sabit) çalışan: talimat sahibi veya ek seansı açan */
   const kilitliPersonel = talimat?.personel_id ?? ekSeans?.personel_id ?? null;
   const kilitliAd = talimat?.personel_adi ?? ekSeans?.personel_adi ?? null;
@@ -223,6 +240,10 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
       toast.error("Ürün ve adım seçimi gereklidir");
       return;
     }
+    if (hatSecimiGerekli && !secilenHatId) {
+      toast.error("Önce hat seçiniz");
+      return;
+    }
     if (selectedWorkers.size === 0) {
       toast.error("En az 1 çalışan seçiniz");
       return;
@@ -241,10 +262,12 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
         ? { talimatSatirId: talimat.satir_id, yardimciSayisi }
         : ekSeans
           ? { ekSeans: true, yardimciSayisi }
-          : undefined,
+          : hat
+            ? { ekSeans: true, yardimciSayisi, hatId: hat.hat_id }
+            : { hatId: secilenHatId },
     );
     if (result.success) {
-      toast.success(ekSeans ? "Ek seans başlatıldı" : "Montaj seansı başlatıldı");
+      toast.success(ekSeans || hat ? "Ek seans başlatıldı" : "Montaj seansı başlatıldı");
       onSuccess?.();
       onOpenChange(false);
     } else {
@@ -283,7 +306,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
             </Button>
           )}
           <DialogTitle className="min-w-0 flex-1 truncate text-base">
-            {activeStep === 1 && !talimat ? (ekSeans ? "Ek Seans — Ürün seç" : "Ürün seç") : "Montaj adımı seç"}
+            {activeStep === 1 && !talimat ? (hat ? `Ek Seans — ${hat.hat_adi}` : ekSeans ? "Ek Seans — Ürün seç" : "Ürün seç") : "Montaj adımı seç"}
           </DialogTitle>
           <Button
             variant="ghost" size="icon" className="size-9 shrink-0"
@@ -293,6 +316,28 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
             <X className="size-5" />
           </Button>
         </DialogHeader>
+
+        {hatSecimiGerekli && (
+          <div className="shrink-0 border-b bg-muted/30 px-4 py-3">
+            <p className="mb-2 text-sm font-semibold">Hangi hat? <span className="text-destructive">*</span></p>
+            <div className="flex flex-wrap gap-2">
+              {hatlar.map((h) => (
+                <button
+                  key={h.hat_id}
+                  type="button"
+                  onClick={() => setSecilenHatId(h.hat_id)}
+                  className={cn(
+                    "min-h-11 rounded-lg border-2 px-3 text-sm font-semibold",
+                    secilenHatId === h.hat_id ? "border-vw-deep bg-vw-deep text-white" : "border-border bg-card",
+                  )}
+                >
+                  {h.ad}
+                </button>
+              ))}
+              {hatlar.length === 0 && <span className="text-sm text-muted-foreground">Hatlar yükleniyor...</span>}
+            </div>
+          </div>
+        )}
 
         {/* ── Kaydırmalı gövde ───────────────────────────── */}
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -475,7 +520,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
                           </p>
                         )}
                       </div>
-                      {(talimat || ekSeans) && (
+                      {(talimat || ekSeans || hat) && (
                         <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border p-3">
                           <Label htmlFor="yardimci-sayisi" className="text-sm">
                             Listede olmayan yardımcı sayısı
@@ -527,7 +572,7 @@ export function NewSessionDialog({ open, onOpenChange, talimat, ekSeans, onSucce
               <div className="shrink-0 border-t p-3">
                 <Button
                   onClick={handleSubmit}
-                  disabled={!selectedStepId || selectedWorkers.size === 0 || submitting}
+                  disabled={!selectedStepId || selectedWorkers.size === 0 || submitting || (hatSecimiGerekli && !secilenHatId)}
                   className="h-12 w-full bg-vw-primary text-base text-white hover:bg-vw-deep"
                 >
                   {submitting && <Loader2 className="mr-2 size-4 animate-spin" />}

@@ -96,12 +96,12 @@ function YayinSatiri({ y, editable, onChanged }: { y: TalimatYayin; editable: bo
           {!hedefler ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : hedefler.length === 0 ? (
-            <span className="text-muted-foreground">Hedef personel yok</span>
+            <span className="text-muted-foreground">Hedef hat yok</span>
           ) : (
             <ul className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2 lg:grid-cols-3">
               {hedefler.map((h) => (
-                <li key={h.personel_id} className="flex justify-between gap-2">
-                  <span>{h.personel_adi ?? h.personel_id}</span>
+                <li key={h.hat_id ?? h.personel_id} className="flex justify-between gap-2">
+                  <span>{h.hat_adi ?? h.personel_adi ?? h.personel_id}</span>
                   <span className={h.onay_zamani ? "text-[#2f7d66]" : "text-[#c0424f]"}>
                     {h.onay_zamani ? `Görüldü ${formatTime(h.onay_zamani)}` : "Görmedi"}
                   </span>

@@ -150,7 +150,7 @@ steps.push(step('2.1 ilerleme/ozet/etkin/katki goruntuleri', 'planner', `
   select count(*) into m from ${S}.talimat_satirlar where plan_id=v_plan;
   ${assert('n=m and n>0', 'ilerleme satir sayisi uyusmuyor')}
   select satir_sayisi, personel_sayisi into n, k from ${S}.talimat_plan_ozet where plan_id=v_plan;
-  ${assert('n=m', 'plan_ozet satir_sayisi')}
+  ${assert(`n=(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and (sku is not null or plaka_id is not null))`, 'plan_ozet satir_sayisi (bos hat satirlari sayilmaz)')}
   select count(*) into k from ${S}.talimat_satir_etkin where plan_id=v_plan;
   select count(*) into k from ${S}.talimat_satir_katki where satir_id=s1;
   select count(*) into k from ${S}.talep_durum;
@@ -453,6 +453,325 @@ steps.push(step('5.19 talep bildirimi: degisiklik sahibe, goruldu, 30 dk temizli
   ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=tid and alici_user_id=${ql(plannerId)} and goruldu_at is not null)>=1`, 'taze goruldu satiri silindi')}
 `));
 
+// ---------------- 11) HAT BAZLI MODEL (H1) ----------------
+const hsat = (id) => `(select sira from ${S}.talimat_satirlar where satir_id = ${id})`;
+const hkaydet = (obj) => kaydet(obj);
+const msIns = (id, sku, step, op, hat, o = {}) => {
+  const durum = o.durum ?? 'tamamlandi';
+  return `insert into ${S}.montaj_sessions (session_id, sku, step_id, step_name, seq_no, durum, operator_id, operator_name, start_time, end_time, qty, is_final_step, hat_id, workers)
+    values ('${id}', '${sku}', '${step}', 'Test adim', 1, '${durum}', ${op}, 'Test Personel', ${o.startExpr ?? 'now()'},
+            ${durum === 'tamamlandi' ? (o.endExpr ?? "now() + interval '1 minute'") : 'null'}, ${o.qty ?? 0}, ${o.final ?? false}, ${hat}, ${o.workers ?? 'null'});`;
+};
+const peIns = (id, sku, op, hat, o = {}) => {
+  const durum = o.durum ?? 'tamamlandi';
+  return `insert into ${S}.pack_events (session_id, tarih, sku, qty, durum, start_time, end_time, operator_id, operator_name, hat_id, personel)
+    values ('${id}', now(), '${sku}', ${o.qty ?? 0}, '${durum}', now(),
+            ${durum === 'tamamlandi' ? (o.endExpr ?? "now() + interval '1 minute'") : 'null'}, ${op}, 'Test Personel', ${hat}, ${o.personel ?? 'null'});`;
+};
+
+steps.push(step('11.1 hatlar: seed + tablet okuyabilir, yazamaz', 'station', `
+  h1 := (select hat_id from ${S}.talimat_hatlar where ad='MONTAJ 1 HATTI');
+  h2 := (select hat_id from ${S}.talimat_hatlar where ad='MONTAJ 2 HATTI');
+  h3 := (select hat_id from ${S}.talimat_hatlar where ad='MONTAJ 3 HATTI');
+  h4 := (select hat_id from ${S}.talimat_hatlar where ad='DÖŞEME HATTI');
+  h5 := (select hat_id from ${S}.talimat_hatlar where ad='PAKETLEME HATTI');
+  ${assert('h1 is not null and h2 is not null and h3 is not null and h4 is not null and h5 is not null', 'varsayilan hatlar yok')}
+  ${assert(`(select count(*) from ${S}.talimat_hatlar where hat_id in (h1,h2,h3,h4) and tur='montaj' and aktif)=4 and (select tur from ${S}.talimat_hatlar where hat_id=h5)='paketleme'`, 'hat turleri')}
+  ${assert(`(select array_agg(ad order by sira) from ${S}.talimat_hatlar where hat_id in (h1,h2,h3,h4,h5))=array['MONTAJ 1 HATTI','MONTAJ 2 HATTI','MONTAJ 3 HATTI','DÖŞEME HATTI','PAKETLEME HATTI']`, 'hat sirasi')}
+`));
+steps.push(expectErr('11.1b istasyon hesabi hat tablosuna dogrudan yazamaz', 'station',
+  `insert into ${S}.talimat_hatlar (ad, tur, sira) values ('HACK HAT', 'montaj', 99);`, 'new row violates row-level security'));
+steps.push(expectErr('11.1c istasyon hesabi hat_ekle yapamaz', 'station', `perform ${S}.hat_ekle('HACK', 'montaj');`, 'Bu işlem için yetkiniz yok'));
+
+steps.push(step('11.2 plan: her aktif hat icin bos satir (idempotent)', 'planner', `
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id in (h1,h2,h3,h4,h5) and sku is null and plaka_id is null and personel_id is null)=5`, 'her hatta 1 bos satir olmali')}
+  ${assert(`(select istasyon from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h5)='paketleme' and (select istasyon from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h1)='montaj'`, 'istasyon hat turunden')}
+  n := (select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id is not null);
+  perform ${S}.talimat_plan_getir_veya_olustur(${S}.talimat_bugun());
+  ${assert(`n = (select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id is not null)`, 'plan_getir idempotent degil (hat satiri cogaldi)')}
+  ${assert(`(select hat_sayisi from ${S}.talimat_plan_ozet where plan_id=v_plan)=0`, 'bos hat satirlari ozette hat sayilmamali')}
+`));
+
+steps.push(step('11.3 hat_ekle / hat_guncelle / hat_pasif', 'planner', `
+  hx := ${S}.hat_ekle('  TEST HATTI ', 'montaj');
+  ${assert(`(select ad='TEST HATTI' and sira=6 and aktif from ${S}.talimat_hatlar where hat_id=hx)`, 'hat_ekle')}
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=hx and sku is null)=1`, 'yeni hat mevcut planda 1 bos satir almali')}
+  perform ${S}.hat_guncelle(hx, 'TEST HATTI 2');
+  ${assert(`(select ad from ${S}.talimat_hatlar where hat_id=hx)='TEST HATTI 2'`, 'hat_guncelle ad')}
+  perform ${S}.hat_guncelle(hx, null, 'paketleme');
+  ${assert(`(select istasyon from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=hx)='paketleme'`, 'tur degisince istasyon guncellenmeli')}
+  perform ${S}.hat_guncelle(hx, null, 'montaj');
+  perform ${S}.hat_pasif(hx);
+  ${assert(`not (select aktif from ${S}.talimat_hatlar where hat_id=hx)`, 'hat_pasif')}
+`));
+steps.push(expectErr('11.3b pasif hatta satir kaydedilemez', 'planner',
+  `perform ${hkaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',hx,'sku','LS031')`)};`, 'Hat bulunamadı veya pasif'));
+steps.push(expectErr('11.3c ayni isimde hat', 'planner', `perform ${S}.hat_ekle('montaj 1 hatti', 'montaj');`, 'Bu isimde hat zaten var'));
+steps.push(expectErr('11.3d gecersiz tur', 'planner', `perform ${S}.hat_ekle('X HAT', 'kesim');`, 'Geçersiz hat türü'));
+steps.push(step('11.3e hat_pasif(false) geri acar', 'planner', `
+  perform ${S}.hat_pasif(hx, false);
+  ${assert(`(select aktif from ${S}.talimat_hatlar where hat_id=hx)`, 'hat tekrar aktif degil')}
+`));
+
+steps.push(step('11.4 hat satiri: doldur / ekle / araya gir / sirala', 'planner', `
+  r1 := (select satir_id from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h1 order by sira limit 1);
+  perform ${hkaydet(`jsonb_build_object('satir_id',r1,'sku','LS031','istenen_miktar',10,'not_text','hat notu','personel_id',w1)`)};
+  ${assert(`(select sku='LS031' and personel_id is null and istasyon='montaj' and sira=1 and istenen_miktar=10 and degisti from ${S}.talimat_satirlar where satir_id=r1)`, 'hat satiri dolmadi / personel yok sayilmadi / degisti yok')}
+  r2 := ${hkaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h1,'sku','LS051','istenen_miktar',20)`)};
+  ${assert(`${hsat('r2')}=2`, 'ikinci hat satiri sira 2 degil')}
+`));
+steps.push(expectErr('11.4b dolu sira kaydir olmadan', 'planner',
+  `perform ${hkaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h1,'sku','MKOS41','sira',1)`)};`, 'SIRA_DOLU'));
+steps.push(step('11.4c kaydir=true araya girer, sirala_hat, eksik liste', 'planner', `
+  r3 := ${hkaydet(`jsonb_build_object('plan_id',v_plan,'hat_id',h1,'sku','MKOS41','istenen_miktar',30,'sira',1,'kaydir',true)`)};
+  ${assert(`${hsat('r3')}=1 and ${hsat('r1')}=2 and ${hsat('r2')}=3`, 'kaydirma hatali')}
+  perform ${S}.talimat_satir_sirala_hat(v_plan, h1, array[r1,r2,r3]);
+  ${assert(`${hsat('r1')}=1 and ${hsat('r2')}=2 and ${hsat('r3')}=3`, 'sirala_hat hatali')}
+  ${assert(`(select count(distinct sira) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h1)=3`, 'sira tekil degil')}
+`));
+steps.push(expectErr('11.4d sirala_hat eksik liste', 'planner',
+  `perform ${S}.talimat_satir_sirala_hat(v_plan, h1, array[r1,r2]);`, 'Sıralama listesi hattın'));
+steps.push(step('11.5 satir_sil: sira sikisir; hattin son satiri silinirse bos satir kalir', 'planner', `
+  perform ${S}.talimat_satir_sil(r2);
+  ${assert(`${hsat('r1')}=1 and ${hsat('r3')}=2`, 'sil sonrasi sira sikismadi')}
+  r4 := (select satir_id from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 order by sira limit 1);
+  perform ${hkaydet(`jsonb_build_object('satir_id',r4,'sku','LS031','istenen_miktar',1)`)};
+  perform ${S}.talimat_satir_sil(r4);
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)=1 and (select sku is null from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4)`, 'hattin son satiri silinince bos satir kalmali')}
+  ${assert(`(select h4 = any (degisen_hatlar) from ${S}.talimat_planlar where plan_id=v_plan)`, 'silinen satirin hatti degisen_hatlar a yazilmali')}
+`));
+steps.push(step('11.6 satir baska hatta tasinir (sona), eski hat sikisir', 'planner', `
+  perform ${hkaydet(`jsonb_build_object('satir_id',r3,'hat_id',h2)`)};
+  ${assert(`(select hat_id=h2 and sira=2 and istasyon='montaj' from ${S}.talimat_satirlar where satir_id=r3)`, 'satir hat2 sonuna tasinmadi')}
+  ${assert(`${hsat('r1')}=1 and (select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h1)=1`, 'eski hat sikismadi')}
+  perform ${hkaydet(`jsonb_build_object('satir_id',r3,'hat_id',h1)`)};
+  ${assert(`${hsat('r3')}=2`, 'geri tasima')}
+`));
+
+steps.push(step('11.7 satirlari_hatta_kopyala: bos satir once dolar, sonra sona eklenir', 'planner', `
+  ids := ${S}.talimat_satirlari_hatta_kopyala(array[r1, r3], h3);
+  ${assert(`cardinality(ids)=2`, 'iki satir donmeli')}
+  r5 := ids[1]; r6 := ids[2];
+  ${assert(`(select sku='LS031' and istenen_miktar=10 and hat_id=h3 and sira=1 and personel_id is null from ${S}.talimat_satirlar where satir_id=r5)`, 'ilk kopya hedefin bos satirini doldurmali (sira 1)')}
+  ${assert(`(select sku='MKOS41' and istenen_miktar=30 and sira=2 from ${S}.talimat_satirlar where satir_id=r6)`, 'ikinci kopya sona eklenmeli (sira 2)')}
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h3)=2`, 'hedef hat satir sayisi')}
+  -- kaynak satirlar yerinde
+  ${assert(`(select sku from ${S}.talimat_satirlar where satir_id=r1)='LS031' and (select hat_id from ${S}.talimat_satirlar where satir_id=r1)=h1`, 'kaynak degismemeli')}
+  -- paketleme hattina: istasyon paketleme
+  ids := ${S}.talimat_satirlari_hatta_kopyala(array[r1], h5);
+  ${assert(`(select istasyon='paketleme' and sku='LS031' and sira=1 from ${S}.talimat_satirlar where satir_id=ids[1])`, 'paketleme hattina kopya')}
+  r7 := ids[1];
+`));
+steps.push(expectErr('11.7b pasif/yok hedef hat', 'planner',
+  `perform ${S}.talimat_satirlari_hatta_kopyala(array[r1], gen_random_uuid());`, 'Hedef hat bulunamadı'));
+steps.push(expectErr('11.7c yalniz bos satir kopyalanamaz', 'planner',
+  `perform ${S}.talimat_satirlari_hatta_kopyala(array[(select satir_id from ${S}.talimat_satirlar where plan_id=v_plan and hat_id=h4 limit 1)], h3);`, 'Kopyalanacak dolu satır yok'));
+
+steps.push(step('11.8 ilerleme: hat+tur bazli (montaj=son asama, paketleme=paketleme), sayac, acik seans', 'planner', `
+  -- r5: MONTAJ 3 / LS031 / istenen 10 ; r7: PAKETLEME / LS031 ; r1: MONTAJ 1 / LS031
+  ${su}
+  -- 156: sayac talimatin verildigi an baslar; satirlari 10 dk once verilmis gibi goster
+  update ${S}.talimat_satirlar set sayac_baslangic = now() - interval '10 minutes' where satir_id in (r1, r5, r7);
+  ${msIns('H-M-OK', 'LS031', 'H-STEP-F', 'w1', 'h3', { qty: 4, final: true, startExpr: "now() - interval '3 minutes'", endExpr: "now() - interval '2 minutes'" })}
+  ${msIns('H-M-OTHERHAT', 'LS031', 'H-STEP-F', 'w1', 'h1', { qty: 7, final: true, startExpr: "now() - interval '3 minutes'", endExpr: "now() - interval '2 minutes'" })}
+  ${msIns('H-M-NOTFINAL', 'LS031', 'H-STEP-1', 'w1', 'h3', { qty: 9, final: false, startExpr: "now() - interval '3 minutes'", endExpr: "now() - interval '2 minutes'" })}
+  ${msIns('H-M-OLD', 'LS031', 'H-STEP-F', 'w1', 'h3', { qty: 11, final: true, startExpr: "now() - interval '30 minutes'", endExpr: "now() - interval '20 minutes'" })}
+  ${msIns('H-M-NOHAT', 'LS031', 'H-STEP-F', 'w1', 'null', { qty: 13, final: true, startExpr: "now() - interval '3 minutes'", endExpr: "now() - interval '2 minutes'" })}
+  ${peIns('H-P-OK', 'LS031', 'w2', 'h5', { qty: 6, endExpr: "now() - interval '2 minutes'" })}
+  ${peIns('H-P-NOHAT', 'LS031', 'w2', 'null', { qty: 50, endExpr: "now() - interval '2 minutes'" })}
+  ${as('planner')}
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=r5)=4`, 'MONTAJ 3 uretilen 4 olmali (diger hat/son asama olmayan/eski/hatsiz sayilmamali)')}
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=r1)=7`, 'MONTAJ 1 uretilen 7')}
+  ${assert(`(select uretilen from ${S}.talimat_satir_ilerleme where satir_id=r7)=6`, 'PAKETLEME uretilen 6 (montaj sayilmamali)')}
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where satir_id=r5)='aktif' and (select fark from ${S}.talimat_satir_ilerleme where satir_id=r5)=6`, 'aktif/fark')}
+  ${assert(`(select hat_adi='MONTAJ 3 HATTI' and hat_tur='montaj' and personel_adi is null from ${S}.talimat_satir_ilerleme where satir_id=r5)`, 'hat kolonlari')}
+  ${assert(`(select acik_seans_sayisi from ${S}.talimat_satir_ilerleme where satir_id=r5)=0`, 'acik seans 0 olmali')}
+  ${su}
+  ${msIns('H-M-OPEN', 'LS031', 'H-STEP-2', 'w2', 'h3', { durum: 'montajda' })}
+  ${as('planner')}
+  ${assert(`(select acik_seans_sayisi=1 and son_seans_at is not null and hafta_seans_var from ${S}.talimat_satir_ilerleme where satir_id=r5)`, 'acik seans sayisi / son seans')}
+  ${assert(`(select acik_seans_sayisi from ${S}.talimat_satir_ilerleme where satir_id=r1)=0`, 'baska hattin acik seansi sayilmamali')}
+  -- montaj hattinda katki yalniz o hattin seanslari
+  ${assert(`(select coalesce(sum(qty),0) from ${S}.talimat_satir_katki where satir_id=r5)=13`, 'katki: hat3 tamamlanan seanslar (4 + 9)')}
+  -- tamamlama
+  perform ${hkaydet(`jsonb_build_object('satir_id',r5,'istenen_miktar',4)`)};
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where satir_id=r5)='tamamlandi'`, 'istenen karsilanince tamamlandi olmali')}
+  perform ${S}.talimat_satir_yeniden_aktif(r5, 5);
+  ${assert(`(select uretilen=0 and etkin_durum='aktif' from ${S}.talimat_satir_ilerleme where satir_id=r5)`, 'sayac sifirlanmali (hat satiri)')}
+`));
+
+steps.push(step('11.9 tek acik seans kurali (montaj + paketleme)', null, `
+  ${msIns('H-RULE-1', 'LS031', 'H-RULE-STEP', 'w3', 'h3', { durum: 'montajda' })}
+`));
+steps.push(expectErr('11.9b ayni personel ayni urun/asama ikinci acik seans', null,
+  msIns('H-RULE-2', 'LS031', 'H-RULE-STEP', 'w3', 'h3', { durum: 'montajda' }), 'Bu personelin bu ürün/aşamada açık seansı var'));
+steps.push(expectErr('11.9c workers uyesi olarak ikinci acik seans', null,
+  msIns('H-RULE-3', 'LS031', 'H-RULE-STEP', 'w4', 'h3', { durum: 'montajda', workers: `jsonb_build_array(jsonb_build_object('id', w3, 'name', 'x'))` }),
+  'Bu personelin bu ürün/aşamada açık seansı var'));
+steps.push(step('11.9d farkli asama / farkli urun / kapaninca serbest', null, `
+  ${msIns('H-RULE-4', 'LS031', 'H-RULE-STEP-B', 'w3', 'h3', { durum: 'montajda' })}
+  ${msIns('H-RULE-5', 'LS051', 'H-RULE-STEP', 'w3', 'h3', { durum: 'montajda' })}
+  update ${S}.montaj_sessions set durum='tamamlandi', end_time = now() + interval '2 minutes' where session_id='H-RULE-1';
+  ${msIns('H-RULE-6', 'LS031', 'H-RULE-STEP', 'w3', 'h3', { durum: 'montajda' })}
+  ${peIns('H-RULE-P1', 'LS031', 'w3', 'h5', { durum: 'paketlemede' })}
+`));
+steps.push(expectErr('11.9e paketlemede ayni personel (personel CSV) ikinci acik seans', null,
+  peIns('H-RULE-P2', 'LS031', 'w4', 'h5', { durum: 'paketlemede', personel: `w4 || ',' || w3` }),
+  'Bu personelin bu ürün/aşamada açık seansı var'));
+steps.push(step('11.9f paketleme: farkli urun serbest', null, `
+  ${peIns('H-RULE-P3', 'LS051', 'w3', 'h5', { durum: 'paketlemede' })}
+`));
+
+steps.push(step('11.10 hat bazli yayin: hedefler, bildirim payload, hat onayi, yayin_ozet', 'planner', `
+  j := ${S}.talimat_yayinla(v_plan, true, null, true, 'degisenler');
+  ya := (j->>'yayin_id')::uuid;
+  out := out || '      ' || j::text || E'\\n';
+  ${assert(`(j->>'hat_sayisi')::int >= 4`, 'hat_sayisi >= 4 beklenir (h1,h2?,h3,h4,h5)')}
+  ${assert(`exists (select 1 from ${S}.talimat_yayin_hedefler where yayin_id=ya and hat_id=h1 and personel_id is null and r1 = any (satir_ids))`, 'h1 hedefi / satir_ids')}
+  ${assert(`exists (select 1 from ${S}.talimat_yayin_hedefler where yayin_id=ya and hat_id=h4 and cardinality(satir_ids)=0)`, 'silinen satirli hat (h4) satirsiz hedef olmali')}
+  ${assert(`not exists (select 1 from ${S}.talimat_yayin_hedefler where yayin_id=ya and hat_id=hx)`, 'bos hat hedef olmamali')}
+  ${assert(`(select onay_bekliyor and not degisti from ${S}.talimat_satirlar where satir_id=r1)`, 'bildirimli yayinda onay_bekliyor')}
+  ${su}
+  ${assert(`(select count(*) from ${S}.notifications where yayin_id=ya and kind='talimat_degisiklik' and target_user is null and payload ->> 'hat_id' is not null) = (j->>'hat_sayisi')::int`, 'hat basina 1 bildirim')}
+  ${assert(`(select title like 'MONTAJ 1 HATTI%' and sesli and payload ->> 'hat_adi' = 'MONTAJ 1 HATTI' from ${S}.notifications where yayin_id=ya and payload ->> 'hat_id' = h1::text)`, 'bildirim baslik/payload')}
+  ${as('station')}
+  n := ${S}.talimat_onayla(p_yayin => ya, p_hat => h1);
+  ${assert('n >= 1', 'hat onayi n')}
+  ${assert(`(select onaylayan='${stationId}' and personel_id is null from ${S}.talimat_onaylar where yayin_id=ya and hat_id=h1)`, 'onay kaydi (hat, onaylayan istasyon hesabi)')}
+  ${assert(`${S}.talimat_onayla(p_yayin => ya, p_hat => h1) = 0`, 'ikinci onay idempotent olmali')}
+  ${su}
+  ${assert(`not (select onay_bekliyor from ${S}.talimat_satirlar where satir_id=r1)`, 'onay sonrasi onay_bekliyor kalkmali')}
+  ${assert(`(select status from ${S}.notifications where yayin_id=ya and payload ->> 'hat_id' = h1::text)='Okundu' and (select status from ${S}.notifications where yayin_id=ya and payload ->> 'hat_id' = h3::text)='Yeni'`, 'bildirim okundu yalniz o hat icin')}
+  ${as('planner')}
+  select hedef_sayisi, onay_sayisi, onaylamayan_sayisi into n, m, k from ${S}.talimat_yayin_ozet where yayin_id=ya;
+  ${assert('m=1 and k=n-1', 'yayin_ozet sayilari')}
+  ${assert(`jsonb_array_length((select onaylamayan_hatlar from ${S}.talimat_yayin_ozet where yayin_id=ya)) = k - (select count(*) from ${S}.talimat_yayin_hedefler where yayin_id=ya and hat_id is null)`, 'onaylamayan_hatlar')}
+  ${assert(`(select hat_sayisi from ${S}.talimat_yayin_ozet where yayin_id=ya) = (j->>'hat_sayisi')::int`, 'ozet hat_sayisi')}
+`));
+steps.push(expectErr('11.10b hedef olmayan hat onayi', 'station',
+  `perform ${S}.talimat_onayla(p_yayin => ya, p_hat => hx);`, 'Bu hat yayının hedefi değil'));
+steps.push(step('11.10c tum hedefler onaylayinca yayin tamamlandi', 'station', `
+  for rec in select hat_id from ${S}.talimat_yayin_hedefler where yayin_id=ya and hat_id is not null loop
+    perform ${S}.talimat_onayla(p_yayin => ya, p_hat => rec.hat_id);
+  end loop;
+  for rec in select personel_id from ${S}.talimat_yayin_hedefler where yayin_id=ya and hat_id is null loop
+    perform ${S}.talimat_onayla(ya, rec.personel_id);
+  end loop;
+  ${su}
+  ${assert(`(select durum from ${S}.talimat_yayinlar where yayin_id=ya)='tamamlandi'`, 'yayin tamamlandi degil')}
+  ${assert(`not exists (select 1 from ${S}.talimat_satirlar where plan_id=v_plan and hat_id is not null and onay_bekliyor)`, 'hat satirlarinda onay_bekliyor kalmamali')}
+`));
+
+steps.push(step('11.11 hat hatirlatma + planlayici raporu (zamanlayici)', 'planner', `
+  perform ${hkaydet(`jsonb_build_object('satir_id',r1,'not_text','yeni hat notu')`)};
+  j := ${S}.talimat_yayinla(v_plan, true, null, false, 'degisenler'); yb := (j->>'yayin_id')::uuid;
+  ${assert(`(j->>'hat_sayisi')::int=1`, 'yalniz h1 degisti')}
+  ${su}
+  update ${S}.talimat_yayinlar set ilk_gonderim_at = now() - interval '30 minutes' where yayin_id = yb;
+  update ${S}.talimat_yayin_hedefler set son_bildirim_at = now() - interval '30 minutes' where yayin_id = yb;
+  j := ${S}.talimat_zamanlayici();
+  out := out || '      ' || j::text || E'\\n';
+  ${assert(`(j->>'hatirlatma')::int>=1 and (j->>'rapor')::int>=1`, 'hat hatirlatma/rapor 0')}
+  ${assert(`(select count(*) from ${S}.notifications where yayin_id=yb and kind='talimat_degisiklik' and payload ->> 'hat_id' = h1::text and geri_cekildi_at is null)=1`, 'aktif hatirlatma bildirimi 1 olmali')}
+  ${assert(`(select count(*) from ${S}.notifications where yayin_id=yb and kind='talimat_degisiklik' and payload ->> 'hat_id' = h1::text and geri_cekildi_at is not null)=1`, 'eski hat bildirimi geri cekilmeli')}
+  ${assert(`(select (payload -> 'onaylamayanlar' -> 0 ->> 'hat_id') = h1::text from ${S}.notifications where yayin_id=yb and kind='talimat_rapor' and target_user='${plannerId}')`, 'rapor onaylamayan hat icermeli')}
+  j := ${S}.talimat_zamanlayici();
+  ${assert(`(j->>'hatirlatma')::int=0 and (j->>'rapor')::int=0`, 'ikinci calismada tekrar gonderdi')}
+  ${as('station')}
+  n := ${S}.talimat_onayla(p_yayin => yb, p_hat => h1);
+  ${su}
+  ${assert(`(select durum from ${S}.talimat_yayinlar where yayin_id=yb)='tamamlandi'`, 'yb tamamlandi degil')}
+`));
+
+steps.push(step('11.12 talimat_pasif(hat) + kaldir', 'planner', `
+  n := ${S}.talimat_pasif('hat', v_plan, array[h2::text], null, null, 'ariza');
+  ${assert('n=1', 'pasif hat sayisi')}
+  ${assert(`(select bool_and(etkin_pasif) from ${S}.talimat_satir_etkin where plan_id=v_plan and hat_id=h2) and not (select bool_or(etkin_pasif) from ${S}.talimat_satir_etkin where plan_id=v_plan and hat_id=h1)`, 'yalniz h2 pasif')}
+  ${assert(`(select etkin_durum from ${S}.talimat_satir_ilerleme where plan_id=v_plan and hat_id=h2 order by sira limit 1)='pasif'`, 'etkin_durum pasif')}
+  n := ${S}.talimat_pasif_kaldir('hat', v_plan, array[h2::text]);
+  ${assert(`n=1 and not (select bool_or(etkin_pasif) from ${S}.talimat_satir_etkin where plan_id=v_plan and hat_id=h2)`, 'hat pasif kaldirilmadi')}
+`));
+steps.push(expectErr('11.12b pasif hat bulunamadi', 'planner',
+  `perform ${S}.talimat_pasif('hat', v_plan, array[gen_random_uuid()::text], null, null, null);`, 'Hat bulunamadı'));
+
+steps.push(step('11.13 talep: birden cok hatta atama + asamalar', 'office', `
+  t4 := ${S}.talep_olustur('MKOS41', null, 5, null, 'cok hat');
+`));
+steps.push(step('11.13b talep_talimata_ata(hat_ids)', 'planner', `
+  ids := ${S}.talep_talimata_ata(t4, array[h1, h5]);
+  ${assert('cardinality(ids)=2', 'iki satir donmeli')}
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where talep_id=t4 and hat_id in (h1,h5) and sku='MKOS41' and istenen_miktar=5 and personel_id is null)=2`, 'iki hat satiri talep ile baglanmali')}
+  ${assert(`(select durum from ${S}.talep_durum where talep_id=t4)='is_emri_verildi'`, 'durum is_emri_verildi')}
+  ${assert(`(select jsonb_array_length(asamalar)=2 and bagli_satir_sayisi=2 and atanan_personeller='{}' from ${S}.talep_durum where talep_id=t4)`, 'asamalar / atanan_personeller')}
+  ${assert(`(select bool_and(a ->> 'durum' = 'atandi') from ${S}.talep_durum td, jsonb_array_elements(td.asamalar) a where td.talep_id=t4)`, 'tum asamalar atandi')}
+  ${assert(`(select asamalar -> 0 ->> 'hat_adi' from ${S}.talep_durum where talep_id=t4)='MONTAJ 1 HATTI' and (select asamalar -> 1 ->> 'tur' from ${S}.talep_durum where talep_id=t4)='paketleme'`, 'asama sirasi/hat adi/tur')}
+`));
+steps.push(expectErr('11.13c ayni hata ikinci atama', 'planner', `perform ${S}.talep_talimata_ata(t4, array[h1]);`, 'Talep bu hatta zaten atanmış'));
+steps.push(expectErr('11.13d hatsiz atama', 'planner', `perform ${S}.talep_talimata_ata(t4, array[]::uuid[]);`, 'Hat seçilmeli'));
+steps.push(step('11.13e asama bildirimi: ilk seans (basladi) bir kez', null, `
+  ${msIns('H-T-OPEN', 'MKOS41', 'H-T-STEP-1', 'w2', 'h1', { durum: 'montajda' })}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and asama='basladi' and alici_user_id='${plannerId}' and hat_id=h1)=1`, 'basladi bildirimi planlayiciya 1 kez')}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and alici_user_id='${officeId}')=1`, 'talep sahibine de gitmeli')}
+  ${assert(`(select ozet like '%MONTAJ 1 HATTI%başladı' from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and alici_user_id='${plannerId}')`, 'ozet metni')}
+  ${msIns('H-T-OPEN2', 'MKOS41', 'H-T-STEP-2', 'w5', 'h1', { durum: 'montajda' })}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and asama='basladi' and alici_user_id='${plannerId}')=1`, 'ikinci seans tekrar bildirim uretmemeli')}
+  ${assert(`(select durum from ${S}.talep_durum where talep_id=t4)='hazirlaniyor'`, 'talep hazirlaniyor')}
+  ${assert(`(select a ->> 'durum' from ${S}.talep_durum td, jsonb_array_elements(td.asamalar) a where td.talep_id=t4 and a ->> 'tur'='montaj')='basladi'`, 'montaj asamasi basladi')}
+`));
+steps.push(step('11.13f asama bildirimi: son asama bitince tamamlandi, paketleme -> hazir', null, `
+  ${msIns('H-T-FINAL', 'MKOS41', 'H-T-STEP-F', 'w2', 'h1', { qty: 5, final: true })}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and asama='tamamlandi' and alici_user_id='${plannerId}' and hat_id=h1)=1`, 'tamamlandi bildirimi')}
+  ${assert(`(select a ->> 'durum' from ${S}.talep_durum td, jsonb_array_elements(td.asamalar) a where td.talep_id=t4 and a ->> 'tur'='montaj')='tamamlandi'`, 'montaj asamasi tamamlandi')}
+  ${assert(`(select durum from ${S}.talep_durum where talep_id=t4)='hazirlaniyor'`, 'paketleme bitmeden talep hazir olmamali')}
+  ${peIns('H-T-PACK', 'MKOS41', 'w2', 'h5', { qty: 5 })}
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and asama='tamamlandi' and alici_user_id='${plannerId}' and hat_id=h5)=1`, 'paketleme tamamlandi bildirimi')}
+  ${assert(`(select durum from ${S}.talep_durum where talep_id=t4)='hazir'`, 'paketleme bitince talep hazir')}
+  ${assert(`(select bool_and(a ->> 'durum' = 'tamamlandi') from ${S}.talep_durum td, jsonb_array_elements(td.asamalar) a where td.talep_id=t4)`, 'tum asamalar tamamlandi')}
+  update ${S}.montaj_sessions set durum='tamamlandi', end_time = now() + interval '3 minutes' where session_id in ('H-T-OPEN','H-T-OPEN2');
+  ${assert(`(select count(*) from ${S}.talep_bildirimleri where talep_id=t4 and olay='asama' and alici_user_id='${plannerId}')=3`, 'toplam 3 asama bildirimi (basladi, 2x tamamlandi)')}
+`));
+steps.push(step('11.13g tekrar aktif: asama isaretleri sifirlanir', 'planner', `
+  r8 := (select satir_id from ${S}.talimat_satirlar where talep_id=t4 and hat_id=h1);
+  ${su}
+  -- (test ayni transaction'da: sayac_baslangic = now() oldugundan 'degisme' olusmaz; once sayaci geriye al, sonra isaretleri tekrar yak)
+  update ${S}.talimat_satirlar set sayac_baslangic = now() - interval '1 minute' where satir_id = r8;
+  update ${S}.talimat_satirlar set asama_basladi_bildirildi = true, asama_tamamlandi_bildirildi = true where satir_id = r8;
+  ${as('planner')}
+  ${assert(`(select asama_basladi_bildirildi and asama_tamamlandi_bildirildi from ${S}.talimat_satirlar where satir_id=r8)`, 'isaretler dolu olmali')}
+  perform ${S}.talimat_satir_yeniden_aktif(r8, 2);
+  ${assert(`(select not asama_basladi_bildirildi and not asama_tamamlandi_bildirildi from ${S}.talimat_satirlar where satir_id=r8)`, 'yeniden aktifte isaretler sifirlanmali')}
+`));
+
+steps.push(step('11.14 ek_seanslar: hat bilgisi', null, `
+  insert into ${S}.montaj_sessions (session_id, sku, step_id, step_name, seq_no, durum, operator_id, operator_name, start_time, end_time, qty, ek_seans, hat_id)
+    values ('H-EK-1','LS031','H-EK-STEP','Test adim',1,'tamamlandi',w1,'Test Personel', now() - interval '40 minutes', now() - interval '30 minutes', 2, true, h2);
+  ${assert(`(select hat_id=h2 and hat_adi='MONTAJ 2 HATTI' from ${S}.ek_seanslar where session_id='H-EK-1')`, 'ek_seanslar hat_adi')}
+`));
+
+steps.push(step('11.15 kopyala_hafta hat satirlarini korur; bos hat satirli hedefe kopyalanir', 'planner', `
+  v_plan3 := ${S}.talimat_kopyala_hafta(v_plan, ${S}.talimat_bugun() + 14);
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan3 and hat_id is not null and sku is not null) = (select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id is not null and sku is not null)`, 'dolu hat satiri sayisi')}
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan3 and hat_id=h1 and sku='LS031' and istenen_miktar=10) = 1`, 'h1 satiri korunmali')}
+  ${assert(`(select count(distinct hat_id) from ${S}.talimat_satirlar where plan_id=v_plan3 and hat_id in (h1,h2,h3,h4,h5,hx))=6`, 'her aktif hatta satir olmali')}
+  v_plan4 := ${S}.talimat_plan_getir_veya_olustur(${S}.talimat_bugun() + 21);
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan4 and sku is null)>=6`, 'yeni plan bos hat satirlariyla gelmeli')}
+  v_plan4 := ${S}.talimat_kopyala_hafta(v_plan, ${S}.talimat_bugun() + 21);
+  ${assert(`(select count(*) from ${S}.talimat_satirlar where plan_id=v_plan4 and hat_id is not null and sku is not null) = (select count(*) from ${S}.talimat_satirlar where plan_id=v_plan and hat_id is not null and sku is not null)`, 'bos hat satirli hedefe kopya')}
+`));
+
+steps.push(step('11.16 talimat_tablet_plan_hat() = yayindaki plan', 'station', `
+  ${assert(`${S}.talimat_tablet_plan_hat() = v_plan`, 'tablet plani (hat) yayindaki plan olmali')}
+  ${assert(`(select count(*) from ${S}.talimat_hatlar where aktif) >= 6`, 'istasyon hesabi hatlari okuyabilmeli')}
+`));
+
+// Hat testlerinin ürettiği seansları sonraki (eski personel bazlı) adımları kirletmesin diye 90 gün geriye al / kapat
+steps.push(step('11.99 hat test seanslari temizlik (kapat + zamani geriye al)', null, `
+  update ${S}.montaj_sessions set durum='tamamlandi', end_time = coalesce(end_time, start_time) where session_id like 'H-%' and durum='montajda';
+  update ${S}.montaj_sessions set start_time = start_time - interval '90 days', end_time = end_time - interval '90 days' where session_id like 'H-%';
+  update ${S}.pack_events set durum='tamamlandi', end_time = coalesce(end_time, start_time) where session_id like 'H-%' and durum='paketlemede';
+  update ${S}.pack_events set tarih = tarih - interval '90 days', start_time = start_time - interval '90 days', end_time = end_time - interval '90 days' where session_id like 'H-%';
+`));
+
 // ---------------- 7) kopyala ----------------
 steps.push(step('7.1 talimat_kopyala_hafta (gelecek hafta)', 'planner', `
   v_plan2 := ${S}.talimat_kopyala_hafta(v_plan, ${S}.talimat_bugun() + 7);
@@ -597,6 +916,8 @@ const body = `
 declare
   v_plan uuid; v_plan2 uuid; s1 uuid; s2 uuid; s3 uuid; s4 uuid; s5 uuid; s6 uuid; s7 uuid; s8 uuid; s9 uuid; s10 uuid;
   y1 uuid; y2 uuid; y3 uuid; y4 uuid; y5 uuid; y6 uuid; t1 uuid; t2 uuid; t3 uuid; tid uuid;
+  h1 uuid; h2 uuid; h3 uuid; h4 uuid; h5 uuid; hx uuid; r1 uuid; r2 uuid; r3 uuid; r4 uuid; r5 uuid; r6 uuid; r7 uuid; r8 uuid;
+  ids uuid[]; ya uuid; yb uuid; t4 uuid; v_plan3 uuid; v_plan4 uuid; rec record;
   n int; m int; k int; tmpn numeric; flag boolean; d date; j jsonb; plk text; tmp text; tmp2 text;
   w1 text := 'VW016'; w2 text := 'VW018'; w3 text := 'VW020'; w4 text := 'VW022'; w5 text := 'VW021';
   other text; out text := '';

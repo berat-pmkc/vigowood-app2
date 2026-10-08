@@ -2,6 +2,8 @@
 
 Paket P4a (DB + RPC + cron + server action çekirdeği). UI paketleri (P4b yönetim, P4c tablet) bu API üzerine kurulur.
 
+> **Güncel model: hat bazlı (bkz. §9 "Hat bazlı model").** Bu belgenin §1-8 bölümleri personel bazlı eski modeli anlatır; hat satırları aynı tablolarda (`hat_id`) yaşar ve plan/yayın/pasif/zamanlayıcı mantığı ortaktır.
+
 Migration'lar (`supabase/pending_migrations/`, sırayla): `130_talimat_temel.sql`, `131_talimat_gorunumler.sql`,
 `132_talimat_rpc.sql`, `133_talep_rpc.sql`, `134_talimat_zamanlayici.sql`.
 Bağımlılıklar: 002/003 (roller), `depolar`, `montaj_sessions`, `pack_events.durum`, `cut_batches.durum`, `notifications`, `app_settings`, `pg_cron`.
@@ -178,3 +180,99 @@ Okuma: `has_production_access() OR is_office_user()`. Doğrudan yazma: planlayı
 - Sürükle-bırak: tam liste `satirSirala`'ya gönderilir, **tamamlananlar listenin sonuna** alınır; böylece aktif satırlar DB'de de 1..k olur.
 - Talep -> "İş talimatına ata" diyaloğunda sıra N = aktif satırlar arasındaki görünen konum; istemci gerçek `sira`'ya çevirip RPC'ye gönderir (N > aktif sayısı = listenin sonu). `SIRA_DOLU`/kaydır mantığı aynen geçerli.
 - Tamamlananlar diyaloğu: arama (kod/ad/personel, Türkçe harf duyarsız), Personel, İstasyon (chip) ve Ürün (aranabilir) filtreleri, "N / M kalem", Temizle; tek tablo + sabit başlık, boş gruplar gizlenir.
+
+---
+
+## 9. Hat bazlı model (H1 — `docs/plan-3-hat.md`)
+
+İş talimatı **personel değil HAT bazlıdır**. Migration'lar: `160_hat_bazli_talimat.sql` (çekirdek), `161_hat_yayin_talep.sql` (yayın/onay/zamanlayıcı/talep).
+Eski personel bazlı satırlar (`hat_id IS NULL`, yalnız prova) DB'de çalışmaya devam eder ama arayüzde gösterilmez; hat UI'ları `hat_id` dolu satırları okur.
+Kesim hattı yoktur (kesim talimatı kaldırıldı); gerekirse "Hat ekle".
+
+### 9.1 Şema özeti
+
+| Nesne | Açıklama |
+|---|---|
+| `talimat_hatlar` | `hat_id uuid pk, ad unique, tur ('montaj'\|'paketleme'), sira, aktif, created_at`. Seed: MONTAJ 1/2/3 HATTI (montaj 1-3), DÖŞEME HATTI (montaj 4), PAKETLEME HATTI (paketleme 5). RLS: okuma üretim+ofis, yazma planlayıcı (`is_admin_or_engineer`). Realtime yayında. |
+| `talimat_satirlar.hat_id` | Hat satırı. `personel_id` NULL olabilir (`CHECK hat_id IS NOT NULL OR personel_id IS NOT NULL`). `UNIQUE (plan_id, hat_id, sira)` (deferrable). `istasyon` her zaman hat türünden (`montaj`/`paketleme`). Her satırda ayrıca `asama_basladi_bildirildi`, `asama_tamamlandi_bildirildi` (talep zili işaretleri). |
+| `talimat_planlar.degisen_hatlar uuid[]` | Silme / sıra kayması gibi satır bayrağıyla taşınamayan yayınlanmamış hat değişiklikleri. |
+| `montaj_sessions.hat_id`, `pack_events.hat_id` | Seansın yapıldığı hat (eski kayıtlarda NULL). **Seansı yazan action'lar `hat_id` doldurmalı** (tablet paketi). |
+| `talimat_yayin_hedefler.hat_id` | Yayın hedefi artık hat da olabilir (`personel_id` NULL). Vekil PK: `hedef_id`; `UNIQUE(yayin_id, hat_id)` / `UNIQUE(yayin_id, personel_id) WHERE hat_id IS NULL`. |
+| `talimat_onaylar.hat_id` | Hat onayı (hat başına bir kez, `personel_id` NULL, `onaylayan` = onaylayan kullanıcı/istasyon hesabı). Vekil PK: `onay_id`. |
+| `talimat_pasifler` | `kapsam='hat'` + `hat_id`. |
+| `talimat_yayinlar.hat_sayisi` | Hedef hat sayısı (`personel_sayisi` eski personel hedefleri). |
+| `talep_bildirimleri` | `olay='asama'` + `hat_id`, `hat_adi`, `asama ('basladi'\|'tamamlandi')`. |
+| Satır kapanışı | `talimat_satirlar.kapanis/kapanis_neden/kapanis_at/kapatan` (`talimat_satir_kapat`, 160 bu kolonları idempotent ekler ve görünümlere dahil eder). |
+
+**Görünümler** (hepsi sona yeni kolon eklenmiş, security_invoker):
+- `talimat_satir_etkin` / `talimat_satir_ilerleme`: `hat_id, hat_adi, hat_tur, hat_sira, hat_aktif`, `acik_seans_sayisi` (yalnız ilerleme), `kapanis*`. `personel_adi` hat satırında NULL.
+- **Üretilen (hat satırı)**: montaj hattı → `montaj_sessions` (`durum='tamamlandi'`, `is_final_step`, aynı `sku`, `hat_id = satır.hat_id`, kapanış `COALESCE(end_time,start_time) ≥ sayac_bas_ts` ve hafta sonundan önce) `qty` toplamı; paketleme hattı → `pack_events` (`durum='tamamlandi'`, aynı sku, aynı `hat_id`). **Montaj asla stoğa gitmez**, yalnız paketleme stoğa girer (mevcut paketleme akışı değişmedi). Sayaç kuralları 154/156 ile aynıdır: yeni satırda `sayac_baslangic=now()`, ürün **veya hat** değişince ve "Tekrar aktif et"te sıfırlanır.
+- `acik_seans_sayisi`: satıra (`talimat_satir_id`) ya da aynı hat+sku'ya bağlı `montajda`/`paketlemede` seanslar (bekletilenler dahil). `son_seans_at` / `bugun_seans_var` hat satırlarında aynı bağlarla hesaplanır. Montaj adım kırılımı görünümde YOK (UI `montaj_sessions`'ı sorgular; `talimat_satir_katki` hat satırında yalnız o hattın seanslarını toplar).
+- `talimat_plan_ozet`: `hat_sayisi` (ürünlü satırı olan hat), `degisen_hatlar`. `talimat_yayin_ozet`: `hat_sayisi`, `onaylamayan_hatlar jsonb [{hat_id,hat_adi}]` (`onaylamayanlar` yalnız eski personel). `ek_seanslar`: `hat_id`, `hat_adi`.
+- `talep_durum`: `asamalar jsonb` (aşağıda), `atanan_personeller` NULL'suz; `uretilen` = paketleme hattı atanmışsa **paketleme adedi**, yoksa montaj son aşama/kesim (talep açıldığından beri).
+
+### 9.2 RPC'ler (SECURITY DEFINER; "planlayıcı" = `is_admin_or_engineer()`)
+
+| RPC | Yetki | Açıklama |
+|---|---|---|
+| `hat_ekle(p_ad text, p_tur text) → uuid` | planlayıcı | Yeni hat (sona); mevcut pasif olmayan planlara 1 boş satırla eklenir. Aynı isim (büyük/küçük harf duyarsız): `Bu isimde hat zaten var`. |
+| `hat_guncelle(p_hat uuid, p_ad text=null, p_tur text=null, p_sira int=null, p_aktif bool=null)` | planlayıcı | Gelen alan değişir; tür değişince hattın satır istasyonu güncellenir. |
+| `hat_pasif(p_hat uuid, p_pasif bool=true)` | planlayıcı | Hattı pasife al / aç (satırlar kalır). Pasif hatta yeni satır yazılamaz (`Hat bulunamadı veya pasif`). |
+| `talimat_plan_hat_satirlari_hazirla(p_plan uuid) → int` | planlayıcı | Her **aktif** hatta en az 1 (boş) satır sağlar. `talimat_plan_getir_veya_olustur`, `talimat_kopyala_hafta`, `hat_ekle`, satır silme ve hat değiştirme zaten çağırır (pasif plan atlanır). |
+| `talimat_satir_kaydet(p jsonb) → uuid` | planlayıcı | `hat_id` anahtarı eklendi. Yeni hat satırı: `{plan_id, hat_id, sku?, istenen_miktar?, not_text?, talep_id?, sira?, kaydir?}`; `personel_id` hat satırında yok sayılır, `plaka_id` yok sayılır. Güncellemede `hat_id` değişirse satır yeni hattın sonuna (veya `sira`) taşınır, eski hat sıkışır, `durum` aktife döner. Hata kodları: `SIRA_DOLU`, `PLAN_PASIF`. Boş (ürünsüz) satır geçerlidir; boş satır `degisti` işaretlemez ve yayına girmez. |
+| `talimat_satir_sil(p_satir uuid)` | planlayıcı | Hat içi sıra sıkışır; hattın son satırı silinirse hat yine 1 boş satırla kalır. Dolu satır silmek hattı `degisen_hatlar`'a yazar. |
+| `talimat_satir_sirala_hat(p_plan uuid, p_hat uuid, p_satir_ids uuid[])` | planlayıcı | Hattın TÜM satırlarını verilen sırayla numaralar (eksik/fazla liste: `Sıralama listesi hattın tüm satırlarını içermeli`). (`talimat_satir_sirala` eski personel sürümü kalır.) |
+| `talimat_satirlari_hatta_kopyala(p_satir_ids uuid[], p_hedef_hat uuid) → uuid[]` | planlayıcı | Aynı plandaki seçili satırları hedef hattın SONUNA kopyalar: önce hedefin **boş satırlarını doldurur**, gerekirse yeni satır açar. sku, istenen, not ve **açık** talep bağı kopyalanır; sayaç sıfırdan. Boş kaynak satırlar atlanır (hepsi boşsa `Kopyalanacak dolu satır yok`). Dönen id'ler verilen sırada. |
+| `talimat_kopyala_hafta(uuid, date)` | planlayıcı | Hat satırlarını da kopyalar. Hedef plan yalnız boş hat satırları içeriyorsa onlar temizlenip kopyalar yazılır; ürünlü satırı varsa `Hedef haftanın planı dolu`. |
+| `talimat_yayinla(...)` / `talimat_yayinla_ic` | planlayıcı | Hedefler: **değişen hatlar** (değişen satırı olan + `degisen_hatlar`) — `herkes`/ilk yayın/otomatik: ürünlü satırı olan tüm hatlar. Dönen JSON'a `hat_sayisi` eklendi. Eski personel hedefleri paralel çalışır. |
+| `talimat_onayla(p_yayin uuid, p_personel text=null, p_hepsi bool=true, p_hat uuid=null) → int` | üretim/ofis | `p_hat` verilirse **hat onayı** (hat başına bir kez; planın tüm üretim kullanıcıları/tabletleri onaylayabilir). `p_hepsi`: o hat için aynı plandaki bekleyen tüm yayınları onaylar. Hedef olmayan hat: `Bu hat yayının hedefi değil`; tekrar onay: 0. |
+| `talimat_pasif(p_kapsam, ...)` / `talimat_pasif_kaldir(...)` | planlayıcı | Kapsam **`'hat'`** eklendi (`p_ids` = hat_id metinleri). Diğerleri (`satir`, `personel`, `liste`) aynen. |
+| `talimat_tablet_plan_hat() → uuid` | okuma | Hat tableti planı: yayındaki (bu hafta) plan; plan pasifleşmişse hat satırlarına bağlı açık seans sürdükçe (≤14 gün) eski plan. |
+| `talep_talimata_ata(p_talep uuid, p_hat_ids uuid[], p_miktar numeric=null, p_sira int=null, p_kaydir bool=false, p_plan uuid=null) → uuid[]` | planlayıcı | Talebi **birden fazla hatta** atar (hat başına bir satır; eski personel imzası overload olarak kalır). `p_sira` boş: hattın ilk boş satırı doldurulur, yoksa sona eklenir. Aynı hatta ikinci atama: `Talep bu hatta zaten atanmış`. |
+
+İç (istemciye kapalı): `talimat_sira_yerlestir_g`, `talimat_degisen_grup_isaretle`, `talimat_plan_hat_hazirla_ic`, `talimat_onay_bekliyor_temizle_hat`, `talimat_bildirim_gonder_hat_ic`, `talimat_yayin_onaysiz_var`, `talep_asama_*`, tetikleyiciler.
+
+### 9.3 Tek açık seans kuralı (DB)
+
+`BEFORE INSERT` tetikleyicileri: bir personel (operatör **veya** `workers` JSON üyesi / paketlemede `personel` CSV) aynı **ürün + aşamada** (montaj) / aynı **üründe** (paketleme) ikinci açık seans (`montajda` / `paketlemede`, bekletilenler dahil) açamaz →
+`Bu personelin bu ürün/aşamada açık seansı var`. Seans action'ları bu hata mesajını kullanıcıya göstermelidir. Farklı aşama, farklı ürün veya önceki seans kapatıldıysa serbest.
+
+### 9.4 Bildirim / onay / zamanlayıcı (hat bazlı)
+
+- Hat bildirimi: `notifications` (`kind='talimat_degisiklik'`, **`target_user = NULL`**, `payload = {yayin_id, plan_id, hat_id, hat_adi, hat_tur, satir_sayisi, hatirlatma, otomatik}`, `sesli`, `yayin_id`). Başlık "MONTAJ 1 HATTI iş talimatı güncellendi". `/bildirimler` ve rozet `kind='genel'` ile sınırlı olduğundan karışmaz. **Banner artık `tabletHatBildirimleriGetir(hatIds?)` ile hat bildirimlerini okumalıdır** (eski `tabletBildirimleriGetir` `target_user`'a göre çalışır, hat bildirimlerini görmez). Realtime filtresi aynı (`kind=eq.talimat_degisiklik`).
+- Zamanlayıcı (`talimat_zamanlayici`, her dakika): hat hedefleri için planlı gönderim, hatırlatma (10 dk, onaylamayan her hat), 15 dk sonra planlayıcıya `talimat_rapor` (`payload.onaylamayanlar = [{hat_id|personel_id, ad}]`), otomatik pasif, Pazartesi bildirimi — eski personel akışıyla birlikte.
+- Onay sonrası: hat satırlarının `onay_bekliyor`'u kalkar, ilgili bildirimler `Okundu`, tüm hedefler onaylayınca yayın `tamamlandi`.
+
+### 9.5 Talepler: çoklu hat + aşama durumları
+
+`talepTalimataAtaHatlar({talepId, hatIds, miktar?, sira?, kaydir?, planId?})`. `Talep.asamalar` (hat sırasıyla):
+```ts
+{ satir_id, hat_id, hat_adi, tur: "montaj"|"paketleme",
+  durum: "atandi" | "basladi" | "tamamlandi" | "tamamlanmadi",   // tamamlanmadi: satır elle "tamamlanmadı" kapatıldı
+  uretilen, istenen, pasif }
+```
+`basladi`: satırın hat+sku'su için sayaçtan beri seans açıldı / üretim var / açık seans; `tamamlandi`: `uretilen ≥ istenen` (veya satır tamamlandı). UI etiketi: tur + durum → "Montaj başladı", "Döşeme tamamlandı", "Paketleme başladı"… (hat adı `hat_adi`). Talep `durum` mantığı aynıdır (`is_emri_verildi` / `hazirlaniyor` / `hazir`); `hazir` paketleme hattı atanmışsa paketleme adedine göre.
+
+**Talep zili (`talep_bildirimleri`, `olay='asama'`)**: bağlı hat satırı için ilk seans açılınca `asama='basladi'`, hat satırı tamamlanınca (montaj: son aşama seansı kapanınca; paketleme: seans kapanınca) `asama='tamamlandi'` bildirimi **bir kez** üretilir (alıcılar: planlayıcılar + talebi açan). Tetikleyici: `montaj_sessions` / `pack_events` (`AFTER INSERT/UPDATE OF durum, qty`), tekrarı `talimat_satirlar.asama_*_bildirildi` önler; "Tekrar aktif et" / ürün-hat değişimi işaretleri sıfırlar. `ozet` örn. "MKOS41 · 5 adet · MONTAJ 1 HATTI · başladı"; `hat_id`/`hat_adi`/`asama` ayrıca kolon olarak gelir.
+
+### 9.6 TypeScript API
+
+`src/lib/talimat/types.ts` (yeni): `HatTur`, `TalimatHat`, `TabletHatSeans`, `TabletHatEkSeans`, `TabletHatSatir`, `TalimatTabletHat`, `TalimatTabletHatListe`, `TalimatPlanHatGrubu`; `TalimatSatir` hat alanları (`hat_id, hat_adi, hat_tur, hat_sira, hat_aktif, acik_seans_sayisi, kapanis*`) ve **`personel_id: string | null`**; `TalimatPasifKapsam` + `'hat'`; `SatirKaydetGirdi.hat_id`; `TalimatSatirFiltre.hatId / sadeceHat`; `TalimatYayin.hat_sayisi / onaylamayan_hatlar`; `TalimatYayinHedefDetay.hat_id / hat_adi`; `SeansOnDoldurma.hat_id / hat_adi`.
+`src/lib/talep/types.ts`: `Talep.asamalar`, `TalepAsama`, `TalepAsamaDurum`, `TalepTalimataAtaHatlarGirdi`.
+
+Server component sorguları (`queries.ts`): `getHatlar({sadeceAktif})`, `getPlanHatGruplari(planId, filtre?, {pasifHatlariDahilEt})` → `TalimatPlanHatGrubu[]` (boş hat satırları dahil), `getHatSiraDurumu(planId, hatId)`, `getPasifHatIdleri(planId)`, `getTabletHatListe()`, `getTabletHatBildirimleri({hatIds?, sadeceOkunmamis?})`, `getPlanSatirlari` (+ `hatId`/`sadeceHat` filtreleri, hat sırasına göre). `getYayinDetay` hat hedeflerini de döndürür. Yardımcılar (`helpers.ts`): `hataGoreGrupla`, `satirBosMu`.
+
+Server action'lar:
+- `hat-actions.ts` (yeni): `hatlariGetir`, `hatEkle(ad, tur)`, `hatGuncelle(hatId, {ad?,tur?,sira?,aktif?})`, `hatPasifYap(hatId, pasif)`, `planHatGruplariGetir(planId, filtre?, pasifHatlariDahilEt?)`, `hatSiraDurumuGetir`, `satirSiralaHat(planId, hatId, satirIdleri)`, `satirlariHattaKopyala(satirIdleri, hedefHatId)`, `talimatOnaylaHat(yayinId, hatId, hepsi?)`, `tabletHatListeGetir()`, `tabletHatBildirimleriGetir(hatIds?, {sadeceOkunmamis?})`.
+- `actions.ts` (genişledi): `satirKaydet` (`hat_id`; yeni satırda `plan_id` + `hat_id`), `satirSil`, `talimatPasifYap/Kaldir` (`kapsam:'hat'`, `ids` = hat_id'ler), `planGetirVeyaOlustur` (otomatik hat satırları), `planKopyala`, `talimatYayinla`, `bildirimDurdur`, `satirYenidenAktifEt`, `talimatPasifKayitlari` (`hat_id`).
+- `talep/actions.ts`: `talepTalimataAtaHatlar`.
+
+**Tablet veri modeli** (`getTabletHatListe`): `hatlar[]` (aktif hatlar, hat sırasıyla) → `{ hat, pasif, aktif[], tamamlanan[], diger_acik_seanslar[], ek_seanslar[], bekleyen_yayin_idler[] }`. Satır başına `acik_seanslar` (adım ve işçi bilgisiyle: `step_name`, `seq_no`, `is_final_step`, `operator_name`, `workers`, bekletme alanları); `diger_acik_seanslar` hatta ait ama hiçbir satıra bağlanmayan (talimat dışı / ek) açık seanslar; hatsız-talimatsız seanslar ana ekrana aittir. Onay düğmesi: `bekleyen_yayin_idler[0]` varsa `talimatOnaylaHat(id, hat.hat_id)`.
+
+**Seans yazan action'lar (uretim) için**: `montaj_sessions.hat_id` / `pack_events.hat_id` doldurun (talimat dışı seanslarda hat her seferinde sorulur); talimattan açılıyorsa ayrıca `talimat_satir_id`. Üretilen sayımı hat+sku ile eşleştiğinden `hat_id` yazılmayan seans hat satırına **sayılmaz**. Açık seans çakışması hatası için bkz. 9.3. Seans kapanırken (`durum='tamamlandi'`, `end_time`, `qty`, montajda `is_final_step`) talep zili otomatik tetiklenir.
+
+### 9.7 Bilinen notlar
+- `TalimatSatir.personel_id` artık nullable: eski personel UI'ları (Mavi Yaka personel gruplama, `/uretim/talimatlarim`) tip hatası verir; hat UI'ları ile değiştirilecek.
+- Aynı hatta aynı sku iki satırda varsa üretilen her iki satıra yansır (hat+sku bazlı sayım).
+- `talimat_satir_kapat` / `talimat_satir_yeniden_aktif` (başka çalışmadan gelen, canlı şemada) hat satırında `talimat_degisen_isaretle(plan, NULL)` çağırır; 160 bunu NULL-güvenli yapar (satırın `degisti` bayrağı hattı yayına zaten dahil eder).
+- Test: `node scripts/migrate/test-talimat.mjs --schema vigowood_prova` (hat adımları 11.x; tek transaction, her zaman rollback).

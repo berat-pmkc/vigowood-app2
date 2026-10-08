@@ -7,6 +7,7 @@ import { MontajDashboard } from "./components/montaj-dashboard";
 import type { ActiveMontajSession } from "./components/session-card";
 import { parseWorkers } from "./utils";
 import { talimatDb } from "@/lib/talimat/db";
+import { getHatlar } from "@/lib/talimat/queries";
 
 export const metadata: Metadata = { title: "Montaj" };
 
@@ -17,12 +18,13 @@ export default async function MontajPage() {
   }
 
   const supabase = await createClient();
+  const hatlar = await getHatlar().catch(() => []);
 
   // Parallel: aktif seanslar + tüm aktif ürünler (birbirinden bağımsız)
   const [activeDataRes, activeProductsRes] = await Promise.all([
     supabase
       .from("montaj_sessions")
-      .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id")
+      .select("session_id, sku, step_id, step_name, seq_no, is_final_step, start_time, durum, operator_name, workers, duraklama_dk, duraklatma_baslangic, yardimci_sayisi, talimat_satir_id, hat_id")
       .eq("durum", "montajda")
       .order("start_time", { ascending: true }),
     supabase
@@ -36,6 +38,7 @@ export default async function MontajPage() {
   type AktifSatir = Omit<ActiveMontajSession, "urun_adi" | "workers" | "not_text"> & {
     workers: unknown;
     talimat_satir_id: string | null;
+    hat_id: string | null;
   };
   const activeData = activeDataRes.data as unknown as AktifSatir[] | null;
   const activeProducts = activeProductsRes.data;
@@ -82,6 +85,7 @@ export default async function MontajPage() {
       <MontajDashboard
         activeSessions={activeSessions}
         productOptions={productOptions}
+        hatlar={hatlar}
         canCancel={PRODUCTION_CANCEL_ROLES.includes(user.role)}
         analizGorebilir={URETIM_ANALIZ_ROLES.includes(user.role)}
       />

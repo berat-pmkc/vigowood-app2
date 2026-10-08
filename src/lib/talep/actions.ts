@@ -21,6 +21,7 @@ import type {
   TalepRevizyon,
   TalepStokUyarisi,
   TalepTalimataAtaGirdi,
+  TalepTalimataAtaHatlarGirdi,
 } from "./types";
 
 const uuid = z.string().uuid("Geçersiz kimlik");
@@ -198,6 +199,38 @@ export async function talepTalimataAta(girdi: TalepTalimataAtaGirdi): Promise<Ac
     });
     talimatYenile();
     return id;
+  });
+}
+
+/**
+ * Talebi bir veya birden fazla HATTA ata (planlayıcı). Her hat için bir hat satırı oluşur (talep_id bağlı, sku talebin ürünü,
+ * not = talep açıklaması). sira boşsa: hattın ilk BOŞ satırı doldurulur, yoksa hattın sonuna eklenir; sira doluysa
+ * (kaydir:true araya girer, değilse SIRA_DOLU). planId boşsa bu haftanın yayındaki planı, yoksa en yakın taslak.
+ * Aşama durumları talep_durum.asamalar'dan okunur (Talep.asamalar). Dönen: satir_id dizisi (hatIds sırasıyla).
+ */
+export async function talepTalimataAtaHatlar(girdi: TalepTalimataAtaHatlarGirdi): Promise<ActionResult<string[]>> {
+  return sonucaCevir(async () => {
+    await rolGerekli(TALIMAT_PLANNER_ROLES);
+    const p = z
+      .object({
+        talepId: uuid,
+        hatIds: z.array(uuid).min(1, "En az bir hat seçilmeli"),
+        miktar: z.number().positive("Miktar sıfırdan büyük olmalı").nullish(),
+        sira: z.number().int().min(1).nullish(),
+        kaydir: z.boolean().optional(),
+        planId: uuid.nullish(),
+      })
+      .parse(girdi);
+    const ids = await rpcCagir<string[]>("talep_talimata_ata", {
+      p_talep: p.talepId,
+      p_hat_ids: p.hatIds,
+      p_miktar: p.miktar ?? null,
+      p_sira: p.sira ?? null,
+      p_kaydir: p.kaydir ?? false,
+      p_plan: p.planId ?? null,
+    });
+    talimatYenile();
+    return ids;
   });
 }
 

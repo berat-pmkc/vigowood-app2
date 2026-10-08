@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, formatDistanceToNow } from "@/lib/utils";
 import {
-  TALEP_BILDIRIM_OLAY_LABEL,
+  talepBildirimBaslik,
   bildirimHref,
   useTalepBildirimleri,
 } from "@/hooks/use-talep-bildirimleri";
@@ -69,8 +69,10 @@ export function TalepBildirimBell() {
                     aria-hidden
                   />
                   <span className="min-w-0 flex-1">
-                    <span className={cn("block", !okundu && "font-semibold")}>{TALEP_BILDIRIM_OLAY_LABEL[b.olay]}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{b.ozet}</span>
+                    <span className={cn("block", !okundu && "font-semibold")}>{talepBildirimBaslik(b)}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{b.ozet}
+                      {b.olay === "asama" && b.hat_adi && !b.ozet?.includes(b.hat_adi) ? ` · ${b.hat_adi}` : ""}
+                    </span>
                     <span className="block text-[11px] text-muted-foreground">
                       {formatDistanceToNow(b.created_at)}
                       {okundu && " · görüldü"}

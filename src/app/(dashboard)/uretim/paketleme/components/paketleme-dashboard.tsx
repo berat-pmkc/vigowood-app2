@@ -25,6 +25,7 @@ import type { ActiveSession } from "./session-card";
 import { cancelSession, toggleDuraklat } from "../actions";
 import { toast } from "sonner";
 import { usePaketlemeRealtime } from "@/hooks/use-paketleme-realtime";
+import type { TalimatHat } from "@/lib/talimat/types";
 import { useServerDataCache } from "@/hooks/use-server-data-cache";
 
 interface ProductOption {
@@ -38,6 +39,7 @@ interface PaketlemeDashboardProps {
   activeSessions: ActiveSession[];
   completedSessions: CompletedSession[];
   productOptions: ProductOption[];
+  hatlar: TalimatHat[];
 }
 
 export function PaketlemeDashboard({
@@ -45,6 +47,7 @@ export function PaketlemeDashboard({
   activeSessions: serverActiveSessions,
   completedSessions: serverCompletedSessions,
   productOptions: serverProductOptions,
+  hatlar,
 }: PaketlemeDashboardProps) {
   const activeSessions = useServerDataCache("paketleme-sessions", serverActiveSessions);
   const completedSessions = useServerDataCache("paketleme-completed", serverCompletedSessions);
@@ -143,6 +146,7 @@ export function PaketlemeDashboard({
         </h2>
         <ActiveSessions
           sessions={activeSessions}
+          hatlar={hatlar}
           onClose={handleClose}
           onCancel={handleCancel}
           onToggleDuraklat={handleToggleDuraklat}

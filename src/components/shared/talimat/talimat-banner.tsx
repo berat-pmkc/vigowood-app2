@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BellRing, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { DB_SCHEMA } from "@/lib/supabase/schema";
-import { tabletBildirimleriGetir } from "@/lib/talimat/actions";
+import { tabletHatBildirimleriGetir } from "@/lib/talimat/hat-actions";
 import { tabletKontekstGetir } from "@/lib/talimat/tablet-actions";
 import type { TalimatBildirim } from "@/lib/talimat/types";
 import { bipDizisi, sesHazirla } from "./ses";
@@ -36,7 +36,6 @@ function calinanlariYaz(s: Set<string>): void {
 export function TalimatBanner() {
   const [aktif, setAktif] = useState(false);
   const [liste, setListe] = useState<TalimatBildirim[]>([]);
-  const [operatorId, setOperatorId] = useState<string | null>(null);
   const bekleyenSes = useRef(false);
 
   const sesDene = useCallback(() => {
@@ -45,7 +44,7 @@ export function TalimatBanner() {
   }, []);
 
   const yukle = useCallback(async () => {
-    const r = await tabletBildirimleriGetir(undefined, { istasyonKapsami: true });
+    const r = await tabletHatBildirimleriGetir(undefined, { sadeceOkunmamis: true });
     if (!r.success) return;
     const yeni = r.data.filter((n) => !n.geri_cekildi_at);
     setListe(yeni);
@@ -66,7 +65,6 @@ export function TalimatBanner() {
     tabletKontekstGetir().then((r) => {
       if (iptal || !r.success) return;
       if (r.data.istasyonHesabi) {
-        setOperatorId(r.data.operatorId);
         setAktif(true);
       }
     });
@@ -108,23 +106,27 @@ export function TalimatBanner() {
 
   if (!aktif || liste.length === 0) return null;
 
-  // Seçili operatöre ait olan öncelikli
-  const hedef = liste.find((n) => n.target_user === operatorId) ?? liste[0];
-  const personelId = hedef.payload?.personel_id ?? hedef.target_user ?? "";
-  const baskasi = operatorId && personelId && personelId !== operatorId ? hedef.payload?.personel_adi : null;
+  // Hat bildirimleri: tüm hatlar gösterilir; ilk hat odak olur
+  const hedef = liste[0];
+  const hatAdlari = [...new Set(liste.map((n) => n.payload?.hat_adi).filter(Boolean) as string[])];
+  const hatId = hedef.payload?.hat_id ?? "";
 
   return (
     <Link
-      href={`/uretim/talimatlarim${personelId ? `?personel=${encodeURIComponent(personelId)}` : ""}`}
+      href={`/uretim/talimatlarim${hatId ? `?hat=${encodeURIComponent(hatId)}` : ""}`}
       className="flex min-h-16 w-full items-center gap-4 bg-[#f28a19] px-5 py-3 text-white shadow-md animate-pulse hover:animate-none active:bg-[#d97a10]"
       role="alert"
     >
       <BellRing className="size-8 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="text-lg font-bold leading-tight sm:text-xl">
-          {baskasi ? `${baskasi} için iş talimatlarında değişiklik var` : "İş talimatlarınızda değişiklik var"}
+          {hatAdlari.length === 1
+            ? `${hatAdlari[0]} iş talimatı güncellendi`
+            : hatAdlari.length > 1
+              ? `${hatAdlari.length} hattın iş talimatı güncellendi`
+              : "İş talimatlarında değişiklik var"}
         </p>
-        {liste.length > 1 && <p className="text-sm opacity-90">{liste.length} bekleyen bildirim</p>}
+        {hatAdlari.length > 1 && <p className="text-sm opacity-90">{hatAdlari.join(" · ")}</p>}
       </div>
       <span className="flex shrink-0 items-center gap-1 rounded-lg bg-white px-4 py-3 text-base font-bold text-[#c26a0c]">
         Değişiklikleri gör
