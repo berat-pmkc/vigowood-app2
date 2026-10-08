@@ -360,7 +360,7 @@ function HatBolumu({
     <section
       id={hatDomId(h.hat.hat_id)}
       className={cn(
-        "scroll-mt-16 rounded-2xl lg:w-[25rem] lg:shrink-0 xl:w-[28rem]",
+        "scroll-mt-16 rounded-2xl lg:w-[19rem] lg:shrink-0 xl:w-[20rem]",
         odak && "ring-4 ring-offset-2",
       )}
       style={odak ? ({ "--tw-ring-color": renk } as React.CSSProperties) : undefined}
