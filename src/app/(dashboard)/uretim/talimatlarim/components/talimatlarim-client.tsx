@@ -243,7 +243,11 @@ export function TalimatlarimClient({ odakHatId, odakIstasyon, baslangicListe, ba
         </p>
       ) : (
         // Geniş ekran (>=1024px): hatlar yan yana sütun, sığmazsa yatay kaydırma. Dar ekran: alt alta.
-        <div className="space-y-8 lg:flex lg:items-start lg:gap-5 lg:space-y-0 lg:overflow-x-auto lg:pb-4">
+        <div
+          // Geniş ekranda tüm hatlar ekran genişliğine eşit sütunlar halinde sığar (yatay kaydırma yok)
+          className="space-y-8 lg:grid lg:items-start lg:gap-3 lg:space-y-0 lg:pb-4"
+          style={{ gridTemplateColumns: `repeat(${Math.max(hatlar.length, 1)}, minmax(0, 1fr))` }}
+        >
           {hatlar.map((h) => (
             <HatBolumu
               key={h.hat.hat_id}
@@ -360,15 +364,17 @@ function HatBolumu({
     <section
       id={hatDomId(h.hat.hat_id)}
       className={cn(
-        "scroll-mt-16 rounded-2xl lg:w-[19rem] lg:shrink-0 xl:w-[20rem]",
+        "scroll-mt-16 rounded-2xl min-w-0",
         odak && "ring-4 ring-offset-2",
       )}
       style={odak ? ({ "--tw-ring-color": renk } as React.CSSProperties) : undefined}
     >
-      <div className="rounded-xl px-4 py-3 text-white shadow-sm" style={{ backgroundColor: renk }}>
+      <div className="rounded-xl px-3 py-2.5 text-white shadow-sm" style={{ backgroundColor: renk }}>
         <div className="flex items-center gap-2">
-          {h.hat.tur === "montaj" ? <Wrench className="size-6 shrink-0" /> : <Package className="size-6 shrink-0" />}
-          <h2 className="min-w-0 flex-1 text-xl font-extrabold leading-tight">{h.hat.ad} İŞ TALİMATLARI</h2>
+          {h.hat.tur === "montaj" ? <Wrench className="size-5 shrink-0" /> : <Package className="size-5 shrink-0" />}
+          <h2 className="min-w-0 flex-1 text-base font-extrabold leading-tight" title={`${h.hat.ad} iş talimatları`}>
+            {h.hat.ad}
+          </h2>
           <span className="shrink-0 rounded-full bg-white/25 px-3 py-1 text-base font-bold">{h.aktif.length} iş</span>
         </div>
         {bekleyen && (
@@ -541,7 +547,7 @@ function SatirKarti({
         <Rakam etiket="İstenen" deger={istenen != null ? istenen : "—"} />
         <Rakam etiket="Üretilen" deger={s.uretilen} vurgu />
         <Button
-          className="h-auto min-h-10 flex-1 flex-col gap-0 px-2 py-1 text-sm font-bold text-white hover:opacity-90"
+          className="h-auto min-h-10 min-w-0 flex-1 flex-col gap-0 whitespace-normal px-1.5 py-1 text-xs font-bold leading-tight text-white hover:opacity-90 xl:text-sm"
           style={{ backgroundColor: renk }}
           onClick={onSeansIslemi}
         >
@@ -559,7 +565,7 @@ function SatirKarti({
 
 function Rakam({ etiket, deger, vurgu }: { etiket: string; deger: number | string; vurgu?: boolean }) {
   return (
-    <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-md bg-muted/60 py-0.5">
+    <div className="flex w-12 shrink-0 flex-col items-center justify-center rounded-md bg-muted/60 py-0.5 xl:w-14">
       <p className="text-[10px] leading-tight text-muted-foreground">{etiket}</p>
       <p className={cn("text-base font-extrabold leading-tight tabular-nums", vurgu && "text-vw-deep")}>{deger}</p>
     </div>
