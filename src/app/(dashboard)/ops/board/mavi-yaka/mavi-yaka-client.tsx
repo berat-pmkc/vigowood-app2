@@ -991,7 +991,13 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                   {isOver && <span className="text-xs font-semibold text-[#2f7d66]">Buraya bırak: kopyala</span>}
                                   {hatDuzenlenebilir && (
                                     <div className="ml-auto flex items-center gap-1">
-                                      <Button variant="outline" size="sm" className="h-7 bg-white text-xs" onClick={() => satirEkle(hat.hat_id)}>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 border-white bg-white text-xs font-semibold hover:bg-white/90"
+                                        style={{ color: hatRengi(hat) }}
+                                        onClick={() => satirEkle(hat.hat_id)}
+                                      >
                                         <Plus className="mr-1 h-3.5 w-3.5" /> satır
                                       </Button>
                                       <DropdownMenu>
