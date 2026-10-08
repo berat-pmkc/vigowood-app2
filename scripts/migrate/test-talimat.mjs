@@ -118,6 +118,7 @@ steps.push(step('1.11 plaka satiri: sku otomatik + etkin_istasyon=kesim', 'plann
 steps.push(step('1.12 dogrudan yazma ardisik ayni sku artik serbest', 'planner', `
   insert into ${S}.talimat_satirlar (plan_id, personel_id, sira, sku) values (v_plan, w3, 1, 'LS031'), (v_plan, w3, 2, 'LS031');
   execute 'set constraints all immediate';
+  execute 'set constraints all deferred';
   delete from ${S}.talimat_satirlar where plan_id=v_plan and personel_id=w3;
 `));
 steps.push(expectErr('1.13 gecersiz personel (Yonetici)', 'planner',
@@ -698,6 +699,8 @@ steps.push(step('11.13 talep: birden cok hatta atama + asamalar', 'office', `
   t4 := ${S}.talep_olustur('MKOS41', null, 5, null, 'cok hat');
 `));
 steps.push(step('11.13b talep_talimata_ata(hat_ids)', 'planner', `
+  -- (165) h1 sonunda MKOS41 (r3) varken ayni urun hatta art arda atanamaz: r3 baska hatta alinir
+  perform ${hkaydet(`jsonb_build_object('satir_id',r3,'hat_id',hx)`)};
   ids := ${S}.talep_talimata_ata(t4, array[h1, h5]);
   ${assert('cardinality(ids)=2', 'iki satir donmeli')}
   ${assert(`(select count(*) from ${S}.talimat_satirlar where talep_id=t4 and hat_id in (h1,h5) and sku='MKOS41' and istenen_miktar=5 and personel_id is null)=2`, 'iki hat satiri talep ile baglanmali')}
@@ -835,6 +838,131 @@ steps.push(expectErr('11.21 zamanli islem: zamanlayici-calistir istemciden cagri
 steps.push(expectErr('11.22 zamanli islem: gecersiz yayin', 'planner', `perform ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif', null, null, null, null, 'xyz', false);`, 'Geçersiz yayın'));
 
 // Hat testlerinin ürettiği seansları sonraki (eski personel bazlı) adımları kirletmesin diye 90 gün geriye al / kapat
+// ---------------- 11.2x) Hatta art arda aynı ürün yasak (165) ----------------
+const aK = (sku, more = '') => hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',h2${sku ? `,'sku','${sku}'` : ''}${more})`);
+const simdi = `perform ${S}.talimat_ardisik_simdi();`;
+const okRb = (name, body) => expectErr(name, 'planner', `${body}\n  ${simdi}\n  raise exception 'ROLLBACK_OK';`, 'ROLLBACK_OK');
+steps.push(expectErr('11.23 ardisik: ayni hatta ayni urun art arda reddedilir', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS031')};
+  ${simdi}
+`, 'ARDISIK_SKU: LS031 bu hatta arka arkaya verilemez'));
+steps.push(okRb('11.23b ardisik: araya baska urun girince ayni urun tekrar verilebilir (A,B,A)', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+`));
+steps.push(expectErr('11.23c ardisik: bos satir komsulugu bozmaz (A, bos, A reddedilir)', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK(null)};
+  q3 := ${aK('LS031')};
+  ${simdi}
+`, 'ARDISIK_SKU'));
+steps.push(expectErr('11.23d ardisik: satir_sil ile yan yana kalan ayni urun (A,B,A -> B silinir)', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('MKOS41')};
+  q3 := ${aK('LS031')};
+  ${simdi}
+  perform ${S}.talimat_satir_sil(q2);
+  ${simdi}
+`, 'ARDISIK_SKU'));
+steps.push(expectErr('11.23e ardisik: sirala_hat ile yan yana (A,B,A -> A,A,B)', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  r1 := (select satir_id from ${S}.talimat_satirlar where plan_id=v_plan4 and hat_id=h2 and sku is null limit 1);
+  ${simdi}
+  perform ${S}.talimat_satir_sirala_hat(v_plan4, h2, array[q1,q3,q2,r1]);
+  ${simdi}
+`, 'ARDISIK_SKU'));
+steps.push(okRb('11.23f ardisik: sirala_hat gecerli sira (A,B,C,A) serbest', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  q4 := ${aK('MKOS41')};
+  r1 := (select satir_id from ${S}.talimat_satirlar where plan_id=v_plan4 and hat_id=h2 and sku is null limit 1);
+  ${simdi}
+  perform ${S}.talimat_satir_sirala_hat(v_plan4, h2, array[q1,q2,q4,q3,r1]);
+`));
+steps.push(expectErr('11.23g ardisik: pasif satir komsulugu bozmaz (A,B pasif,A reddedilir)', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  ${simdi}
+  perform ${hkaydet(`jsonb_build_object('satir_id',q2,'durum','pasif')`)};
+  ${simdi}
+`, 'ARDISIK_SKU'));
+steps.push(expectErr('11.23h ardisik: tamamlanan satir komsulugu bozmaz (A,B tamamlandi,A reddedilir)', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  ${simdi}
+  ${su}
+  update ${S}.talimat_satirlar set durum='tamamlandi' where satir_id=q2;
+  ${simdi}
+`, 'ARDISIK_SKU'));
+steps.push(okRb('11.23i ardisik: uretimle olusan eski komsuluk, ilgisiz satir duzenlemesini engellemez', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  q4 := ${aK('MKOS41')};
+  ${simdi}
+  ${su}
+  set local session_replication_role = replica;
+  update ${S}.talimat_satirlar set durum='tamamlandi' where satir_id=q2;
+  set local session_replication_role = origin;
+  ${as('planner')}
+  perform ${hkaydet(`jsonb_build_object('satir_id',q4,'not_text','ilgisiz not')`)};
+`));
+steps.push(expectErr('11.24 ardisik: kopyala — komsusu ayni urun olan satir atlanir, digerleri kopyalanir', 'planner', `
+  perform ${aK('LS031')};
+  r1 := ${hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',h3,'sku','LS031')`)};
+  r2 := ${hkaydet(`jsonb_build_object('plan_id',v_plan4,'hat_id',h3,'sku','LS051')`)};
+  ids := ${S}.talimat_satirlari_hatta_kopyala(array[r1, r2], h2);
+  ${assert('cardinality(ids)=1', 'yalniz LS051 kopyalanmali (LS031 atlanmali)')}
+  ${assert(`(select sku from ${S}.talimat_satirlar where satir_id=ids[1])='LS051'`, 'kopyalanan LS051 olmali')}
+  ${simdi}
+  -- hepsi atlanirsa ARDISIK_SKU
+  perform ${S}.talimat_satirlari_hatta_kopyala(array[r1], h2);
+`, 'ARDISIK_SKU: Seçilen ürünler'));
+steps.push(step('11.25 talep ayni urun icin birden cok kez acilabilir', 'office', `
+  t1 := ${S}.talep_olustur('LS031', null, 1, null, 'ardisik-1');
+  t2 := ${S}.talep_olustur('LS031', null, 1, null, 'ardisik-2');
+  ${assert('t1 <> t2', 'iki talep')}
+`));
+steps.push(expectErr('11.25b ardisik: talep_talimata_ata ayni urunu art arda atayamaz', 'planner', `
+  perform ${aK('LS031')};
+  perform ${S}.talep_talimata_ata(t1, array[h2], null, null, false, v_plan4);
+  ${simdi}
+`, 'ARDISIK_SKU'));
+steps.push(okRb('11.25c ardisik: talep_talimata_ata farkli urun komsusuna atanabilir', `
+  perform ${aK('LS051')};
+  perform ${S}.talep_talimata_ata(t1, array[h2], null, null, false, v_plan4);
+`));
+steps.push(expectErr('11.26 ardisik: zamanli pasif hemen — ihlal hata verir', 'planner', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  ${simdi}
+  perform ${S}.talimat_zamanli_islem_ekle(v_plan4, 'satir', array[q2::text], 'pasif');
+`, 'ARDISIK_SKU'));
+steps.push(okRb('11.26b ardisik: zamanlayici ihlalde islemi hata yapar, cron cokmez, pasif uygulanmaz', `
+  q1 := ${aK('LS031')};
+  q2 := ${aK('LS051')};
+  q3 := ${aK('LS031')};
+  ${simdi}
+  j := ${S}.talimat_zamanli_islem_ekle(v_plan4, 'satir', array[q2::text], 'pasif', now() + interval '1 hour');
+  tid := (j->>'islem_id')::uuid;
+  ${su}
+  update ${S}.talimat_zamanli_islemler set calisma_zamani = now() - interval '1 minute' where islem_id = tid;
+  j := ${S}.talimat_zamanlayici();
+  ${assert(`(select durum='hata' and hata like 'ARDISIK_SKU%' from ${S}.talimat_zamanli_islemler where islem_id=tid)`, 'islem hata olmali')}
+  ${assert(`(select durum from ${S}.talimat_satirlar where satir_id=q2)='aktif'`, 'pasif uygulanmamali')}
+`));
+steps.push(step('11.27 ardisik: oturum sonu — biriken tum degisiklikler denetimden gecer (commit simulasyonu)', null, `
+  ${simdi}
+`));
+
 steps.push(step('11.99 hat test seanslari temizlik (kapat + zamani geriye al)', null, `
   update ${S}.montaj_sessions set durum='tamamlandi', end_time = coalesce(end_time, start_time) where session_id like 'H-%' and durum='montajda';
   update ${S}.montaj_sessions set start_time = start_time - interval '90 days', end_time = end_time - interval '90 days' where session_id like 'H-%';

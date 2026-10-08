@@ -42,9 +42,11 @@ interface Props {
   hatRenkAcik?: string;
   /** Bu satırı etkileyecek bekleyen zamanlı işlemler (satır / hat / liste kapsamlı) */
   zamanli?: ZamanliIslem[];
+  /** Hatta art arda verilemeyen (komşu satırlardaki) SKU'lar: sku -> neden */
+  engelliSkular?: Record<string, string>;
 }
 
-export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle, hatRenk, hatRenkAcik, zamanli }: Props) {
+export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, parlak, secili, onSecToggle, hatRenk, hatRenkAcik, zamanli, engelliSkular }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: s.satir_id,
     disabled: !editable || !sirali,
@@ -115,6 +117,7 @@ export function SatirRow({ s, editable, siraNo, depoStoklari, islem, sirali, par
           disabled={!editable}
           onChange={(u) => islem.kaydet(s.satir_id, { sku: u.sku, ...(s.plaka_id ? { plaka_id: null } : {}) })}
           placeholder="Ürün seç..."
+          disabledSkus={engelliSkular}
         />
         {(s.istasyon === "kesim" || s.plaka_id) && (
           <PlakaSecici

@@ -284,3 +284,12 @@ Server action'lar:
 - `hedef_sira` = hattın aktif (pasif/tamamlanmamış olmayan) satırları arasındaki görünen konum; NULL = aktiflerin sonu. Yayın, değişiklik uygulandıktan sonra `talimat_yayinla_ic(..., 'degisenler')`; yayın başarısızsa pasif/aktif korunur, `hata` alanına uyarı yazılır.
 - `talimat_zamanlayici()` her dakika zamanı gelen `bekliyor` işlemleri çalıştırır (sonuç JSON'unda `zamanli_islem`).
 - UI: `mavi-yaka/pasif-dialog.tsx` (Ne zaman / İş sırası / Yayın, `zamanli-secenek.tsx`), `zamanli-liste.tsx` (İşlemler > Zamanlanmış işlemler, iptal), satır/hat rozetleri. Action'lar: `src/lib/talimat/zamanli-actions.ts`.
+
+## 13. Hatta art arda aynı ürün yasağı (SQL 165)
+
+- Kural (hat bazlı): işçinin sırayla gördüğü satırlar (sku dolu, `durum<>'pasif'`, tamamlanmamış) arasında yan yana aynı sku olamaz; boş/pasif/tamamlanan satırlar komşuluğa sayılmaz, araya başka ürün girerse aynı ürün tekrar verilebilir. Aynı ürün için talep birden çok kez açılabilir. Eski personel bazlı `talimat_ardisik_dogrula(plan, personel)` no-op kalır.
+- `talimat_hat_ardisik_dogrula(plan, hat [, satir, sira])` -> `ARDISIK_SKU: <sku> bu hatta arka arkaya verilemez (önceki/sonraki satırda aynı ürün var). Aynı ürünü tek satırda toplayın — <hat adı>`. `DEFERRABLE INITIALLY DEFERRED` constraint trigger `trg_talimat_hat_ardisik` (talimat_satirlar: INSERT/DELETE/UPDATE OF sku, sira, durum, hat_id, plan_id, istenen_miktar, sayac_baslangic, kapanis) tüm yazma yollarını COMMIT'te denetler; yalnız değişen satırın (ve eski konumunun) komşulukları bakılır, üretimle tamamlanma sonucu oluşan eski komşuluklar ilgisiz düzenlemeleri engellemez.
+- `talimat_ardisik_simdi()`: bekleyen denetimi hemen çalıştırır (alt işlem/test için).
+- `talimat_satirlari_hatta_kopyala`: komşusu aynı ürün olacak satır atlanır (NOTICE); hepsi atlanırsa `ARDISIK_SKU: Seçilen ürünler ...`. İstemci atlanan sayısını (dolu kaynak - dönen id) uyarı toast'ı olarak gösterir.
+- `talimat_zamanli_islem_calistir`: ihlalde işlem `hata` olur (değişiklik geri alınır), cron çökmez; "hemen" işlemde hata fırlatılır.
+- İstemci: Mavi Yaka ürün combobox'ı en yakın görünen önceki/sonraki satırın sku'sunu devre dışı bırakır (tooltip nedeni); sürükle-sırala hatası toast + geri alma; `hataMesaji` ARDISIK_SKU mesajı; Talepler "İş talimatına ata" hat başına hatayı gösterir.

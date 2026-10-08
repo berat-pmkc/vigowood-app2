@@ -135,6 +135,7 @@ const TOGGLES: Array<{ key: Toggle; label: string }> = [
 
 function hataMesaji(r: { error: string; code?: string }): string {
   if (r.code === "PLAN_PASIF") return "Pasif plan düzenlenemez.";
+  if (r.code === "ARDISIK_SKU") return `Aynı hatta aynı ürün arka arkaya verilemez: ${r.error}`;
   return r.error;
 }
 
@@ -209,6 +210,28 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
   useEffect(() => setYerelSira({}), [satirlar]);
 
   const tumGrup = useMemo(() => hataGoreGrupla(satirlar), [satirlar]);
+  /** Hat içinde her satırın en yakın görünen komşu SKU'ları (boş/pasif/tamamlanan satırlar atlanır): satır_id -> {sku -> neden} */
+  const engelliSkular = useMemo(() => {
+    const m = new Map<string, Record<string, string>>();
+    for (const liste of tumGrup.values()) {
+      const sirali = [...liste].sort((a, b) => a.sira - b.sira);
+      const gorunen = sirali.filter((s) => s.sku && s.durum !== "pasif" && s.etkin_durum !== "tamamlandi");
+      for (const s of sirali) {
+        const o: Record<string, string> = {};
+        let onceki: (typeof gorunen)[number] | undefined;
+        let sonraki: (typeof gorunen)[number] | undefined;
+        for (const g of gorunen) {
+          if (g.satir_id === s.satir_id) continue;
+          if (g.sira < s.sira) onceki = g;
+          else if (g.sira > s.sira && !sonraki) sonraki = g;
+        }
+        if (onceki?.sku) o[onceki.sku] = "Önceki satırda aynı ürün var";
+        if (sonraki?.sku) o[sonraki.sku] = o[sonraki.sku] ? "Önceki/sonraki satırda aynı ürün var" : "Sonraki satırda aynı ürün var";
+        m.set(s.satir_id, o);
+      }
+    }
+    return m;
+  }, [tumGrup]);
   const hatHaritasi = useMemo(() => new Map(hatlar.map((h) => [h.hat_id, h])), [hatlar]);
 
   const gorunenSatirlar = useMemo(() => {
@@ -362,11 +385,14 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
       if (!hedef.aktif) return void toast.error(`${hedef.ad} kapalı; önce hattı açın`);
       const r = await satirlariHattaKopyala(ids, hedefHatId);
       if (!r.success) return void toast.error(hataMesaji(r));
+      const doluSayi = satirlar.filter((s) => ids.includes(s.satir_id) && s.sku).length;
+      const atlanan = Math.max(0, doluSayi - r.data.length);
       toast.success(`${r.data.length} satır ${hataEki(hedef.ad)} kopyalandı`);
+      if (atlanan > 0) toast.warning(`${atlanan} satır atlandı: önceki/sonraki satırda aynı ürün var (arka arkaya verilemez)`);
       setSecili(new Set());
       yenile();
     },
-    [hatHaritasi, yenile],
+    [hatHaritasi, yenile, satirlar],
   );
 
   // ── pasif ──
@@ -1129,6 +1155,7 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                                     hatRenk={hatRengi(hat)}
                                     hatRenkAcik={hatRengiAcik(hat, 0.07)}
                                     zamanli={satirZamanli.get(s.satir_id)}
+                                    engelliSkular={engelliSkular.get(s.satir_id)}
                                     onSecToggle={satirBosMu(s) ? undefined : () => seciliToggle(s.satir_id)}
                                   />
                                 );

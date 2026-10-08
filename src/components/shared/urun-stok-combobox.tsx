@@ -19,10 +19,12 @@ interface Props {
   disabled?: boolean;
   className?: string;
   compact?: boolean;
+  /** Seçilemeyen SKU'lar: sku -> neden (tooltip) */
+  disabledSkus?: Record<string, string>;
 }
 
 /** Ürün kodu / adı ile sunucuda arama yapan, stok gösteren combobox */
-export function UrunStokCombobox({ value, label, onChange, placeholder = "Ürün seç...", disabled, className, compact }: Props) {
+export function UrunStokCombobox({ value, label, onChange, placeholder = "Ürün seç...", disabled, className, compact, disabledSkus }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [items, setItems] = useState<UrunStokSecenek[]>([]);
@@ -73,15 +75,18 @@ export function UrunStokCombobox({ value, label, onChange, placeholder = "Ürün
             {!loading && items.length === 0 && <CommandEmpty>Ürün bulunamadı</CommandEmpty>}
             <CommandGroup>
               {items.map((u) => {
+                const engel = disabledSkus?.[u.sku];
                 return (
                   <CommandItem
                     key={u.sku}
                     value={u.sku}
+                    disabled={!!engel}
+                    title={engel}
                     onSelect={() => {
                       onChange(u);
                       setOpen(false);
                     }}
-                    className="flex items-start gap-2"
+                    className={cn("flex items-start gap-2", engel && "opacity-50")}
                   >
                     <Check className={cn("mt-0.5 h-4 w-4 shrink-0", value === u.sku ? "opacity-100" : "opacity-0")} />
                     <div className="min-w-0 flex-1">
@@ -89,6 +94,7 @@ export function UrunStokCombobox({ value, label, onChange, placeholder = "Ürün
                         <span className="font-medium">{u.sku}</span>
                         {u.urun_adi && <span className="text-muted-foreground"> · {u.urun_adi}</span>}
                       </div>
+                      {engel && <div className="text-[11px] text-[#c0424f]">{engel}</div>}
                     </div>
                     <span className="shrink-0 rounded bg-vw-light px-1.5 py-0.5 text-[11px] font-medium text-vw-deep">
                       Stok {u.toplam_stok}
