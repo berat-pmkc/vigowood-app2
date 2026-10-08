@@ -505,24 +505,24 @@ function SatirKarti({
   return (
     <li
       className={cn(
-        "rounded-xl border-2 bg-card px-3 py-2.5 shadow-sm",
+        "rounded-lg border bg-card px-2.5 py-1.5 shadow-sm",
         s.kirmizi ? "border-[#ee7683] bg-[#ee7683]/10" : "border-border",
       )}
-      style={s.kirmizi ? undefined : { borderLeftColor: renk, borderLeftWidth: 5 }}
+      style={s.kirmizi ? undefined : { borderLeftColor: renk, borderLeftWidth: 4 }}
     >
       {/* Üst satır: sıra · ürün adı / kod */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-lg font-extrabold text-white"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-extrabold text-white"
           style={{ backgroundColor: renk }}
         >
           {no}
         </span>
         <div className="min-w-0 flex-1">
-          <p className={cn("line-clamp-2 text-base font-bold leading-snug", s.kirmizi && "text-[#b3202f]")}>
+          <p className={cn("line-clamp-1 text-sm font-bold leading-snug", s.kirmizi && "text-[#b3202f]")}>
             {s.urun_adi ?? s.sku ?? "—"}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] leading-tight text-muted-foreground">
             {s.sku}
             {s.kirmizi && <span className="ml-2 font-bold text-[#b3202f]">Değişti</span>}
           </p>
@@ -530,24 +530,24 @@ function SatirKarti({
       </div>
 
       {s.not_text?.trim() && (
-        <div className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-sm text-amber-900">
-          <StickyNote className="mt-0.5 size-4 shrink-0" />
+        <div className="mt-1.5 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+          <StickyNote className="mt-px size-3.5 shrink-0" />
           <span className="whitespace-pre-wrap">{s.not_text}</span>
         </div>
       )}
 
       {/* Alt satır: istenen / üretilen + seans işlemi */}
-      <div className="mt-2 flex items-stretch gap-2">
+      <div className="mt-1.5 flex items-stretch gap-1.5">
         <Rakam etiket="İstenen" deger={istenen != null ? istenen : "—"} />
         <Rakam etiket="Üretilen" deger={s.uretilen} vurgu />
         <Button
-          className="h-auto min-h-12 flex-1 flex-col gap-0 px-2 py-1.5 text-base font-bold text-white hover:opacity-90"
+          className="h-auto min-h-10 flex-1 flex-col gap-0 px-2 py-1 text-sm font-bold text-white hover:opacity-90"
           style={{ backgroundColor: renk }}
           onClick={onSeansIslemi}
         >
           Seans işlemi
           {acik > 0 && (
-            <span className="mt-0.5 rounded-full bg-white px-2 text-xs font-bold leading-5" style={{ color: renk }}>
+            <span className="rounded-full bg-white px-1.5 text-[10px] font-bold leading-4" style={{ color: renk }}>
               {acik} açık
             </span>
           )}
@@ -559,9 +559,9 @@ function SatirKarti({
 
 function Rakam({ etiket, deger, vurgu }: { etiket: string; deger: number | string; vurgu?: boolean }) {
   return (
-    <div className="flex w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-lg bg-muted/60 py-1">
-      <p className="text-[11px] leading-tight text-muted-foreground">{etiket}</p>
-      <p className={cn("text-xl font-extrabold leading-tight tabular-nums", vurgu && "text-vw-deep")}>{deger}</p>
+    <div className="flex w-14 shrink-0 flex-col items-center justify-center rounded-md bg-muted/60 py-0.5">
+      <p className="text-[10px] leading-tight text-muted-foreground">{etiket}</p>
+      <p className={cn("text-base font-extrabold leading-tight tabular-nums", vurgu && "text-vw-deep")}>{deger}</p>
     </div>
   );
 }
