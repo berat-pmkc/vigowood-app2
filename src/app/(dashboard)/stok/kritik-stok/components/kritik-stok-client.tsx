@@ -365,7 +365,7 @@ export function KritikStokClient({ data, canEdit, initialSariEsik }: KritikStokC
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Kritik Stok Yönetimi</h1>
         <p className="text-sm text-muted-foreground">
-          Aktif ürünler için önerilen kritik stok seviyeleri ve mevcut ayarlar
+          Aktif ürünler için sistemin hesapladığı kritik stok seviyeleri ve mevcut ayarlar
         </p>
       </div>
 
@@ -408,12 +408,12 @@ export function KritikStokClient({ data, canEdit, initialSariEsik }: KritikStokC
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm text-vw-info">
             <Info className="h-4 w-4" />
-            Önerilen Değer Nasıl Hesaplanıyor?
+            Sistemin Hesapladığı Değer Nasıl Bulunuyor?
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            Sistem her ürün için üç bilgiyi birleştirerek bir <b>&quot;önerilen kritik stok&quot;</b> değeri
+            Sistem her ürün için üç bilgiyi birleştirerek bir <b>&quot;sistemin hesapladığı kritik stok&quot;</b> değeri
             hesaplar. Bu, &quot;bu üründen elde en az kaç tane bulunmalı ki bir sonraki üretim/paketleme
             partisi tamamlanana kadar stok tükenmesin&quot; sorusuna verilen cevaptır:
           </p>
@@ -434,7 +434,7 @@ export function KritikStokClient({ data, canEdit, initialSariEsik }: KritikStokC
             </li>
           </ol>
           <p className="rounded-md bg-background/60 px-3 py-2 font-mono text-xs">
-            Önerilen Kritik Stok = YUKARI YUVARLA(Günlük Satış Hızı × Tedarik Süresi (gün) × 1.3)
+            Sistemin Hesapladığı Kritik Stok = YUKARI YUVARLA(Günlük Satış Hızı × Tedarik Süresi (gün) × 1.3)
           </p>
           <p className="flex items-start gap-1.5">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-vw-warning" />
