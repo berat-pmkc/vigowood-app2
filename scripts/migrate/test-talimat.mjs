@@ -844,7 +844,8 @@ steps.push(step('11.18 zamanli pasif/aktif islemleri (164)', 'planner', `
   ${assert(`not exists (select 1 from ${S}.talimat_pasifler where plan_id=v_plan and kapsam='hat' and hat_id=h4 and iptal_at is null)`, 'hat pasifi kalkmadi')}
 `));
 steps.push(expectErr('11.19 zamanli islem: planlayici degil', 'station', `perform ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif');`, ''));
-steps.push(expectErr('11.20 zamanli islem: dogrudan INSERT yok', 'planner', `insert into ${S}.talimat_zamanli_islemler (plan_id, kapsam, ids, islem) values (v_plan, 'satir', array[q4::text], 'pasif');`, 'permission denied'));
+// Tablo yetkisi (permission denied) veya RLS (row-level security) — ikisi de SQLSTATE 42501; hangisi olursa olsun yazma engellenmeli
+steps.push(expectErr('11.20 zamanli islem: dogrudan INSERT yok', 'planner', `begin insert into ${S}.talimat_zamanli_islemler (plan_id, kapsam, ids, islem) values (v_plan, 'satir', array[q4::text], 'pasif'); exception when insufficient_privilege then raise exception 'YAZMA_ENGELLENDI'; end;`, 'YAZMA_ENGELLENDI'));
 steps.push(expectErr('11.21 zamanli islem: zamanlayici-calistir istemciden cagrilamaz', 'planner', `perform ${S}.talimat_zamanli_islem_calistir(gen_random_uuid());`, 'permission denied'));
 steps.push(expectErr('11.22 zamanli islem: gecersiz yayin', 'planner', `perform ${S}.talimat_zamanli_islem_ekle(v_plan, 'satir', array[q4::text], 'pasif', null, null, null, null, 'xyz', false);`, 'Geçersiz yayın'));
 
