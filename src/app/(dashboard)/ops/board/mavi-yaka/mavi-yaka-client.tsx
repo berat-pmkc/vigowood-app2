@@ -792,6 +792,12 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
                 </DropdownMenu>
               </>
             )}
+            {/* Hafta kapandı (pasif plan): düzenlenemez, ama satırlar yeni haftaya aktif olarak kopyalanabilir */}
+            {planner && plan && plan.durum === "pasif" && (
+              <Button size="sm" className="bg-vw-deep text-white hover:bg-vw-dark" disabled={busy} onClick={() => setKopyaOnay(true)}>
+                <Copy className="mr-1.5 h-4 w-4" /> Bu haftayı kopyala → yeni hafta
+              </Button>
+            )}
           </div>
         </div>
 
@@ -833,6 +839,13 @@ export function MaviYakaClient({ hafta, buHafta, plan, satirlar, yayinlar, hatla
             </Badge>
           )}
         </Card>
+
+        {plan && plan.durum === "pasif" && (
+          <div className="rounded-lg border border-[#cfd8dc] bg-[#eceff1] px-3 py-2 text-sm text-[#546e7a]">
+            Bu haftanın planı kapandı (haftalık otomatik kapanış) ve artık düzenlenemez.
+            {planner && " Satırları yeni haftada aktif olarak kullanmak için “Bu haftayı kopyala → yeni hafta” deyin."}
+          </div>
+        )}
 
         {/* Plan yok */}
         {!plan && (
