@@ -5,7 +5,7 @@ import { TALIMAT_PLANNER_ROLES, TALIMAT_VIEW_ROLES } from "@/lib/talimat/constan
 import { rpcCagir } from "@/lib/talimat/db";
 import { talimatZamanliIslemler } from "@/lib/talimat/zamanli-actions";
 import { haftaBaslangici } from "@/lib/talimat/helpers";
-import { getPlanByHafta, getHatlar, getPlanSatirlari, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
+import { getPlan, getPlanByHafta, getHatlar, getPlanSatirlari, getUrunStoklari, getYayinlar } from "@/lib/talimat/queries";
 import type { UrunStokSecenek } from "@/lib/talimat/types";
 import { MaviYakaClient } from "./mavi-yaka-client";
 
@@ -22,9 +22,25 @@ export default async function MaviYakaPage({ searchParams }: { searchParams: Pro
 
   const params = await searchParams;
   const buHafta = haftaBaslangici(new Date());
-  const hafta = params.hafta && /^\d{4}-\d{2}-\d{2}$/.test(params.hafta) ? haftaBaslangici(params.hafta) : buHafta;
+  const haftaSecili = !!params.hafta && /^\d{4}-\d{2}-\d{2}$/.test(params.hafta);
+  let hafta = haftaSecili ? haftaBaslangici(params.hafta!) : buHafta;
 
-  const [plan, hatlar] = await Promise.all([getPlanByHafta(hafta), getHatlar({ sadeceAktif: false })]);
+  let [plan, hatlar] = await Promise.all([getPlanByHafta(hafta), getHatlar({ sadeceAktif: false })]);
+
+  // Haftalık otomatik kapanış yok (169): bu haftanın planı yoksa tabletlerin gösterdiği
+  // (en son yayındaki) plan açılır; liste haftalar boyunca kesintisiz devam eder.
+  if (!plan && !haftaSecili) {
+    try {
+      const tabletPlanId = await rpcCagir<string | null>("talimat_tablet_plan_hat", {});
+      const tabletPlan = tabletPlanId ? await getPlan(tabletPlanId) : null;
+      if (tabletPlan) {
+        plan = tabletPlan;
+        hafta = haftaBaslangici(tabletPlan.hafta_baslangic);
+      }
+    } catch (e) {
+      console.error("[mavi-yaka] yayındaki plan bulunamadı", e);
+    }
+  }
 
   // Hat sistemi öncesi oluşturulmuş ya da sonradan hat eklenmiş planlarda her aktif hatta
   // en az bir boş satır olsun (yalnızca planlayıcı, pasif olmayan planda; satır ekler, silmez).

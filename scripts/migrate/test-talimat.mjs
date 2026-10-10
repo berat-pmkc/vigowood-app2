@@ -1057,7 +1057,15 @@ steps.push(step('6.3b otomatik pazartesi yayini (yayinla_ic otomatik=true)', nul
   ${assert(`(j->>'durum')='gonderildi' and (j->>'personel_sayisi')::int>=3`, 'otomatik yayin')}
   ${assert(`exists (select 1 from ${S}.notifications where yayin_id=(j->>'yayin_id')::uuid and title like 'Bu haftan%' and kind='talimat_degisiklik')`, 'otomatik baslik yok')}
 `));
-steps.push(step('6.4 otomatik pasif (hafta gecmis) + PLAN_PASIF + tablet', null, `
+steps.push(step('6.3b otomatik kapanis varsayilan kapali (169)', null, `
+  update ${S}.talimat_planlar set hafta_baslangic = hafta_baslangic - 14 where plan_id = v_plan;
+  j := ${S}.talimat_zamanlayici();
+  ${assert(`(j->>'pasif_plan')::int=0 and (select durum from ${S}.talimat_planlar where plan_id=v_plan)<>'pasif'`, 'ayar kapaliyken plan kapandi')}
+  update ${S}.talimat_planlar set hafta_baslangic = hafta_baslangic + 14 where plan_id = v_plan;
+`));
+steps.push(step('6.4 otomatik pasif (ayar acik, hafta gecmis) + PLAN_PASIF + tablet', null, `
+  insert into ${S}.app_settings(key, value) values ('talimat_ayarlari', '{"otomatik_kapanis": true}'::jsonb)
+    on conflict (key) do update set value = ${S}.app_settings.value || '{"otomatik_kapanis": true}'::jsonb;
   update ${S}.talimat_planlar set hafta_baslangic = hafta_baslangic - 14 where plan_id = v_plan;
   j := ${S}.talimat_zamanlayici();
   out := out || '      ' || j::text || E'\\n';
