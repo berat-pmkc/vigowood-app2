@@ -259,7 +259,7 @@ export async function createPackSession(
       operator_name: operatorName,
       // Talimat: isimli çalışanlar + listede olmayan yardımcılar (kapanışta yeniden hesaplanır)
       worker_count: talimatWorkers.length > 0 ? talimatWorkers.length + yardimciSayisi : 1,
-      workers: JSON.stringify(talimatWorkers),
+      workers: talimatWorkers,
       // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
       ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
       ...(talimat?.ekSeans ? { ek_seans: true } : {}),

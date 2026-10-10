@@ -729,7 +729,7 @@ export async function createMontajSession(
       start_time: now.toISOString(),
       qty: 0,
       worker_count: sessionWorkers.length + yardimciSayisi,
-      workers: JSON.stringify(sessionWorkers),
+      workers: sessionWorkers,
       // Yeni kolonlar yalnız talimat varsa yazılır (kolon yoksa eski akış bozulmaz)
       ...(talimat?.talimatSatirId ? { talimat_satir_id: talimat.talimatSatirId } : {}),
       ...(talimat?.ekSeans ? { ek_seans: true } : {}),
